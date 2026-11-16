@@ -50,7 +50,7 @@
   - UserAdapter.revoke_my_keypair: 성공 있음 1 · 거부 있음 4 (single_field)
   - UserAdapter.switch_default_access_key: 성공 있음 1 · 거부 있음 2 (single_entity)
   - UserAdapter.update_user: 성공 있음 1 · 거부 있음 1 (single_entity)
-  - UserConfigAdapter.create_auto_generated_file: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserConfigAdapter.create_auto_generated_file: 성공 있음 1 · 거부 있음 2 (scope)
 
 **UserAdapter.admin_search**
 
@@ -182,7 +182,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [권한을 받지 않은 사용자가 자기 설정 파일을 지우려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-delete-a-config-file) | 거부 |
-| [READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
+| [READ 와 HARD_DELETE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
 
 **UserConfigAdapter.get_default_auto_generated_file**
 
@@ -195,7 +195,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다](#config_files-a-user-granted-read-on-themselves-lists-no-default-config-file) | 성공 |
+| [READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다](#config_files-a-user-granted-read-on-their-config-files-lists-no-default-one) | 성공 |
 | [권한을 받지 않은 사용자가 자기 설정 파일을 훑으려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-list-their-config-files) | 거부 |
 
 **UserConfigAdapter.update_default_auto_generated_file**
@@ -394,8 +394,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 자신에게 UPDATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다](#config_files-a-user-granted-update-on-themselves-writes-their-own-config-file) | 성공 |
-| [UPDATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | 거부 |
+| [자기 설정 파일에 CREATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다](#config_files-a-user-granted-create-on-their-config-files-writes-one) | 성공 |
+| [CREATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | 거부 |
 | [권한을 받지 않은 사용자가 자기 설정 파일을 만들려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-write-a-config-file) | 거부 |
 
 ### UserAdapter.admin_search
@@ -1940,23 +1940,23 @@ Then
 
 #### [deleting-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다
+READ 와 HARD_DELETE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ, UPDATE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 설정 파일에 대한 READ, HARD_DELETE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 설정 파일 .vimrc: 기본으로 표시되지 않았습니다
+  - 자기 설정 파일 READ, HARD_DELETE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 역할 config-file-role-1: auto_generated_file 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
@@ -1977,18 +1977,18 @@ READ 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 �
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 설정 파일에 대한 READ 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 설정 파일 .vimrc: 기본으로 표시되지 않았습니다
+  - 자기 설정 파일 READ 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
@@ -2026,25 +2026,25 @@ Then
 
 ### UserConfigAdapter.get_default_auto_generated_files
 
-<a id="config_files-a-user-granted-read-on-themselves-lists-no-default-config-file"></a>
+<a id="config_files-a-user-granted-read-on-their-config-files-lists-no-default-one"></a>
 
-#### [a-user-granted-read-on-themselves-lists-no-default-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-on-their-config-files-lists-no-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
 READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 READ 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 자기 설정 파일에 대한 READ 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 자기 설정 파일 READ 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
@@ -2115,19 +2115,19 @@ READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ, UPDATE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 설정 파일에 대한 READ, UPDATE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 설정 파일 .vimrc: 기본으로 표시되지 않았습니다
+  - 자기 설정 파일 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 역할 config-file-role-1: auto_generated_file 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
@@ -5124,25 +5124,25 @@ Then
 
 ### UserConfigAdapter.create_auto_generated_file
 
-<a id="config_files-a-user-granted-update-on-themselves-writes-their-own-config-file"></a>
+<a id="config_files-a-user-granted-create-on-their-config-files-writes-one"></a>
 
-#### [a-user-granted-update-on-themselves-writes-their-own-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-create-on-their-config-files-writes-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-자기 자신에게 UPDATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다
+자기 설정 파일에 CREATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 UPDATE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 자기 설정 파일에 대한 CREATE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 자기 설정 파일 CREATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
@@ -5157,21 +5157,21 @@ Then
 
 #### [a-config-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-UPDATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다
+CREATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 UPDATE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 자기 설정 파일에 대한 CREATE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 자기 설정 파일 CREATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 

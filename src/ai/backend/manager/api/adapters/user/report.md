@@ -50,7 +50,7 @@ Scenario: incomplete 4 / 44
   - UserAdapter.revoke_my_keypair: success present 1 · rejection present 4 (single_field)
   - UserAdapter.switch_default_access_key: success present 1 · rejection present 2 (single_entity)
   - UserAdapter.update_user: success present 1 · rejection present 1 (single_entity)
-  - UserConfigAdapter.create_auto_generated_file: success present 1 · rejection present 2 (single_entity)
+  - UserConfigAdapter.create_auto_generated_file: success present 1 · rejection present 2 (scope)
 
 **UserAdapter.admin_search**
 
@@ -182,7 +182,7 @@ Scenario: incomplete 4 / 44
 | scenario | verdict |
 |---|---|
 | [a user holding no permission who tries to delete their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-a-config-file) | rejected |
-| [when a user holding READ and UPDATE deletes a config file not marked as default, it is rejected as not found](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
+| [when a user holding READ and HARD_DELETE deletes a config file not marked as default, it is rejected as not found](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
 
 **UserConfigAdapter.get_default_auto_generated_file**
 
@@ -195,7 +195,7 @@ Scenario: incomplete 4 / 44
 
 | scenario | verdict |
 |---|---|
-| [when a user holding READ lists the config files of theirs marked as default, an empty list comes back](#config_files-a-user-granted-read-on-themselves-lists-no-default-config-file) | answered |
+| [when a user holding READ lists the config files of theirs marked as default, an empty list comes back](#config_files-a-user-granted-read-on-their-config-files-lists-no-default-one) | answered |
 | [a user holding no permission who tries to list their own config files is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-list-their-config-files) | rejected |
 
 **UserConfigAdapter.update_default_auto_generated_file**
@@ -394,8 +394,8 @@ Scenario: incomplete 4 / 44
 
 | scenario | verdict |
 |---|---|
-| [when a user holding UPDATE on themselves writes a config file, an empty response comes back](#config_files-a-user-granted-update-on-themselves-writes-their-own-config-file) | answered |
-| [when a user holding UPDATE tries to write a config file where the manager keeps its own, input validation rejects it](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | rejected |
+| [when a user holding CREATE on their own config files writes one, an empty response comes back](#config_files-a-user-granted-create-on-their-config-files-writes-one) | answered |
+| [when a user holding CREATE tries to write a config file where the manager keeps its own, input validation rejects it](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | rejected |
 | [a user holding no permission who tries to write their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-write-a-config-file) | rejected |
 
 ### UserAdapter.admin_search
@@ -1940,23 +1940,23 @@ Then
 
 #### [deleting-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding READ and UPDATE deletes a config file not marked as default, it is rejected as not found
+when a user holding READ and HARD_DELETE deletes a config file not marked as default, it is rejected as not found
 
 Given
 
-- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ, HARD_DELETE permission on their own config files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one config file that is not marked default
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - Config file .vimrc: not marked default
+  - a role assignment granting the READ, HARD_DELETE permissions on their own config files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
@@ -1977,18 +1977,18 @@ when a user holding READ reads a config file not marked as default, it is reject
 
 Given
 
-- one domain and one user, the user holds one config file not marked as default, the user holds the READ permission on themselves
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ permission on their own config files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one config file that is not marked default
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - Config file .vimrc: not marked default
+  - a role assignment granting the READ permissions on their own config files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
@@ -2026,25 +2026,25 @@ Then
 
 ### UserConfigAdapter.get_default_auto_generated_files
 
-<a id="config_files-a-user-granted-read-on-themselves-lists-no-default-config-file"></a>
+<a id="config_files-a-user-granted-read-on-their-config-files-lists-no-default-one"></a>
 
-#### [a-user-granted-read-on-themselves-lists-no-default-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-on-their-config-files-lists-no-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
 when a user holding READ lists the config files of theirs marked as default, an empty list comes back
 
 Given
 
-- one domain and one user, the user holds the READ permission on themselves
+- one domain and one user, the user holds the READ permission on their own config files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - a role assignment granting the READ permissions on their own config files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
@@ -2115,19 +2115,19 @@ when a user holding READ and UPDATE changes a config file not marked as default,
 
 Given
 
-- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on their own config files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one config file that is not marked default
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - Config file .vimrc: not marked default
+  - a role assignment granting the READ, UPDATE permissions on their own config files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: UPDATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
@@ -5124,25 +5124,25 @@ Then
 
 ### UserConfigAdapter.create_auto_generated_file
 
-<a id="config_files-a-user-granted-update-on-themselves-writes-their-own-config-file"></a>
+<a id="config_files-a-user-granted-create-on-their-config-files-writes-one"></a>
 
-#### [a-user-granted-update-on-themselves-writes-their-own-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-create-on-their-config-files-writes-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding UPDATE on themselves writes a config file, an empty response comes back
+when a user holding CREATE on their own config files writes one, an empty response comes back
 
 Given
 
-- one domain and one user, the user holds the UPDATE permission on themselves
+- one domain and one user, the user holds the CREATE permission on their own config files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - a role assignment granting the CREATE permissions on their own config files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: CREATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
@@ -5157,21 +5157,21 @@ Then
 
 #### [a-config-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding UPDATE tries to write a config file where the manager keeps its own, input validation rejects it
+when a user holding CREATE tries to write a config file where the manager keeps its own, input validation rejects it
 
 Given
 
-- one domain and one user, the user holds the UPDATE permission on themselves
+- one domain and one user, the user holds the CREATE permission on their own config files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - a role assignment granting the CREATE permissions on their own config files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: CREATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
