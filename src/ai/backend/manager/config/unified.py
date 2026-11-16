@@ -1867,6 +1867,54 @@ class ResourcesConfig(BaseConfigSchema):
     ]
 
 
+class AggregateConfig(BaseConfigSchema):
+    max_scopes: Annotated[
+        int,
+        Field(
+            default=100,
+            ge=1,
+            validation_alias=AliasChoices("max_scopes", "max-scopes"),
+            serialization_alias="max-scopes",
+        ),
+        BackendAIConfigMeta(
+            description="Maximum number of scopes one scoped aggregate request may name.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="100", prod="100"),
+        ),
+    ]
+    max_group_by_fields: Annotated[
+        int,
+        Field(
+            default=4,
+            ge=1,
+            validation_alias=AliasChoices("max_group_by_fields", "max-group-by-fields"),
+            serialization_alias="max-group-by-fields",
+        ),
+        BackendAIConfigMeta(
+            description="Maximum number of groupBy fields in one aggregate request.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="4", prod="4"),
+        ),
+    ]
+    max_limit: Annotated[
+        int,
+        Field(
+            default=1000,
+            ge=1,
+            validation_alias=AliasChoices("max_limit", "max-limit"),
+            serialization_alias="max-limit",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of groups an aggregate returns per scope. "
+                "Also the limit applied when a request gives none."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="1000", prod="1000"),
+        ),
+    ]
+
+
 class APIConfig(BaseConfigSchema):
     allow_origins: Annotated[
         str,
@@ -1959,6 +2007,15 @@ class APIConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             example=ConfigExample(local="", prod="100"),
+        ),
+    ]
+    aggregate: Annotated[
+        AggregateConfig,
+        Field(default_factory=AggregateConfig),
+        BackendAIConfigMeta(
+            description="Limits on the aggregate queries.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
     resources: Annotated[

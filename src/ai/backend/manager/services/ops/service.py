@@ -17,6 +17,7 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import (
     EntityData,
+    EntityIdentifier,
     FieldData,
     FieldIdentifier,
     RuntimeEntityID,
@@ -45,6 +46,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkGetOwnerCandidatesFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
+from ai.backend.manager.actions.v2.ops.aggregate import AggregateLimits
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
@@ -65,6 +67,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     FieldPurgeOpsAction,
     FieldUpsertOpsAction,
     GetOpsAction,
+    GlobalAggregateOpsAction,
     GlobalBatchPurgeOpsAction,
     GlobalBatchUpdateOpsAction,
     GlobalEntityAtomicCreateOpsAction,
@@ -78,6 +81,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalSearchOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
+    PartialBulkScopedAggregateOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
@@ -104,12 +108,18 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.models.specs.aggregate.aggregator import (
+    AggregateResult,
+    ScopeAggregateResult,
+)
 from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = (
     "GetService",
+    "GlobalAggregateService",
+    "PartialBulkScopedAggregateService",
     "PartialBulkGetService",
     "BulkOwnedFieldGetService",
     "LookupService",
@@ -531,6 +541,59 @@ class GlobalSearcherService[TData]:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+
+class GlobalAggregateService:
+    """Counts across the entire table, held to the configured limits.
+
+    Wired from ``BaseGlobalAction``, whose SUPERADMIN gate answers for the unscoped read.
+    """
+
+    _repository: OpsRepository[Any]
+    _limits: AggregateLimits
+
+    def __init__(self, repository: OpsRepository[Any], limits: AggregateLimits) -> None:
+        self._repository = repository
+        self._limits = limits
+
+    async def execute(self, action: GlobalAggregateOpsAction[Any]) -> AggregateResult:
+        return await self._repository.aggregate_in_global(
+            self._limits.bounded(action.to_aggregator())
+        )
+
+
+class PartialBulkScopedAggregateService:
+    """Counts within each scope the action names, held to the configured limits.
+
+    The scopes the caller was denied are gone from the action by the time this runs.
+    """
+
+    _repository: OpsRepository[Any]
+    _limits: AggregateLimits
+
+    def __init__(self, repository: OpsRepository[Any], limits: AggregateLimits) -> None:
+        self._repository = repository
+        self._limits = limits
+
+    async def execute(
+        self, action: PartialBulkScopedAggregateOpsAction[Any, Any]
+    ) -> PartialBulkResult[Sequence[ScopeAggregateResult[Any]]]:
+        aggregator = self._limits.bounded(action.to_aggregator())
+        targets = action.targets()
+        if not targets:
+            return PartialBulkResult(items=[])
+        results = await self._repository.aggregate_in_scopes(targets, aggregator)
+        answered: dict[EntityIdentifier, list[ScopeAggregateResult[Any]]] = {}
+        for target, result in zip(targets, results, strict=True):
+            answered.setdefault(target.scope_id(), []).append(ScopeAggregateResult(target, result))
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[Sequence[ScopeAggregateResult[Any]]].succeeded(
+                    entity_id, answered[entity_id]
+                )
+                for entity_id in action.entity_ids()
+            ]
         )
 
 
