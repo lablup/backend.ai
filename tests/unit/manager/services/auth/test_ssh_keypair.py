@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -10,9 +10,13 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+<<<<<<< HEAD
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
 )
+=======
+from ai.backend.manager.secret.pool import KeyProviderPool
+>>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
 )
@@ -92,6 +96,7 @@ async def test_get_ssh_keypair_nonexistent_key(
     mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
 
 
+<<<<<<< HEAD
 # Test Generate SSH Keypair
 async def test_generate_ssh_keypair(
     auth_service: AuthService,
@@ -124,6 +129,8 @@ async def test_generate_ssh_keypair(
     assert result.ssh_keypair.ssh_private_key == mock_privkey
 
 
+=======
+>>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 # Test Upload SSH Keypair
 async def test_upload_ssh_keypair_replaces_only_the_public_key(
     auth_service: AuthService,

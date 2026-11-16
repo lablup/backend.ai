@@ -39,13 +39,15 @@ from ai.backend.manager.api.rest.middleware.auth import (
     TRUSTED_PROXY_NETWORKS_KEY,
     parse_trusted_proxy_networks,
 )
+<<<<<<< HEAD
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+=======
+from ai.backend.manager.data.auth.types import AuthorizationResult
+from ai.backend.manager.dto.auth import SignupHeader
+>>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairActionResult,
-)
 from ai.backend.manager.services.auth.actions.get_role import GetRoleActionResult
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairActionResult
 from ai.backend.manager.services.auth.actions.signout import SignoutActionResult
@@ -662,6 +664,7 @@ class TestGetSSHKeypair:
         assert data["ssh_public_key"] == public_key
 
 
+<<<<<<< HEAD
 class TestGenerateSSHKeypair:
     """Tests for generate_ssh_keypair handler."""
 
@@ -696,6 +699,8 @@ class TestGenerateSSHKeypair:
         assert data["ssh_private_key"] == ssh_private_key
 
 
+=======
+>>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 class TestUploadSSHKeypair:
     """Tests for upload_ssh_keypair handler."""
 

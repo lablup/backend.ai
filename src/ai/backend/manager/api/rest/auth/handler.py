@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.auth.response import (
     MyIpResponse,
     SignoutResponse,
     SignupResponse,
-    SSHKeypairResponse,
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
@@ -53,7 +52,6 @@ from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
 from ai.backend.manager.services.auth.actions.logout import LogoutAction
@@ -315,6 +313,7 @@ class AuthHandler:
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     # generate_ssh_keypair (PATCH /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
@@ -333,6 +332,8 @@ class AuthHandler:
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
+=======
+>>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
     # upload_ssh_keypair (POST /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
