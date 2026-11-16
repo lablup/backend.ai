@@ -9,6 +9,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import (
     AllowDomainContainerRegistriesInput,
 )
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     AllowDomainContainerRegistriesPayload,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.domain_container_registry_relation.row import (
     DomainContainerRegistryRelationRow,
@@ -36,6 +38,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
+    MISSING_ENTITY_ID,
     ADomainAndARegistryToAllow,
     ADomainAndARegistryToAllowAndACaller,
 )
@@ -50,12 +53,22 @@ type AllowScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Allowed]
 
 @dataclass(frozen=True)
 class Allowing(When[Laid, DomainAdapter, Allowed]):
+    missing_registry: bool = False
+
     @override
     def operation(self) -> str:
         return "allow_container_registries"
 
     @override
     def describe(self, laid: Laid) -> str:
+        if self.missing_registry:
+            return Says(
+                f"{laid.caller.username}이 {laid.domain.name}에 존재하지 않는 레지스트리를 허용합니다",
+                english=(
+                    f"{laid.caller.username} allows a registry that does not exist for "
+                    f"{laid.domain.name}"
+                ),
+            )
         return Says(
             f"{laid.caller.username}이 {laid.domain.name}에 그 레지스트리를 허용합니다",
             english=f"{laid.caller.username} allows that registry for {laid.domain.name}",
@@ -66,7 +79,10 @@ class Allowing(When[Laid, DomainAdapter, Allowed]):
         with ActingAs(laid.caller):
             return await adapter.allow_container_registries(
                 AllowDomainContainerRegistriesInput(
-                    domain_id=laid.domain.id, container_registry_ids=[laid.registry.id]
+                    domain_id=laid.domain.id,
+                    container_registry_ids=[
+                        MISSING_ENTITY_ID if self.missing_registry else laid.registry.id
+                    ],
                 )
             )
 
@@ -211,16 +227,47 @@ class AllowingAnAllowedRegistryLeavesItOut(
         return TheAllowedRegistriesComeBack(newly_allowed=False)
 
 
+@dataclass(frozen=True)
+class AllowingAMissingRegistryIsRefused(Scenario[TestSeedingSession, Laid, DomainAdapter, Allowed]):
+    @override
+    def summary(self) -> str:
+        return "a-superadmin-naming-a-registry-that-does-not-exist-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "존재하지 않는 레지스트리를 도메인에 허용하려 하면 그 레지스트리가 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "allowing a registry that does not exist for a domain is refused because "
+                "there is no such registry"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, Laid]:
+        return ADomainAndARegistryToAllow(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[Laid, DomainAdapter, Allowed]:
+        return Allowing(missing_registry=True)
+
+    @override
+    def then(self) -> Then[Laid, Any]:
+        return TheCallIsRefused(ContainerRegistryNotFound)
+
+
 SCENARIOS: list[AllowScenario] = [
     AUserGrantedOnBothScopesAllows(),
     AUserGrantedOnTheRegistryAloneMayNotAllow(),
     AllowingAnAllowedRegistryLeavesItOut(),
+    AllowingAMissingRegistryIsRefused(),
 ]
 
 
 def expected_relation_count(scenario: AllowScenario) -> int:
     match scenario:
-        case AUserGrantedOnTheRegistryAloneMayNotAllow():
+        case AUserGrantedOnTheRegistryAloneMayNotAllow() | AllowingAMissingRegistryIsRefused():
             return 0
         case _:
             return 1

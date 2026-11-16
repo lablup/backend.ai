@@ -18,7 +18,7 @@ Scenario: incomplete 3 / 17
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (5)
-  - allow_container_registries: success present 2 · rejection present 1 (relation)
+  - allow_container_registries: success present 2 · rejection present 2 (relation)
   - create: success present 2 · rejection present 4 (global_scope)
   - disallow_container_registries: success present 2 · rejection present 1 (relation)
   - purge: success present 1 · rejection present 4 (single_entity)
@@ -130,6 +130,7 @@ Scenario: incomplete 3 / 17
 |---|---|
 | [a user granted permission on both the domain and the registry scopes can allow the registry for the domain](#allowing_registries-a-user-granted-on-both-scopes-allows-a-registry-for-a-domain) | answered |
 | [allowing a registry the domain already allows is not refused, and the registry is left out of the response](#allowing_registries-allowing-an-already-allowed-registry-leaves-it-out-of-the-response) | answered |
+| [allowing a registry that does not exist for a domain is refused because there is no such registry](#allowing_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | rejected |
 | [a user granted permission on the registry alone is refused when allowing it for a domain](#allowing_registries-a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain) | rejected |
 
 **create**
@@ -1580,6 +1581,42 @@ Then
 - the domain id and an empty registry list come back
   - domain_id: same as the requested domain id
   - container_registry_ids = []
+
+<a id="allowing_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_allowing_registries.py): pass
+
+allowing a registry that does not exist for a domain is refused because there is no such registry
+
+Given
+
+- one domain, one registry, and one superadmin
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - superadmin user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-domain permission
+    - Role allow-on-domain-1: applies only within the scope it is granted in
+    - Role allow-on-domain-1: CREATE allowed on every domain
+    - Role allow-on-domain-1: SOFT_DELETE allowed on every domain
+    - superadmin user-1: holds Role allow-on-domain-1
+
+When
+
+- DomainAdapter.allow_container_registries: user-1 allows a registry that does not exist for home-1
+
+Then
+
+- the call is rejected
+  - rejected: ContainerRegistryNotFound
 
 <a id="allowing_registries-a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain"></a>
 

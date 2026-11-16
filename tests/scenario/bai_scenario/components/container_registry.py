@@ -427,9 +427,15 @@ class ADomainAndARegistryToAllow(Given[TestSeedingSession, ADomainAndARegistryTo
     on_domain: bool = True
     allowed: bool = False
     permissions: tuple[Permission, ...] = ALLOWING
+    role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
+        if self.role == UserRole.SUPERADMIN:
+            return Says(
+                "도메인 하나, 레지스트리 하나, 슈퍼관리자 한 명",
+                english="one domain, one registry, and one superadmin",
+            )
         holds_ko = "도메인과 레지스트리에" if self.on_domain else "레지스트리에만"
         holds_en = "the domain and the registry" if self.on_domain else "the registry alone"
         already_ko = ", 도메인은 그 레지스트리를 이미 허용하고 있음" if self.allowed else ""
@@ -448,7 +454,7 @@ class ADomainAndARegistryToAllow(Given[TestSeedingSession, ADomainAndARegistryTo
         registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         if self.allowed:
             await seeding.linking(AllowDomain(), domain, registry)
-        caller = await seeding.within(SomeoneOf(domain, role=UserRole.USER))
+        caller = await seeding.within(SomeoneOf(domain, role=self.role))
         await seeding.within(
             SomeoneAllowingIn(
                 registry,

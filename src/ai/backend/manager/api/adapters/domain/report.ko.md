@@ -18,7 +18,7 @@
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (5)
-  - allow_container_registries: 성공 있음 2 · 거부 있음 1 (relation)
+  - allow_container_registries: 성공 있음 2 · 거부 있음 2 (relation)
   - create: 성공 있음 2 · 거부 있음 4 (global_scope)
   - disallow_container_registries: 성공 있음 2 · 거부 있음 1 (relation)
   - purge: 성공 있음 1 · 거부 있음 4 (single_entity)
@@ -130,6 +130,7 @@
 |---|---|
 | [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 허용할 수 있습니다](#allowing_registries-a-user-granted-on-both-scopes-allows-a-registry-for-a-domain) | 성공 |
 | [이미 허용된 레지스트리를 다시 허용해도 거부되지 않고, 응답에서는 빠집니다](#allowing_registries-allowing-an-already-allowed-registry-leaves-it-out-of-the-response) | 성공 |
+| [존재하지 않는 레지스트리를 도메인에 허용하려 하면 그 레지스트리가 없다는 이유로 거부됩니다](#allowing_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | 거부 |
 | [레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 허용하려 하면 거부됩니다](#allowing_registries-a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain) | 거부 |
 
 **create**
@@ -1580,6 +1581,42 @@ Then
 - 도메인 id 와 빈 레지스트리 목록이 옵니다
   - domain_id: 요청한 도메인의 id 와 같다
   - container_registry_ids = []
+
+<a id="allowing_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_allowing_registries.py): pass
+
+존재하지 않는 레지스트리를 도메인에 허용하려 하면 그 레지스트리가 없다는 이유로 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.allow_container_registries: user-1이 home-1에 존재하지 않는 레지스트리를 허용합니다
+
+Then
+
+- 거부됩니다
+  - 거부: ContainerRegistryNotFound
 
 <a id="allowing_registries-a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain"></a>
 
