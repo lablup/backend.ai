@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, overload
+from zoneinfo import ZoneInfo
 
 from ai.backend.common.data.entity.types import FieldIdentifier
+from ai.backend.common.dto.manager.v2.aggregate.request import (
+    DateTimeGroup,
+    EnumGroup,
+    StringGroup,
+    UUIDGroup,
+)
+from ai.backend.common.dto.manager.v2.aggregate.response import (
+    AggregateValueInfo,
+    DateTimeBucketInfo,
+)
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.manager.actions.v2.field.bulk_base import (
     BasePartialBulkFieldAction,
     BasePartialBulkOwnerCandidatesFieldAction,
@@ -21,6 +34,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     build_orders,
     build_pagination,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -29,6 +43,20 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
+from ai.backend.manager.models.specs.aggregate.aggregator import (
+    AggregateOrder,
+    AggregateValue,
+    CountOrder,
+    GroupKeyOrder,
+)
+from ai.backend.manager.models.specs.aggregate.group import (
+    DateTimeBucket,
+    DateTimeGroupField,
+    EnumGroupField,
+    GroupBy,
+    StringGroupField,
+    UUIDGroupField,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -199,6 +227,52 @@ class BaseAdapter(BaseFilterAdapter):
             orders=final_orders,
             pagination=pagination,
         )
+
+    def apply_enum_group(
+        self, group: EnumGroup | None, field: EnumGroupField[Any]
+    ) -> list[GroupBy]:
+        if group is None:
+            return []
+        return [field.by(include_empty=group.include_empty)]
+
+    def apply_datetime_group(
+        self, group: DateTimeGroup | None, field: DateTimeGroupField
+    ) -> list[GroupBy]:
+        if group is None:
+            return []
+        timezone = ZoneInfo(group.timezone or "UTC")
+        return [field.by(interval=timedelta(seconds=group.interval_seconds), timezone=timezone)]
+
+    def apply_uuid_group(self, group: UUIDGroup | None, field: UUIDGroupField) -> list[GroupBy]:
+        if group is None:
+            return []
+        return [field.by(include_null=group.include_null)]
+
+    def apply_string_group(
+        self, group: StringGroup | None, field: StringGroupField
+    ) -> list[GroupBy]:
+        if group is None:
+            return []
+        return [field.by(include_null=group.include_null)]
+
+    def key_order(
+        self, direction: OrderDirection, groups: Sequence[GroupBy], field_name: str
+    ) -> AggregateOrder:
+        """Order by the key of the one group ``groups`` holds for ``field_name``."""
+        if not groups:
+            raise InvalidAPIParameters(f"Cannot order by {field_name}: it is not in groupBy")
+        return GroupKeyOrder(groups[0], ascending=direction == OrderDirection.ASC)
+
+    def count_order(self, direction: OrderDirection) -> AggregateOrder:
+        return CountOrder(ascending=direction == OrderDirection.ASC)
+
+    def aggregate_value_info(self, value: AggregateValue) -> AggregateValueInfo:
+        return AggregateValueInfo(count=value.count)
+
+    def datetime_bucket_info(self, bucket: DateTimeBucket | None) -> DateTimeBucketInfo | None:
+        if bucket is None:
+            return None
+        return DateTimeBucketInfo(start=bucket.start, end=bucket.end)
 
     def _build_searcher[TSearcher: Searcher[Any, Any]](
         self,
