@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
@@ -41,6 +42,7 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -59,6 +61,7 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -432,3 +435,22 @@ async def test_list_endpoints_by_owner_validated_drives_to_data_end_to_end(
     # routings is sourced from EndpointRow.routings; defaults to [] if
     # the relationship is not loaded.
     assert len(endpoint.routings) == 1
+
+
+async def test_search_services_paginated_reads_the_current_revision_slots(
+    repository: ModelServingRepository,
+    test_user: tuple[uuid.UUID, str],
+    listed_endpoint: tuple[uuid.UUID, str],
+) -> None:
+    """The resource slots come from the current revision, read with its own query."""
+    user_id, _owner_email = test_user
+    endpoint_id, _endpoint_name = listed_endpoint
+
+    result = await repository.search_services_paginated(
+        user_id, DeploymentInfoSearcher(pagination=NoPagination())
+    )
+
+    (item,) = result.items
+    assert item.id == endpoint_id
+    assert item.resource_slots == ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("268435456")})
+    assert len(item.routings) == 1

@@ -114,20 +114,24 @@ class DeploymentIDSearcher(Searcher[EndpointRow, DeploymentID]):
 
 @dataclass
 class DeploymentInfoSearcher(Searcher[EndpointRow, DeploymentInfo]):
-    """Deployment rows read with the revision rows embedded.
+    """Deployment rows read with the current and deploying revision ids.
 
-    The REST v1 surface and the reconcilers need the current and deploying revision
-    themselves, so both are loaded with the page.
+    The revisions and the policy are not loaded; the caller reads them with their own
+    queries.
     """
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
         return sa.select(EndpointRow).options(
-            selectinload(EndpointRow.current_revision_row),
-            selectinload(EndpointRow.deploying_revision_row),
-            selectinload(EndpointRow.deployment_policy),
+            with_expression(EndpointRow.current_revision_id, current_revision_id_subquery()),
         )
 
     @override
     def to_data(self, row: EndpointRow) -> DeploymentInfo:
-        return row.to_deployment_info()
+        return row.to_bare_deployment_info().with_revisions_and_policy(
+            current_revision_id=row.current_revision_id,
+            deploying_revision_id=row.deploying_revision_id,
+            current_revision=None,
+            deploying_revision=None,
+            policy=None,
+        )
