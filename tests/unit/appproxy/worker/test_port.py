@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from ipaddress import ip_network
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 from uuid import UUID
 
 import aiohttp
@@ -26,6 +26,7 @@ from ai.backend.appproxy.worker.errors.ingress import (
     IngressFrontendNotRegisteredError,
     IngressNotRegisteredError,
 )
+from ai.backend.appproxy.worker.proxy.backend.pool import RoutePool
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -112,6 +113,15 @@ class _PortSlotSituation:
 class _ServingPortFrontend:
     port: int
     bodies_received_by_backend: list[bytes]
+
+
+@dataclass(frozen=True)
+class _FrontendServingAnIngress:
+    frontend: PortFrontend
+    served_ingress: Ingress
+    ingress_with_a_new_route: Ingress
+    update_route_pool: MagicMock
+    close_route_pool: MagicMock
 
 
 @pytest.fixture
@@ -276,3 +286,64 @@ class TestPortFrontend:
                 assert response.status == 200
 
         assert serving_port_frontend.bodies_received_by_backend == [_GZIP_REQUEST_BODY]
+
+
+class TestIngressLifecycle:
+    @pytest.fixture
+    async def frontend_serving_an_ingress(
+        self, mocker: pytest_mock.MockerFixture
+    ) -> AsyncIterator[_FrontendServingAnIngress]:
+        root_context = mocker.MagicMock()
+        proxy_worker_config = root_context.local_config.proxy_worker
+        proxy_worker_config.client_pool_cleanup_interval = 60.0
+        proxy_worker_config.client_pool_keep_inflight_sessions = False
+        circuit = create_circuit(_PORT)
+        served_ingress = circuit.to_ingress(_AUTHORITY)
+        circuit_with_a_new_route = circuit.model_copy(
+            update={
+                "route_info": [
+                    RouteInfo(
+                        route_id=UUID("5a1f0b7e-2d0c-4f43-9a3e-0d6c7b1e8f21"),
+                        session_id=UUID("c2a4e6f8-1b3d-4c5e-8f7a-9b0c1d2e3f40"),
+                        session_name=None,
+                        kernel_host="127.0.0.2",
+                        kernel_port=30730,
+                        protocol=ProxyProtocol.HTTP,
+                        traffic_ratio=1.0,
+                    )
+                ]
+            }
+        )
+        frontend = PortFrontend(root_context=root_context)
+        frontend.backends[served_ingress.frontend.key()] = await frontend.initialize_backend(
+            served_ingress, circuit
+        )
+        yield _FrontendServingAnIngress(
+            frontend=frontend,
+            served_ingress=served_ingress,
+            ingress_with_a_new_route=circuit_with_a_new_route.to_ingress(_AUTHORITY),
+            update_route_pool=mocker.spy(RoutePool, "update"),
+            close_route_pool=mocker.spy(RoutePool, "close"),
+        )
+        await frontend.remove_all_ingresses()
+
+    async def test_update_hands_the_new_ingress_to_the_backend_and_its_route_pool(
+        self, frontend_serving_an_ingress: _FrontendServingAnIngress
+    ) -> None:
+        situation = frontend_serving_an_ingress
+        await situation.frontend.update_ingress(situation.ingress_with_a_new_route)
+
+        backend = situation.frontend.backends[situation.served_ingress.frontend.key()]
+        assert backend.ingress == situation.ingress_with_a_new_route
+        situation.update_route_pool.assert_called_once_with(
+            ANY, situation.ingress_with_a_new_route.backend
+        )
+
+    async def test_remove_closes_the_route_pool_and_drops_the_backend(
+        self, frontend_serving_an_ingress: _FrontendServingAnIngress
+    ) -> None:
+        situation = frontend_serving_an_ingress
+        await situation.frontend.remove_ingress(situation.served_ingress.frontend)
+
+        assert situation.frontend.backends == {}
+        situation.close_route_pool.assert_called_once()
