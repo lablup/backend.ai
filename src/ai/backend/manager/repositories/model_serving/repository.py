@@ -53,7 +53,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData as ResourceGroupEntityData,
 )
-from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
@@ -91,7 +91,7 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
@@ -1003,7 +1003,7 @@ class ModelServingRepository:
             matched_vfolders = await query_reachable_vfolders(
                 conn,
                 owner_scope,
-                model_condition & vfolders.c.status.not_in(VFolderOperationStatus.dead()),
+                model_condition & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES),
                 owner_held,
             )
             if len(matched_vfolders) == 0:
