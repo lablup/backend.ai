@@ -6,6 +6,9 @@ from typing import override
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain_container_registry_relation.row import (
     DomainContainerRegistryRelationRow,
 )
@@ -39,4 +42,15 @@ class DomainContainerRegistryRelationCreator(
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_domain_container_registry_relations_domain_id_domains",
+                error=DomainNotFound("The domain to allow registries for does not exist"),
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_domain_container_registry_relations_container_registry_id",
+                error=ContainerRegistryNotFound("A container registry to allow does not exist"),
+            ),
+        )
