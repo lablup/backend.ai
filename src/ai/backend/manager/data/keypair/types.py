@@ -24,8 +24,8 @@ class KeyPairSecrets:
 
     access_key: AccessKey
     secret_key: SecretValue
-    ssh_public_key: str
-    ssh_private_key: str
+    ssh_public_key: str | None
+    ssh_private_key: str | None
 
 
 @dataclass
