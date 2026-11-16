@@ -16,7 +16,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import RBACElementType, RoleStatus
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import SlotName, VFolderID
@@ -32,6 +32,7 @@ from ai.backend.manager.data.group.types import (
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -723,10 +724,23 @@ class GroupDBSource:
 
         async with self._db.begin_session_read_committed() as session:
             # TODO: https://github.com/lablup/backend.ai/issues/10687
-            # Validate role exists
-            role_exists = await session.scalar(sa.select(sa.exists().where(RoleRow.id == role_id)))
-            if not role_exists:
-                raise InvalidAPIParameters(f"Role not found: {role_id}")
+            # Only an active role registered in this project's scope may be granted.
+            project_role_ids = sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.scope_id == str(project_id),
+                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+            )
+            is_project_role = await session.scalar(
+                sa.select(
+                    sa.exists().where(
+                        RoleRow.id == role_id,
+                        RoleRow.status == RoleStatus.ACTIVE,
+                        sa.cast(RoleRow.id, sa.String).in_(project_role_ids),
+                    )
+                )
+            )
+            if not is_project_role:
+                raise RoleNotFound(f"Role {role_id} is not an active role of project {project_id}")
 
             # Find assignable users in a single query:
             # same domain as the project and not already assigned (per ASE).
