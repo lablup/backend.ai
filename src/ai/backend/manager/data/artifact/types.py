@@ -35,12 +35,6 @@ class ArtifactStatus(enum.StrEnum):
     REJECTED = "REJECTED"
 
 
-ARTIFACT_IMPORT_IN_PROGRESS_STATUSES: Final[frozenset[ArtifactStatus]] = frozenset({
-    ArtifactStatus.PULLING,
-    ArtifactStatus.VERIFYING,
-})
-
-
 class ArtifactRemoteStatus(enum.StrEnum):
     """
     ArtifactRevision's remote status.
@@ -60,6 +54,12 @@ class ArtifactAvailability(enum.StrEnum):
 
     ALIVE = "ALIVE"
     DELETED = "DELETED"
+
+
+ARTIFACT_IMPORT_IN_PROGRESS_STATUSES: Final[frozenset[ArtifactStatus]] = frozenset({
+    ArtifactStatus.PULLING,
+    ArtifactStatus.VERIFYING,
+})
 
 
 @dataclass
