@@ -229,10 +229,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-<<<<<<< HEAD
-        "main_access_key": ("main_access_key", None),
-=======
->>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
     }
 
     # External table filter specifications
@@ -274,10 +270,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-<<<<<<< HEAD
-        "main_access_key": ("main_access_key", None),
-=======
->>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
     }
 
     @staticmethod

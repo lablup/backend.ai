@@ -13,11 +13,10 @@ from graphql_relay import to_global_id
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.manager.api.gql_legacy.vfolder import ModelCard
-from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.user.row import UserRole
 
-# Reachable only through string relationships of the vfolder row's eager loads.
-_ORM_CLUSTER = (ResourceGroupForProjectRow,)
+ensure_all_tables_registered()
 
 
 class TestModelCardParseModelModifiedAt:

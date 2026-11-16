@@ -297,23 +297,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         description="Added in 24.09.0.",
     )
 
-<<<<<<< HEAD
-    @classmethod
-    async def get_node(
-        cls,
-        info: graphene.ResolveInfo,
-        id: str,
-    ) -> Self | None:
-        graphene_ctx: GraphQueryContext = info.context
-        _, raw_session_id = AsyncNode.resolve_global_id(info, id)
-        session_id = parse_uuid(raw_session_id)
-        user = graphene_ctx.user
-=======
     @staticmethod
     def _visible_to(user: Mapping[str, Any]) -> sa.ColumnElement[bool]:
         """The sessions the requester may read: all for a superadmin, the domain's for an
         admin, their own for a user, none for any other role."""
->>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
         visible: sa.ColumnElement[bool]
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -333,7 +320,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         id: str,
     ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
-        session_id = resolve_entity_id(id, SessionID)
+        _, raw_session_id = AsyncNode.resolve_global_id(info, id)
+        session_id = parse_uuid(raw_session_id)
         visible = cls._visible_to(graphene_ctx.user)
         async with graphene_ctx.db.begin_readonly_session_read_committed() as db_session:
             stmt = (

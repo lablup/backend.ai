@@ -34,20 +34,8 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
 from ai.backend.manager.services.processors import Processors
-<<<<<<< HEAD
-=======
-from ai.backend.manager.services.project.actions.search_projects import GetProjectAction
-from ai.backend.manager.services.project_resource_policy.actions.lookup import (
-    LookupProjectResourcePolicyAction,
-)
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupKeypairOwnerByAccessKeyAction,
-)
-from ai.backend.manager.services.user_resource_policy.actions.lookup import (
-    LookupUserResourcePolicyAction,
-)
->>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
 
 from .audit_log import (
     AuditLogConnection,
@@ -2296,7 +2284,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[ScalingGroup]:
         ctx: GraphQueryContext = info.context
         domain_name = domain_name or ctx.user["domain_name"]
-<<<<<<< HEAD
+        # `scoped_query()` pins the domain and the access key but not the project, so the
+        # read permission on the project answers for it.
+        await ctx.processors.group.get_project.wait_for_complete(
+            GetProjectAction(project_id=project_id)
+        )
         async with ctx.db.begin() as db_conn:
             sgroup_rows = await query_allowed_sgroups(
                 db_conn, domain_name, ProjectID(project_id), access_key
@@ -2304,25 +2296,6 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
         sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
         return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
-=======
-        owner = await ctx.processors.user.lookup_keypair_owner.run(
-            LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
-        )
-        # `scoped_query()` pins the domain and the access key but not the project, so the
-        # read permission on the project answers for it.
-        await ctx.processors.project.get_project.run(
-            GetProjectAction(project_id=ProjectID(project_id))
-        )
-        domain_id = await ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
-        allowed = await ctx.scheduler_repository.query_allowed_resource_groups(
-            domain_id=domain_id,
-            project_ids=[ProjectID(project_id)],
-            user_id=UserID(owner.owner_entity_id),
-        )
-        conditions = [and_names([rg.name for rg in allowed])]
-        sgroup_orm_rows = await ResourceGroupRow.list_by_condition(conditions, db=ctx.db)
-        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
->>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

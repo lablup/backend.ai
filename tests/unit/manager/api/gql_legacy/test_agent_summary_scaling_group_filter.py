@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.api.gql_legacy.agent import _append_sgroup_from_clause
 from ai.backend.manager.models.agent.row import AgentRow
 
@@ -21,15 +19,17 @@ class TestAgentSummaryScalingGroupFilter:
                 __aexit__=AsyncMock(return_value=None),
             )
         )
-        graph_ctx.scheduler_repository.get_domain_id_by_name = AsyncMock(return_value=uuid.uuid4())
         allowed = MagicMock()
         allowed.name = "rg-allowed"
-        graph_ctx.scheduler_repository.query_allowed_resource_groups = AsyncMock(
-            return_value=[allowed]
-        )
-        with patch(
-            "ai.backend.manager.api.gql_legacy.agent._query_domain_groups_by_ak",
-            AsyncMock(return_value=("default", UserID(uuid.uuid4()), [])),
+        with (
+            patch(
+                "ai.backend.manager.api.gql_legacy.agent._query_domain_groups_by_ak",
+                AsyncMock(return_value=("default", [])),
+            ),
+            patch(
+                "ai.backend.manager.models.scaling_group.query_allowed_sgroups",
+                AsyncMock(return_value=[allowed]),
+            ),
         ):
             query = await _append_sgroup_from_clause(
                 graph_ctx, sa.select(AgentRow), "AKIACALLER", None, scaling_group="rg-other"
