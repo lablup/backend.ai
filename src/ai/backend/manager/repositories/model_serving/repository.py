@@ -67,7 +67,11 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
+from ai.backend.manager.models.vfolder.row import (
+    DEAD_VFOLDER_STATUSES,
+    query_accessible_vfolders,
+    vfolders,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -979,7 +983,9 @@ class ModelServingRepository:
 
             allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
             try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(model)
+                extra_vf_conds = (vfolders.c.id == uuid.UUID(model)) & vfolders.c.status.not_in(
+                    DEAD_VFOLDER_STATUSES
+                )
                 matched_vfolders = await query_accessible_vfolders(
                     conn,
                     owner_uuid,
@@ -991,8 +997,10 @@ class ModelServingRepository:
             except Exception as e:
                 if isinstance(e, (ValueError, VFolderNotFound)):
                     try:
-                        extra_vf_conds = (vfolders.c.name == model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                        extra_vf_conds = (
+                            (vfolders.c.name == model)
+                            & (vfolders.c.usage_mode == VFolderUsageMode.MODEL)
+                            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
                         )
                         matched_vfolders = await query_accessible_vfolders(
                             conn,
