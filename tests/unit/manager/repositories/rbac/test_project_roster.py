@@ -18,11 +18,11 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import (
     PersonalProjectMemberAdditionError,
     ProjectMemberNotJoinableError,
 )
+from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow

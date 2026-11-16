@@ -25,13 +25,13 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import (
     ModelStoreProjectLeaveError,
     PersonalProjectMemberAdditionError,
     ProjectMemberNotJoinableError,
     ProjectNotFound,
 )
+from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow

@@ -26,7 +26,8 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.permission import NotEnoughPermission, RoleNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
