@@ -7,7 +7,6 @@ from ai.backend.common.dto.manager.auth.response import (
     GetSSHKeypairResponse,
     SignoutResponse,
     SignupResponse,
-    SSHKeypairResponse,
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
@@ -99,15 +98,6 @@ def test_get_ssh_keypair_response() -> None:
     assert resp.ssh_public_key == "ssh-rsa AAAA..."
 
 
-def test_ssh_keypair_response() -> None:
-    resp = SSHKeypairResponse(
-        ssh_public_key="ssh-rsa AAAA...",
-        ssh_private_key="-----BEGIN RSA PRIVATE KEY-----...",
-    )
-    assert resp.ssh_public_key == "ssh-rsa AAAA..."
-    assert resp.ssh_private_key == "-----BEGIN RSA PRIVATE KEY-----..."
-
-
 def test_verify_auth_response() -> None:
     resp = VerifyAuthResponse(
         authorized="yes",
@@ -125,7 +115,6 @@ def test_response_models_have_field_descriptions() -> None:
         UpdatePasswordResponse,
         UpdatePasswordNoAuthResponse,
         GetSSHKeypairResponse,
-        SSHKeypairResponse,
         UploadSSHKeypairResponse,
         VerifyAuthResponse,
     ]

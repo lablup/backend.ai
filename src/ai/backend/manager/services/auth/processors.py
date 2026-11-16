@@ -10,10 +10,6 @@ from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
 )
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-    GenerateSSHKeypairActionResult,
-)
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, GetRoleActionResult
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
@@ -77,9 +73,6 @@ class AuthProcessors(AbstractProcessorPackage):
     signout: ActionProcessor[SignoutAction, SignoutActionResult]
     update_full_name: ActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
     get_ssh_keypair: SingleEntityActionProcessor[GetSSHKeypairAction, GetSSHKeypairActionResult]
-    generate_ssh_keypair: ScopeActionProcessor[
-        GenerateSSHKeypairAction, GenerateSSHKeypairActionResult
-    ]
     upload_ssh_keypair: ScopeActionProcessor[UploadSSHKeypairAction, UploadSSHKeypairActionResult]
     get_role: ActionProcessor[GetRoleAction, GetRoleActionResult]
     authorize: ActionProcessor[AuthorizeAction, AuthorizeActionResult]
@@ -125,9 +118,6 @@ class AuthProcessors(AbstractProcessorPackage):
         self.get_ssh_keypair = SingleEntityActionProcessor(
             service.get_ssh_keypair, action_monitors, validators=[validators.rbac.single_entity]
         )
-        self.generate_ssh_keypair = ScopeActionProcessor(
-            service.generate_ssh_keypair, action_monitors, validators=[validators.rbac.scope]
-        )
         self.upload_ssh_keypair = ScopeActionProcessor(
             service.upload_ssh_keypair, action_monitors, validators=[validators.rbac.scope]
         )
@@ -168,7 +158,6 @@ class AuthProcessors(AbstractProcessorPackage):
             SignoutAction.spec(),
             UpdateFullNameAction.spec(),
             GetSSHKeypairAction.spec(),
-            GenerateSSHKeypairAction.spec(),
             UploadSSHKeypairAction.spec(),
             GetRoleAction.spec(),
             AuthorizeAction.spec(),
