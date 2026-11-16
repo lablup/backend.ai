@@ -48,8 +48,8 @@ from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
+from ai.backend.manager.errors.virtual_entity import VirtualEntityNotFound
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow

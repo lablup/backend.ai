@@ -106,7 +106,6 @@ from ai.backend.manager.models.session.searchable_fields import SessionSearchabl
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -125,10 +124,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     vfolders,
 )
-from ai.backend.manager.repositories.auth.keypair_secrets import (
-    generate_keypair_data,
-    generate_ssh_keypair_data,
-)
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -272,16 +268,10 @@ class UserDBSource:
                 f"User with email {creator.email} or username {creator.username} already exists."
             )
 
-        ssh_secrets = await generate_ssh_keypair_data(self._key_provider_pool)
         result = await w.create_user(
             FullUserCreator(
                 user=creator,
                 keypair_secrets=await generate_keypair_data(self._key_provider_pool),
-                ssh_keypair=SSHKeypairCreator(
-                    public_key=ssh_secrets.public_key,
-                    private_key=ssh_secrets.private_key,
-                    is_default=True,
-                ),
                 keypair_resource_policy=keypair_resource_policy,
             )
         )

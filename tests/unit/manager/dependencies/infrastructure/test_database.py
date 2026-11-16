@@ -8,7 +8,7 @@ import pytest
 
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.database import DatabaseDependency
-from ai.backend.manager.errors.permission import GlobalEntityMissing
+from ai.backend.manager.errors.global_entity import GlobalEntityMissing
 
 _LOADER = "ai.backend.manager.dependencies.infrastructure.database.GlobalEntityIDLoader"
 

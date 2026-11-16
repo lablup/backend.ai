@@ -15,7 +15,7 @@ from tabulate import tabulate
 
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.registry.types import WiredProcessor
-from ai.backend.manager.actions.types import ActionGate
+from ai.backend.manager.actions.spec import ActionGate
 from ai.backend.manager.cli.role_fixture import RoleFixture
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.seed import InvalidSeedDocument

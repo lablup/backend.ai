@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.auth.response import (
     MyIpResponse,
     SignoutResponse,
     SignupResponse,
-    SSHKeypairResponse,
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
@@ -59,7 +58,6 @@ from ai.backend.manager.dto.auth import SignupHeader
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
 from ai.backend.manager.services.auth.actions.logout import LogoutAction
@@ -293,23 +291,6 @@ class AuthHandler:
             )
         )
         resp = GetSSHKeypairResponse(ssh_public_key=result.public_key)
-        return APIResponse.build(HTTPStatus.OK, resp)
-
-    # ------------------------------------------------------------------
-    # generate_ssh_keypair (PATCH /auth/ssh-keypair)
-    # ------------------------------------------------------------------
-
-    async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
-        result = await self._auth.generate_ssh_keypair.run(
-            GenerateSSHKeypairAction(
-                user_id=UserID(ctx.user_uuid),
-                access_key=ctx.access_key,
-            )
-        )
-        resp = SSHKeypairResponse(
-            ssh_public_key=result.ssh_keypair.ssh_public_key,
-            ssh_private_key=result.ssh_keypair.ssh_private_key,
-        )
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------

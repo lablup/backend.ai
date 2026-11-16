@@ -174,7 +174,6 @@ A user is created inside the domain scope. The create gate is user CREATE on the
 | resource policy of the personal project | the name `"default"` fixed by the code | `models/project/creators.py:66-67` |
 | personal project name | the user name. On a collision `-2` through `-999`, and on a further collision the user id | `repositories/ops/v2/user/write.py:175-199` |
 | access key, secret key | created. The secret is encrypted with the key provider pool | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py` |
-| default SSH keypair | created with the user in the same transaction. The private key is encrypted with the key provider pool | `repositories/auth/keypair_secrets.py`, `repositories/ops/v2/user/write.py` |
 | active and admin markers of the default keypair | whether the user status is ACTIVE and whether the role is SUPERADMIN or ADMIN | `write.py:106-107` |
 | password hash setting | the manager setting `auth.password_hash_*` | `adapter.py:491-496` |
 | domain id | read by name | `adapter.py:217-220` |

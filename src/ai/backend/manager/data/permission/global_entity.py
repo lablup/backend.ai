@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import ClassVar
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
-from ai.backend.manager.errors.permission import GlobalEntityMissing, GlobalEntityNotLoaded
+from ai.backend.manager.errors.global_entity import GlobalEntityMissing, GlobalEntityNotLoaded
 
 __all__ = (
     "GlobalEntityIDCache",

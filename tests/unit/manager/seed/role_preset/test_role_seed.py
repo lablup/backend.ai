@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.cli.permissions import _render
 from ai.backend.manager.cli.role_fixture import RoleFixture
-from ai.backend.manager.errors.permission import InvalidRoleSeed
+from ai.backend.manager.errors.role import InvalidRoleSeed
 from ai.backend.manager.errors.seed import InvalidSeedDocument
 from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
 from ai.backend.manager.seed.role_preset.check import RoleSeedChecker

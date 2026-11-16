@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.errors.permission import RoleNotFound
+from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
