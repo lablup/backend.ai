@@ -62,8 +62,9 @@ user 이므로 user 그룹의 public 이다. 위임 대상을 지목하는 경�
 
 `services/user` 의 `admin_get_ssh_keypair` · `admin_register_ssh_keypair` ·
 `admin_delete_ssh_keypair` 는 관리자가 남의 키페어를 지목하는 경로다. 여기의
-`get_ssh_keypair` · `generate_ssh_keypair` · `upload_ssh_keypair` 는 로그인한 사용자가
-자기 세션의 액세스 키에 대해 하는 조작이고, 키 생성은 이쪽에만 있다.
+`get_ssh_keypair` · `upload_ssh_keypair` 는 로그인한 사용자가 자기 세션의 액세스 키에
+대해 하는 조작이다. 어느 쪽도 키를 생성하지 않는다. 클라이언트가 키쌍을 만들고 공개키만
+등록한다.
 
 ## 로그인 세션과 이력은 사용자의 field group 이다
 

@@ -37,7 +37,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.auth.types import AuthorizationResult
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
@@ -63,10 +63,7 @@ from ai.backend.manager.errors.user import (
     UserResourcePolicyNotFound,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_ssh_keypair,
-)
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
@@ -89,10 +86,6 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
-)
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-    GenerateSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.get_role import (
     GetRoleAction,
@@ -798,19 +791,6 @@ class AuthService:
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
         pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
         return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
-
-    async def generate_ssh_keypair(
-        self, action: GenerateSSHKeypairAction
-    ) -> GenerateSSHKeypairActionResult:
-        pubkey, privkey = generate_ssh_keypair()
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
-
-        return GenerateSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
-        )
 
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
