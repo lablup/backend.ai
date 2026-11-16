@@ -2,21 +2,20 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from aiohttp import web
-
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
 @dataclass(frozen=True)
 class SignupAction(UserGlobalAction):
-    request: web.Request
     domain_name: str
     email: str
     password: str
     username: str | None
     full_name: str | None
     description: str | None
+    lang: str
+    token: str | None = None
 
     @override
     @classmethod
@@ -27,21 +26,6 @@ class SignupAction(UserGlobalAction):
     @classmethod
     def action_name(cls) -> str:
         return "signup"
-
-    @property
-    def hook_params(self) -> dict[str, str]:
-        params = {
-            "domain": self.domain_name,
-            "email": self.email,
-            "password": self.password,
-        }
-        if self.username:
-            params["username"] = self.username
-        if self.full_name:
-            params["full_name"] = self.full_name
-        if self.description:
-            params["description"] = self.description
-        return params
 
 
 @dataclass(frozen=True)

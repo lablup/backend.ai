@@ -22,6 +22,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -33,6 +34,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
@@ -82,6 +84,9 @@ async def adapter(
                     config,
                     unwired(StorageSessionManager, "no row reaches a storage host"),
                     permission_check,
+                    key_provider_pool=KeyProviderPool(
+                        providers=[], write_provider_type=KeyProviderType.PLAIN
+                    ),
                 ),
                 scheduling_controller=unwired(
                     SchedulingController, "no row leaves a kernel running on the agent"

@@ -317,19 +317,16 @@ type AdminRefreshDeploymentRevisionsPayload
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.10.0.
 """
 input AdminRegisterSSHKeypairInput
   @join__type(graph: STRAWBERRY)
 {
-  """Access key whose SSH keypair will be replaced."""
+  """Access key whose SSH public key will be replaced."""
   accessKey: String!
 
   """PEM-encoded SSH public key."""
   sshPublicKey: String!
-
-  """PEM-encoded SSH private key."""
-  sshPrivateKey: String!
 }
 
 """
@@ -9489,6 +9486,10 @@ type HuggingFaceRegistry implements Node
   entityId: UUID!
   url: String!
   name: String!
+
+  """
+  Access token for the registry. Masked unless the caller is a superadmin.
+  """
   token: String
 }
 
@@ -11628,7 +11629,9 @@ type KeyPair implements Item
   rolling_count: Int
   user: UUID
   projects: [String]
-  ssh_public_key: String
+
+  """The public key of the owner's default SSH keypair."""
+  ssh_public_key: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
   vfolders: [VirtualFolder]
   compute_sessions(status: String): [ComputeSession]
   concurrency_used: Int
@@ -11957,8 +11960,10 @@ type KeyPairV2 implements Node
   """Name of the resource policy assigned to this keypair."""
   resourcePolicy: String!
 
-  """The SSH public key associated with this keypair."""
-  sshPublicKey: String
+  """
+  The public key of the owner's default SSH keypair, the same for every keypair of one user.
+  """
+  sshPublicKey: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
 
   """UUID of the user who owns this keypair."""
   userId: UUID!
@@ -13112,6 +13117,11 @@ input ModelDeploymentMetadataInput
   resourceGroupName: String!
   name: String = null
   tags: [String!] = null
+
+  """
+  Added in 26.10.0. UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.
+  """
+  designatedAgentIds: [UUID!] = null
 }
 
 """
@@ -15349,7 +15359,7 @@ type Mutation
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
@@ -15413,7 +15423,7 @@ type Mutation
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
+  """Added in 26.4.2. Admin registers (overwrites) a user's SSH public key."""
   adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
@@ -23093,6 +23103,10 @@ type ReservoirRegistry implements Node
   name: String!
   endpoint: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   apiVersion: String!
 
@@ -28709,6 +28723,11 @@ input UpdateDeploymentInput
   replicaCount: Int
   name: String
   preferredDomainName: String
+
+  """
+  Added in 26.10.0. Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.
+  """
+  designatedAgentIds: [UUID!]
 }
 
 """Added in 25.19.0. Payload for updating a model deployment."""
@@ -29997,6 +30016,11 @@ input UpdateUserV2Input
 
   """New password."""
   password: String
+
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
 
   """New full display name."""
   fullName: String
@@ -31821,6 +31845,27 @@ input VFolderAutoMountFilter
   NOT: [VFolderAutoMountFilter!] = null
 }
 
+"""
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Each relation matches one auto-mount at a time.
+"""
+input VFolderAutoMountNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  True for a vfolder that has at least one auto-mount, false for one that has none.
+  """
+  exists: Boolean = null
+
+  """At least one auto-mount matches."""
+  some: VFolderAutoMountFilter = null
+
+  """Every auto-mount matches; true when there is none."""
+  every: VFolderAutoMountFilter = null
+
+  """No auto-mount matches."""
+  none: VFolderAutoMountFilter = null
+}
+
 """Added in 26.10.0. One ordering rule for a vfolder auto-mount search."""
 input VFolderAutoMountOrderBy
   @join__type(graph: STRAWBERRY)
@@ -31991,6 +32036,9 @@ input VFolderFilter
 
   """Added in 26.10.0. Filter by vfolder ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
+  autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

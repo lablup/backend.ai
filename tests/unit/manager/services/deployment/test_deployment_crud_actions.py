@@ -1,7 +1,8 @@
 """
 Mock-based unit tests for DeploymentService CRUD and replica/revision actions.
 
-Tests cover: CreateLegacyDeployment, DestroyDeployment, SyncReplica.
+Tests cover: CreateLegacyDeployment, DestroyDeployment, SyncReplica, and the designated
+agents of CreateDeployment and UpdateDeployment.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.image import ImageID
@@ -21,8 +23,11 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
+from ai.backend.common.types import AgentId, ClusterMode, MountPermission, ResourceSlot
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.data.agent.types import AgentData, AgentStatus
+from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
@@ -38,9 +43,15 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaData,
     ResourceConfigData,
 )
+from ai.backend.manager.errors.deployment import DesignatedAgentOutsideResourceGroup
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.services.deployment.actions.create_deployment import (
+    CreateDeploymentAction,
+)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
 )
@@ -50,9 +61,34 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
 )
+from ai.backend.manager.services.deployment.actions.update_deployment import (
+    UpdateDeploymentAction,
+)
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.types import OptionalState
+
+
+def _agent_in(resource_group: str, agent_uuid: AgentUUID) -> AgentData:
+    return AgentData(
+        uuid=agent_uuid,
+        id=AgentId(f"i-{agent_uuid.hex[:12]}"),
+        status=AgentStatus.ALIVE,
+        status_changed=None,
+        region="local",
+        resource_group=resource_group,
+        schedulable=True,
+        addr="tcp://127.0.0.1:6001",
+        public_host=None,
+        first_contact=None,
+        lost_at=None,
+        version="test",
+        architecture="x86_64",
+        compute_plugins={},
+        public_key=None,
+        auto_terminate_abusing_kernel=False,
+    )
 
 
 class DeploymentCRUDBaseFixtures:
@@ -61,6 +97,10 @@ class DeploymentCRUDBaseFixtures:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         return MagicMock(spec=DeploymentRepository)
+
+    @pytest.fixture
+    def mock_agent_repository(self) -> MagicMock:
+        return MagicMock(spec=AgentRepository)
 
     @pytest.fixture
     def mock_deployment_controller(self) -> MagicMock:
@@ -75,11 +115,13 @@ class DeploymentCRUDBaseFixtures:
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            agent_repository=mock_agent_repository,
             appproxy_client_pool=mock_appproxy_client_pool,
         )
 
@@ -364,3 +406,159 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
             DeploymentLifecycleType.CHECK_REPLICA
         )
+
+
+class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
+    @pytest.fixture
+    def agent_uuid(self) -> AgentUUID:
+        return AgentUUID(uuid.uuid4())
+
+    @pytest.fixture
+    def create_action(
+        self, endpoint_info: DeploymentInfo, agent_uuid: AgentUUID
+    ) -> CreateDeploymentAction:
+        return CreateDeploymentAction(
+            project_id=ProjectID(endpoint_info.metadata.project),
+            creator=NewDeploymentCreator(
+                metadata=endpoint_info.metadata, designated_agents=frozenset({agent_uuid})
+            ),
+            auto_activate=False,
+        )
+
+    @pytest.fixture(autouse=True)
+    def stub_controller_and_repository(
+        self,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.set_designated_agents = AsyncMock()
+
+    async def test_agents_of_the_resource_group_are_designated(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+        agent_uuid: AgentUUID,
+        create_action: CreateDeploymentAction,
+    ) -> None:
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(
+            return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
+        )
+
+        await deployment_service.create_deployment(create_action)
+
+        mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
+            endpoint_info.id, {agent_uuid}
+        )
+
+    async def test_an_agent_outside_the_resource_group_is_refused_before_creating(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
+        create_action: CreateDeploymentAction,
+    ) -> None:
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(return_value=[])
+
+        with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
+            await deployment_service.create_deployment(create_action)
+
+        assert raised.value.entity_error_code().operation == ActionOperationType.CREATE
+
+        mock_deployment_controller.create_deployment.assert_not_awaited()
+        mock_deployment_repository.set_designated_agents.assert_not_awaited()
+
+
+class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
+    @pytest.fixture
+    def agent_uuid(self) -> AgentUUID:
+        return AgentUUID(uuid.uuid4())
+
+    @pytest.fixture(autouse=True)
+    def stub_controller_and_repository(
+        self,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        mock_deployment_controller.update_deployment = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.set_designated_agents = AsyncMock()
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(return_value=[])
+
+    def _update_action(
+        self, endpoint_info: DeploymentInfo, designated_agents: frozenset[AgentUUID] | None
+    ) -> UpdateDeploymentAction:
+        return UpdateDeploymentAction(
+            deployment_id=endpoint_info.id,
+            updater=DeploymentUpdater(
+                deployment_id=endpoint_info.id,
+                designated_agents=OptionalState.from_nullable(designated_agents),
+            ),
+        )
+
+    async def test_the_given_agents_become_the_designation(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+        agent_uuid: AgentUUID,
+    ) -> None:
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(
+            return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
+        )
+
+        await deployment_service.update_deployment(
+            self._update_action(endpoint_info, frozenset({agent_uuid}))
+        )
+
+        mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
+            endpoint_info.id, {agent_uuid}
+        )
+
+    async def test_an_empty_set_clears_the_designation(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        await deployment_service.update_deployment(self._update_action(endpoint_info, frozenset()))
+
+        mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
+            endpoint_info.id, set()
+        )
+
+    async def test_an_agent_outside_the_resource_group_leaves_the_deployment_unchanged(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+        agent_uuid: AgentUUID,
+    ) -> None:
+        with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
+            await deployment_service.update_deployment(
+                self._update_action(endpoint_info, frozenset({agent_uuid}))
+            )
+
+        assert raised.value.entity_error_code().operation == ActionOperationType.UPDATE
+
+        mock_deployment_controller.update_deployment.assert_not_awaited()
+        mock_deployment_repository.set_designated_agents.assert_not_awaited()
+
+    async def test_omitting_the_agents_leaves_the_designation(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        await deployment_service.update_deployment(self._update_action(endpoint_info, None))
+
+        mock_deployment_repository.set_designated_agents.assert_not_awaited()

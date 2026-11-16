@@ -18,9 +18,11 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetInvalidLabel,
+)
 from ai.backend.common.exception import (
     InvalidMetricPresetTemplate,
-    PrometheusQueryPresetInvalidLabel,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import (

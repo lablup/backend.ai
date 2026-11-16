@@ -18,17 +18,17 @@ theme.json fontFamily: "MyFont, 'Ubuntu', Roboto, Pretendard, sans-serif"
 Auto-loading rules (from `injectFontCSS` in `customThemeConfig.ts`):
 
 1. Split the `fontFamily` string by `,`
-2. Normalize each name to **lowercase with spaces replaced by hyphens** (for example, `My Custom Font` → `my-custom-font`)
+2. Normalize each name to **lowercase with spaces replaced by hyphens** (e.g. `My Custom Font` → `my-custom-font`)
 3. Inject a `<link>` tag into `<head>` pointing to `resources/fonts/{normalized-name}/{normalized-name}.css`
-4. Generic families like `sans-serif` and `monospace` are ignored
+4. Generic families like `sans-serif`, `monospace`, etc. are ignored
 
-> **Key rule**: The font directory name and the CSS file name must match the normalized form of the font name.
+> **Key rule**: The font directory name and CSS file name must match the normalized form of the font name.
 
 ---
 
 ## Case 1: Font Distributed with CSS
 
-This applies to fonts that already include a CSS file (for example, Google Fonts downloads and open-source font packages).
+This applies to fonts that already include a CSS file (e.g. Google Fonts downloads, open-source font packages).
 
 ### Steps
 
@@ -38,7 +38,7 @@ This applies to fonts that already include a CSS file (for example, Google Fonts
    resources/fonts/{normalized-name}/
    ```
 
-2. **Place the files**: copy the provided CSS and font files as-is.
+2. **Place the files** — copy the provided CSS and font files as-is.
 
    ```
    resources/fonts/my-custom-font/
@@ -51,10 +51,10 @@ This applies to fonts that already include a CSS file (for example, Google Fonts
        └── ...
    ```
 
-3. **Verify the CSS file name**: the entry CSS file must be named `{normalized-name}.css`.
+3. **Verify CSS file name** — the entry CSS file must be named `{normalized-name}.css`.
    - If the provided CSS has a different name, either **rename it** or create a wrapper CSS that `@import`s the original.
 
-4. **Verify internal paths**: ensure `url()` paths inside the CSS point to the correct file locations.
+4. **Verify internal paths** — ensure `url()` paths inside the CSS point to the correct file locations.
 
    ```css
    /* Use relative paths */
@@ -64,9 +64,9 @@ This applies to fonts that already include a CSS file (for example, Google Fonts
 ### Example: Pretendard (upstream web package, copied as-is)
 
 The Hangul face is the upstream `dist/web/static` folder of
-[Pretendard](https://github.com/orioncactus/pretendard) copied without changes. Its entry
+[Pretendard](https://github.com/orioncactus/pretendard) copied without changes — its entry
 CSS is already named `pretendard.css`, so the auto-loader resolves it once `Pretendard` is
-listed in `fontFamily`. Keep `'Ubuntu', Roboto` **before** it: Latin stays in Ubuntu, and
+listed in `fontFamily`. Keep `'Ubuntu', Roboto` **before** it: Latin then stays in Ubuntu and
 only the code points Ubuntu/Roboto lack (Hangul) fall through to Pretendard.
 
 ```
@@ -104,7 +104,7 @@ resources/fonts/roboto/
 
 ## Case 2: Font Files Only (No CSS Provided)
 
-This applies when only raw font files (ttf, otf, woff2 and so on) are available without a CSS file.
+This applies when you only have raw font files (ttf, otf, woff2, etc.) without a CSS file.
 
 ### Steps
 
@@ -124,7 +124,7 @@ This applies when only raw font files (ttf, otf, woff2 and so on) are available 
    └── ...
    ```
 
-3. **Write a CSS file**: create `{normalized-name}.css` with `@font-face` declarations for each weight.
+3. **Write a CSS file** — create `{normalized-name}.css` with `@font-face` declarations for each weight.
 
 ### Writing `@font-face` Rules
 
@@ -233,11 +233,11 @@ After placing font files and CSS, add the font name to `fontFamily` in `resource
 
 ## Checklist
 
-- [ ] Directory name matches the normalized font name (lowercase, spaces replaced by hyphens)
+- [ ] Directory name matches the normalized font name (lowercase, spaces → hyphens)
 - [ ] CSS file is named `{directory-name}.css`
 - [ ] `font-family` in `@font-face` matches the name used in `theme.json`
 - [ ] `url()` paths in CSS point to the correct font file locations
-- [ ] For new fonts, `font-display: swap` is set on all `@font-face` rules (recommended; some legacy fonts in this repository may not yet include it)
+- [ ] For new fonts, `font-display: swap` is set on all `@font-face` rules (recommended; some legacy fonts in this repo may not yet include it)
 - [ ] Font name is added to `fontFamily` in `theme.json`
 
 ## Currently Registered Fonts
@@ -246,4 +246,4 @@ After placing font files and CSS, add the font name to `fontFamily` in `resource
 |-----------------|----------------------|--------------------------------|
 | `roboto/`       | `roboto.css`         | woff2/woff, CSS included       |
 | `ubuntu/`       | `ubuntu.css`         | woff2/woff, CSS included       |
-| `pretendard/`   | `pretendard.css`     | upstream `dist/web/static` as-is (woff2/woff and `-subset` variants); Hangul face after Ubuntu/Roboto |
+| `pretendard/`   | `pretendard.css`     | upstream `dist/web/static` as-is (woff2/woff + `-subset` variants); Hangul face after Ubuntu/Roboto |

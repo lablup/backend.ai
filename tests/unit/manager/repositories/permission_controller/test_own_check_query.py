@@ -39,7 +39,6 @@ from ai.backend.manager.data.permission.virtual_entity import OwnCheckKey
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -92,7 +91,6 @@ async def database(
             RoleRow,
             UserRoleRow,
             UserRow,
-            KeyPairRow,
             PermissionRow,
             PermissionFieldRow,
             VirtualEntityRow,

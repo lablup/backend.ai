@@ -20,8 +20,9 @@ from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
+from bai_scenario.components.nothing_is_found import NothingIsFound
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario

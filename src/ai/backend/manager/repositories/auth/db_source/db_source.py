@@ -14,7 +14,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
-from ai.backend.common.auth.password import HashInfo, PasswordInfo
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -39,11 +39,12 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
+    PasswordMismatch,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
@@ -52,6 +53,7 @@ from ai.backend.manager.models.keypair.row import (
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
@@ -61,7 +63,10 @@ from ai.backend.manager.models.user.row import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
+from ai.backend.manager.repositories.auth.keypair_secrets import (
+    generate_keypair_data,
+    generate_ssh_keypair_data,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
@@ -165,11 +170,17 @@ class AuthDBSource:
     ) -> UserCreationData:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
+        ssh_secrets = await generate_ssh_keypair_data(self._key_provider_pool)
         async with self._user_ops_provider.write_ops() as w:
             result = await w.create_user(
                 FullUserCreator(
                     user=user_spec,
                     keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                    ssh_keypair=SSHKeypairCreator(
+                        public_key=ssh_secrets.public_key,
+                        private_key=ssh_secrets.private_key,
+                        is_default=True,
+                    ),
                     keypair_resource_policy=keypair_resource_policy,
                     keypair_rate_limit=keypair_rate_limit,
                 )
@@ -250,24 +261,6 @@ class AuthDBSource:
                 .where(keypairs.c.user.in_(sa.select(users.c.uuid).where(users.c.email == email)))
             )
             await conn.execute(keypair_query)
-
-    @auth_db_source_resilience.apply()
-    async def fetch_ssh_public_key(self, access_key: str) -> str | None:
-        """Fetch SSH public key for an access key from database."""
-        async with self._db.begin() as conn:
-            query = sa.select(keypairs.c.ssh_public_key).where(keypairs.c.access_key == access_key)
-            return await conn.scalar(query)
-
-    @auth_db_source_resilience.apply()
-    async def modify_ssh_keypair(self, access_key: str, public_key: str, private_key: str) -> None:
-        """Modify SSH keypair for an access key in database."""
-        async with self._db.begin() as conn:
-            data = {
-                "ssh_public_key": public_key,
-                "ssh_private_key": private_key,
-            }
-            query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
-            await conn.execute(query)
 
     @auth_db_source_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
@@ -389,21 +382,39 @@ class AuthDBSource:
         async with self._v2_ops.read_ops() as r:
             return await r.query_data(querier)
 
-    async def _check_password(
+    async def _password_matched_row(
         self,
-        row: sa.Row[Any],
+        row: sa.Row[Any] | None,
         target_password_info: PasswordInfo,
-    ) -> None:
-        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
-        if row.password is None:
+    ) -> sa.Row[Any]:
+        """The user row whose stored hash the password matches. Every refusal costs at least
+        one hash at the configured cost, so the answer time does not tell whether the account
+        exists, even when its stored hash is older and cheaper."""
+        configured_hasher = PasswordHasherFactory.get_hasher(target_password_info.algorithm)
+        if row is None or row.password is None:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not await asyncio.to_thread(
-                compare_to_hashed_password, target_password_info.password, row.password
-            ):
-                raise AuthorizationFailed("User credential mismatch.")
+            stored = HashInfo.from_hash_string(row.password)
+            matched = await asyncio.to_thread(
+                PasswordHasherFactory.get_hasher(stored.algorithm).verify,
+                target_password_info.password,
+                stored,
+            )
         except ValueError:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.") from None
+        if not matched:
+            # A stored hash cheaper than the configured one is topped up to that cost. Rounds
+            # compare only within one algorithm; SHA256 is cheaper than any other.
+            if stored.algorithm == target_password_info.algorithm:
+                cheaper = stored.rounds < target_password_info.rounds
+            else:
+                cheaper = stored.algorithm == PasswordHashAlgorithm.SHA256
+            if cheaper:
+                await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
+            raise PasswordMismatch(UserID(row.uuid))
+        return row
 
     async def _migrate_password_hash(
         self,
@@ -487,12 +498,7 @@ class AuthDBSource:
                 .select_from(users)
                 .where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
-            row = result.first()
-
-            if row is None:
-                raise AuthorizationFailed("User credential mismatch.")
-
-            await self._check_password(row, target_password_info)
+            row = await self._password_matched_row(result.first(), target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -609,15 +615,22 @@ class AuthDBSource:
         """Verify credentials without password migration (for signout, etc.)"""
         async with self._db.begin_readonly_read_committed() as conn:
             result = await conn.execute(
-                sa.select(users.c.uuid, users.c.password).where(
-                    (users.c.email == email) & (users.c.domain_name == domain_name)
-                ),
+                sa.select(
+                    users.c.uuid,
+                    users.c.username,
+                    users.c.password,
+                    users.c.status,
+                    users.c.password_changed_at,
+                ).where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
-            row = result.first()
-            if row is None:
-                raise AuthorizationFailed("User credential mismatch.")
-            await self._check_password(row, target_password_info)
-        return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
+            row = await self._password_matched_row(result.first(), target_password_info)
+        return UserCredential(
+            user_id=UserID(row.uuid),
+            username=row.username,
+            hashed_password=row.password,
+            status=row.status,
+            password_changed_at=row.password_changed_at,
+        )
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:

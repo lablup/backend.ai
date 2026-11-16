@@ -26,7 +26,6 @@ from ai.backend.manager.models.agent.row import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
     PermissionSearchableFields,
@@ -77,7 +76,6 @@ class TestSearchPermissions:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 PermissionRow,
             ],
         ):

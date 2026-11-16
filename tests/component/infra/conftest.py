@@ -164,6 +164,7 @@ def agent_processors(
         config_provider,
         MagicMock(),
         RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = AgentService(
         etcd=async_etcd,
@@ -249,7 +250,12 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
+    return DomainProcessors(
+        processor_registry.group(GroupMeta(DomainEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
+        service,
+    )
 
 
 @pytest.fixture()

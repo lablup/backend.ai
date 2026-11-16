@@ -4,8 +4,8 @@
 
 Scenario: complete
 
-- built from ops (1)
-  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+- ops + direct implementation (1)
+  - batch_load_by_ids: success present 1 · rejection present 1 (partial_bulk, partial_bulk_get_ops)
 - direct implementation (8)
   - create: success present 1 · rejection present 1 (global_scope)
   - get: success present 1 · rejection present 1 (single_entity)
@@ -20,7 +20,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user granted permission to read Reservoir registries loads two registries seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order) | answered |
+| [when a user granted permission to read Reservoir registries loads two registries seeded in advance at once, the two come back in the requested order without their stored secret keys](#reading-a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order) | answered |
 | [when a user granted nothing loads several registry ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id) | rejected |
 
 **create**
@@ -34,7 +34,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user granted permission to read Reservoir registries reads one, the whole registry seeded in advance comes back](#reading-a-user-granted-read-gets-a-registry) | answered |
+| [when a user granted permission to read Reservoir registries reads one, the registry seeded in advance comes back without its stored secret key](#reading-a-user-granted-read-gets-a-registry) | answered |
 | [when a user granted nothing tries to read a registry, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-get-a-registry) | rejected |
 
 **get_many**
@@ -86,7 +86,7 @@ Scenario: complete
 
 #### [a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order](/tests/scenario/bai_scenario/manager/reservoir_registry/test_reading.py): pass
 
-when a user granted permission to read Reservoir registries loads two registries seeded in advance at once, the two come back in the requested order
+when a user granted permission to read Reservoir registries loads two registries seeded in advance at once, the two come back in the requested order without their stored secret keys
 
 Given
 
@@ -110,21 +110,21 @@ When
 
 Then
 
-- the registries seeded in advance come back in the requested order
+- the registries seeded in advance come back in the requested order with '*****' as their secret keys
   - length = 2
   - [0].id: same as the id of the registry seeded in advance
   - [0].entity_id: same as the id of the registry seeded in advance
   - [0].name = 'registry-1'
   - [0].endpoint = 'https://reservoir.example.com'
   - [0].access_key = 'access-key'
-  - [0].secret_key = 'secret-key'
+  - [0].secret_key = '*****'
   - [0].api_version = 'v1'
   - [1].id: same as the id of the registry seeded in advance
   - [1].entity_id: same as the id of the registry seeded in advance
   - [1].name = 'registry-2'
   - [1].endpoint = 'https://reservoir.example.com'
   - [1].access_key = 'access-key'
-  - [1].secret_key = 'secret-key'
+  - [1].secret_key = '*****'
   - [1].api_version = 'v1'
 
 <a id="reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id"></a>
@@ -220,7 +220,7 @@ Then
 
 #### [a-user-granted-read-gets-a-registry](/tests/scenario/bai_scenario/manager/reservoir_registry/test_reading.py): pass
 
-when a user granted permission to read Reservoir registries reads one, the whole registry seeded in advance comes back
+when a user granted permission to read Reservoir registries reads one, the registry seeded in advance comes back without its stored secret key
 
 Given
 
@@ -243,13 +243,13 @@ When
 
 Then
 
-- the whole registry seeded in advance comes back
+- the registry seeded in advance comes back with '*****' as its secret key
   - id: same as the id of the registry seeded in advance
   - entity_id: same as the id of the registry seeded in advance
   - name = 'registry-1'
   - endpoint = 'https://reservoir.example.com'
   - access_key = 'access-key'
-  - secret_key = 'secret-key'
+  - secret_key = '*****'
   - api_version = 'v1'
 
 <a id="reading-a-user-granted-nothing-may-not-get-a-registry"></a>
@@ -472,14 +472,14 @@ Then
   - successes[0].name = 'registry-1'
   - successes[0].endpoint = 'https://storage.example.com'
   - successes[0].access_key = 'access-key'
-  - successes[0].secret_key = 'secret-key'
+  - successes[0].secret_key = '*****'
   - successes[0].api_version = 'v1'
   - successes[1].id: same as the id of the registry seeded in advance
   - successes[1].entity_id: same as the id of the registry seeded in advance
   - successes[1].name = 'registry-2'
   - successes[1].endpoint = 'https://storage.example.com'
   - successes[1].access_key = 'access-key'
-  - successes[1].secret_key = 'secret-key'
+  - successes[1].secret_key = '*****'
   - successes[1].api_version = 'v1'
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries"></a>
@@ -668,7 +668,7 @@ Then
   - name = 'registry-1'
   - endpoint = 'https://storage.example.com'
   - access_key = 'access-key'
-  - secret_key = 'secret-key'
+  - secret_key = '*****'
   - api_version = 'v1'
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-registry"></a>

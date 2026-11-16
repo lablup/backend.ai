@@ -65,9 +65,11 @@ a user and is global behind the SUPERADMIN gate.
 ## Relation to the SSH keypair actions in the user domain
 
 `admin_get_ssh_keypair`, `admin_register_ssh_keypair` and `admin_delete_ssh_keypair` in
-`services/user` are the path where an admin names another user's keypair. The
-`get_ssh_keypair`, `generate_ssh_keypair` and `upload_ssh_keypair` here are the operations
-a logged-in user does on its own session's access key, and key generation exists only here.
+`services/user` are the path where an admin names another user by one of their access
+keys. The `get_ssh_keypair`, `generate_ssh_keypair` and `upload_ssh_keypair` here are the
+operations a logged-in user does through its own session's access key, and key generation
+exists only here. Both act on the default SSH keypair of the user the access key belongs
+to (`ssh_keypairs`); the SSH columns on `keypairs` are no longer read or written.
 
 ## Login sessions and history are the user's field group
 

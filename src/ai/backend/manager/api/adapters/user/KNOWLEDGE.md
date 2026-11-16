@@ -173,7 +173,8 @@ A user is created inside the domain scope. The create gate is user CREATE on the
 | user resource policy | the default `"default"` of the request | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
 | resource policy of the personal project | the name `"default"` fixed by the code | `models/project/creators.py:66-67` |
 | personal project name | the user name. On a collision `-2` through `-999`, and on a further collision the user id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key, SSH keypair | created. The secret is encrypted with the key provider pool | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py:10-18` |
+| access key, secret key | created. The secret is encrypted with the key provider pool | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py` |
+| default SSH keypair | created with the user in the same transaction. The private key is encrypted with the key provider pool | `repositories/auth/keypair_secrets.py`, `repositories/ops/v2/user/write.py` |
 | active and admin markers of the default keypair | whether the user status is ACTIVE and whether the role is SUPERADMIN or ADMIN | `write.py:106-107` |
 | password hash setting | the manager setting `auth.password_hash_*` | `adapter.py:491-496` |
 | domain id | read by name | `adapter.py:217-220` |
@@ -202,7 +203,7 @@ The adapter path adds two steps around this. Inside the same write transaction i
 |---|---|---|
 | duplicate check | none | present |
 | keypair policy | the policy the earlier step created | read of the default-marked policy (to be replaced) |
-| key values | plaintext, an empty string for the SSH key | created, encrypted |
+| key values | plaintext | created, encrypted |
 | project registration | none | present |
 
 ## Dependencies the adapter requires
@@ -237,7 +238,7 @@ The default is a whole-node comparison. The items below either cannot state a va
 | `is_active`, `is_admin`, `is_default`, `rate_limit`, `resource_policy` | read as values |
 | `num_queries` | 0 |
 | `last_used` | None |
-| `ssh_public_key` | ignored on the create path (the generated RSA key), an empty string for a seeded key |
+| `ssh_public_key` | deprecated. The public key of the owner's default SSH keypair, the same for every keypair of one user |
 | `created_at`, `modified_at` | the time this run wrote |
 | `user_id` | same as the owning user |
 | secret key in the issue response | ignored. Created anew each time |

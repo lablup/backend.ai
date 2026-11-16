@@ -9,7 +9,6 @@ import signal
 import socket
 import ssl
 import sys
-import time
 import traceback
 import uuid
 from collections.abc import (
@@ -73,6 +72,7 @@ from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
+from ai.backend.common.json import load_json
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
@@ -118,6 +118,7 @@ from .auth import (
 from .errors import (
     AlreadyLoggedInError,
     InvalidAPIConfigurationError,
+    LoginBlockedError,
     MissingAuthTokenError,
     MissingRequestParameterError,
     ProxyTargetUnreachableError,
@@ -179,7 +180,11 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
@@ -212,6 +217,16 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     return response
 
 
+async def version_json_handler(request: web.Request) -> web.StreamResponse:
+    session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    return apply_cache_headers(
+        web.FileResponse(config.service.static_path / "version.json"), "version.json"
+    )
+
+
 async def console_handler(request: web.Request) -> web.StreamResponse:
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
@@ -228,7 +243,11 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
@@ -291,7 +310,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.trace(
             "password update failed (email: {}, ip: {}): {}",
@@ -431,41 +450,14 @@ async def login_handler(request: web.Request) -> web.Response:
     valkey_client: ValkeySessionClient = request.app["redis"]
     BLOCK_TIME = config.session.login_block_time
 
-    async def _get_login_history() -> dict[str, float | int]:
-        login_history_bytes = await valkey_client.get_login_history(creds["username"])
-        if not login_history_bytes:
-            login_history: dict[str, float | int] = {
-                "last_login_attempt": 0,
-                "login_fail_count": 0,
-            }
-        else:
-            login_history = json.loads(login_history_bytes)
-        if login_history["last_login_attempt"] < 0:
-            login_history["last_login_attempt"] = 0
-        if login_history["login_fail_count"] < 0:
-            login_history["login_fail_count"] = 0
-        return login_history
-
-    async def _set_login_history(last_login_attempt: float, login_fail_count: float | int) -> None:
-        """
-        Set login history per email (not in browser session).
-        """
-        value = json.dumps({
-            "last_login_attempt": last_login_attempt,
-            "login_fail_count": login_fail_count,
-        })
-        await valkey_client.set_login_block(creds["username"], value, BLOCK_TIME)
-
-    # Block login if there are too many consecutive failed login attempts.
+    # Block login after too many failures. The history key expires BLOCK_TIME
+    # after the last counted failure, so an existing key is never stale.
     ALLOWED_FAIL_COUNT = config.session.login_allowed_fail_count
-    login_time = time.time()
-    login_history = await _get_login_history()
-    last_login_attempt = login_history.get("last_login_attempt", 0)
-    login_fail_count = login_history.get("login_fail_count", 0)
-    if login_time - last_login_attempt > BLOCK_TIME:
-        # If last attempt is far past, allow login again.
-        login_fail_count = 0
-    last_login_attempt = login_time
+    login_history_bytes = await valkey_client.get_login_history(creds["username"])
+    login_fail_count = 0
+    if login_history_bytes:
+        login_history = load_json(login_history_bytes)
+        login_fail_count = login_history.get("login_fail_count", 0)
     if login_fail_count >= ALLOWED_FAIL_COUNT:
         log.trace(
             "login blocked after consecutive failures (email: {}, count: {}, ip: {})",
@@ -473,14 +465,7 @@ async def login_handler(request: web.Request) -> web.Response:
             login_fail_count,
             client_ip,
         )
-        await _set_login_history(last_login_attempt, login_fail_count)
-        raise web.HTTPTooManyRequests(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/too-many-requests",
-                "title": "Too many failed login attempts",
-            }),
-            content_type="application/problem+json",
-        )
+        raise LoginBlockedError()
 
     manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
     try:
@@ -518,8 +503,7 @@ async def login_handler(request: web.Request) -> web.Response:
                 session["token"] = stored_token  # store full token
                 result["authenticated"] = True
                 result["data"] = public_return  # store public info from token
-                login_fail_count = 0
-                await _set_login_history(last_login_attempt, login_fail_count)
+                await valkey_client.clear_login_block(creds["username"])
                 log.trace(
                     "login succeeded (email: {}, ip: {})",
                     creds["username"],
@@ -550,7 +534,7 @@ async def login_handler(request: web.Request) -> web.Response:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.trace(
             "login failed (email: {}, ip: {}): {}",
@@ -566,8 +550,9 @@ async def login_handler(request: web.Request) -> web.Response:
         }
         session["authenticated"] = False
         if e.status == 401:
-            login_fail_count += 1
-            await _set_login_history(last_login_attempt, login_fail_count)
+            await valkey_client.record_login_failure(
+                creds["username"], BLOCK_TIME, ALLOWED_FAIL_COUNT
+            )
         return web.json_response(result, status=e.status)
     return web.json_response(result)
 
@@ -617,7 +602,6 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -629,7 +613,6 @@ def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Re
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -664,11 +647,7 @@ async def check_readyz(request: web.Request) -> web.Response:
 
 
 async def webserver_healthcheck(_request: web.Request) -> web.Response:
-    result = {
-        "version": __version__,
-        "details": "Success",
-    }
-    return web.json_response(result)
+    return web.json_response({"details": "Success"})
 
 
 def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
@@ -774,7 +753,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.trace(
             "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)
@@ -1123,7 +1102,7 @@ async def webapp_ctx(
         app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", manager_web_handler)
     )
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", manager_websocket_handler))
-    cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+    cors.add(app.router.add_route("GET", "/func/health", anon_web_handler))
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
@@ -1145,6 +1124,7 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("GET", "/version.json", version_json_handler))
     if config.service.mode == ServiceMode.WEBUI:
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         app["webui_index_template"] = (config.service.static_path / "index.html").read_text()

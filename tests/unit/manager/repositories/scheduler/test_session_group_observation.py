@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, AgentId, SessionTypes
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
@@ -33,6 +34,7 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
@@ -150,7 +152,9 @@ class TestSessionGroupPolicyOnWorkload:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -175,7 +179,9 @@ class TestSessionGroupPolicyOnWorkload:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -209,7 +215,9 @@ class TestSessionGroupPolicyOnWorkload:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -270,7 +278,9 @@ class TestSessionGroupMemberObservation:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -325,7 +335,9 @@ class TestSessionGroupMemberObservation:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -385,7 +397,9 @@ class TestSessionGroupMemberObservation:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -427,7 +441,9 @@ class TestSessionGroupMemberObservation:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None

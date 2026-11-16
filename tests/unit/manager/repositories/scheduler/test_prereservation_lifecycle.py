@@ -21,11 +21,13 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
@@ -134,7 +136,11 @@ class TestPrereservationLifecycle:
         kernel_ids: list[KernelId],
         agent_id: str,
     ) -> list[SessionId]:
-        db_source = ScheduleDBSource(db, ReconcileOpsProvider(db))
+        db_source = ScheduleDBSource(
+            db,
+            ReconcileOpsProvider(db),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         allocations = make_session_allocations(
             session_id=session_id,
             kernel_assignments=[(kernel_id, agent_id) for kernel_id in kernel_ids],
@@ -208,7 +214,11 @@ class TestPrereservationLifecycle:
             mem_used=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # Victims still hold too much: used 3 + hold 2 > capacity 4
         admitted = await db_source.admit_prereserved_kernels([session_id])
@@ -245,7 +255,11 @@ class TestPrereservationLifecycle:
             mem_capacity=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         admitted = await db_source.admit_prereserved_kernels([session_id])
         assert admitted == kernel_ids
 
@@ -289,7 +303,11 @@ class TestPrereservationLifecycle:
             mem_used=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         async with db_with_cleanup.begin_session_read_committed() as db_sess:
             now = await db_source._get_db_now_in_session(db_sess)

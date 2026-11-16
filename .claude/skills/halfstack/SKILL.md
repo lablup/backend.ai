@@ -289,6 +289,9 @@ docker exec $REDIS_CONTAINER valkey-cli flushall
 ```bash
 ETCD_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-etcd)
 
+# Key reads need the root user once auth is enabled: add
+# --user=root:<password> (the [etcd] password in manager.toml) to each `get`.
+
 # List all keys
 docker exec $ETCD_CONTAINER etcdctl get --prefix "" --keys-only
 
@@ -299,8 +302,8 @@ docker exec $ETCD_CONTAINER etcdctl get <key>
 docker exec $ETCD_CONTAINER etcdctl get --prefix "config/redis"
 docker exec $ETCD_CONTAINER etcdctl get --prefix "volumes"
 
-# Health check
-docker exec $ETCD_CONTAINER etcdctl endpoint health
+# Health check (needs no credentials; `endpoint health` fails once auth is enabled)
+docker exec $ETCD_CONTAINER etcdctl endpoint status
 ```
 
 Or via Backend.AI CLI:

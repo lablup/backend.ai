@@ -21,7 +21,6 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -70,7 +69,6 @@ class TestVfolderSearchVfolders:
                 KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
-                ImageRow,
                 VFolderRow,
                 ModelCardRow,
             ],

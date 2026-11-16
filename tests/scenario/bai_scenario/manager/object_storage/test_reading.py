@@ -11,9 +11,9 @@ from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.response import ObjectStorageNode
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,

@@ -1,0 +1,11 @@
+import{a as e}from"./rolldown-runtime-BWaJ3C7D.js";import{u as t}from"./icons-Btg1s2wy.js";import{t as n}from"./compiler-runtime-CZQb2eIb.js";import{t as r}from"./jsx-runtime-BapUIyWk.js";import{S as i,t as a}from"./Modal2-DnaQJkP1.js";import{n as o,t as s}from"./VStack-DaUzGF31.js";import{u as c}from"./Skeleton-D35z7Ria.js";/* empty css                 */import{i as l,o as u,t as d}from"./DataGrid2-S8Qkyg5h.js";import{t as f}from"./Banner-ElTQ2msG.js";var p=r(),m=720,h=10;function g({columns:e,data:n,idKey:r,description:o,descriptionTitle:l,title:u,width:g=m,..._}){let v=i();return(0,p.jsx)(a,{..._,width:g,title:u??(0,p.jsxs)(c,{gap:2,align:`center`,children:[(0,p.jsx)(t,{color:`currentColor`,size:`1em`,className:`uic-bulk-error-modal__icon`,"aria-hidden":!0}),v(`uic.BulkErrorModal.title`)]}),footer:null,children:(0,p.jsxs)(s,{gap:3,align:`stretch`,children:[o?(0,p.jsx)(f,{status:`error`,title:l??v(`uic.BulkErrorModal.errorOccurred`),description:o}):null,(0,p.jsx)(d,{columns:e,data:n,idKey:r,scrollWidth:`max-content`,pagination:{pageSize:h,hasPageSizeSelector:!1,isHiddenOnSinglePage:!0},isResizable:!1,density:`compact`,dividers:`grid`})]})})}var _=n(),v=e(o(),1),y=e=>{"use memo";
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ui-common `BulkErrorModal` under its BUI name (FR-4096): `open` → `isOpen`,
+`onRequestClose` → `onOpenChange(false)`, `alertDescription` → `description`,
+and BAITable's `columns` / `dataSource` translated as BAITable does. The
+header takes BAIModal's geometry; the strings come from ui-common's catalog.
+*/
+let t=(0,_.c)(22),n,r,i,a,o,s,c;t[0]===e?(n=t[1],r=t[2],i=t[3],a=t[4],o=t[5],s=t[6],c=t[7]):({open:c,columns:r,dataSource:i,alertDescription:n,onRequestClose:s,headerClassName:a,...o}=e,t[0]=e,t[1]=n,t[2]=r,t[3]=i,t[4]=a,t[5]=o,t[6]=s,t[7]=c);let d=c!==void 0&&c,f;t[8]===s?f=t[9]:(f=e=>{e||s()},t[8]=s,t[9]=f);let m;t[10]===a?m=t[11]:(m=(0,v.default)(`bai-modal__header`,a),t[10]=a,t[11]=m);let h;t[12]===r?h=t[13]:(h=u(l(r)),t[12]=r,t[13]=h);let y;return t[14]!==n||t[15]!==i||t[16]!==o||t[17]!==d||t[18]!==f||t[19]!==m||t[20]!==h?(y=(0,p.jsx)(g,{...o,isOpen:d,onOpenChange:f,headerClassName:m,columns:h,data:i,description:n}),t[14]=n,t[15]=i,t[16]=o,t[17]=d,t[18]=f,t[19]=m,t[20]=h,t[21]=y):y=t[21],y};export{y as t};

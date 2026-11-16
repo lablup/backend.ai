@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.json import load_json
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.base import populate_fixture
+from ai.backend.manager.models.fixture import populate_fixture
 
 if TYPE_CHECKING:
     from .context import CLIContext

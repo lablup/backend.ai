@@ -7,6 +7,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.dto.manager.v2.entity.response import EntityTypeNode
 from ai.backend.manager.api.adapters.entity.adapter import EntityAdapter
@@ -73,19 +74,28 @@ class Listing(When[None, EntityAdapter, list[EntityTypeNode]]):
 
 
 @dataclass(frozen=True)
-class TheDomainIsListed(Then[None, list[EntityTypeNode]]):
+class TheWiredTypesAreListed(Then[None, list[EntityTypeNode]]):
     @override
     def says(self) -> str:
         return Says(
-            "배선된 도메인 유형 하나가 그 이름으로 반환됩니다",
-            english="the one wired domain type comes back by its name",
+            "도메인 처리기가 배선한 엔티티 유형 두 개가 이름순으로 반환됩니다",
+            english="the two entity types the domain processors wire come back by name",
         )
 
     @override
     def look(self, laid: None, answered: Answered[list[EntityTypeNode]]) -> list[Verdict]:
         if answered.response is None:
             return [MissingResponse(answered.raised)]
-        return [Same("items", answered.response, [EntityTypeNode(name=str(DomainEntityType()))])]
+        return [
+            Same(
+                "items",
+                answered.response,
+                [
+                    EntityTypeNode(name=str(ContainerRegistryEntityType())),
+                    EntityTypeNode(name=str(DomainEntityType())),
+                ],
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -126,7 +136,7 @@ class TheWiredEntityTypeIsListed(
 
     @override
     def then(self) -> Then[None, list[EntityTypeNode]]:
-        return TheDomainIsListed()
+        return TheWiredTypesAreListed()
 
 
 @dataclass(frozen=True)

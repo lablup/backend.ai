@@ -1,9 +1,11 @@
 import logging
 
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetInvalidLabel,
+)
 from ai.backend.common.exception import (
     InvalidMetricPresetTemplate,
-    PrometheusQueryPresetInvalidLabel,
 )
 from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
 from ai.backend.logging.structured import StructuredLogger

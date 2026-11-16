@@ -52,6 +52,8 @@ InOtherContainerPID: Final = ContainerPID(PID(-2))
 NotContainerPID: Final = ContainerPID(PID(-1))
 NotHostPID: Final = HostPID(PID(-1))
 
+SECRET_MASK: Final = "***"
+
 
 class SupportsAsyncClose(Protocol):
     async def close(self) -> None: ...

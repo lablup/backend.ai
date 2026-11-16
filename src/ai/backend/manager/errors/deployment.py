@@ -165,3 +165,22 @@ class IncompleteRevisionData(FieldError, web.HTTPInternalServerError):
             ActionOperationType.GET,
             ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class DesignatedAgentOutsideResourceGroup(EntityError, web.HTTPBadRequest):
+    """Raised when a deployment designates an agent outside its resource group."""
+
+    error_type = "https://api.backend.ai/probs/designated-agent-outside-resource-group"
+    error_title = "A designated agent does not belong to the deployment's resource group."
+
+    _operation: ActionOperationType
+
+    def __init__(self, extra_msg: str | None = None, *, operation: ActionOperationType) -> None:
+        self._operation = operation
+        super().__init__(extra_msg)
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            DeploymentEntityType(), self._operation, ErrorDetail.INVALID_PARAMETERS
+        )

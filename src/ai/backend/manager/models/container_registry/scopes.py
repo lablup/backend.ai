@@ -9,21 +9,27 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = (
     "ContainerRegistryTarget",
+    "DomainContainerRegistryTarget",
     "ProjectContainerRegistryTarget",
     "PublicContainerRegistryTarget",
 )
@@ -31,6 +37,41 @@ __all__ = (
 
 class ContainerRegistryTarget(ScopeTarget, ABC):
     """One side a container registry is reachable from."""
+
+
+@dataclass(frozen=True)
+class DomainContainerRegistryTarget(ContainerRegistryTarget):
+    """The container registries one domain is related to."""
+
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        domain_id = self.domain_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ContainerRegistryRow.id.in_(
+                sa.select(DomainContainerRegistryRelationRow.container_registry_id).where(
+                    DomainContainerRegistryRelationRow.domain_id == domain_id
+                )
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
+            ),
+        ]
 
 
 @dataclass(frozen=True)

@@ -11,10 +11,12 @@ import pytest
 
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     FailedToGetMetric,
     InvalidMetricPresetTemplate,
-    PrometheusConnectionError,
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient

@@ -28,11 +28,10 @@ from ai.backend.agent.errors.watcher import (
 )
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
-from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.exception import BackendAIError, InvalidConfigError
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -316,23 +315,7 @@ async def watcher_server(
         },
     )
     with logger:
-        etcd_config = app["config"]["etcd"]
-        if etcd_config["user"] is None:
-            raise InvalidConfigError("etcd user is required")
-        if etcd_config["password"] is None:
-            raise InvalidConfigError("etcd password is required")
-        async with AsyncEtcd.create_from_config(
-            EtcdConfigData(
-                namespace=etcd_config["namespace"],
-                addrs=[
-                    HostPortPair(host=addr.host, port=addr.port) for addr in etcd_config["addrs"]
-                ],
-                user=etcd_config["user"],
-                password=etcd_config["password"],
-                keep_alive_interval=etcd_config["keep-alive-interval"],
-                keep_alive_timeout=etcd_config["keep-alive-timeout"],
-            )
-        ) as etcd:
+        async with AsyncEtcd.create_from_config(app["config"]["etcd"].to_dataclass()) as etcd:
             app["config_server"] = etcd
 
             token = await etcd.get(WATCHER_TOKEN_ETCD_KEY)
@@ -416,25 +399,22 @@ def main(
     log_level: LogLevel,
     debug: bool,
 ) -> None:
-    watcher_config_iv = (
-        t.Dict({
-            t.Key("watcher"): t.Dict({
-                t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
-                t.Key("ssl-enabled", default=False): t.Bool,
-                t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
-                t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
-                t.Key("target-service", default="backendai-agent.service"): t.String,
-                t.Key("soft-reset-available", default=False): t.Bool,
-                t.Key("fstab-path", default="/etc/fstab"): t.String,
-            }).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.logging
-            t.Key("debug"): t.Dict({
-                t.Key("enabled", default=False): t.Bool,
-            }).allow_extra("*"),
-        })
-        .merge(config.etcd_config_iv)
-        .allow_extra("*")
-    )
+    watcher_config_iv = t.Dict({
+        t.Key("watcher"): t.Dict({
+            t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
+            t.Key("ssl-enabled", default=False): t.Bool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
+            t.Key("target-service", default="backendai-agent.service"): t.String,
+            t.Key("soft-reset-available", default=False): t.Bool,
+            t.Key("fstab-path", default="/etc/fstab"): t.String,
+        }).allow_extra("*"),
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
+        t.Key("etcd"): t.Any,  # checked by EtcdConfig
+        t.Key("debug"): t.Dict({
+            t.Key("enabled", default=False): t.Bool,
+        }).allow_extra("*"),
+    }).allow_extra("*")
 
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
@@ -463,6 +443,7 @@ def main(
             pprint(_mask_secrets(cfg))
         cfg["_src"] = cfg_src_path
         cfg["logging"] = logging_config
+        cfg["etcd"] = EtcdConfig.model_validate(cfg["etcd"])
     except config.ConfigurationError as e:
         print("Validation of watcher configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -489,7 +470,7 @@ def main(
         fn = Path(logging_config.file.filename)
         logging_config.file.filename = f"{fn.stem}-watcher{fn.suffix}"
 
-    setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
+    setproctitle(f"backend.ai: watcher {cfg['etcd'].namespace}")
     with logger:
         log.info("watcher starting", version=__version__)
         log.info("runtime environment", runtime_info=utils.env_info())
