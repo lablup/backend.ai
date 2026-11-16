@@ -75,7 +75,6 @@ from ai.backend.manager.models.image.searchable_fields import ImageSearchableFie
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
     from ai.backend.manager.models.routing.row import RoutingRow
     from ai.backend.manager.models.user.row import UserRow
@@ -108,12 +107,6 @@ def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
     return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
-
-
-def _get_deployment_policy_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-
-    return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
 def _get_created_user_row_join_condition() -> Any:
@@ -279,14 +272,6 @@ class EndpointRow(Base):
         "DeploymentRevisionRow",
         primaryjoin=_get_deploying_revision_join_condition,
         viewonly=True,
-        uselist=False,
-    )
-
-    # Read only by DeploymentSearcher, whose to_data gets the row alone. Delete it once
-    # that Searcher loads the policy another way.
-    deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
-        "DeploymentPolicyRow",
-        primaryjoin=_get_deployment_policy_join_condition,
         uselist=False,
     )
 
