@@ -20,13 +20,13 @@ from pydantic import BaseModel, Field
 
 from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.docker import ImageRef, LabelName
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     ClusterMode,
     ClusterSSHKeyPair,
     ImageConfig,
-    KernelCreationConfig,
     SessionTypes,
 )
 

@@ -1,4 +1,5 @@
 import logging
+import secrets
 import uuid
 from collections.abc import Iterable
 
@@ -34,7 +35,9 @@ async def conf_v2(
     root_ctx: RootContext = request.app["_root.context"]
     if not root_ctx.local_config.proxy_coordinator.allow_unauthorized_configure_request:
         token_to_evaluate = request.headers.get("X-BackendAI-Token")
-        if token_to_evaluate != root_ctx.local_config.secrets.api_secret:
+        if not token_to_evaluate or not secrets.compare_digest(
+            token_to_evaluate.encode(), root_ctx.local_config.secrets.api_secret.encode()
+        ):
             raise AuthorizationFailed("Unauthorized access")
 
     if not params.session.id or not params.session.access_key:

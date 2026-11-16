@@ -25,3 +25,5 @@ jobs:
         run: python3 scripts/knowledge/check_bilingual.py --base "origin/${{ github.base_ref }}"
       - name: Check words the glossary rejects
         run: python3 scripts/knowledge/check_words.py --base "origin/${{ github.base_ref }}"
+      - name: Check BEP length limits
+        run: python3 scripts/knowledge/check_bep_length.py

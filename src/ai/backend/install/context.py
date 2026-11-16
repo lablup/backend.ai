@@ -33,7 +33,7 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
-from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
@@ -437,6 +437,13 @@ class Context(metaclass=ABCMeta):
             password=halfstack.etcd_password,
             keep_alive_interval=halfstack.etcd_keep_alive_interval,
             keep_alive_timeout=halfstack.etcd_keep_alive_timeout,
+            tls=EtcdTLSConfigData(
+                enabled=False,
+                ca_cert=None,
+                client_cert=None,
+                client_key=None,
+                handshake_timeout=None,
+            ),
         )
         async with AsyncEtcd.create_from_config(etcd_config) as etcd:
             yield etcd

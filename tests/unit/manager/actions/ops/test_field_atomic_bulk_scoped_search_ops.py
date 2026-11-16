@@ -29,7 +29,8 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 )
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.errors.permission import NotEnoughPermission, RoleNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
     PermissionSearchableFields,

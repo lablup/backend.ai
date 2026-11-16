@@ -184,24 +184,16 @@ def ssh() -> None:
     type=click.Path(exists=True, dir_okay=False, readable=True),
     help="Path to PEM-encoded SSH public key file.",
 )
-@click.option(
-    "--private-key-file",
-    required=True,
-    type=click.Path(exists=True, dir_okay=False, readable=True),
-    help="Path to PEM-encoded SSH private key file.",
-)
-def ssh_register(access_key: str, public_key_file: str, private_key_file: str) -> None:
-    """Register (overwrite) a user's SSH keypair (superadmin only)."""
+def ssh_register(access_key: str, public_key_file: str) -> None:
+    """Register (overwrite) a user's SSH public key (superadmin only)."""
     from pathlib import Path
 
     from ai.backend.common.dto.manager.v2.keypair.request import AdminRegisterSSHKeypairInput
 
     ssh_public_key = Path(public_key_file).read_text(encoding="utf-8")
-    ssh_private_key = Path(private_key_file).read_text(encoding="utf-8")
     input_dto = AdminRegisterSSHKeypairInput(
         access_key=access_key,
         ssh_public_key=ssh_public_key,
-        ssh_private_key=ssh_private_key,
     )
 
     async def _run() -> None:

@@ -75,7 +75,7 @@ pants test tests/integration/::
 
 # Run specific component
 pants test tests/unit/manager/::
-pants test tests/component/agent/::
+pants test tests/component/vfolder/::
 
 # Run changed tests only
 pants test --changed-since=HEAD~1
@@ -101,14 +101,14 @@ instead.
 
 ## Test batches
 
-`tests/component/BUILD` sets `batch_compatibility_tag="component"` for every
-`python_tests` target under it, so Pants runs up to `[test].batch_size` files in one
-pytest process. Files in a batch share one database, etcd namespace and redis, so a
+`tests/component/BUILD` and `tests/unit/common/BUILD` set `batch_compatibility_tag`
+(`component`, `unit-common`) for every `python_tests` target under them, so Pants runs
+up to `[test].batch_size` files in one pytest process. Files in a batch share one database, etcd namespace and redis, so a
 test must clean up what its fixtures wrote.
 
 | Rule | |
 |---|---|
-| A tag names an infrastructure set | `component` = postgres + etcd + redis; `component-agent` = pulled docker images |
+| A tag names an infrastructure set | `component` = postgres + etcd + redis |
 | Set it once, in the subtree's top `__defaults__` | Do not set it on an individual `python_tests` target |
 | A new tag needs a different infrastructure set | Write the reason in that BUILD file |
 | State leaking between files is a fixture bug | Fix the fixture; do not split the tag or pull the file out of the batch |

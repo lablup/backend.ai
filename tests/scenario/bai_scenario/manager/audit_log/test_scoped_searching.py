@@ -37,7 +37,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ActorRecords,
     ARecordScopedToAProject,
@@ -50,6 +50,7 @@ from bai_scenario.components.audit_log import (
     ThePageIsCapped,
     TheRecordsAnswered,
 )
+from bai_scenario.components.nothing_is_found import NothingIsFound
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario

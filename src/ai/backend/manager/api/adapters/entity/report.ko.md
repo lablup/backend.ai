@@ -46,6 +46,6 @@ When
 
 Then
 
-- 배선된 도메인 유형 하나가 그 이름으로 반환됩니다
-  - items = [EntityTypeNode(name='domain')]
+- 도메인 처리기가 배선한 엔티티 유형 두 개가 이름순으로 반환됩니다
+  - items = [EntityTypeNode(name='container_registry'), EntityTypeNode(name='domain')]
 

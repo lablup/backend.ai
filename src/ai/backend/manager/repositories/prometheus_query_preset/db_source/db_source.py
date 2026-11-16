@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.exception import PrometheusQueryPresetNotFound
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetNotFound,
+)
 from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetData,
     PrometheusQueryPresetListResult,

@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryName,
     ContainerRegistryProjectName,
 )
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.container_registry.request import (
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     ContainerRegistryOrder,
     CreateContainerRegistryInput,
     PartialBulkPurgeContainerRegistriesInput,
+    ScopedSearchContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
@@ -26,6 +28,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     ContainerRegistryNode,
     CreateContainerRegistryPayload,
     PurgeContainerRegistryPayload,
+    ScopedSearchContainerRegistriesPayload,
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import (
@@ -56,12 +59,13 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryPurger,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.scopes import DomainContainerRegistryTarget
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
 from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
@@ -77,6 +81,9 @@ from ai.backend.manager.services.container_registry.actions.lookup import (
 )
 from ai.backend.manager.services.container_registry.actions.partial_bulk_purge_container_registries import (
     PartialBulkPurgeContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.scoped_search_container_registries import (
+    ScopedSearchContainerRegistriesAction,
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
@@ -145,6 +152,44 @@ class ContainerRegistryAdapter(BaseAdapter):
         )
 
         return AdminSearchContainerRegistriesPayload(
+            items=[self._data_to_dto(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def scoped_search(
+        self, input: ScopedSearchContainerRegistriesInput
+    ) -> ScopedSearchContainerRegistriesPayload:
+        """Search the container registries the named domains are related to, combined with OR."""
+        querier = self._build_querier(
+            conditions=self._convert_filter(input.filter) if input.filter else [],
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._container_registry.scoped_search_container_registries.run(
+            ScopedSearchContainerRegistriesAction(
+                searcher=ScopedSearcher(
+                    scopes=[
+                        DomainContainerRegistryTarget(DomainID(entry.value))
+                        for entry in input.scope.domain
+                    ],
+                    used_by=(),
+                    searcher=ContainerRegistrySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
+        )
+        return ScopedSearchContainerRegistriesPayload(
             items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,

@@ -2,13 +2,12 @@
 
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingMode
@@ -55,11 +54,6 @@ def mock_group_repository() -> AsyncMock:
     repo = AsyncMock(spec=ProjectRepository)
     repo.project_id_by_name_in_domain.return_value = None
     return repo
-
-
-@pytest.fixture
-def sample_client_type_id() -> UUID:
-    return uuid4()
 
 
 @pytest.fixture

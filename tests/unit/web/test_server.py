@@ -2,6 +2,7 @@ import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -23,6 +24,7 @@ from ai.backend.web.server import (
     config_toml_handler,
     extend_login_session,
     update_password_no_auth,
+    version_json_handler,
 )
 from ai.backend.web.template import build_template_environment
 
@@ -377,3 +379,36 @@ class TestConfigTomlHandler:
         assert config["general"]["hideAgents"] is False
         assert {"resources", "environments", "menu", "plugin", "wsproxy", "pipeline"} <= set(config)
         assert config["menu"]["blocklist"] == "agent"
+
+
+_VERSION_JSON = '{ "package": "26.10.0", "buildNumber": "100" }'
+
+
+class TestVersionJsonHandler:
+    @pytest.fixture
+    def app_serving_version_json(self, tmp_path: Path) -> web.Application:
+        (tmp_path / "version.json").write_text(_VERSION_JSON)
+        app = web.Application()
+        setup_session(app, SimpleCookieStorage())
+        app["config"] = WebServerUnifiedConfig.model_validate({
+            "service": {"static-path": str(tmp_path)},
+        })
+        app.router.add_route("POST", "/login", _login)
+        app.router.add_route("GET", "/version.json", version_json_handler)
+        return app
+
+    async def test_before_login_is_unauthorized(
+        self, aiohttp_client: Any, app_serving_version_json: web.Application
+    ) -> None:
+        client = await aiohttp_client(app_serving_version_json)
+        resp = await client.get("/version.json")
+        assert resp.status == 401
+
+    async def test_after_login_is_served(
+        self, aiohttp_client: Any, app_serving_version_json: web.Application
+    ) -> None:
+        client = await aiohttp_client(app_serving_version_json)
+        await client.post("/login")
+        resp = await client.get("/version.json")
+        assert resp.status == 200
+        assert await resp.text() == _VERSION_JSON

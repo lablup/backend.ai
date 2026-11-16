@@ -79,6 +79,7 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -106,6 +107,7 @@ _SCHEDULER_ROWS: list[type] = [
     UserDefaultBootstrapScriptRow,
     BootstrapScriptRevisionRow,
     KeyPairRow,
+    SSHKeypairRow,
     ProjectRow,
     EntityFieldRow,
     AgentRow,

@@ -31,6 +31,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.exceptions import convert_to_status_data
@@ -62,6 +63,7 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -517,7 +519,11 @@ class TestCancelFreesResourceAllocations:
         pending_session: tuple[SessionId, KernelId],
     ) -> None:
         session_id, kernel_id = pending_session
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         result = await db_source.mark_sessions_terminating([session_id])
 
@@ -530,7 +536,11 @@ class TestCancelFreesResourceAllocations:
         pulling_session_on_agent: tuple[SessionId, KernelId, str],
     ) -> None:
         session_id, kernel_id, agent_id = pulling_session_on_agent
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         affected = await db_source.cancel_kernels_for_failed_image(
             AgentId(agent_id), "python:3.8", "image pull failed for test"
@@ -584,7 +594,11 @@ class TestCancelFreesResourceAllocations:
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         await db_source.cancel_kernels_for_failed_image(
             AgentId(agent_id), "python:3.8", "image pull failed for test"
@@ -604,7 +618,11 @@ class TestCancelFreesResourceAllocations:
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         await db_source.mark_session_cancelled(
             session_id, convert_to_status_data(RuntimeError("failed to start"))

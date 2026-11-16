@@ -4,8 +4,8 @@
 
 시나리오: 완성
 
-- ops 구성 (1)
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+- ops + 직접 구현 (1)
+  - batch_load_by_ids: 성공 있음 1 · 거부 있음 1 (partial_bulk, partial_bulk_get_ops)
 - 직접 구현 (8)
   - create: 성공 있음 1 · 거부 있음 1 (global_scope)
   - get: 성공 있음 1 · 거부 있음 1 (single_entity)

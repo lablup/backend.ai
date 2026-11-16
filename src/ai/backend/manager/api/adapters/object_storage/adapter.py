@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.object_storage.types import (
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
 from ai.backend.manager.models.object_storage.searchable_fields import (
@@ -47,6 +46,7 @@ from ai.backend.manager.models.object_storage.searchers import ObjectStorageSear
 from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.services.object_storage.actions.bulk_get import (
     BulkGetObjectStoragesAction,
 )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.errors.permission import InvalidPermissionOperation
+from ai.backend.manager.errors.permission_field import InvalidPermissionOperation
 
 
 def single_bit(permission: Permission) -> Permission:

@@ -695,7 +695,6 @@ def _build_worker_health_response(connectivity: ConnectivityCheckResponse) -> we
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="appproxy-worker",
         connectivity=connectivity,
     )
@@ -707,7 +706,6 @@ def _build_worker_probe_response(connectivity: ConnectivityCheckResponse) -> web
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="appproxy-worker",
         connectivity=connectivity,
     )

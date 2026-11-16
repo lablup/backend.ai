@@ -13,7 +13,7 @@
         "cpu": "4",
         "mem": "8589934592"
       },
-      "shared_memory": "1073741824"
+      "shared_memory": 1073741824
     },
     {
       "name": "cpu03-large",
@@ -21,7 +21,7 @@
         "cpu": "8",
         "mem": "17179869184"
       },
-      "shared_memory": "2147483648"
+      "shared_memory": 2147483648
     },
     {
       "name": "cuda01-small",
@@ -40,7 +40,7 @@
         "cuda.device": "2",
         "cuda.shares": "2.0"
       },
-      "shared_memory": "1073741824"
+      "shared_memory": 1073741824
     },
     {
       "name": "cuda03-large",
@@ -50,7 +50,7 @@
         "cuda.device": "4",
         "cuda.shares": "4.0"
       },
-      "shared_memory": "2147483648"
+      "shared_memory": 2147483648
     }
   ]
 }

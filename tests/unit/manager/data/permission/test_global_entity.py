@@ -10,7 +10,7 @@ from ai.backend.manager.data.permission.global_entity import (
     GlobalEntityIDCache,
     global_entity_id,
 )
-from ai.backend.manager.errors.permission import GlobalEntityMissing, GlobalEntityNotLoaded
+from ai.backend.manager.errors.global_entity import GlobalEntityMissing, GlobalEntityNotLoaded
 
 
 class TestGlobalEntityIDCache:

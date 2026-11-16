@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.session_template import (
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -58,6 +59,15 @@ class TemplateUserScopeAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
         return (self.user_uuid,)
+
+
+class TemplateGlobalAction(BaseGlobalAction):
+    """Base for a read of the templates of every user and project."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return SessionTemplateEntityType()
 
 
 @dataclass

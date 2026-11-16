@@ -166,8 +166,8 @@ from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.errors.base.not_found import NotFoundError
-from ai.backend.manager.errors.permission import (
-    NotEnoughPermission,
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.permission_field import (
     PermissionAlreadyGranted,
     ReplaceRolePermissionRoleIdMismatch,
 )

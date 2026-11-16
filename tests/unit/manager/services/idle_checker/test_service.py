@@ -18,7 +18,9 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationSpec,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetInvalidLabel,
+)
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.errors.metric import InvalidContainerMetricName
