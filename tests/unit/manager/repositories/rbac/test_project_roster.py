@@ -18,10 +18,10 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import (
     PersonalProjectMemberAdditionError,
     ProjectMemberNotJoinableError,
-    ProjectRoleNotGrantableError,
 )
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -462,7 +462,7 @@ class TestEnrollUsersInProject:
     ) -> None:
         """A role enrolled in another project is not granted through this project's
         roster."""
-        with pytest.raises(ProjectRoleNotGrantableError):
+        with pytest.raises(RoleNotFound):
             await roster_repository.join_members(
                 test_project, [same_domain_user_1], other_project_role
             )
@@ -483,7 +483,7 @@ class TestEnrollUsersInProject:
     ) -> None:
         """A role held at the domain scope, such as the domain's admin role, is not
         granted through a project's roster."""
-        with pytest.raises(ProjectRoleNotGrantableError):
+        with pytest.raises(RoleNotFound):
             await roster_repository.join_members(test_project, [same_domain_user_1], domain_role)
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -499,7 +499,7 @@ class TestEnrollUsersInProject:
         inactive_project_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
-        with pytest.raises(ProjectRoleNotGrantableError):
+        with pytest.raises(RoleNotFound):
             await roster_repository.join_members(
                 test_project, [same_domain_user_1], inactive_project_role
             )
@@ -510,7 +510,7 @@ class TestEnrollUsersInProject:
         test_project: ProjectID,
         same_domain_user_1: UserID,
     ) -> None:
-        with pytest.raises(ProjectRoleNotGrantableError):
+        with pytest.raises(RoleNotFound):
             await roster_repository.join_members(
                 test_project, [same_domain_user_1], RoleID(uuid.uuid4())
             )

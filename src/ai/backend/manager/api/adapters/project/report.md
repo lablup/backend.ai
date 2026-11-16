@@ -316,7 +316,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: ProjectRoleNotGrantableError
+  - rejected: RoleNotFound
 
 ### partial_bulk_update
 

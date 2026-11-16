@@ -26,8 +26,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.resource import ProjectRoleNotGrantableError
+from ai.backend.manager.errors.permission import NotEnoughPermission, RoleNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -440,7 +439,7 @@ class AssigningWithARoleOfAnotherProjectIsRefused(
 
     @override
     def then(self) -> Then[AProjectAMemberAndACaller, Answer]:
-        return TheCallIsRefused(ProjectRoleNotGrantableError)
+        return TheCallIsRefused(RoleNotFound)
 
 
 @dataclass(frozen=True)

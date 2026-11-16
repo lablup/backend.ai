@@ -316,7 +316,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: ProjectRoleNotGrantableError
+  - 거부: RoleNotFound
 
 ### partial_bulk_update
 

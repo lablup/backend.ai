@@ -25,12 +25,12 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import (
     ModelStoreProjectLeaveError,
     PersonalProjectMemberAdditionError,
     ProjectMemberNotJoinableError,
     ProjectNotFound,
-    ProjectRoleNotGrantableError,
 )
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -171,9 +171,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             )
         )
         if (await self._sess.execute(stmt)).first() is None:
-            raise ProjectRoleNotGrantableError(
-                f"Role {role_id} is not a role of project {project_id}"
-            )
+            raise RoleNotFound(f"Role {role_id} is not an active role of project {project_id}")
 
     async def _domain_users(
         self, project_id: ProjectID, user_ids: Collection[UserID], *, include_joined: bool
