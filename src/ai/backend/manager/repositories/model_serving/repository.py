@@ -40,21 +40,10 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
-<<<<<<< HEAD
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
-=======
-from ai.backend.manager.data.resource_group.types import (
-    ResourceGroupData as ResourceGroupEntityData,
-)
-from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
-from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import DomainNotFound
->>>>>>> 3df44f7da (fix(BA-9021): leave out vfolders no session may mount when resolving the model folder of a model service (#16979))
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
@@ -78,7 +67,11 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
+from ai.backend.manager.models.vfolder.row import (
+    DEAD_VFOLDER_STATUSES,
+    query_accessible_vfolders,
+    vfolders,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -990,7 +983,9 @@ class ModelServingRepository:
 
             allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
             try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(model)
+                extra_vf_conds = (vfolders.c.id == uuid.UUID(model)) & vfolders.c.status.not_in(
+                    DEAD_VFOLDER_STATUSES
+                )
                 matched_vfolders = await query_accessible_vfolders(
                     conn,
                     owner_uuid,
@@ -999,12 +994,13 @@ class ModelServingRepository:
                     allowed_vfolder_types=allowed_vfolder_types,
                     extra_vf_conds=extra_vf_conds,
                 )
-<<<<<<< HEAD
             except Exception as e:
                 if isinstance(e, (ValueError, VFolderNotFound)):
                     try:
-                        extra_vf_conds = (vfolders.c.name == model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                        extra_vf_conds = (
+                            (vfolders.c.name == model)
+                            & (vfolders.c.usage_mode == VFolderUsageMode.MODEL)
+                            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
                         )
                         matched_vfolders = await query_accessible_vfolders(
                             conn,
@@ -1018,14 +1014,6 @@ class ModelServingRepository:
                         raise VFolderNotFound("Cannot find model folder") from e
                 else:
                     raise
-=======
-            matched_vfolders = await query_reachable_vfolders(
-                conn,
-                owner_scope,
-                model_condition & vfolders.c.status.not_in(VFolderOperationStatus.dead()),
-                owner_held,
-            )
->>>>>>> 3df44f7da (fix(BA-9021): leave out vfolders no session may mount when resolving the model folder of a model service (#16979))
             if len(matched_vfolders) == 0:
                 raise VFolderNotFound
             folder_row = matched_vfolders[0]
