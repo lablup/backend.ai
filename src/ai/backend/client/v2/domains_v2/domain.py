@@ -8,19 +8,23 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainContainerRegistryRelationsInput,
     CreateDomainInput,
     DeleteDomainInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
+    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
+    CreateDomainContainerRegistryRelationsPayload,
     DeleteDomainPayload,
     DomainNode,
     DomainPayload,
+    PurgeDomainContainerRegistryRelationsPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
 )
@@ -116,6 +120,28 @@ class V2DomainClient(BaseDomainClient):
             f"{_PATH}/partial-bulk-restore",
             request=request,
             response_model=PartialBulkPayload[DomainNode],
+        )
+
+    async def create_container_registry_relations(
+        self, request: CreateDomainContainerRegistryRelationsInput
+    ) -> CreateDomainContainerRegistryRelationsPayload:
+        """Relate a domain to container registries."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/container-registry-relations",
+            request=request,
+            response_model=CreateDomainContainerRegistryRelationsPayload,
+        )
+
+    async def purge_container_registry_relations(
+        self, request: PurgeDomainContainerRegistryRelationsInput
+    ) -> PurgeDomainContainerRegistryRelationsPayload:
+        """Remove the relations between a domain and container registries."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/container-registry-relations/purge",
+            request=request,
+            response_model=PurgeDomainContainerRegistryRelationsPayload,
         )
 
     async def admin_update(self, domain_name: str, request: UpdateDomainInput) -> DomainPayload:

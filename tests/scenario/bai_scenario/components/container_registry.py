@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
 )
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
@@ -410,6 +410,70 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
             seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+
+
+@dataclass(frozen=True)
+class ADomainAndARegistryToRelateAndACaller:
+    domain: DomainData
+    registry: ContainerRegistryData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ADomainAndARegistryToRelate(Given[TestSeedingSession, ADomainAndARegistryToRelateAndACaller]):
+    """관계 연산은 지정한 스코프 모두에 권한이 있어야 실행된다. 그래서 한쪽에만 권한을 주는 상황이 필요하다."""
+
+    on_domain: bool = True
+    related: bool = False
+    permissions: tuple[Permission, ...] = ALLOWING
+
+    @override
+    def describe(self) -> str:
+        holds_ko = "도메인과 레지스트리에" if self.on_domain else "레지스트리에만"
+        holds_en = "the domain and the registry" if self.on_domain else "the registry alone"
+        already_ko = ", 둘 사이에는 relation이 이미 있음" if self.related else ""
+        already_en = ", and the two are already related" if self.related else ""
+        return Says(
+            f"도메인 하나, 레지스트리 하나, {holds_ko} 권한이 있는 사용자 한 명{already_ko}",
+            english=(
+                f"one domain, one registry, and one user holding permission on "
+                f"{holds_en}{already_en}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ADomainAndARegistryToRelateAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        if self.related:
+            await seeding.linking(AllowDomain(), domain, registry)
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.USER))
+        await seeding.within(
+            SomeoneAllowingIn(
+                registry,
+                caller,
+                scope_of=lambda one: ContainerRegistryID(one.id),
+                entity_type=ContainerRegistryEntityType(),
+                name_hint="allow-on-registry",
+                permissions=self.permissions,
+            )
+        )
+        if self.on_domain:
+            await seeding.within(
+                SomeoneAllowingIn(
+                    domain,
+                    caller,
+                    scope_of=lambda one: DomainID(one.id),
+                    entity_type=DomainEntityType(),
+                    name_hint="allow-on-domain",
+                    permissions=self.permissions,
+                )
+            )
+        return ADomainAndARegistryToRelateAndACaller(
+            domain=seeding.made(domain),
+            registry=seeding.made(registry),
+            caller=seeding.made(caller),
         )
 
 

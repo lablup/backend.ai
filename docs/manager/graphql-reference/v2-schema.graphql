@@ -3251,6 +3251,28 @@ type CreateDeploymentRevisionPresetPayload {
   preset: DeploymentRevisionPreset!
 }
 
+"""Added in 26.10.0. Input for relating a domain to container registries."""
+input CreateDomainContainerRegistryRelationsInput {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """IDs of the container registries to relate to the domain."""
+  containerRegistryIds: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Payload for relating a domain to container registries.
+"""
+type CreateDomainContainerRegistryRelationsPayload {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """
+  IDs of the container registries this request related. A pair already related is left out.
+  """
+  containerRegistryIds: [UUID!]!
+}
+
 """Added in 26.4.2. Input for creating a new domain."""
 input CreateDomainInput {
   """Domain name. Must be unique across the system."""
@@ -5806,6 +5828,9 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Added in 26.9.0. Resource groups this domain may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """Added in 26.10.0. Container registries this domain is related to."""
+  containerRegistries(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection
 
   """
   Added in 26.10.0. System session environ rows bound to this domain itself, soft-deleted ones included.
@@ -10813,6 +10838,16 @@ type Mutation {
   partialBulkRestoreDomainsV2(input: PartialBulkRestoreDomainsInput!): PartialBulkDomainsPayload!
 
   """
+  Added in 26.10.0. Relate a domain to container registries. A pair already related is left as it stands.
+  """
+  createDomainContainerRegistryRelations(input: CreateDomainContainerRegistryRelationsInput!): CreateDomainContainerRegistryRelationsPayload
+
+  """
+  Added in 26.10.0. Remove the relations between a domain and container registries. A pair not related is skipped.
+  """
+  purgeDomainContainerRegistryRelations(input: PurgeDomainContainerRegistryRelationsInput!): PurgeDomainContainerRegistryRelationsPayload
+
+  """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
   """
   adminCreateProjectV2(input: CreateProjectInput!): ProjectPayload
@@ -14922,6 +14957,30 @@ type PurgeDeploymentRevisionPresetPayload {
 
   """UUID of the purged deployment revision preset."""
   entityId: UUID!
+}
+
+"""
+Added in 26.10.0. Input for removing the relations between a domain and container registries.
+"""
+input PurgeDomainContainerRegistryRelationsInput {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """IDs of the container registries to unrelate from the domain."""
+  containerRegistryIds: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Payload for removing the relations between a domain and container registries.
+"""
+type PurgeDomainContainerRegistryRelationsPayload {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """
+  IDs of the container registries this request unrelated. A pair not related is left out.
+  """
+  containerRegistryIds: [UUID!]!
 }
 
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""

@@ -25,6 +25,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchDomainsInput",
+    "CreateDomainContainerRegistryRelationsInput",
     "CreateDomainInput",
     "DeleteDomainInput",
     "RestoreDomainInput",
@@ -34,6 +35,7 @@ __all__ = (
     "PartialBulkRestoreDomainsInput",
     "PartialBulkUpdateDomainItemInput",
     "PartialBulkUpdateDomainsInput",
+    "PurgeDomainContainerRegistryRelationsInput",
     "PurgeDomainInput",
     "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
@@ -113,6 +115,24 @@ class PurgeDomainInput(BaseRequestModel):
     """Input for permanently purging a domain and all associated data."""
 
     name: str = Field(description="Name of the domain to permanently purge.")
+
+
+class CreateDomainContainerRegistryRelationsInput(BaseRequestModel):
+    """Input for relating a domain to container registries."""
+
+    domain_id: UUID = Field(description="ID of the domain.")
+    container_registry_ids: NonEmptyList[UUID] = Field(
+        description="IDs of the container registries to relate to the domain."
+    )
+
+
+class PurgeDomainContainerRegistryRelationsInput(BaseRequestModel):
+    """Input for removing the relations between a domain and container registries."""
+
+    domain_id: UUID = Field(description="ID of the domain.")
+    container_registry_ids: NonEmptyList[UUID] = Field(
+        description="IDs of the container registries to unrelate from the domain."
+    )
 
 
 class PartialBulkUpdateDomainItemInput(BaseRequestModel):

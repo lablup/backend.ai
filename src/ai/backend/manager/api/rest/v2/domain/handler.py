@@ -10,11 +10,13 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainContainerRegistryRelationsInput,
     CreateDomainInput,
     DeleteDomainInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
+    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     RestoreDomainInput,
     ScopedSearchDomainsInput,
@@ -116,6 +118,22 @@ class V2DomainHandler:
     ) -> APIResponse:
         """Restore several soft-deleted domains, answering for each one."""
         result = await self._adapter.partial_bulk_restore(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def create_container_registry_relations(
+        self,
+        body: BodyParam[CreateDomainContainerRegistryRelationsInput],
+    ) -> APIResponse:
+        """Relate a domain to container registries."""
+        result = await self._adapter.create_container_registry_relations(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge_container_registry_relations(
+        self,
+        body: BodyParam[PurgeDomainContainerRegistryRelationsInput],
+    ) -> APIResponse:
+        """Remove the relations between a domain and container registries."""
+        result = await self._adapter.purge_container_registry_relations(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_update(

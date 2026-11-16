@@ -8,6 +8,9 @@ from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
+    CreateDomainContainerRegistryRelationsInput as CreateDomainContainerRegistryRelationsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput as CreateDomainInputDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.request import (
@@ -23,7 +26,13 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     PartialBulkUpdateDomainsInput as PartialBulkUpdateDomainsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.request import (
+    PurgeDomainContainerRegistryRelationsInput as PurgeDomainContainerRegistryRelationsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.request import (
     UpdateDomainInput as UpdateDomainInputDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    CreateDomainContainerRegistryRelationsPayload as CreateDomainContainerRegistryRelationsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     DeleteDomainPayload as DeleteDomainPayloadDTO,
@@ -33,6 +42,9 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainPayload as DomainPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    PurgeDomainContainerRegistryRelationsPayload as PurgeDomainContainerRegistryRelationsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload as PurgeDomainPayloadDTO,
@@ -155,6 +167,38 @@ class PartialBulkRestoreDomainsInputGQL(PydanticInputMixin[PartialBulkRestoreDom
     ids: list[UUID] = gql_field(description="IDs of the domains to restore.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for relating a domain to container registries.",
+    ),
+    name="CreateDomainContainerRegistryRelationsInput",
+)
+class CreateDomainContainerRegistryRelationsInputGQL(
+    PydanticInputMixin[CreateDomainContainerRegistryRelationsInputDTO]
+):
+    domain_id: UUID = gql_field(description="ID of the domain.")
+    container_registry_ids: list[UUID] = gql_field(
+        description="IDs of the container registries to relate to the domain."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for removing the relations between a domain and container registries.",
+    ),
+    name="PurgeDomainContainerRegistryRelationsInput",
+)
+class PurgeDomainContainerRegistryRelationsInputGQL(
+    PydanticInputMixin[PurgeDomainContainerRegistryRelationsInputDTO]
+):
+    domain_id: UUID = gql_field(description="ID of the domain.")
+    container_registry_ids: list[UUID] = gql_field(
+        description="IDs of the container registries to unrelate from the domain."
+    )
+
+
 # --- Payloads ---
 
 
@@ -247,4 +291,44 @@ class PartialBulkDomainsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[Domain
     )
     failed: list[PartialBulkFailureGQL] = gql_field(
         description="The domains not processed, each with the reason."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for relating a domain to container registries.",
+    ),
+    model=CreateDomainContainerRegistryRelationsPayloadDTO,
+    name="CreateDomainContainerRegistryRelationsPayload",
+)
+class CreateDomainContainerRegistryRelationsPayloadGQL(
+    PydanticOutputMixin[CreateDomainContainerRegistryRelationsPayloadDTO]
+):
+    domain_id: UUID = gql_field(description="ID of the domain.")
+    container_registry_ids: list[UUID] = gql_field(
+        description=(
+            "IDs of the container registries this request related. "
+            "A pair already related is left out."
+        )
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for removing the relations between a domain and container registries.",
+    ),
+    model=PurgeDomainContainerRegistryRelationsPayloadDTO,
+    name="PurgeDomainContainerRegistryRelationsPayload",
+)
+class PurgeDomainContainerRegistryRelationsPayloadGQL(
+    PydanticOutputMixin[PurgeDomainContainerRegistryRelationsPayloadDTO]
+):
+    domain_id: UUID = gql_field(description="ID of the domain.")
+    container_registry_ids: list[UUID] = gql_field(
+        description=(
+            "IDs of the container registries this request unrelated. "
+            "A pair not related is left out."
+        )
     )
