@@ -9,20 +9,37 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+<<<<<<< HEAD
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+=======
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+>>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
+<<<<<<< HEAD
 from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+=======
+from ai.backend.manager.errors.resource import (
+    PersonalProjectMemberAdditionError,
+    ProjectMemberNotJoinableError,
+)
+from ai.backend.manager.errors.role import RoleNotFound
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+>>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -350,6 +367,67 @@ class TestEnrollUsersInProject:
         return role_id
 
     @pytest.fixture
+    async def other_project_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        personal_project: ProjectID,
+    ) -> RoleID:
+        role_id = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"other-role-{role_id.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=personal_project,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    @pytest.fixture
+    async def domain_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> RoleID:
+        role_id = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            await VirtualEntitySeeder().provision(
+                session, DomainEntityType(), test_domain.domain_id
+            )
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"domain-role-{role_id.hex[:8]}",
+                    scope_type=DomainEntityType(),
+                    scope_id=test_domain.domain_id,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    @pytest.fixture
+    async def inactive_project_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: ProjectID,
+    ) -> RoleID:
+        role_id = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"inactive-role-{role_id.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=test_project,
+                    status=RoleStatus.INACTIVE,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    @pytest.fixture
     def roster_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -388,6 +466,69 @@ class TestEnrollUsersInProject:
                 )
             ).all()
             assert len(members) == 2
+
+    async def test_enroll_refuses_a_role_of_another_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        other_project_role: RoleID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """A role enrolled in another project is not granted through this project's
+        roster."""
+        with pytest.raises(RoleNotFound):
+            await roster_repository.join_members(
+                test_project, [same_domain_user_1], other_project_role
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            granted = await session.scalar(
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == other_project_role)
+            )
+            assert granted is None
+
+    async def test_enroll_refuses_a_role_of_the_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        domain_role: RoleID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """A role held at the domain scope, such as the domain's admin role, is not
+        granted through a project's roster."""
+        with pytest.raises(RoleNotFound):
+            await roster_repository.join_members(test_project, [same_domain_user_1], domain_role)
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            granted = await session.scalar(
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == domain_role)
+            )
+            assert granted is None
+
+    async def test_enroll_refuses_an_inactive_role_of_the_project(
+        self,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        inactive_project_role: RoleID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        with pytest.raises(RoleNotFound):
+            await roster_repository.join_members(
+                test_project, [same_domain_user_1], inactive_project_role
+            )
+
+    async def test_enroll_refuses_a_role_that_is_not_there(
+        self,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        with pytest.raises(RoleNotFound):
+            await roster_repository.join_members(
+                test_project, [same_domain_user_1], RoleID(uuid.uuid4())
+            )
 
     async def test_enroll_empty_list_returns_empty(
         self,
