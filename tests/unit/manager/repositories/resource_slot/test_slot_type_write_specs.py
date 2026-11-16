@@ -157,6 +157,7 @@ def _creator(
     enabled: bool = True,
     display_name: str = "",
     rank: int = 0,
+    sealed_launch: bool = False,
 ) -> ResourceSlotTypeCreator:
     """Build a creator with every field named, since the spec carries no defaults."""
     return ResourceSlotTypeCreator(
@@ -170,6 +171,7 @@ def _creator(
         display_icon="",
         number_format=NumberFormat(),
         rank=rank,
+        sealed_launch=sealed_launch,
     )
 
 
@@ -195,6 +197,19 @@ class TestResourceSlotTypeCreator:
         assert data.enabled is False
         assert data.rank == 7
         assert isinstance(data.uuid, uuid.UUID)
+
+    async def test_sealed_launch_defaults_to_false_and_is_stored(
+        self,
+        db_with_referencing_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+            default = await w.create_entity(_creator("cpu", SlotTypes.COUNT))
+            sealed = await w.create_entity(
+                _creator("confidential.tdx", SlotTypes.UNIQUE, sealed_launch=True)
+            )
+
+        assert default.sealed_launch is False
+        assert sealed.sealed_launch is True
 
     async def test_each_row_gets_a_distinct_uuid(
         self,
@@ -254,6 +269,21 @@ class TestResourceSlotTypeUpdater:
         assert data.required is True
         assert data.display_name == "GPU"
         assert data.slot_type == "unique"
+
+    async def test_sets_sealed_launch(
+        self,
+        db_with_referencing_tables: ExtendedAsyncSAEngine,
+        existing_slot_type: ResourceSlotTypeData,
+    ) -> None:
+        async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+            data = await w.update_data(
+                ResourceSlotTypeUpdater(
+                    slot_type_id=existing_slot_type.uuid,
+                    sealed_launch=OptionalState.update(True),
+                )
+            )
+        assert data is not None
+        assert data.sealed_launch is True
 
     async def test_unknown_name_matches_nothing(
         self,

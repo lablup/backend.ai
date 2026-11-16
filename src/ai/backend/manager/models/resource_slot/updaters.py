@@ -40,6 +40,7 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
         default_factory=OptionalState[NumberFormat].nop
     )
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    sealed_launch: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @property
     @override
@@ -70,6 +71,7 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
         self.display_icon.update_dict(to_update, "display_icon")
         self.number_format.update_dict(to_update, "number_format")
         self.rank.update_dict(to_update, "rank")
+        self.sealed_launch.update_dict(to_update, "sealed_launch")
         return to_update
 
     @override

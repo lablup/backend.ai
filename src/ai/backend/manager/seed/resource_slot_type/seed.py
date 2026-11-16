@@ -28,6 +28,7 @@ class ResourceSlotTypeSeed(SeedItem):
     display_icon: str = Field(default="", max_length=64)
     number_format: NumberFormat = NumberFormat()
     rank: int = Field(default=0, ge=-(2**31), le=2**31 - 1)
+    sealed_launch: bool = False
 
     @override
     def key(self) -> str:
@@ -48,6 +49,7 @@ class ResourceSlotTypeSeed(SeedItem):
                 display_icon=self.display_icon,
                 number_format=self.number_format,
                 rank=self.rank,
+                sealed_launch=self.sealed_launch,
             ),
             field_upserters=[],
             field_purgers=[],

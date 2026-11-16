@@ -96,6 +96,11 @@ def search(
 @click.option("--binary/--decimal", default=False, help="Binary (1024) or decimal (1000) prefixes.")
 @click.option("--round-length", type=int, default=0, help="Decimal places when displaying.")
 @click.option("--rank", type=int, default=0, help="Display ordering rank.")
+@click.option(
+    "--sealed-launch/--no-sealed-launch",
+    default=False,
+    help="Whether kernels holding it must be launched sealed.",
+)
 def create(
     slot_name: str,
     slot_type_category: str,
@@ -108,6 +113,7 @@ def create(
     binary: bool,
     round_length: int,
     rank: int,
+    sealed_launch: bool,
 ) -> None:
     """Register a new resource slot type."""
     from ai.backend.common.dto.manager.v2.resource_slot.request import (
@@ -130,6 +136,7 @@ def create(
                     display_icon=display_icon,
                     number_format=NumberFormatInput(binary=binary, round_length=round_length),
                     rank=rank,
+                    sealed_launch=sealed_launch,
                 ),
             )
             print_result(result)
@@ -164,6 +171,12 @@ def create(
     help="Decimal places when displaying. Sets the number format.",
 )
 @click.option("--rank", type=int, default=None, help="Display ordering rank.")
+@click.option(
+    "--sealed-launch/--no-sealed-launch",
+    "sealed_launch",
+    default=None,
+    help="Whether kernels holding it must be launched sealed.",
+)
 def update(
     slot_name: str,
     required: bool | None,
@@ -175,6 +188,7 @@ def update(
     binary: bool | None,
     round_length: int | None,
     rank: int | None,
+    sealed_launch: bool | None,
 ) -> None:
     """Update a resource slot type. The slot name and slot type are immutable."""
     from ai.backend.common.dto.manager.v2.resource_slot.request import (
@@ -208,6 +222,7 @@ def update(
                     display_icon=display_icon,
                     number_format=number_format,
                     rank=rank,
+                    sealed_launch=sealed_launch,
                 ),
             )
             print_result(result)
