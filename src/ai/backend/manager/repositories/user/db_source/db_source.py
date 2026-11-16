@@ -76,9 +76,29 @@ from ai.backend.manager.models.session import (
     by_status,
     by_user_id,
 )
+<<<<<<< HEAD
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+=======
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.purgers import (
+    UserErrorLogPurger,
+    UserGroupAssociationPurger,
+    UserKeyPairPurger,
+    UserPurger,
+    UserSessionGroupPurger,
+    UserVFolderAutoMountPurger,
+)
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
+from ai.backend.manager.models.user.updaters import UserUpdater
+>>>>>>> 070426869 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -90,6 +110,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+<<<<<<< HEAD
 from ai.backend.manager.repositories.base.creator import (
     BulkCreatorError,
     Creator,
@@ -100,6 +121,13 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_b
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
+=======
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+>>>>>>> 070426869 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityBatchPurger,
@@ -201,6 +229,7 @@ class UserDBSource:
                     f"User with email {email} or username {user_name} already exists."
                 )
 
+<<<<<<< HEAD
             # Collect project IDs to join (including model store project)
             project_ids = await self._get_project_scope_ids_for_user(
                 db_session, domain_name, [UUID(gid) for gid in group_ids or []]
@@ -423,6 +452,13 @@ class UserDBSource:
             sa.select(GroupRow.id).where(
                 GroupRow.domain_name == domain_name,
                 GroupRow.type == ProjectType.MODEL_STORE,
+=======
+        result = await w.create_user(
+            FullUserCreator(
+                user=creator,
+                keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                keypair_resource_policy=keypair_resource_policy,
+>>>>>>> 070426869 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
             )
         )
         return list(rows.all())
