@@ -60,10 +60,9 @@ from ai.backend.common.exception import BackendAIError
         (QueryNotImplemented, 501),
     ],
 )
-def test_error_status_codes(error_cls: type, expected_status: int) -> None:
-    err = error_cls()
-    assert err.status_code == expected_status, (
-        f"{error_cls.__name__} has status_code={err.status_code}, expected {expected_status}"
+def test_error_status_codes(error_cls: type[BackendAIError], expected_status: int) -> None:
+    assert error_cls.status_code == expected_status, (
+        f"{error_cls.__name__} has status_code={error_cls.status_code}, expected {expected_status}"
     )
 
 
