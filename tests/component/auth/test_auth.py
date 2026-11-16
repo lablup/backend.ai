@@ -19,13 +19,6 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-<<<<<<< HEAD
-=======
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
-from ai.backend.common.auth.ssh import generate_ssh_keypair
-from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.user import UserEntityType
->>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -57,19 +50,11 @@ from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.row import generate_ssh_keypair
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.user import UserRole, users
-=======
-from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
-from ai.backend.manager.models.user.row import UserRole, users
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.secret.types import SecretValue
->>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
@@ -449,23 +434,16 @@ def rsa_public_key() -> str:
 async def regular_user_public_key_already_stored(
     db_engine: SAEngine,
     regular_user_fixture: UserFixtureData,
-) -> AsyncIterator[str]:
-    """The regular user's default SSH keypair row, holding only a public key."""
+) -> str:
+    """The regular user's keypair, holding only an SSH public key."""
     public_key, _ = generate_ssh_keypair()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(SSHKeypairRow).values(
-                user_id=regular_user_fixture.user_uuid,
-                public_key=public_key,
-                private_key=None,
-                is_default=True,
-            )
+            sa.update(keypairs)
+            .where(keypairs.c.access_key == regular_user_fixture.keypair.access_key)
+            .values(ssh_public_key=public_key)
         )
-    yield public_key
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.delete(SSHKeypairRow).where(SSHKeypairRow.user_id == regular_user_fixture.user_uuid)
-        )
+    return public_key
 
 
 # ============================================================================
@@ -912,7 +890,7 @@ class TestSSHKeypair:
         user_registry: BackendAIClientRegistry,
         regular_user_public_key_already_stored: str,
     ) -> None:
-        """get_ssh_keypair returns the public key of the user's default SSH keypair."""
+        """get_ssh_keypair returns the SSH public key stored on the caller's keypair."""
         fetched = await user_registry.auth.get_ssh_keypair()
         assert fetched.ssh_public_key.strip() == regular_user_public_key_already_stored.strip()
 

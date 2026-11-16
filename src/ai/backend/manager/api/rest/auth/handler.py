@@ -313,27 +313,6 @@ class AuthHandler:
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
-<<<<<<< HEAD
-    # generate_ssh_keypair (PATCH /auth/ssh-keypair)
-    # ------------------------------------------------------------------
-
-    async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
-        log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._auth.generate_ssh_keypair.wait_for_complete(
-            GenerateSSHKeypairAction(
-                user_id=ctx.user_uuid,
-                access_key=ctx.access_key,
-            )
-        )
-        resp = SSHKeypairResponse(
-            ssh_public_key=result.ssh_keypair.ssh_public_key,
-            ssh_private_key=result.ssh_keypair.ssh_private_key,
-        )
-        return APIResponse.build(HTTPStatus.OK, resp)
-
-    # ------------------------------------------------------------------
-=======
->>>>>>> a35af390e (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
     # upload_ssh_keypair (POST /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
