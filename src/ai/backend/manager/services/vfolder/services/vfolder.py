@@ -129,10 +129,6 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.lookup import (
-    LookupVFolderAction,
-    LookupVFolderActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
     PartialBulkDeleteVFoldersAction,
 )
@@ -287,19 +283,6 @@ class VFolderService:
                 )
             )
         return PartialBulkResult(items=items)
-
-    async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
-        """Resolve a vfolder name into the folder a session of the owner in the project mounts.
-
-        A folder the caller cannot read is passed over: the lookup gate would refuse it.
-        """
-        vfolder_id = await self._vfolder_repository.resolve_mountable_vfolder_id_by_name(
-            action.owner_access_key,
-            action.project_id,
-            action.vfolder_name,
-            self._own_check.held,
-        )
-        return LookupVFolderActionResult(vfolder_uuid=vfolder_id)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         """Create the vfolder the action's insert spec describes.

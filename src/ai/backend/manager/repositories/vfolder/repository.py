@@ -23,7 +23,6 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
-    AccessKey,
     QuotaScopeID,
     VFolderHostPermission,
     VFolderHostPermissionMap,
@@ -152,10 +151,6 @@ from ai.backend.manager.repositories.vfolder.host_permission import (
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
 )
-from ai.backend.manager.repositories.vfolder.mount import (
-    HeldPermissions,
-    query_reachable_vfolders,
-)
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
     get_sessions_by_mounted_folder,
@@ -168,7 +163,6 @@ from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
     VFolderPurgeFailure,
 )
-from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.user import UserResourceInfo
 
 vfolder_repository_resilience = Resilience(
@@ -385,44 +379,6 @@ class VfolderRepository:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
             return user_max_vfolder_count
-
-    @vfolder_repository_resilience.apply()
-    async def resolve_mountable_vfolder_id_by_name(
-        self,
-        owner_access_key: AccessKey,
-        project_id: ProjectID,
-        name: str,
-        held_permissions: HeldPermissions,
-    ) -> VFolderUUID:
-        """The folder a session of the owner in the project mounts under the name.
-
-        The first of the owner's reachable folders, the project's first, that no
-        status keeps from being mounted and that ``held_permissions`` lets be read.
-        """
-        async with self._db.begin_readonly_read_committed() as conn:
-            owner = (
-                await conn.execute(
-                    sa.select(UserRow.uuid, UserRow.domain_name, UserRow.role)
-                    .select_from(sa.join(KeyPairRow, UserRow, KeyPairRow.user == UserRow.uuid))
-                    .where(KeyPairRow.access_key == owner_access_key)
-                )
-            ).one_or_none()
-            if owner is None:
-                raise KeyPairNotFound(extra_data=owner_access_key)
-            reachable = await query_reachable_vfolders(
-                conn,
-                UserScope(
-                    domain_name=owner.domain_name,
-                    group_id=project_id,
-                    user_uuid=owner.uuid,
-                    user_role=owner.role.value,
-                ),
-                (VFolderRow.name == name) & VFolderRow.status.not_in(VFolderOperationStatus.dead()),
-                held_permissions,
-            )
-        if not reachable:
-            raise VFolderNotFound(extra_data=name)
-        return VFolderUUID(reachable[0]["id"])
 
     @vfolder_repository_resilience.apply()
     async def get_personal_project_id(self, user_id: uuid.UUID) -> ProjectID:
