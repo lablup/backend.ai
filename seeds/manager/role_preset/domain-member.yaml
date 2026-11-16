@@ -14,6 +14,7 @@ items:
       app_config_fragment:              []
       artifact:                         []
       artifact_registry:                []
+      auto_generated_file:              []
       client_ip_masking_policy:         []
       container_registry:               []
       deployment:                       []
