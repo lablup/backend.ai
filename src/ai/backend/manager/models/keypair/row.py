@@ -152,8 +152,6 @@ class KeyPairRow(Base):  # type: ignore[misc]
             resource_policy=creator.resource_policy,
             rate_limit=creator.rate_limit,
             num_queries=0,
-            ssh_public_key=generated_data.ssh_public_key,
-            ssh_private_key=generated_data.ssh_private_key,
         )
 
     def to_data(self) -> KeyPairData:
@@ -227,7 +225,6 @@ def generate_ssh_keypair() -> tuple[str, str]:
 
 def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, object]:
     ak, sk = generate_keypair()
-    pubkey, privkey = generate_ssh_keypair()
     return {
         "user_id": user_email,
         "access_key": ak,
@@ -237,8 +234,6 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, o
         "resource_policy": creator.resource_policy,
         "rate_limit": creator.rate_limit,
         "num_queries": 0,
-        "ssh_public_key": pubkey,
-        "ssh_private_key": privkey,
     }
 
 
@@ -247,19 +242,6 @@ def generate_keypair_data() -> KeyPairSecrets:
     return KeyPairSecrets(
         access_key=ak,
         secret_key=sk,
-        ssh_public_key=None,
-        ssh_private_key=None,
-    )
-
-
-def generate_keypair_data_with_ssh_keypair() -> KeyPairSecrets:
-    ak, sk = generate_keypair()
-    pubkey, privkey = generate_ssh_keypair()
-    return KeyPairSecrets(
-        access_key=ak,
-        secret_key=sk,
-        ssh_public_key=pubkey,
-        ssh_private_key=privkey,
     )
 
 

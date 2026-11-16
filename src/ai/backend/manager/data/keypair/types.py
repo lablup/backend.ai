@@ -19,8 +19,6 @@ class KeyPairSecrets:
 
     access_key: AccessKey
     secret_key: SecretKey
-    ssh_public_key: str | None
-    ssh_private_key: str | None
 
 
 @dataclass
@@ -36,8 +34,6 @@ class KeyPairData:
 
     resource_policy_name: str
     rate_limit: int
-    ssh_public_key: str | None
-    ssh_private_key: str | None
     dotfiles: bytes
     bootstrap_script: str
 

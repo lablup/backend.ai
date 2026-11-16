@@ -63,7 +63,6 @@ from ai.backend.manager.models.keypair import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.keypair.row import generate_keypair_data_with_ssh_keypair
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -1465,7 +1464,7 @@ class UserDBSource:
                     rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
                 )
 
-            secrets = generate_keypair_data_with_ssh_keypair()
+            secrets = generate_keypair_data()
             kp_spec = KeyPairCreatorSpec(
                 creator=keypair_creator,
                 generated_data=secrets,
@@ -1629,7 +1628,7 @@ class UserDBSource:
             if not user_row:
                 raise UserNotFound(f"User {user_id} not found")
 
-            secrets = generate_keypair_data_with_ssh_keypair()
+            secrets = generate_keypair_data()
             kp_spec = KeyPairCreatorSpec(
                 creator=creator,
                 generated_data=secrets,
