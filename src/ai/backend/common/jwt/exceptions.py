@@ -89,4 +89,5 @@ class JWTDecodeError(JWTError, web.HTTPUnauthorized):
 
 
 class JWTGenerationError(JWTError, web.HTTPInternalServerError):
-    pass
+    error_type = "https://api.backend.ai/probs/jwt-generation-error"
+    error_title = "Failed to generate JWT token."
