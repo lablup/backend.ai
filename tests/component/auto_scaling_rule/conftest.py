@@ -83,6 +83,7 @@ def deployment_processors(
     service = DeploymentService(
         deployment_controller,
         repo,
+        agent_repository=MagicMock(),
         appproxy_client_pool=mock_appproxy_client_pool,
     )
     return DeploymentProcessors(

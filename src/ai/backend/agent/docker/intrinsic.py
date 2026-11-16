@@ -46,6 +46,7 @@ from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController, CgroupResolutionFailed
 from ai.backend.common.json import dump_json
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -54,7 +55,6 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceModelInfo,
     DeviceName,
-    KernelCreationConfig,
     MetricKey,
     SlotName,
     SlotTypes,

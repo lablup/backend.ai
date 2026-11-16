@@ -27,12 +27,8 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.errors.permission import (
-    PermissionNotFound,
-    RoleAlreadyAssigned,
-    RoleNotAssigned,
-    RoleNotFound,
-)
+from ai.backend.manager.errors.permission_field import PermissionNotFound
+from ai.backend.manager.errors.role import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger

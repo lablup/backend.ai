@@ -71,7 +71,6 @@ from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -102,7 +101,6 @@ from ai.backend.manager.models.session.row import SessionDependencyRow, SessionR
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -293,7 +291,6 @@ class TestLogsRetention:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,
@@ -625,14 +622,12 @@ class TestSessionsRetention:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
                 KernelRow,
-                VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
@@ -913,7 +908,6 @@ class TestSweep:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,
@@ -1220,7 +1214,6 @@ class TestDeploymentsTerminalChildCleanup:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionRow,
                 EndpointRow,
@@ -1464,7 +1457,6 @@ class TestDeploymentsSessionGroupCleanup:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionGroupRow,
                 SessionRow,
@@ -1843,7 +1835,6 @@ class TestSweepCategoryIsolation:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,

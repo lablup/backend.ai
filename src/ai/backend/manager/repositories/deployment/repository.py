@@ -371,7 +371,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (modern, light: revision *ids* only).
+        """Get endpoint information with its revisions and policy.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -383,8 +383,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (legacy, full: includes the current/deploying
-        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        """Get endpoint information with its revisions and policy, for the REST v1 surface.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -423,17 +422,17 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def replace_designated_agents(
+    async def set_designated_agents(
         self,
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``.
+        """Make ``agent_uuids`` the agents the deployment designates.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
+        await self._db_source.set_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
     async def fetch_designated_agents_by_deployment_ids(

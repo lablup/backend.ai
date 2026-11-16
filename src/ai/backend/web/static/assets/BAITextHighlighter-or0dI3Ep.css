@@ -1,1 +1,0 @@
-@layer reset,theme,base,astryx-base,astryx-theme,ui-common,components,utilities;@layer ui-common{.uic-text-highlighter__match{background-color:var(--color-warning-border-hover,var(--color-warning-muted))}}

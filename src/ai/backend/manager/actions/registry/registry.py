@@ -22,7 +22,7 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
     WiredProcessor,
 )
-from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
     LookupBulkRuntimeFieldOwnerOpsAction,
 )

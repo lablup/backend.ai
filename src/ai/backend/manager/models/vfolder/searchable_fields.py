@@ -40,6 +40,10 @@ from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.specs.search.usage import UsedByConditions
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
+from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
+    VFolderAutoMountSearchableFields,
+)
 
 
 class _VFolderOwnFields(RowDataConverter[VFolderRow, VFolderData]):
@@ -197,7 +201,8 @@ class VFolderMountPolicySearchableFields:
 
 
 class _VFolderNestedFields:
-    """Rows of other tables the vfolder owns: its labels and per-user mount policies."""
+    """Rows of other tables the vfolder owns: its labels, per-user mount policies and
+    auto-mounts."""
 
     labels = NestedSearchableField(
         EntityLabelSearchableFields.own,
@@ -209,6 +214,14 @@ class _VFolderNestedFields:
             VFolderUserMountPolicyRow,
             VFolderRow,
             VFolderUserMountPolicyRow.vfolder_id == VFolderRow.id,
+        ),
+    )
+    auto_mounts = NestedSearchableField(
+        VFolderAutoMountSearchableFields.own,
+        ToManyCorrelation(
+            VFolderAutoMountRow,
+            VFolderRow,
+            VFolderAutoMountRow.vfolder_id == VFolderRow.id,
         ),
     )
 

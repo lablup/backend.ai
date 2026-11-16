@@ -56,11 +56,15 @@ def fake_ssh_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Call
     monkeypatch.setenv("HOME", str(home_dir))
     monkeypatch.setenv("USERPROFILE", str(home_dir))
 
-    def install(barrier: threading.Barrier | None = None, download_fails: bool = False) -> None:
+    def install(
+        barrier: threading.Barrier | None = None,
+        download_fails: bool = False,
+        key_content: bytes = KEY_CONTENT,
+    ) -> None:
         def fake_run(cmd: Sequence[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
             # The key always lands in the destination directory under its
             # container-side basename, even when the download later fails.
-            (_download_dest(cmd) / cmd[-1]).write_bytes(KEY_CONTENT)
+            (_download_dest(cmd) / cmd[-1]).write_bytes(key_content)
             if barrier is not None:
                 barrier.wait()
             if download_fails:
@@ -94,6 +98,7 @@ def test_container_ssh_ctx_concurrent_invocations_in_same_cwd(
     def run_ssh_ctx(index: int, port: int) -> None:
         try:
             with container_ssh_ctx("mock-session", port) as key_path:
+                assert key_path is not None
                 key_paths[index] = key_path
                 assert key_path.read_bytes() == KEY_CONTENT
         except Exception as e:
@@ -128,4 +133,19 @@ def test_container_ssh_ctx_leaves_no_key_behind_when_download_fails(
             pass
 
     assert not list(cwd.iterdir())
+    assert not list((tmp_path / "home" / ".ssh").iterdir())
+
+
+def test_container_ssh_ctx_yields_none_when_the_session_holds_no_private_key(
+    fake_ssh_subprocess: Callable[..., None],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A user who uploaded only a public key gets an empty `id_container`."""
+    monkeypatch.chdir(tmp_path)
+    fake_ssh_subprocess(key_content=b"")
+
+    with container_ssh_ctx("mock-session", 9922) as key_path:
+        assert key_path is None
+
     assert not list((tmp_path / "home" / ".ssh").iterdir())

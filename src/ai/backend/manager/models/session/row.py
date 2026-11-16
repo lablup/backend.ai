@@ -628,56 +628,6 @@ class SessionRow(CreatedAtMixin, Base):
     def project_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return joinedload(cls.group) if not already_joined else contains_eager(cls.group)
 
-    @classmethod
-    def from_dataclass(cls, session_data: SessionData) -> SessionRow:
-        vfolder_mounts = []
-        if session_data.vfolder_mounts:
-            vfolder_mounts = [
-                VFolderMount.from_dataclass(mount) for mount in session_data.vfolder_mounts
-            ]
-
-        instance = cls(
-            name=session_data.name,
-            session_type=session_data.session_type,
-            priority=session_data.priority,
-            cluster_mode=session_data.cluster_mode,
-            cluster_size=session_data.cluster_size,
-            agent_ids=session_data.agent_ids,
-            session_group_id=session_data.session_group_id,
-            scaling_group_name=session_data.resource_group_name,
-            target_sgroup_names=session_data.target_sgroup_names,
-            domain_name=session_data.domain_name,
-            group_id=session_data.group_id,
-            user_uuid=session_data.user_uuid,
-            access_key=session_data.access_key,
-            images=session_data.images,
-            image_ids=session_data.image_ids,
-            tag=session_data.tag,
-            vfolder_mounts=vfolder_mounts,
-            environ=session_data.environ,
-            bootstrap_script=session_data.bootstrap_script,
-            use_host_network=session_data.use_host_network,
-            timeout=session_data.timeout,
-            batch_timeout=session_data.batch_timeout,
-            status_history={},
-            status=session_data.status,
-            status_info=session_data.status_info,
-            status_data=session_data.status_data,
-            callback_url=session_data.callback_url,
-            startup_command=session_data.startup_command,
-            result=session_data.result,
-            num_queries=session_data.num_queries,
-            last_stat=session_data.last_stat,
-            network_type=session_data.network_type,
-            network_id=session_data.network_id,
-            created_at=session_data.created_at,
-            terminated_at=session_data.terminated_at,
-            starts_at=session_data.starts_at,
-            requested_starts_at=session_data.requested_starts_at,
-        )
-        instance.id = SessionId(session_data.id)
-        return instance
-
     def to_dataclass(self, owner: UserData | None = None) -> SessionData:
         return SessionData(
             id=self.id,

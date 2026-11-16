@@ -67,6 +67,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 )
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
 from ai.backend.manager.views.sokovan.allocation import SessionAllocation
@@ -136,9 +137,10 @@ class SchedulerRepository:
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         permission_check: RbacPermissionCheckRepository,
+        key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
-        self._db_source = ScheduleDBSource(db, reconcile_ops_provider)
+        self._db_source = ScheduleDBSource(db, reconcile_ops_provider, key_provider_pool)
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider

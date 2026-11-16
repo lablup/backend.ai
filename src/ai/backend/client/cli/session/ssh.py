@@ -19,7 +19,9 @@ else:
 
 
 @contextlib.contextmanager
-def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
+def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path | None]:
+    """Yield the session's private key, or None when the session holds none (the user uploaded
+    only a public key), so ssh falls back to the user's own keys."""
     random_id = secrets.token_hex(16)
     key_filename = "id_container"
     # Create ssh directory with recommended permissions if not exists
@@ -51,6 +53,10 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
             print(e.stdout.decode())
             sys.exit(ExitCode.FAILURE)
         (Path(download_dir) / key_filename).rename(key_path)
+    identity_path: Path | None = key_path
+    if not key_path.read_bytes().strip():
+        key_path.unlink()
+        identity_path = None
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
@@ -76,8 +82,9 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
                 break
             lines.append(line)
         lines.clear()
-        yield key_path
+        yield identity_path
     finally:
         proxy_proc.send_signal(signal.SIGINT)
         proxy_proc.wait()
-        Path(key_path).unlink()
+        if identity_path is not None:
+            identity_path.unlink()

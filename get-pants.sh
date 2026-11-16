@@ -8,11 +8,13 @@ script=$(mktemp)
 curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o "$script" \
   https://static.pantsbuild.org/setup/get-pants.sh
 
-for attempt in 1 2 3 4 5; do
+for attempt in 1 2 3 4 5 6; do
   if bash "$script" "$@"; then
     exit 0
   fi
-  echo "get-pants.sh failed (attempt ${attempt}/5)" >&2
-  sleep 5
+  echo "get-pants.sh failed (attempt ${attempt}/6)" >&2
+  if [ "$attempt" -lt 6 ]; then
+    sleep $((attempt * 10))
+  fi
 done
 exit 1

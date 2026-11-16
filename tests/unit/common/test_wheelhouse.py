@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
-from ai.backend.common.plugin import load_configured_wheelhouse
+from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 
 _PLANTED_WHEEL_STEM = "planted-1.0-py3-none-any"
 

@@ -24,7 +24,8 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.nothing_is_found import NothingIsFound
 from bai_scenario.components.resource_usage import (
     AUsageScopeAndACaller,
     AUsageScopeAndSomeone,

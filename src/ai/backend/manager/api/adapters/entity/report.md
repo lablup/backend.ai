@@ -46,6 +46,6 @@ When
 
 Then
 
-- the one wired domain type comes back by its name
-  - items = [EntityTypeNode(name='domain')]
+- the two entity types the domain processors wire come back by name
+  - items = [EntityTypeNode(name='container_registry'), EntityTypeNode(name='domain')]
 

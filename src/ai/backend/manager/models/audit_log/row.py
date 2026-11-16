@@ -12,7 +12,8 @@ from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.actions.types import ActionKind, OperationStatus
+from ai.backend.manager.actions.spec import ActionKind
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.base import (
     GUID,
     Base,
