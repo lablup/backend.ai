@@ -1,13 +1,24 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiodocker
 import pytest
 
-from ai.backend.agent.stats import Measurement, Metric, MetricTypes, MovingStatistics
+from ai.backend.agent.stats import (
+    Measurement,
+    Metric,
+    MetricTypes,
+    MovingStatistics,
+    StatContext,
+    StatModes,
+)
+from ai.backend.common.types import PID, ContainerId, KernelId, MetricKey
 
 
 class TestMovingStatistics:
@@ -161,3 +172,87 @@ class TestMetric:
 
         assert cpu_util_metric.current == Decimal(500)
         assert cpu_util_metric.to_serializable_dict()["pct"] == "50"
+
+
+class TestGetProcesses:
+    """Tests for StatContext._get_processes, which reads a container's PIDs from Docker."""
+
+    @pytest.fixture
+    def stat_ctx(self) -> StatContext:
+        return StatContext(MagicMock(), MagicMock(), mode=StatModes.DOCKER)
+
+    def _docker_answering(self, top: dict[str, Any]) -> aiodocker.Docker:
+        docker = MagicMock(spec=aiodocker.Docker)
+        docker._query_json = AsyncMock(return_value=top)
+        return docker
+
+    async def test_returns_the_pids_docker_lists(self, stat_ctx: StatContext) -> None:
+        docker = self._docker_answering({
+            "Titles": ["UID", "PID", "CMD"],
+            "Processes": [["root", "1", "/sbin/docker-init"], ["work", "42", "python"]],
+        })
+
+        pids = await stat_ctx._get_processes(ContainerId("c1"), docker)
+
+        assert pids == [PID(1), PID(42)]
+
+    async def test_a_null_process_list_is_unknown(self, stat_ctx: StatContext) -> None:
+        """Docker answers `"Processes": null` for a running container it cannot list."""
+        docker = self._docker_answering({"Titles": ["UID", "PID", "CMD"], "Processes": None})
+
+        pids = await stat_ctx._get_processes(ContainerId("c1"), docker)
+
+        assert pids is None
+
+
+class TestCollectPerContainerProcessStat:
+    """The pruning of per-process metrics after a collection pass."""
+
+    @pytest.fixture
+    def container_id(self) -> ContainerId:
+        return ContainerId("c1")
+
+    @pytest.fixture
+    def lazy_remove(self) -> AsyncMock:
+        return AsyncMock()
+
+    @pytest.fixture
+    def stat_ctx(self, container_id: ContainerId, lazy_remove: AsyncMock) -> StatContext:
+        kernel = MagicMock()
+        kernel.__getitem__.side_effect = {"container_id": container_id}.__getitem__
+        agent = MagicMock()
+        agent.kernel_registry = {KernelId(uuid.uuid4()): kernel}
+        agent.computers = {}
+        ctx = StatContext(agent, MagicMock(), mode=StatModes.DOCKER)
+        ctx.process_metrics = {container_id: {PID(42): {MetricKey("cpu_util"): MagicMock()}}}
+        ctx._utilization_metric_observer = MagicMock()
+        ctx._utilization_metric_observer.lazy_remove_process_metric = lazy_remove
+        return ctx
+
+    async def _collect_with_top(
+        self, stat_ctx: StatContext, container_id: ContainerId, top: dict[str, Any]
+    ) -> None:
+        docker = MagicMock()
+        docker._query_json = AsyncMock(return_value=top)
+        docker_cm = MagicMock()
+        docker_cm.__aenter__ = AsyncMock(return_value=docker)
+        docker_cm.__aexit__ = AsyncMock(return_value=None)
+        with (
+            patch("ai.backend.agent.stats.sys.platform", "linux"),
+            patch("ai.backend.agent.stats.aiodocker.Docker", return_value=docker_cm),
+        ):
+            await stat_ctx.collect_per_container_process_stat([container_id])
+
+    async def test_keeps_the_metrics_of_a_container_whose_list_is_null(
+        self, stat_ctx: StatContext, container_id: ContainerId, lazy_remove: AsyncMock
+    ) -> None:
+        await self._collect_with_top(stat_ctx, container_id, {"Processes": None})
+
+        lazy_remove.assert_not_called()
+
+    async def test_prunes_the_metrics_of_a_pid_no_longer_listed(
+        self, stat_ctx: StatContext, container_id: ContainerId, lazy_remove: AsyncMock
+    ) -> None:
+        await self._collect_with_top(stat_ctx, container_id, {"Processes": []})
+
+        lazy_remove.assert_awaited_once()
