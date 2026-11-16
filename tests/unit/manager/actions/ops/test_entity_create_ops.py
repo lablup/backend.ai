@@ -32,7 +32,8 @@ from ai.backend.manager.actions.types import ActionOperationType, OperationStatu
 from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.errors.permission import NotEnoughPermission, VirtualEntityNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.virtual_entity import VirtualEntityNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
