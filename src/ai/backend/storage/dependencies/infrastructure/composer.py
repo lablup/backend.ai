@@ -58,7 +58,7 @@ class InfrastructureComposer(
         local_config = setup_input.local_config
 
         etcd = await stack.enter_dependency(EtcdProvider(), local_config)
-        redis_config = await stack.enter_dependency(RedisConfigProvider(), etcd)
+        redis_config = await stack.enter_dependency(RedisConfigProvider(), local_config)
         sentinel_monitors = await stack.enter_dependency(
             SentinelMonitorDependency(),
             redis_config.to_valkey_profile_target().targets(),

@@ -11,6 +11,10 @@
   - Set a random token before the upgrade: `./backend.ai mgr etcd put config/watcher/token "$(openssl rand -hex 32)"`.
   - The agent watcher reads the token only at startup. Restart it after you change the token.
   - The 26.9 and 26.4 patch releases that include this change require the same step.
+* The manager, the agent and the storage proxy no longer read the Valkey config from etcd.
+  - The agent and the storage proxy no longer read `config/redis`. The manager ignores it and logs a warning when it is set.
+  - Before the upgrade, copy the keys under `config/redis` to the `[redis]` table of `manager.toml`, `agent.toml` and `storage-proxy.toml`.
+  - Then delete `config/redis` from etcd.
 
 # 24.09 to 24.12
 * `endpoints.desired_session_count` is renamed to `endpoints.replicas`. Update external components that locate the database column directly.
