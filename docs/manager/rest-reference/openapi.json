@@ -25604,19 +25604,6 @@
             "description": "How agents are chosen for a session's kernels. Omit to leave unchanged.",
             "title": "Agent Selection Strategy"
           },
-          "agent_selector_config": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Options of the agent selector. Omit to leave unchanged.",
-            "title": "Agent Selector Config"
-          },
           "allow_fractional_resource_fragmentation": {
             "anyOf": [
               {
@@ -25633,7 +25620,7 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/RouteHealthStatus"
                 },
                 "type": "array"
               },
@@ -25641,7 +25628,7 @@
                 "type": "null"
               }
             ],
-            "description": "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically. Omit to leave unchanged.",
+            "description": "Route health statuses whose routes are cleaned up automatically. Omit to leave unchanged.",
             "title": "Route Cleanup Target Statuses"
           }
         },

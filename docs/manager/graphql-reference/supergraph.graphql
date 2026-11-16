@@ -23425,18 +23425,13 @@ type ResourceGroupSchedulerOptions
   """How agents are chosen for a session's kernels."""
   agentSelectionStrategy: AgentSelectionStrategy!
 
-  """Options of the agent selector."""
-  agentSelectorConfig: JSON!
-
   """
   Whether an agent may start a kernel that fragments a fractional resource request.
   """
   allowFractionalResourceFragmentation: Boolean!
 
-  """
-  Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically.
-  """
-  routeCleanupTargetStatuses: [String!]!
+  """Route health statuses whose routes are cleaned up automatically."""
+  routeCleanupTargetStatuses: [RouteHealthStatus!]!
 }
 
 """
@@ -29703,18 +29698,15 @@ input UpdateResourceGroupSchedulerOptionsInput
   """
   agentSelectionStrategy: AgentSelectionStrategy
 
-  """Options of the agent selector. Omit to leave unchanged."""
-  agentSelectorConfig: JSON
-
   """
   Whether an agent may start a kernel that fragments a fractional resource request. Omit to leave unchanged.
   """
   allowFractionalResourceFragmentation: Boolean
 
   """
-  Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically. Omit to leave unchanged.
+  Route health statuses whose routes are cleaned up automatically. Omit to leave unchanged.
   """
-  routeCleanupTargetStatuses: [String!]
+  routeCleanupTargetStatuses: [RouteHealthStatus!]
 }
 
 """
