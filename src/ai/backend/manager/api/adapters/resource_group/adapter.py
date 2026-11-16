@@ -1110,7 +1110,6 @@ class ResourceGroupAdapter(BaseAdapter):
                         ),
                     ),
                     agent_selection_strategy=data.scheduler.options.agent_selection_strategy,
-                    agent_selector_config=dict(data.scheduler.options.agent_selector_config),
                     allow_fractional_resource_fragmentation=(
                         data.scheduler.options.allow_fractional_resource_fragmentation
                     ),

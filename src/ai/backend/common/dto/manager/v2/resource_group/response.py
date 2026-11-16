@@ -212,7 +212,6 @@ class ResourceGroupSchedulerOptionsInfo(BaseResponseModel):
     agent_selection_strategy: AgentSelectionStrategy = Field(
         description="How agents are chosen for a session's kernels."
     )
-    agent_selector_config: dict[str, Any] = Field(description="Options of the agent selector.")
     allow_fractional_resource_fragmentation: bool = Field(
         description=(
             "Whether an agent may start a kernel that fragments a fractional resource request."

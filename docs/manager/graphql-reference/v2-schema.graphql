@@ -17637,9 +17637,6 @@ type ResourceGroupSchedulerOptions {
   """How agents are chosen for a session's kernels."""
   agentSelectionStrategy: AgentSelectionStrategy!
 
-  """Options of the agent selector."""
-  agentSelectorConfig: JSON!
-
   """
   Whether an agent may start a kernel that fragments a fractional resource request.
   """

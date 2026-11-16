@@ -461,7 +461,6 @@ class GroupLook:
     pending_timeout: float | Kept = KEPT
     num_retries_to_skip: int | None | Kept = KEPT
     agent_selection_strategy: AgentSelectionStrategy | Kept = KEPT
-    agent_selector_config: dict[str, Any] | Kept = KEPT
     allow_fractional_resource_fragmentation: bool | Kept = KEPT
     route_cleanup_target_statuses: list[str] | Kept = KEPT
 
@@ -567,11 +566,6 @@ class GroupLook:
                 f"{prefix}scheduler.options.agent_selection_strategy",
                 node.scheduler.options.agent_selection_strategy,
                 _or(self.agent_selection_strategy, seed.scheduler.options.agent_selection_strategy),
-            ),
-            Same(
-                f"{prefix}scheduler.options.agent_selector_config",
-                node.scheduler.options.agent_selector_config,
-                _or(self.agent_selector_config, dict(seed.scheduler.options.agent_selector_config)),
             ),
             Same(
                 f"{prefix}scheduler.options.allow_fractional_resource_fragmentation",
@@ -696,11 +690,6 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
                 "scheduler.options.agent_selection_strategy",
                 node.scheduler.options.agent_selection_strategy,
                 self.agent_selection_strategy,
-            ),
-            Same(
-                "scheduler.options.agent_selector_config",
-                node.scheduler.options.agent_selector_config,
-                {},
             ),
             Same(
                 "scheduler.options.allow_fractional_resource_fragmentation",

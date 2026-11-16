@@ -11,7 +11,6 @@ from uuid import UUID
 import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
-from strawberry.scalars import JSON
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import RuntimeEntityID
@@ -368,7 +367,6 @@ class ResourceGroupSchedulerOptionsGQL(PydanticOutputMixin[ResourceGroupSchedule
     agent_selection_strategy: AgentSelectionStrategyGQL = gql_field(
         description="How agents are chosen for a session's kernels."
     )
-    agent_selector_config: JSON = gql_field(description="Options of the agent selector.")
     allow_fractional_resource_fragmentation: bool = gql_field(
         description=(
             "Whether an agent may start a kernel that fragments a fractional resource request."
