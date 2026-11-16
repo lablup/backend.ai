@@ -17643,7 +17643,7 @@ type ResourceGroupSchedulerOptions {
   allowFractionalResourceFragmentation: Boolean!
 
   """Route health statuses whose routes are cleaned up automatically."""
-  routeCleanupTargetStatuses: [ReplicaHealthStatus!]!
+  routeCleanupTargetStatuses: [RouteHealthStatus!]!
 }
 
 """
