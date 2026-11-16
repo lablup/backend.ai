@@ -65,7 +65,16 @@ user 이므로 user 그룹의 public 이다. 위임 대상을 지목하는 경�
 `get_ssh_keypair` · `generate_ssh_keypair` · `upload_ssh_keypair` 는 로그인한 사용자가
 자기 세션의 액세스 키에 대해 하는 조작이고, 키 생성은 이쪽에만 있다.
 
+<<<<<<< HEAD
 ## 로그인 세션과 이력은 사용자의 field group 이다
+=======
+`admin_get_ssh_keypair`, `admin_register_ssh_keypair` and `admin_delete_ssh_keypair` in
+`services/user` are the path where an admin names another user by one of their access
+keys. The `get_ssh_keypair` and `upload_ssh_keypair` here are the operations a logged-in
+user does through its own session's access key. Neither path generates a key: a client
+creates its keypair and registers only the public key. Both act on the default SSH keypair of the user the access key belongs
+to (`ssh_keypairs`); the SSH columns on `keypairs` are no longer read or written.
+>>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 
 두 행 모두 사용자가 소유하는 field row 이므로 조회는 `user_group.field_group(...)` 이
 내주는 하위 그룹에서 나온다. 소유자 lookup 은 그 그룹이 스스로 만들고, 도메인은 조회

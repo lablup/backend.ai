@@ -10,6 +10,11 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+<<<<<<< HEAD
+=======
+from ai.backend.common import msgpack
+from ai.backend.common.auth.password import PasswordInfo
+>>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -37,7 +42,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.auth.types import AuthorizationResult
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
@@ -89,10 +94,6 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
-)
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-    GenerateSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.get_role import (
     GetRoleAction,
@@ -799,6 +800,7 @@ class AuthService:
         pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
         return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
 
+<<<<<<< HEAD
     async def generate_ssh_keypair(
         self, action: GenerateSSHKeypairAction
     ) -> GenerateSSHKeypairActionResult:
@@ -812,6 +814,8 @@ class AuthService:
             ),
         )
 
+=======
+>>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
