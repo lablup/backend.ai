@@ -689,6 +689,30 @@ enum AllocatedResourceSlotOrderField {
   RANK
 }
 
+"""
+Added in 26.10.0. Input for allowing container registries for a domain.
+"""
+input AllowDomainContainerRegistriesInput {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """IDs of the container registries to allow for the domain."""
+  containerRegistryIds: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Payload for allowing container registries for a domain.
+"""
+type AllowDomainContainerRegistriesPayload {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """
+  IDs of the container registries this request allowed. A registry already allowed is left out.
+  """
+  containerRegistryIds: [UUID!]!
+}
+
 """Added in 26.4.2. Payload containing allowed domain names."""
 type AllowedDomainsPayload {
   """Allowed domain names."""
@@ -3251,28 +3275,6 @@ type CreateDeploymentRevisionPresetPayload {
   preset: DeploymentRevisionPreset!
 }
 
-"""Added in 26.10.0. Input for relating a domain to container registries."""
-input CreateDomainContainerRegistryRelationsInput {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """IDs of the container registries to relate to the domain."""
-  containerRegistryIds: [UUID!]!
-}
-
-"""
-Added in 26.10.0. Payload for relating a domain to container registries.
-"""
-type CreateDomainContainerRegistryRelationsPayload {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries this request related. A pair already related is left out.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
 """Added in 26.4.2. Input for creating a new domain."""
 input CreateDomainInput {
   """Domain name. Must be unique across the system."""
@@ -5421,6 +5423,30 @@ input DeploymentUses {
 }
 
 """
+Added in 26.10.0. Input for disallowing container registries for a domain.
+"""
+input DisallowDomainContainerRegistriesInput {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """IDs of the container registries to disallow for the domain."""
+  containerRegistryIds: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Payload for disallowing container registries for a domain.
+"""
+type DisallowDomainContainerRegistriesPayload {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """
+  IDs of the container registries this request disallowed. A registry not allowed is left out.
+  """
+  containerRegistryIds: [UUID!]!
+}
+
+"""
 Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
 """
 type DomainBasicInfo {
@@ -5829,7 +5855,7 @@ type DomainV2 implements Node @key(fields: "id") {
   """Added in 26.9.0. Resource groups this domain may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
-  """Added in 26.10.0. Container registries this domain is related to."""
+  """Added in 26.10.0. Container registries this domain is allowed to use."""
   containerRegistries(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection
 
   """
@@ -10838,14 +10864,14 @@ type Mutation {
   partialBulkRestoreDomainsV2(input: PartialBulkRestoreDomainsInput!): PartialBulkDomainsPayload!
 
   """
-  Added in 26.10.0. Relate a domain to container registries. A pair already related is left as it stands.
+  Added in 26.10.0. Allow container registries for a domain. A registry already allowed is left as it stands.
   """
-  createDomainContainerRegistryRelations(input: CreateDomainContainerRegistryRelationsInput!): CreateDomainContainerRegistryRelationsPayload
+  allowDomainContainerRegistries(input: AllowDomainContainerRegistriesInput!): AllowDomainContainerRegistriesPayload
 
   """
-  Added in 26.10.0. Remove the relations between a domain and container registries. A pair not related is skipped.
+  Added in 26.10.0. Disallow container registries for a domain. A registry not allowed is skipped.
   """
-  purgeDomainContainerRegistryRelations(input: PurgeDomainContainerRegistryRelationsInput!): PurgeDomainContainerRegistryRelationsPayload
+  disallowDomainContainerRegistries(input: DisallowDomainContainerRegistriesInput!): DisallowDomainContainerRegistriesPayload
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
@@ -14957,30 +14983,6 @@ type PurgeDeploymentRevisionPresetPayload {
 
   """UUID of the purged deployment revision preset."""
   entityId: UUID!
-}
-
-"""
-Added in 26.10.0. Input for removing the relations between a domain and container registries.
-"""
-input PurgeDomainContainerRegistryRelationsInput {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """IDs of the container registries to unrelate from the domain."""
-  containerRegistryIds: [UUID!]!
-}
-
-"""
-Added in 26.10.0. Payload for removing the relations between a domain and container registries.
-"""
-type PurgeDomainContainerRegistryRelationsPayload {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries this request unrelated. A pair not related is left out.
-  """
-  containerRegistryIds: [UUID!]!
 }
 
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""

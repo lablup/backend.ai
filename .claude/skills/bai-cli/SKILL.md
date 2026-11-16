@@ -39,7 +39,7 @@ Check options with `--help`.
 
 ### Core
 
-- **domain**: user(get, relate-container-registries, unrelate-container-registries) | admin(search, create, update, delete, purge)
+- **domain**: user(get, allow-container-registries, disallow-container-registries) | admin(search, create, update, delete, purge)
 - **user**: user(get, create, update, delete, search) | admin(create, delete, search)
 - **project**: user(get, assign-users, unassign-users | sub role: search) | admin(search, create, update, delete, purge)
 - **agent**: user(empty group) | admin(search, total-resources, update-resource-group)

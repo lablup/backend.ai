@@ -13,28 +13,28 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
-    CreateDomainContainerRegistryRelationsInput,
+    AllowDomainContainerRegistriesInput,
     CreateDomainInput,
+    DisallowDomainContainerRegistriesInput,
     DomainFilter,
     DomainOrder,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
-    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
-    CreateDomainContainerRegistryRelationsPayload,
+    AllowDomainContainerRegistriesPayload,
     DeleteDomainPayload,
+    DisallowDomainContainerRegistriesPayload,
     DomainBasicInfo,
     DomainLifecycleInfo,
     DomainNode,
     DomainPayload,
     DomainRegistryInfo,
-    PurgeDomainContainerRegistryRelationsPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
 )
@@ -344,9 +344,9 @@ class DomainAdapter(BaseAdapter):
             )
         )
 
-    async def create_container_registry_relations(
-        self, input: CreateDomainContainerRegistryRelationsInput
-    ) -> CreateDomainContainerRegistryRelationsPayload:
+    async def allow_container_registries(
+        self, input: AllowDomainContainerRegistriesInput
+    ) -> AllowDomainContainerRegistriesPayload:
         """Relate the domain to the named registries. The permission is asked of the domain
         and of every registry; a pair already related is left as it stands."""
         domain_id = DomainID(input.domain_id)
@@ -363,13 +363,13 @@ class DomainAdapter(BaseAdapter):
         for link in result.results:
             if link.linked:
                 linked.append(link.pair.target)
-        return CreateDomainContainerRegistryRelationsPayload(
+        return AllowDomainContainerRegistriesPayload(
             domain_id=domain_id, container_registry_ids=linked
         )
 
-    async def purge_container_registry_relations(
-        self, input: PurgeDomainContainerRegistryRelationsInput
-    ) -> PurgeDomainContainerRegistryRelationsPayload:
+    async def disallow_container_registries(
+        self, input: DisallowDomainContainerRegistriesInput
+    ) -> DisallowDomainContainerRegistriesPayload:
         """Remove the relations between the domain and the named registries. The permission
         is asked of the domain and of every registry; a pair not related is skipped."""
         domain_id = DomainID(input.domain_id)
@@ -386,7 +386,7 @@ class DomainAdapter(BaseAdapter):
         for unlink in result.results:
             if unlink.unlinked:
                 unlinked.append(unlink.pair.target)
-        return PurgeDomainContainerRegistryRelationsPayload(
+        return DisallowDomainContainerRegistriesPayload(
             domain_id=domain_id, container_registry_ids=unlinked
         )
 

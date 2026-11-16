@@ -25,7 +25,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchDomainsInput",
-    "CreateDomainContainerRegistryRelationsInput",
+    "AllowDomainContainerRegistriesInput",
     "CreateDomainInput",
     "DeleteDomainInput",
     "RestoreDomainInput",
@@ -35,7 +35,7 @@ __all__ = (
     "PartialBulkRestoreDomainsInput",
     "PartialBulkUpdateDomainItemInput",
     "PartialBulkUpdateDomainsInput",
-    "PurgeDomainContainerRegistryRelationsInput",
+    "DisallowDomainContainerRegistriesInput",
     "PurgeDomainInput",
     "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
@@ -117,21 +117,21 @@ class PurgeDomainInput(BaseRequestModel):
     name: str = Field(description="Name of the domain to permanently purge.")
 
 
-class CreateDomainContainerRegistryRelationsInput(BaseRequestModel):
-    """Input for relating a domain to container registries."""
+class AllowDomainContainerRegistriesInput(BaseRequestModel):
+    """Input for allowing container registries for a domain."""
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_ids: NonEmptyList[UUID] = Field(
-        description="IDs of the container registries to relate to the domain."
+        description="IDs of the container registries to allow for the domain."
     )
 
 
-class PurgeDomainContainerRegistryRelationsInput(BaseRequestModel):
-    """Input for removing the relations between a domain and container registries."""
+class DisallowDomainContainerRegistriesInput(BaseRequestModel):
+    """Input for disallowing container registries for a domain."""
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_ids: NonEmptyList[UUID] = Field(
-        description="IDs of the container registries to unrelate from the domain."
+        description="IDs of the container registries to disallow for the domain."
     )
 
 

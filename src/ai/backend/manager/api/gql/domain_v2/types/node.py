@@ -416,7 +416,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Container registries this domain is related to.",
+            description="Container registries this domain is allowed to use.",
         )
     )  # type: ignore[misc]
     async def container_registries(

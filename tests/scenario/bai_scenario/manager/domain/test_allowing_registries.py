@@ -1,4 +1,4 @@
-"""도메인과 레지스트리 relation 만들기 — 두 스코프의 권한과 이미 있는 relation."""
+"""도메인에 레지스트리 허용하기 — 두 스코프의 권한과 이미 허용된 레지스트리."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.dto.manager.v2.domain.request import (
-    CreateDomainContainerRegistryRelationsInput,
+    AllowDomainContainerRegistriesInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
-    CreateDomainContainerRegistryRelationsPayload,
+    AllowDomainContainerRegistriesPayload,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -36,53 +36,53 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    ADomainAndARegistryToRelate,
-    ADomainAndARegistryToRelateAndACaller,
+    ADomainAndARegistryToAllow,
+    ADomainAndARegistryToAllowAndACaller,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Laid = ADomainAndARegistryToRelateAndACaller
-type Created = CreateDomainContainerRegistryRelationsPayload
-type RelateScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
+type Laid = ADomainAndARegistryToAllowAndACaller
+type Allowed = AllowDomainContainerRegistriesPayload
+type AllowScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Allowed]
 
 
 @dataclass(frozen=True)
-class Relating(When[Laid, DomainAdapter, Created]):
+class Allowing(When[Laid, DomainAdapter, Allowed]):
     @override
     def operation(self) -> str:
-        return "create_container_registry_relations"
+        return "allow_container_registries"
 
     @override
     def describe(self, laid: Laid) -> str:
         return Says(
-            f"{laid.caller.username}이 {laid.domain.name}와 그 레지스트리 사이에 relation을 만듭니다",
-            english=(f"{laid.caller.username} relates {laid.domain.name} to that registry"),
+            f"{laid.caller.username}이 {laid.domain.name}에 그 레지스트리를 허용합니다",
+            english=f"{laid.caller.username} allows that registry for {laid.domain.name}",
         )
 
     @override
-    async def call(self, adapter: DomainAdapter, laid: Laid) -> Created:
+    async def call(self, adapter: DomainAdapter, laid: Laid) -> Allowed:
         with ActingAs(laid.caller):
-            return await adapter.create_container_registry_relations(
-                CreateDomainContainerRegistryRelationsInput(
+            return await adapter.allow_container_registries(
+                AllowDomainContainerRegistriesInput(
                     domain_id=laid.domain.id, container_registry_ids=[laid.registry.id]
                 )
             )
 
 
 @dataclass(frozen=True)
-class TheRelatedRegistriesComeBack(Then[Laid, Created]):
-    """이번 요청이 relation을 만든 레지스트리만 응답에 온다."""
+class TheAllowedRegistriesComeBack(Then[Laid, Allowed]):
+    """이번 요청이 새로 허용한 레지스트리만 응답에 온다."""
 
-    newly_related: bool
+    newly_allowed: bool
 
     @override
     def says(self) -> str:
-        if self.newly_related:
+        if self.newly_allowed:
             return Says(
-                "도메인 id와 relation을 만든 레지스트리의 id가 옵니다",
-                english="the domain id and the id of the newly related registry come back",
+                "도메인 id와 새로 허용한 레지스트리의 id가 옵니다",
+                english="the domain id and the id of the newly allowed registry come back",
             )
         return Says(
             "도메인 id와 빈 레지스트리 목록이 옵니다",
@@ -90,14 +90,14 @@ class TheRelatedRegistriesComeBack(Then[Laid, Created]):
         )
 
     @override
-    def look(self, laid: Laid, answered: Answered[Created]) -> list[Verdict]:
+    def look(self, laid: Laid, answered: Answered[Allowed]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         registry_ids: list[Verdict] = [
             Same[list[UUID]]("container_registry_ids", payload.container_registry_ids, [])
         ]
-        if self.newly_related:
+        if self.newly_allowed:
             registry_ids = [
                 Held[list[UUID]](
                     "container_registry_ids",
@@ -121,59 +121,59 @@ class TheRelatedRegistriesComeBack(Then[Laid, Created]):
 
 
 @dataclass(frozen=True)
-class AUserGrantedOnBothScopesRelates(Scenario[TestSeedingSession, Laid, DomainAdapter, Created]):
+class AUserGrantedOnBothScopesAllows(Scenario[TestSeedingSession, Laid, DomainAdapter, Allowed]):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-both-scopes-relates-a-domain-to-a-registry"
+        return "a-user-granted-on-both-scopes-allows-a-registry-for-a-domain"
 
     @override
     def describe(self) -> str:
         return Says(
-            "도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 둘 사이에 relation을 만들 수 있습니다",
+            "도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 허용할 수 있습니다",
             english=(
                 "a user granted permission on both the domain and the registry scopes can "
-                "relate the two"
+                "allow the registry for the domain"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, Laid]:
-        return ADomainAndARegistryToRelate()
+        return ADomainAndARegistryToAllow()
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Created]:
-        return Relating()
+    def when(self) -> When[Laid, DomainAdapter, Allowed]:
+        return Allowing()
 
     @override
-    def then(self) -> Then[Laid, Created]:
-        return TheRelatedRegistriesComeBack(newly_related=True)
+    def then(self) -> Then[Laid, Allowed]:
+        return TheAllowedRegistriesComeBack(newly_allowed=True)
 
 
 @dataclass(frozen=True)
-class AUserGrantedOnTheRegistryAloneMayNotRelate(
-    Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
+class AUserGrantedOnTheRegistryAloneMayNotAllow(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Allowed]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-the-registry-alone-may-not-relate-it-to-a-domain"
+        return "a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain"
 
     @override
     def describe(self) -> str:
         return Says(
-            "레지스트리에만 권한을 받은 사용자가 도메인과 relation을 만들려 하면 거부됩니다",
+            "레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 허용하려 하면 거부됩니다",
             english=(
-                "a user granted permission on the registry alone is refused when relating "
-                "it to a domain"
+                "a user granted permission on the registry alone is refused when allowing "
+                "it for a domain"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, Laid]:
-        return ADomainAndARegistryToRelate(on_domain=False)
+        return ADomainAndARegistryToAllow(on_domain=False)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Created]:
-        return Relating()
+    def when(self) -> When[Laid, DomainAdapter, Allowed]:
+        return Allowing()
 
     @override
     def then(self) -> Then[Laid, Any]:
@@ -181,46 +181,46 @@ class AUserGrantedOnTheRegistryAloneMayNotRelate(
 
 
 @dataclass(frozen=True)
-class RelatingAnAlreadyRelatedPairLeavesItOut(
-    Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
+class AllowingAnAllowedRegistryLeavesItOut(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Allowed]
 ):
     @override
     def summary(self) -> str:
-        return "relating-an-already-related-registry-leaves-it-out-of-the-response"
+        return "allowing-an-already-allowed-registry-leaves-it-out-of-the-response"
 
     @override
     def describe(self) -> str:
         return Says(
-            "이미 relation이 있는 레지스트리를 다시 요청해도 거부되지 않고, 응답에서는 빠집니다",
+            "이미 허용된 레지스트리를 다시 허용해도 거부되지 않고, 응답에서는 빠집니다",
             english=(
-                "requesting a registry already related to the domain is not refused, and the "
+                "allowing a registry the domain already allows is not refused, and the "
                 "registry is left out of the response"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, Laid]:
-        return ADomainAndARegistryToRelate(related=True)
+        return ADomainAndARegistryToAllow(allowed=True)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Created]:
-        return Relating()
+    def when(self) -> When[Laid, DomainAdapter, Allowed]:
+        return Allowing()
 
     @override
-    def then(self) -> Then[Laid, Created]:
-        return TheRelatedRegistriesComeBack(newly_related=False)
+    def then(self) -> Then[Laid, Allowed]:
+        return TheAllowedRegistriesComeBack(newly_allowed=False)
 
 
-SCENARIOS: list[RelateScenario] = [
-    AUserGrantedOnBothScopesRelates(),
-    AUserGrantedOnTheRegistryAloneMayNotRelate(),
-    RelatingAnAlreadyRelatedPairLeavesItOut(),
+SCENARIOS: list[AllowScenario] = [
+    AUserGrantedOnBothScopesAllows(),
+    AUserGrantedOnTheRegistryAloneMayNotAllow(),
+    AllowingAnAllowedRegistryLeavesItOut(),
 ]
 
 
-def expected_relation_count(scenario: RelateScenario) -> int:
+def expected_relation_count(scenario: AllowScenario) -> int:
     match scenario:
-        case AUserGrantedOnTheRegistryAloneMayNotRelate():
+        case AUserGrantedOnTheRegistryAloneMayNotAllow():
             return 0
         case _:
             return 1
@@ -233,8 +233,8 @@ async def relation_count(engine: ExtendedAsyncSAEngine) -> int:
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_relating_registries(
-    scenario: RelateScenario, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
+async def test_allowing_registries(
+    scenario: AllowScenario, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
     assert await relation_count(engine) == expected_relation_count(scenario)

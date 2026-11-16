@@ -414,26 +414,26 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class ADomainAndARegistryToRelateAndACaller:
+class ADomainAndARegistryToAllowAndACaller:
     domain: DomainData
     registry: ContainerRegistryData
     caller: UserData
 
 
 @dataclass(frozen=True)
-class ADomainAndARegistryToRelate(Given[TestSeedingSession, ADomainAndARegistryToRelateAndACaller]):
+class ADomainAndARegistryToAllow(Given[TestSeedingSession, ADomainAndARegistryToAllowAndACaller]):
     """관계 연산은 지정한 스코프 모두에 권한이 있어야 실행된다. 그래서 한쪽에만 권한을 주는 상황이 필요하다."""
 
     on_domain: bool = True
-    related: bool = False
+    allowed: bool = False
     permissions: tuple[Permission, ...] = ALLOWING
 
     @override
     def describe(self) -> str:
         holds_ko = "도메인과 레지스트리에" if self.on_domain else "레지스트리에만"
         holds_en = "the domain and the registry" if self.on_domain else "the registry alone"
-        already_ko = ", 둘 사이에는 relation이 이미 있음" if self.related else ""
-        already_en = ", and the two are already related" if self.related else ""
+        already_ko = ", 도메인은 그 레지스트리를 이미 허용하고 있음" if self.allowed else ""
+        already_en = ", and the domain already allows the registry" if self.allowed else ""
         return Says(
             f"도메인 하나, 레지스트리 하나, {holds_ko} 권한이 있는 사용자 한 명{already_ko}",
             english=(
@@ -443,10 +443,10 @@ class ADomainAndARegistryToRelate(Given[TestSeedingSession, ADomainAndARegistryT
         )
 
     @override
-    async def lay(self, seeding: TestSeedingSession) -> ADomainAndARegistryToRelateAndACaller:
+    async def lay(self, seeding: TestSeedingSession) -> ADomainAndARegistryToAllowAndACaller:
         domain = await seeding.creating(TestSeedDomain(name_hint="home"))
         registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
-        if self.related:
+        if self.allowed:
             await seeding.linking(AllowDomain(), domain, registry)
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.USER))
         await seeding.within(
@@ -470,7 +470,7 @@ class ADomainAndARegistryToRelate(Given[TestSeedingSession, ADomainAndARegistryT
                     permissions=self.permissions,
                 )
             )
-        return ADomainAndARegistryToRelateAndACaller(
+        return ADomainAndARegistryToAllowAndACaller(
             domain=seeding.made(domain),
             registry=seeding.made(registry),
             caller=seeding.made(caller),

@@ -37,17 +37,17 @@ def get(domain_name: str) -> None:
 @domain.command()
 @click.argument("domain_id", type=click.UUID)
 @click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
-def relate_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
-    """Relate a domain to container registries."""
+def allow_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
+    """Allow container registries for a domain."""
     from ai.backend.common.dto.manager.v2.domain.request import (
-        CreateDomainContainerRegistryRelationsInput,
+        AllowDomainContainerRegistriesInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.create_container_registry_relations(
-                CreateDomainContainerRegistryRelationsInput(
+            result = await registry.domain.allow_container_registries(
+                AllowDomainContainerRegistriesInput(
                     domain_id=domain_id, container_registry_ids=list(container_registry_ids)
                 )
             )
@@ -61,19 +61,19 @@ def relate_container_registries(domain_id: UUID, container_registry_ids: tuple[U
 @domain.command()
 @click.argument("domain_id", type=click.UUID)
 @click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
-def unrelate_container_registries(
+def disallow_container_registries(
     domain_id: UUID, container_registry_ids: tuple[UUID, ...]
 ) -> None:
-    """Remove the relations between a domain and container registries."""
+    """Disallow container registries for a domain."""
     from ai.backend.common.dto.manager.v2.domain.request import (
-        PurgeDomainContainerRegistryRelationsInput,
+        DisallowDomainContainerRegistriesInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.purge_container_registry_relations(
-                PurgeDomainContainerRegistryRelationsInput(
+            result = await registry.domain.disallow_container_registries(
+                DisallowDomainContainerRegistriesInput(
                     domain_id=domain_id, container_registry_ids=list(container_registry_ids)
                 )
             )

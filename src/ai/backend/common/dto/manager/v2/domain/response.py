@@ -17,7 +17,7 @@ from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchDomainsPayload",
-    "CreateDomainContainerRegistryRelationsPayload",
+    "AllowDomainContainerRegistriesPayload",
     "DeleteDomainPayload",
     "RestoreDomainPayload",
     "DomainBasicInfo",
@@ -25,7 +25,7 @@ __all__ = (
     "DomainNode",
     "DomainPayload",
     "DomainRegistryInfo",
-    "PurgeDomainContainerRegistryRelationsPayload",
+    "DisallowDomainContainerRegistriesPayload",
     "PurgeDomainPayload",
     "SearchDomainsPayload",
 )
@@ -155,25 +155,25 @@ class PurgeDomainPayload(BaseResponseModel):
     )
 
 
-class CreateDomainContainerRegistryRelationsPayload(BaseResponseModel):
-    """Payload for relating a domain to container registries."""
+class AllowDomainContainerRegistriesPayload(BaseResponseModel):
+    """Payload for allowing container registries for a domain."""
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_ids: list[UUID] = Field(
         description=(
-            "IDs of the container registries this request related. "
-            "A pair already related is left out."
+            "IDs of the container registries this request allowed. "
+            "A registry already allowed is left out."
         )
     )
 
 
-class PurgeDomainContainerRegistryRelationsPayload(BaseResponseModel):
-    """Payload for removing the relations between a domain and container registries."""
+class DisallowDomainContainerRegistriesPayload(BaseResponseModel):
+    """Payload for disallowing container registries for a domain."""
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_ids: list[UUID] = Field(
         description=(
-            "IDs of the container registries this request unrelated. "
-            "A pair not related is left out."
+            "IDs of the container registries this request disallowed. "
+            "A registry not allowed is left out."
         )
     )

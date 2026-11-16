@@ -8,23 +8,23 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
-    CreateDomainContainerRegistryRelationsInput,
+    AllowDomainContainerRegistriesInput,
     CreateDomainInput,
     DeleteDomainInput,
+    DisallowDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
-    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
-    CreateDomainContainerRegistryRelationsPayload,
+    AllowDomainContainerRegistriesPayload,
     DeleteDomainPayload,
+    DisallowDomainContainerRegistriesPayload,
     DomainNode,
     DomainPayload,
-    PurgeDomainContainerRegistryRelationsPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
 )
@@ -122,26 +122,26 @@ class V2DomainClient(BaseDomainClient):
             response_model=PartialBulkPayload[DomainNode],
         )
 
-    async def create_container_registry_relations(
-        self, request: CreateDomainContainerRegistryRelationsInput
-    ) -> CreateDomainContainerRegistryRelationsPayload:
-        """Relate a domain to container registries."""
+    async def allow_container_registries(
+        self, request: AllowDomainContainerRegistriesInput
+    ) -> AllowDomainContainerRegistriesPayload:
+        """Allow container registries for a domain."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/container-registry-relations",
+            f"{_PATH}/container-registries/allow",
             request=request,
-            response_model=CreateDomainContainerRegistryRelationsPayload,
+            response_model=AllowDomainContainerRegistriesPayload,
         )
 
-    async def purge_container_registry_relations(
-        self, request: PurgeDomainContainerRegistryRelationsInput
-    ) -> PurgeDomainContainerRegistryRelationsPayload:
-        """Remove the relations between a domain and container registries."""
+    async def disallow_container_registries(
+        self, request: DisallowDomainContainerRegistriesInput
+    ) -> DisallowDomainContainerRegistriesPayload:
+        """Disallow container registries for a domain."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/container-registry-relations/purge",
+            f"{_PATH}/container-registries/disallow",
             request=request,
-            response_model=PurgeDomainContainerRegistryRelationsPayload,
+            response_model=DisallowDomainContainerRegistriesPayload,
         )
 
     async def admin_update(self, domain_name: str, request: UpdateDomainInput) -> DomainPayload:
