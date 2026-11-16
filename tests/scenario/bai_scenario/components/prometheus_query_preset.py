@@ -29,7 +29,9 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     QueryDefinitionOptionsInfo,
 )
-from ai.backend.common.exception import PrometheusQueryPresetNotFound
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetNotFound,
+)
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,

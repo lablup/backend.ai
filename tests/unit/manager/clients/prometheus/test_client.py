@@ -9,9 +9,11 @@ from ai.backend.common.dto.clients.prometheus import (
     PrometheusResponse,
     QueryTimeRange,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     FailedToGetMetric,
-    PrometheusConnectionError,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (

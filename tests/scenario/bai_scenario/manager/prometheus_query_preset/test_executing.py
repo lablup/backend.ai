@@ -23,9 +23,11 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionResultInfo,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetNotFound,
+)
 from ai.backend.common.exception import (
     FailedToGetMetric,
-    PrometheusQueryPresetNotFound,
 )
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
