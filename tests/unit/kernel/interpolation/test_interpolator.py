@@ -15,6 +15,8 @@ _JINJA_AND_ERB: list[InterpolationDelimiter] = [
     {"start": "{{", "end": "}}"},
     {"start": "<%", "end": "%>"},
 ]
+_ERB: list[InterpolationDelimiter] = [{"start": "<%", "end": "%>"}]
+_DOLLAR_BRACE: list[InterpolationDelimiter] = [{"start": "${", "end": "}"}]
 _VARIABLES = {"host": "99.99.99.99", "ports": [11001, 11002], "port": "8000"}
 
 
@@ -76,6 +78,18 @@ class TestServiceArgumentInterpolator:
                 "8000 99.99.99.99",
                 id="delimiter-shorter-start-listed-first",
             ),
+            pytest.param(
+                _ERB,
+                """serve --port <% port %> --chat-template '{% for m in messages %}{{ m["content"] }}{% endfor %}' && echo ${HOME}""",
+                """serve --port 8000 --chat-template '{% for m in messages %}{{ m["content"] }}{% endfor %}' && echo ${HOME}""",
+                id="delimiter-keeps-jinja-chat-template",
+            ),
+            pytest.param(
+                _DOLLAR_BRACE,
+                """serve --port ${ port } --chat-template '{{ m["content"] }}' --hf-overrides '{"a": {"b": 1}}'""",
+                """serve --port 8000 --chat-template '{{ m["content"] }}' --hf-overrides '{"a": {"b": 1}}'""",
+                id="dollar-brace-keeps-jinja-and-json",
+            ),
         ],
     )
     def test_apply(
@@ -97,3 +111,8 @@ class TestServiceArgumentInterpolator:
             ServiceArgumentInterpolator(_VARIABLES, delimiters).apply(["{{ ports[0 }}"])
 
         assert ("Literal braces" in str(exc_info.value)) is mentions_literal_braces
+
+    def test_dollar_brace_takes_shell_expansion(self) -> None:
+        # ``${ }`` delimiters also match shell expansions such as ``${HOME}``.
+        with pytest.raises(InvalidServiceDefinition):
+            ServiceArgumentInterpolator(_VARIABLES, _DOLLAR_BRACE).apply(["echo ${HOME}"])
