@@ -11232,6 +11232,48 @@
         "title": "PurgeDomainInput",
         "type": "object"
       },
+      "AllowDomainContainerRegistriesInput": {
+        "description": "Input for allowing container registries for a domain.",
+        "properties": {
+          "domain_id": {
+            "description": "ID of the domain.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          },
+          "container_registry_ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the container registries to allow for the domain. At least one."
+          }
+        },
+        "required": [
+          "domain_id",
+          "container_registry_ids"
+        ],
+        "title": "AllowDomainContainerRegistriesInput",
+        "type": "object"
+      },
+      "DisallowDomainContainerRegistriesInput": {
+        "description": "Input for disallowing container registries for a domain.",
+        "properties": {
+          "domain_id": {
+            "description": "ID of the domain.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          },
+          "container_registry_ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the container registries to disallow for the domain. At least one."
+          }
+        },
+        "required": [
+          "domain_id",
+          "container_registry_ids"
+        ],
+        "title": "DisallowDomainContainerRegistriesInput",
+        "type": "object"
+      },
       "DeleteDomainInput": {
         "description": "Input for soft-deleting a domain.",
         "properties": {
@@ -55903,6 +55945,64 @@
         },
         "parameters": [],
         "description": "Permanently purge a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/domains/container-registries/allow": {
+      "post": {
+        "operationId": "v2/domains.allow_container_registries",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllowDomainContainerRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Allow container registries for a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/domains/container-registries/disallow": {
+      "post": {
+        "operationId": "v2/domains.disallow_container_registries",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisallowDomainContainerRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Disallow container registries for a domain.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/domains/delete": {
