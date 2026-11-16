@@ -99,9 +99,10 @@ class TestResolveModelServiceValidationContext:
             yield database_connection
 
     @pytest.fixture
-    async def request_naming_a_delete_complete_model_folder_by_id(
+    async def request_naming_a_dead_model_folder_by_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        status: VFolderOperationStatus,
     ) -> _ModelServiceValidationRequest:
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-{domain_id.hex[:8]}"
@@ -218,7 +219,7 @@ class TestResolveModelServiceValidationContext:
                     user=owner_uuid,
                     group=None,
                     cloneable=False,
-                    status=VFolderOperationStatus.DELETE_COMPLETE,
+                    status=status,
                 )
             )
             await sess.flush()
@@ -253,11 +254,21 @@ class TestResolveModelServiceValidationContext:
             model=str(vfolder_id),
         )
 
-    async def test_a_delete_complete_model_folder_id_is_not_found(
+    @pytest.mark.parametrize(
+        "status",
+        [
+            VFolderOperationStatus.DELETE_PENDING,
+            VFolderOperationStatus.DELETE_ONGOING,
+            VFolderOperationStatus.DELETE_COMPLETE,
+            VFolderOperationStatus.DELETE_ERROR,
+        ],
+        ids=lambda status: status.value,
+    )
+    async def test_a_dead_model_folder_id_is_not_found(
         self,
-        request_naming_a_delete_complete_model_folder_by_id: _ModelServiceValidationRequest,
+        request_naming_a_dead_model_folder_by_id: _ModelServiceValidationRequest,
     ) -> None:
-        request = request_naming_a_delete_complete_model_folder_by_id
+        request = request_naming_a_dead_model_folder_by_id
 
         with pytest.raises(VFolderNotFound):
             await request.repository.resolve_model_service_validation_context(
