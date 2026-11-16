@@ -102,7 +102,7 @@ class ValkeyStorageVolumeClient:
         async with self._client.client() as conn:
             raw_values = await conn.mget(cast(list[str | bytes], keys))
         return {
-            agent_id: self._parse_volume_declarations(raw_declarations)
+            agent_id: self._deserialize_volume_declarations(raw_declarations)
             for agent_id, raw_declarations in zip(agent_ids, raw_values, strict=True)
         }
 
@@ -120,15 +120,18 @@ class ValkeyStorageVolumeClient:
         for agent_id, agent_declarations in declarations.items():
             batch.set(
                 self._make_volume_declarations_key(agent_id),
-                dump_json([
-                    declaration.model_dump(mode="json") for declaration in agent_declarations
-                ]),
+                self._serialize_volume_declarations(agent_declarations),
                 expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
             )
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
-    def _parse_volume_declarations(
+    def _serialize_volume_declarations(
+        self, declarations: Sequence[StorageVolumeDeclaration]
+    ) -> bytes:
+        return dump_json([declaration.model_dump(mode="json") for declaration in declarations])
+
+    def _deserialize_volume_declarations(
         self, raw_declarations: bytes | None
     ) -> list[StorageVolumeDeclaration] | None:
         if raw_declarations is None:

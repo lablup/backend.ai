@@ -60,9 +60,7 @@ class ProbeCheckRunner[TID: Hashable]:
         updated_checks = {check.id(): check for check in checks}
         for check_id, check in self._checks.items():
             if updated_checks.get(check_id) is not check:
-                task = self._tasks.pop(check_id, None)
-                if task is not None:
-                    task.cancel()
+                self._cancel_task(check_id)
                 check.close()
         self._checks = updated_checks
         if not self._running:
@@ -75,6 +73,11 @@ class ProbeCheckRunner[TID: Hashable]:
         task = asyncio.create_task(self._run_check(check))
         task.set_name(f"probe-check-{check.id()}")
         self._tasks[check.id()] = task
+
+    def _cancel_task(self, check_id: TID) -> None:
+        task = self._tasks.pop(check_id, None)
+        if task is not None:
+            task.cancel()
 
     async def _run_check(self, check: AbstractProbeCheck[TID]) -> None:
         with with_log_context(check_id=str(check.id())):
