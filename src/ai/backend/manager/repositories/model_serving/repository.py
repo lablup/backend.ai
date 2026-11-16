@@ -40,10 +40,21 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
+<<<<<<< HEAD
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
+=======
+from ai.backend.manager.data.resource_group.types import (
+    ResourceGroupData as ResourceGroupEntityData,
+)
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.resource import DomainNotFound
+>>>>>>> 3df44f7da (fix(BA-9021): leave out vfolders no session may mount when resolving the model folder of a model service (#16979))
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
@@ -988,6 +999,7 @@ class ModelServingRepository:
                     allowed_vfolder_types=allowed_vfolder_types,
                     extra_vf_conds=extra_vf_conds,
                 )
+<<<<<<< HEAD
             except Exception as e:
                 if isinstance(e, (ValueError, VFolderNotFound)):
                     try:
@@ -1006,6 +1018,14 @@ class ModelServingRepository:
                         raise VFolderNotFound("Cannot find model folder") from e
                 else:
                     raise
+=======
+            matched_vfolders = await query_reachable_vfolders(
+                conn,
+                owner_scope,
+                model_condition & vfolders.c.status.not_in(VFolderOperationStatus.dead()),
+                owner_held,
+            )
+>>>>>>> 3df44f7da (fix(BA-9021): leave out vfolders no session may mount when resolving the model folder of a model service (#16979))
             if len(matched_vfolders) == 0:
                 raise VFolderNotFound
             folder_row = matched_vfolders[0]
