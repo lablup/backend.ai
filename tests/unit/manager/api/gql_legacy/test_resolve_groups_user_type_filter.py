@@ -11,7 +11,7 @@ from pytest_mock import MockerFixture
 
 from ai.backend.manager.api.gql_legacy.group import Group
 from ai.backend.manager.api.gql_legacy.schema import Query
-from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.user.row import UserRole
 
