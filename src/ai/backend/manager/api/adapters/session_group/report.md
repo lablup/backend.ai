@@ -18,60 +18,63 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 온다](#creating-a-user-granted-create-in-a-project-creates-a-session-group-there) | answered |
-| [다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다](#creating-a-user-granted-create-only-in-another-project-may-not-create-a-session-group) | rejected |
-| [프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다](#creating-a-user-granted-only-read-in-a-project-may-not-create-a-session-group) | rejected |
+| [when a user granted session group create in a project creates a session group in that project, a session group owned by that user and holding the placement policy that was given comes back](#creating-a-user-granted-create-in-a-project-creates-a-session-group-there) | answered |
+| [when a user granted session group create only in another project creates a session group in that project, the call is rejected for lack of permission and no session group is created](#creating-a-user-granted-create-only-in-another-project-may-not-create-a-session-group) | rejected |
+| [when a user granted only session group read in a project creates a session group in that project, the call is rejected for lack of permission and no session group is created](#creating-a-user-granted-only-read-in-a-project-may-not-create-a-session-group) | rejected |
 
 **global_search**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | answered |
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 검색하면, 역할로 거부된다](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | rejected |
+| [when a superadmin searches everything filtered by the project and by the groups that carry a deletion time, only the session group that carries one comes back; a role checks this operation, so the requesting user is a superadmin](#searching-a-soft-deleted-group-comes-back-when-the-filter-names-it) | answered |
+| [when a superadmin searches everything filtered by the project, the session group that carries a deletion time is left out and only the session group the user made comes back; a role checks this operation, so the requesting user is a superadmin](#searching-a-soft-deleted-group-is-left-out-of-the-search) | answered |
+| [when a superadmin searches the session groups of the project filtered by that project and ordered by the placement direction in ascending order, one per page, the user's packed group comes back alone on the first page and the answer says a next page exists; the session groups of the other project are left out; a role checks this operation, so the requesting user is a superadmin](#searching-ordering-by-the-placement-direction-puts-pack-on-the-first-page) | answered |
+| [when a superadmin with no grant searches everything filtered by one project, the session group the user created in that project and the session group held by the deployment's replica group both come back; a role checks this operation, so the requesting user is a superadmin](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | answered |
+| [when a user granted session group read in that project but not a superadmin searches everything, the role rejects it](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | rejected |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | answered |
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다](#purging-a-deployments-session-group-is-refused-as-in-use) | rejected |
-| [아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | rejected |
-| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | rejected |
+| [when a user granted session group purge in their own scope deletes the session group they created, the id of that session group comes back and the member sessions stay with their session group cleared](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | answered |
+| [when a user granted session group purge in their own scope deletes the session group held by the deployment's replica group, the call is rejected because the replica group is using it and the session group stays](#purging-a-deployments-session-group-is-refused-as-in-use) | rejected |
+| [when a user with no grant deletes the session group they created, the call is rejected for lack of permission and the session group stays](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | rejected |
+| [when a user granted only session group read in their own scope deletes the session group they created, the call is rejected for lack of permission and the session group stays](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다](#scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project) | answered |
-| [자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다](#scoped_searching-a-user-scope-and-a-project-scope-are-joined) | answered |
-| [자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | answered |
-| [다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-a-project-not-granted-is-refused) | rejected |
-| [세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-another-users-scope-is-refused) | rejected |
+| [when a user granted session group read only in that project searches in that project's scope, the session group held by the deployment's replica group and the session groups of the other project are left out and only the session group the user created in that project comes back](#scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project) | answered |
+| [when a user granted session group read in their own scope and in another project searches with both scopes together, the session groups they created and the session groups other users created in that project come back together and the session group held by the deployment's replica group is left out](#scoped_searching-a-user-scope-and-a-project-scope-are-joined) | answered |
+| [when a user granted session group read in their own scope searches in their own scope, the session groups they created in two projects come back and the session group held by the deployment's replica group and the session groups other users created are left out](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | answered |
+| [when a user granted session group read only in another project searches in the scope of the project that holds the session groups, the call is rejected for lack of permission](#scoped_searching-searching-a-project-not-granted-is-refused) | rejected |
+| [when a user granted session group read only in the project that holds the session groups searches in the scope of the user who created them, the call is rejected for lack of permission](#scoped_searching-searching-another-users-scope-is-refused) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다](#updating-an-owner-changes-only-the-direction) | answered |
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다](#updating-an-owner-changes-the-direction-and-the-enforcement) | answered |
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다](#updating-a-deployments-session-group-is-refused-as-in-use) | rejected |
-| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다](#updating-an-owner-granted-only-read-may-not-update) | rejected |
+| [when a user granted session group update in their own scope changes only the direction of the session group they created, that session group comes back with the enforcement left as it was](#updating-an-owner-changes-only-the-direction) | answered |
+| [when a user granted session group update in their own scope changes the direction and the enforcement of the session group they created, that session group comes back with both items changed](#updating-an-owner-changes-the-direction-and-the-enforcement) | answered |
+| [when a user granted session group update in their own scope changes the policy of the session group held by their own deployment's replica group, the call is rejected as in use rather than for permission](#updating-a-deployments-session-group-is-refused-as-in-use) | rejected |
+| [when a user granted only session group read in their own scope changes the policy of the session group they created, the call is rejected for lack of permission](#updating-an-owner-granted-only-read-may-not-update) | rejected |
 
 **bulk_get_ids**
 
 | scenario | verdict |
 |---|---|
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다](#bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group) | answered |
-| [슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다](#bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty) | answered |
-| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group) | rejected |
+| [when a user granted session group read in that project reads the session group the user created and the session group held by the deployment's replica group together, that session group and an empty entry come back in the requested order](#bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group) | answered |
+| [when a superadmin bulk reads an id that holds no session group, that entry comes back empty; only someone who passes the permission check can see the answer of a read, so the requesting user is a superadmin](#bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty) | answered |
+| [when a user with no grant bulk reads the session group the user created by id, that entry is rejected for lack of permission](#bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group) | rejected |
 
 **get**
 
 | scenario | verdict |
 |---|---|
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다](#reading-a-granted-user-reads-a-users-session-group) | answered |
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다](#reading-a-deployments-session-group-is-not-found-even-when-granted) | rejected |
-| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-session-group) | rejected |
+| [when a user granted session group read in that project reads the session group the user created by id, that session group comes back](#reading-a-granted-user-reads-a-users-session-group) | answered |
+| [when a user granted session group read in that project reads the session group held by the deployment's replica group by id, the call is rejected as not found rather than for permission](#reading-a-deployments-session-group-is-not-found-even-when-granted) | rejected |
+| [when a user with no grant reads the session group the user created by id, the call is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-read-a-session-group) | rejected |
 
 ### create
 
@@ -79,144 +82,263 @@ Scenario: complete
 
 #### [a-user-granted-create-in-a-project-creates-a-session-group-there](/tests/scenario/bai_scenario/manager/session_group/test_creating.py): pass
 
-프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 온다
+when a user granted session group create in a project creates a session group in that project, a session group owned by that user and holding the placement policy that was given comes back
 
 Given
 
-- 한 도메인의 두 프로젝트, 그리고 세션 그룹을 만들 프로젝트에서 세션 그룹 생성 권한을 받은 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 프로젝트에서 세션 그룹 생성 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-creator-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-creator-1: session_group 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 session-group-creator-1 보유
+- two projects in one domain, and one user granted create a session group in the project it goes in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Prepare a user granted the session group create permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-creator-1: applies only within the scope it is granted in
+    - Role session-group-creator-1: CREATE allowed on every session_group
+    - regular user user-1: holds Role session-group-creator-1
 
 When
 
-- SessionGroupAdapter.create: user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
+- SessionGroupAdapter.create: user-1 creates a session group in that project with direction spread and enforcement preferred
 
 Then
 
-- 만든 사람이 소유자이고 입력한 배치 정책을 가진 세션 그룹 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: id와 같다
-  - domain_id: 그 도메인의 id와 같다
-  - project_id: 그 프로젝트의 id와 같다
-  - owner_user_id: 만든 사람의 id와 같다
+- the whole session group comes back, owned by the user who created it and holding the placement policy that was given
+  - id: skipped: the database generates it
+  - entity_id: same as id
+  - domain_id: same as the id of that domain
+  - project_id: same as the id of that project
+  - owner_user_id: same as the id of the user who created it
   - placement_direction = <SessionGroupPlacementDirectionEnum.SPREAD: 'spread'>
   - placement_enforcement = <SessionGroupPlacementEnforcementEnum.PREFERRED: 'preferred'>
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - deleted_at = None
 
 <a id="creating-a-user-granted-create-only-in-another-project-may-not-create-a-session-group"></a>
 
 #### [a-user-granted-create-only-in-another-project-may-not-create-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_creating.py): pass
 
-다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다
+when a user granted session group create only in another project creates a session group in that project, the call is rejected for lack of permission and no session group is created
 
 Given
 
-- 한 도메인의 두 프로젝트, 그리고 다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 프로젝트에서 세션 그룹 생성 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-creator-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-creator-1: session_group 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 session-group-creator-1 보유
+- two projects in one domain, and one user granted create a session group only in the other project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Prepare a user granted the session group create permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-creator-1: applies only within the scope it is granted in
+    - Role session-group-creator-1: CREATE allowed on every session_group
+    - regular user user-1: holds Role session-group-creator-1
 
 When
 
-- SessionGroupAdapter.create: user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
+- SessionGroupAdapter.create: user-1 creates a session group in that project with direction spread and enforcement preferred
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="creating-a-user-granted-only-read-in-a-project-may-not-create-a-session-group"></a>
 
 #### [a-user-granted-only-read-in-a-project-may-not-create-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_creating.py): pass
 
-프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다
+when a user granted only session group read in a project creates a session group in that project, the call is rejected for lack of permission and no session group is created
 
 Given
 
-- 한 도메인의 두 프로젝트, 그리고 세션 그룹을 만들 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-reader-1 보유
+- two projects in one domain, and one user granted read a session group in the project it goes in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-1: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.create: user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
+- SessionGroupAdapter.create: user-1 creates a session group in that project with direction spread and enforcement preferred
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### global_search
+
+<a id="searching-a-soft-deleted-group-comes-back-when-the-filter-names-it"></a>
+
+#### [a-soft-deleted-group-comes-back-when-the-filter-names-it](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+when a superadmin searches everything filtered by the project and by the groups that carry a deletion time, only the session group that carries one comes back; a role checks this operation, so the requesting user is a superadmin
+
+Given
+
+- the session group a user made in one project and the session group held by a replica group that stopped serving, and one superadmin looking at that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: one replica group holding the session group stopped serving
+  - a session group stamped as deleted retired-session-group-1: its replica group stopped serving, so its retention period has started
+
+When
+
+- SessionGroupAdapter.global_search: user-2 searches everything filtered by the project team-1 and by the groups that carry a deletion time
+
+Then
+
+- only the session group that carries a deletion time comes back
+  - items: same as the session group of the replica group that stopped serving
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-soft-deleted-group-is-left-out-of-the-search"></a>
+
+#### [a-soft-deleted-group-is-left-out-of-the-search](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+when a superadmin searches everything filtered by the project, the session group that carries a deletion time is left out and only the session group the user made comes back; a role checks this operation, so the requesting user is a superadmin
+
+Given
+
+- the session group a user made in one project and the session group held by a replica group that stopped serving, and one superadmin looking at that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: one replica group holding the session group stopped serving
+  - a session group stamped as deleted retired-session-group-1: its replica group stopped serving, so its retention period has started
+
+When
+
+- SessionGroupAdapter.global_search: user-2 searches everything filtered by the project team-1
+
+Then
+
+- the session group that carries a deletion time is left out and only the one the user made comes back
+  - items: same as the session group the user made
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-ordering-by-the-placement-direction-puts-pack-on-the-first-page"></a>
+
+#### [ordering-by-the-placement-direction-puts-pack-on-the-first-page](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+when a superadmin searches the session groups of the project filtered by that project and ordered by the placement direction in ascending order, one per page, the user's packed group comes back alone on the first page and the answer says a next page exists; the session groups of the other project are left out; a role checks this operation, so the requesting user is a superadmin
+
+Given
+
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one superadmin holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+
+When
+
+- SessionGroupAdapter.global_search: user-3 searches the session groups of team-1, ordered by the placement direction and one per page
+
+Then
+
+- the user's packed session group comes back alone on the first page and the answer says a next page exists; the session groups of the other project are left out
+  - items: same as the session group the user made
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
 
 <a id="searching-the-superadmin-finds-a-users-group-and-a-deployments-group"></a>
 
 #### [the-superadmin-finds-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
 
-아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다
+when a superadmin with no grant searches everything filtered by one project, the session group the user created in that project and the session group held by the deployment's replica group both come back; a role checks this operation, so the requesting user is a superadmin
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one superadmin holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.global_search: user-3이 team-1 프로젝트로 걸러 전체 검색
+- SessionGroupAdapter.global_search: user-3 searches everything filtered by the project team-1
 
 Then
 
-- 그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다
-  - items: 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹
+- the session group the user created in that project and the session group held by the deployment's replica group both come back
+  - items: the session group the user created and the session group held by the deployment's replica group
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -225,46 +347,46 @@ Then
 
 #### [a-user-who-is-not-a-superadmin-may-not-search-every-session-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 검색하면, 역할로 거부된다
+when a user granted session group read in that project but not a superadmin searches everything, the role rejects it
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission in the project the session groups are in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.global_search: user-3이 team-1 프로젝트로 걸러 전체 검색
+- SessionGroupAdapter.global_search: user-3 searches everything filtered by the project team-1
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### purge
 
@@ -272,153 +394,153 @@ Then
 
 #### [the-owner-purges-a-users-session-group-keeping-its-members](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
-자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다
+when a user granted session group purge in their own scope deletes the session group they created, the id of that session group comes back and the member sessions stay with their session group cleared
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made with two member sessions in one project and the session group the deployment's replica group holds, and the user who made those session groups, granted the session group purge permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group purge permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: HARD_DELETE allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session session-1: waiting to be scheduled as a member of the session group
+  - Session session-2: waiting to be scheduled as a member of the session group
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.purge: user-1이 사용자가 만든 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1 purges the session group the user created
 
 Then
 
-- 지운 사용자가 만든 세션 그룹의 id가 온다
-  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
+- the id of the purged session group the user created comes back
+  - entity_id: same as the id of the session group the user created
 
 <a id="purging-a-deployments-session-group-is-refused-as-in-use"></a>
 
 #### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
-자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다
+when a user granted session group purge in their own scope deletes the session group held by the deployment's replica group, the call is rejected because the replica group is using it and the session group stays
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made with two member sessions in one project and the session group the deployment's replica group holds, and the user who made those session groups, granted the session group purge permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group purge permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: HARD_DELETE allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session session-1: waiting to be scheduled as a member of the session group
+  - Session session-2: waiting to be scheduled as a member of the session group
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.purge: user-1이 배포의 replica group이 가진 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1 purges the session group held by the deployment's replica group
 
 Then
 
-- 거부된다
-  - 거부: SessionGroupInUse
+- the call is rejected
+  - rejected: SessionGroupInUse
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-session-group"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다
+when a user with no grant deletes the session group they created, the call is rejected for lack of permission and the session group stays
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 아무 권한도 받지 않은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made with two member sessions in one project and the session group the deployment's replica group holds, and the user who made those session groups, holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session session-1: waiting to be scheduled as a member of the session group
+  - Session session-2: waiting to be scheduled as a member of the session group
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.purge: user-1이 사용자가 만든 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1 purges the session group the user created
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="purging-a-user-granted-only-read-may-not-purge-a-session-group"></a>
 
 #### [a-user-granted-only-read-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
-자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다
+when a user granted only session group read in their own scope deletes the session group they created, the call is rejected for lack of permission and the session group stays
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made with two member sessions in one project and the session group the deployment's replica group holds, and the user who made those session groups, granted the session group read permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group read permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: READ allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session session-1: waiting to be scheduled as a member of the session group
+  - Session session-2: waiting to be scheduled as a member of the session group
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.purge: user-1이 사용자가 만든 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1 purges the session group the user created
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### scoped_search
 
@@ -426,46 +548,46 @@ Then
 
 #### [a-granted-user-finds-only-the-users-group-of-the-project](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
-그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다
+when a user granted session group read only in that project searches in that project's scope, the session group held by the deployment's replica group and the session groups of the other project are left out and only the session group the user created in that project comes back
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission in the project the session groups are in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.scoped_search: user-3이 team-1 프로젝트 범위에서 조회
+- SessionGroupAdapter.scoped_search: user-3 searches in the scope of the project team-1
 
 Then
 
-- 그 프로젝트의 사용자가 만든 세션 그룹만 남는다
-  - items: 그 프로젝트의 사용자가 만든 세션 그룹
+- only the session group the user created in that project stays
+  - items: the session group the user created in that project
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -474,46 +596,46 @@ Then
 
 #### [a-user-scope-and-a-project-scope-are-joined](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
-자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다
+when a user granted session group read in their own scope and in another project searches with both scopes together, the session groups they created and the session groups other users created in that project come back together and the session group held by the deployment's replica group is left out
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프와 한 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-reader-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and the user who made those session groups, granted the session group read permission in their own scope and the other project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group read permission in their own scope and in one project
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: READ allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-1: holds Role session-group-reader-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.scoped_search: user-1이 자기 스코프와 other-1 프로젝트 범위를 함께 조회
+- SessionGroupAdapter.scoped_search: user-1 searches their own scope and the scope of the project other-1 together
 
 Then
 
-- 그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹이 합쳐져 남는다
-  - items: 그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹
+- the session groups the user created and the session groups of the other project stay together
+  - items: the session groups the user created and the session groups of the other project
   - total_count = 3
   - has_next_page = False
   - has_previous_page = False
@@ -522,43 +644,43 @@ Then
 
 #### [an-owner-finds-the-groups-they-made-in-their-own-scope](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
-자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다
+when a user granted session group read in their own scope searches in their own scope, the session groups they created in two projects come back and the session group held by the deployment's replica group and the session groups other users created are left out
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and the user who made those session groups, granted the session group read permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group read permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: READ allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.scoped_search: user-1이 자기 스코프에서 조회
+- SessionGroupAdapter.scoped_search: user-1 searches in their own scope
 
 Then
 
-- 그 사용자가 두 프로젝트에 만든 세션 그룹만 남는다
-  - items: 그 사용자가 두 프로젝트에 만든 세션 그룹
+- only the session groups the user created in two projects stay
+  - items: the session groups the user created in two projects
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -567,91 +689,91 @@ Then
 
 #### [searching-a-project-not-granted-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
-다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다
+when a user granted session group read only in another project searches in the scope of the project that holds the session groups, the call is rejected for lack of permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission only in the other project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.scoped_search: user-3이 team-1 프로젝트 범위에서 조회
+- SessionGroupAdapter.scoped_search: user-3 searches in the scope of the project team-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="scoped_searching-searching-another-users-scope-is-refused"></a>
 
 #### [searching-another-users-scope-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
-세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다
+when a user granted session group read only in the project that holds the session groups searches in the scope of the user who created them, the call is rejected for lack of permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission in the project the session groups are in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.scoped_search: user-3이 user-1의 스코프에서 조회
+- SessionGroupAdapter.scoped_search: user-3 searches in the scope of user-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### update
 
@@ -659,185 +781,185 @@ Then
 
 #### [an-owner-changes-only-the-direction](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
-자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다
+when a user granted session group update in their own scope changes only the direction of the session group they created, that session group comes back with the enforcement left as it was
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 수정 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and the user who made those session groups, granted the session group update permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group update permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: UPDATE allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.update: user-1이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다
+- SessionGroupAdapter.update: user-1 changes only the direction of the session group the user created to spread
 
 Then
 
-- 방향만 바뀌고 강제 수준은 그대로인 세션 그룹 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
-  - domain_id: 그 도메인의 id와 같다
-  - project_id: 그 프로젝트의 id와 같다
-  - owner_user_id: 만든 사람의 id와 같다
+- the whole session group with only the direction changed and the enforcement left as it was comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the session group the user made
+  - domain_id: same as the id of that domain
+  - project_id: same as the id of that project
+  - owner_user_id: same as the id of the user who created it
   - placement_direction = <SessionGroupPlacementDirectionEnum.SPREAD: 'spread'>
   - placement_enforcement = <SessionGroupPlacementEnforcementEnum.STRICT: 'strict'>
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - deleted_at = None
 
 <a id="updating-an-owner-changes-the-direction-and-the-enforcement"></a>
 
 #### [an-owner-changes-the-direction-and-the-enforcement](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
-자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다
+when a user granted session group update in their own scope changes the direction and the enforcement of the session group they created, that session group comes back with both items changed
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 수정 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and the user who made those session groups, granted the session group update permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group update permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: UPDATE allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.update: user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update: user-1 changes the direction of the session group the user created to spread and its enforcement to preferred
 
 Then
 
-- 두 항목이 바뀐 세션 그룹 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
-  - domain_id: 그 도메인의 id와 같다
-  - project_id: 그 프로젝트의 id와 같다
-  - owner_user_id: 만든 사람의 id와 같다
+- the whole session group with both items changed comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the session group the user made
+  - domain_id: same as the id of that domain
+  - project_id: same as the id of that project
+  - owner_user_id: same as the id of the user who created it
   - placement_direction = <SessionGroupPlacementDirectionEnum.SPREAD: 'spread'>
   - placement_enforcement = <SessionGroupPlacementEnforcementEnum.PREFERRED: 'preferred'>
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - deleted_at = None
 
 <a id="updating-a-deployments-session-group-is-refused-as-in-use"></a>
 
 #### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
-자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다
+when a user granted session group update in their own scope changes the policy of the session group held by their own deployment's replica group, the call is rejected as in use rather than for permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 수정 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and the user who made those session groups, granted the session group update permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group update permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: UPDATE allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.update: user-1이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update: user-1 changes the direction of the session group held by the deployment's replica group to spread and its enforcement to preferred
 
 Then
 
-- 거부된다
-  - 거부: SessionGroupInUseForUpdate
+- the call is rejected
+  - rejected: SessionGroupInUseForUpdate
 
 <a id="updating-an-owner-granted-only-read-may-not-update"></a>
 
 #### [an-owner-granted-only-read-may-not-update](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
-자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다
+when a user granted only session group read in their own scope changes the policy of the session group they created, the call is rejected for lack of permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-owner-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and the user who made those session groups, granted the session group read permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the session group read permission in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role session-group-owner-1: applies only within the scope it is granted in
+    - Role session-group-owner-1: READ allowed on every session_group
+    - regular user user-1: holds Role session-group-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.update: user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update: user-1 changes the direction of the session group the user created to spread and its enforcement to preferred
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### bulk_get_ids
 
@@ -845,134 +967,134 @@ Then
 
 #### [a-granted-user-bulk-reads-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py): pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다
+when a user granted session group read in that project reads the session group the user created and the session group held by the deployment's replica group together, that session group and an empty entry come back in the requested order
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission in the project the session groups are in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.bulk_get_ids: user-3이 사용자가 만든 세션 그룹, 배포의 replica group이 가진 세션 그룹 순으로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids: user-3 bulk reads the session group the user created and then the session group held by the deployment's replica group, in that order
 
 Then
 
-- 첫 자리에 사용자가 만든 세션 그룹 전체가 오고, 배포의 replica group이 가진 세션 그룹 자리는 빈 값이다
-  - [0].id: 무시함: 데이터베이스가 만든다
-  - [0].entity_id: 사용자가 만든 세션 그룹의 id와 같다
-  - [0].domain_id: 그 도메인의 id와 같다
-  - [0].project_id: 그 프로젝트의 id와 같다
-  - [0].owner_user_id: 만든 사람의 id와 같다
+- the whole session group the user created comes back in the first entry and the entry for the session group held by the deployment's replica group is empty
+  - [0].id: skipped: the database generates it
+  - [0].entity_id: same as the id of the session group the user made
+  - [0].domain_id: same as the id of that domain
+  - [0].project_id: same as the id of that project
+  - [0].owner_user_id: same as the id of the user who created it
   - [0].placement_direction = <SessionGroupPlacementDirectionEnum.PACK: 'pack'>
   - [0].placement_enforcement = <SessionGroupPlacementEnforcementEnum.STRICT: 'strict'>
-  - [0].created_at: 이 실행이 쓴 시각
+  - [0].created_at: the time this run wrote
   - [0].deleted_at = None
 
 <a id="bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty"></a>
 
 #### [the-superadmin-bulk-reads-a-missing-id-as-empty](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py): pass
 
-슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다
+when a superadmin bulk reads an id that holds no session group, that entry comes back empty; only someone who passes the permission check can see the answer of a read, so the requesting user is a superadmin
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one superadmin holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.bulk_get_ids: user-3이 아무 세션 그룹도 갖지 않은 id로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids: user-3 bulk reads an id that holds no session group
 
 Then
 
-- 물은 자리가 빈 값이다
+- the requested entry is empty
   - answers = ['NoneType']
 
 <a id="bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group"></a>
 
 #### [a-user-granted-nothing-may-not-bulk-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py): pass
 
-아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다
+when a user with no grant bulk reads the session group the user created by id, that entry is rejected for lack of permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.bulk_get_ids: user-3이 사용자가 만든 세션 그룹의 id로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids: user-3 bulk reads the session group the user created by id
 
 Then
 
-- 물은 자리가 거부된다
-  - 거부: NotEnoughPermission
+- the requested entry is rejected
+  - rejected: NotEnoughPermission
 
 ### get
 
@@ -980,137 +1102,137 @@ Then
 
 #### [a-granted-user-reads-a-users-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py): pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다
+when a user granted session group read in that project reads the session group the user created by id, that session group comes back
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission in the project the session groups are in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.get: user-3이 사용자가 만든 세션 그룹을 id로 조회
+- SessionGroupAdapter.get: user-3 reads the session group the user created by id
 
 Then
 
-- 사용자가 만든 세션 그룹 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
-  - domain_id: 그 도메인의 id와 같다
-  - project_id: 그 프로젝트의 id와 같다
-  - owner_user_id: 만든 사람의 id와 같다
+- the whole session group the user created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the session group the user made
+  - domain_id: same as the id of that domain
+  - project_id: same as the id of that project
+  - owner_user_id: same as the id of the user who created it
   - placement_direction = <SessionGroupPlacementDirectionEnum.PACK: 'pack'>
   - placement_enforcement = <SessionGroupPlacementEnforcementEnum.STRICT: 'strict'>
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - deleted_at = None
 
 <a id="reading-a-deployments-session-group-is-not-found-even-when-granted"></a>
 
 #### [a-deployments-session-group-is-not-found-even-when-granted](/tests/scenario/bai_scenario/manager/session_group/test_reading.py): pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다
+when a user granted session group read in that project reads the session group held by the deployment's replica group by id, the call is rejected as not found rather than for permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
-  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-reader-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-3: 역할 session-group-reader-1 보유
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user granted the session group read permission in the project the session groups are in
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Prepare a user granted the session group read permission in the project
+    - Prepare one user in the domain
+      - User resource policy user-policy-3: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-3: has their own keypair and personal project
+    - Role session-group-reader-1: applies only within the scope it is granted in
+    - Role session-group-reader-1: READ allowed on every session_group
+    - regular user user-3: holds Role session-group-reader-1
 
 When
 
-- SessionGroupAdapter.get: user-3이 배포의 replica group이 가진 세션 그룹을 id로 조회
+- SessionGroupAdapter.get: user-3 reads the session group held by the deployment's replica group by id
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-session-group"></a>
 
 #### [a-user-granted-nothing-may-not-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py): pass
 
-아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다
+when a user with no grant reads the session group the user created by id, the call is rejected for lack of permission
 
 Given
 
-- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
-  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one user holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
 
 When
 
-- SessionGroupAdapter.get: user-3이 사용자가 만든 세션 그룹을 id로 조회
+- SessionGroupAdapter.get: user-3 reads the session group the user created by id
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 

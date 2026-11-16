@@ -1,4 +1,4 @@
-"""프로젝트 만들기와 명부에 올리기."""
+"""프로젝트 만들기와 멤버 목록에 올리기."""
 
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
@@ -85,7 +86,10 @@ class ADomainAndAPolicy(Given[Any, ADomainAPolicyAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"도메인 하나와 프로젝트 정책, 그리고 {self.role.value} 한 명"
+        return Says(
+            f"도메인 하나와 프로젝트 정책, 그리고 {self.role.value} 한 명",
+            english=f"one domain, the project policy, and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADomainAPolicyAndACaller:
@@ -103,7 +107,10 @@ class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "프로젝트 하나와 그 프로젝트 스코프의 역할, 올릴 사용자, 그리고 슈퍼관리자"
+        return Says(
+            "프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 superadmin",
+            english="one project, the role in its scope, the user to assign, and the superadmin",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AProjectAMemberAndACaller:
@@ -135,7 +142,10 @@ class MakingAProject(When[ADomainAPolicyAndACaller, ProjectAdapter, Answer]):
 
     @override
     def describe(self, laid: ADomainAPolicyAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name} 아래에 {self.named}을 만듦"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name} 아래에 {self.named}을 만듭니다",
+            english=f"{laid.caller.username} creates {self.named} under {laid.domain.name}",
+        )
 
     @override
     async def call(self, adapter: ProjectAdapter, laid: ADomainAPolicyAndACaller) -> Answer:
@@ -152,7 +162,7 @@ class MakingAProject(When[ADomainAPolicyAndACaller, ProjectAdapter, Answer]):
 
 @dataclass(frozen=True)
 class AssigningTheMember(When[AProjectAMemberAndACaller, ProjectAdapter, Answer]):
-    """그 사용자를 프로젝트 명부에 올린다."""
+    """그 사용자를 프로젝트 멤버 목록에 올린다."""
 
     @override
     def operation(self) -> str:
@@ -160,7 +170,12 @@ class AssigningTheMember(When[AProjectAMemberAndACaller, ProjectAdapter, Answer]
 
     @override
     def describe(self, laid: AProjectAMemberAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.member.username}을 {laid.project.name}에 배정"
+        return Says(
+            f"{laid.caller.username}이 {laid.member.username}을 {laid.project.name}에 배정합니다",
+            english=(
+                f"{laid.caller.username} assigns {laid.member.username} to {laid.project.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ProjectAdapter, laid: AProjectAMemberAndACaller) -> Answer:
@@ -180,7 +195,10 @@ class TheProjectSitsUnderTheDomain(Then[ADomainAPolicyAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "만든 프로젝트 전체가 온다"
+        return Says(
+            "만든 프로젝트 전체가 응답으로 옵니다",
+            english="the whole project just created comes back",
+        )
 
     @override
     def look(self, laid: ADomainAPolicyAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -198,8 +216,11 @@ class TheProjectSitsUnderTheDomain(Then[ADomainAPolicyAndACaller, Answer]):
             ),
             Same("storage.allowed_vfolder_hosts", node.storage.allowed_vfolder_hosts, []),
             Same("lifecycle.is_active", node.lifecycle.is_active, True),
-            Skipped("id", "데이터베이스가 만든다"),
-            Skipped("basic_info.type", "타입이 이미 값을 못박는다"),
+            Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
+            Skipped(
+                "basic_info.type",
+                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
+            ),
             Held("lifecycle.created_at", node.lifecycle.created_at, written),
             Held("lifecycle.modified_at", node.lifecycle.modified_at, written),
         ]
@@ -207,11 +228,14 @@ class TheProjectSitsUnderTheDomain(Then[ADomainAPolicyAndACaller, Answer]):
 
 @dataclass(frozen=True)
 class TheRosterHoldsTheMember(Then[AProjectAMemberAndACaller, Answer]):
-    """명부에 그 사람 하나가 올라 있다."""
+    """멤버 목록에 그 사람 하나가 올라 있다."""
 
     @override
     def says(self) -> str:
-        return "명부에 배정한 사람만 올라 있다"
+        return Says(
+            "멤버 목록에 배정한 사람만 올라 있습니다",
+            english="the roster holds the user assigned, and no one else",
+        )
 
     @override
     def look(self, laid: AProjectAMemberAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -222,7 +246,7 @@ class TheRosterHoldsTheMember(Then[AProjectAMemberAndACaller, Answer]):
             Held(
                 "items",
                 [one.id for one in payload.items],
-                SameAs([laid.member.id], "배정한 사람 하나"),
+                SameAs([laid.member.id], Says("배정한 사람 하나", english="the one user assigned")),
             ),
         ]
 
@@ -239,9 +263,13 @@ class TheSuperadminMakesAProject(
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, "
-            "그 이름의 프로젝트가 그 도메인 아래에 생긴다"
+        return Says(
+            "도메인과 프로젝트 정책이 있을 때 superadmin 이 프로젝트를 만들면, 그 이름의 "
+            "프로젝트가 그 도메인 아래에 생깁니다",
+            english=(
+                "when a domain and a project policy are in place and the superadmin creates a "
+                "project, a project with that name appears under the domain"
+            ),
         )
 
     @override
@@ -267,9 +295,13 @@ class AUserGrantedNothingMayNotMakeAProject(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, "
-            "아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다"
+        return Says(
+            "프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 "
+            "않은 사용자는 권한 부족으로 거부됩니다",
+            english=(
+                "project creation is guarded by permission in the domain scope rather than by a "
+                "role, so a user granted nothing is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -295,9 +327,13 @@ class AssigningAUserPutsThemOnTheRoster(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, "
-            "그 사용자가 명부에 오른다"
+        return Says(
+            "프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 "
+            "멤버 목록에 오릅니다",
+            english=(
+                "when a project and a role in its scope are in place and a user is assigned, "
+                "the user is put on the roster"
+            ),
         )
 
     @override

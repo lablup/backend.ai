@@ -32,6 +32,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -65,9 +66,13 @@ class CreatingInTheProject(When[Laid, SessionGroupAdapter, SessionGroupNode]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return (
-            f"{laid.caller.username}이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 "
-            "세션 그룹을 만든다"
+        return Says(
+            f"{laid.caller.username} 이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 "
+            "세션 그룹을 생성합니다",
+            english=(
+                f"{laid.caller.username} creates a session group in that project with direction "
+                "spread and enforcement preferred"
+            ),
         )
 
     @override
@@ -91,7 +96,13 @@ class TheCreatedGroupNode(Then[Laid, SessionGroupNode]):
 
     @override
     def says(self) -> str:
-        return "만든 사람이 소유자이고 입력한 배치 정책을 가진 세션 그룹 전체가 온다"
+        return Says(
+            "생성한 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹 전체가 옵니다",
+            english=(
+                "the whole session group comes back, owned by the user who created it and holding "
+                "the placement policy that was given"
+            ),
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[SessionGroupNode]) -> list[Verdict]:
@@ -115,9 +126,14 @@ class AUserGrantedCreateCreates(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, "
-            "그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 온다"
+        return Says(
+            "프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 생성하면, "
+            "그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 옵니다",
+            english=(
+                "when a user granted session group create in a project creates a session group in "
+                "that project, a session group owned by that user and holding the placement policy "
+                "that was given comes back"
+            ),
         )
 
     @override
@@ -143,9 +159,14 @@ class AReaderMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, "
-            "권한 부족으로 거부되고 세션 그룹은 생기지 않는다"
+        return Says(
+            "프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 생성하면, "
+            "권한 부족으로 거부되고 세션 그룹은 생기지 않습니다",
+            english=(
+                "when a user granted only session group read in a project creates a session group "
+                "in that project, the call is rejected for lack of permission and no session group "
+                "is created"
+            ),
         )
 
     @override
@@ -171,9 +192,14 @@ class AnOutsiderMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 "
-            "만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다"
+            "생성하면, 권한 부족으로 거부되고 세션 그룹은 생기지 않습니다",
+            english=(
+                "when a user granted session group create only in another project creates a "
+                "session group in that project, the call is rejected for lack of permission and no "
+                "session group is created"
+            ),
         )
 
     @override

@@ -622,58 +622,6 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/bgtask-not-registered"
-    error_title = "Background Task Not Registered"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.NOT_IMPLEMENTED,
-        )
-
-
-class BgtaskNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/bgtask-not-found"
-    error_title = "Background Task Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/bgtask-failed"
-    error_title = "Background Task Failed"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/bgtask-cancelled"
-    error_title = "Background Task Cancelled"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.CANCELED,
-        )
-
-
 class UnreachableError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/unreachable"
     error_title = "Unreachable"
@@ -843,6 +791,19 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InvalidVFolderMountSourceError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-vfolder-mount-source"
+    error_title = "Invalid vfolder mount source."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
@@ -1198,16 +1159,6 @@ class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
         return self._error_code
 
 
-class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
 class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/container-registry/groups-already-associated"
     error_title = "Container registry groups already associated."
@@ -1218,34 +1169,6 @@ class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict)
             domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
-        )
-
-
-class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-channel-spec"
-    error_title = "Invalid Notification Channel Specification."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.NOTIFICATION,
-            operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class PrometheusConnectionError(BackendAIError, web.HTTPServiceUnavailable):
-    """Exception raised when a connection to Prometheus fails."""
-
-    error_type = "https://api.backend.ai/probs/prometheus-connection-error"
-    error_title = "Failed to connect to Prometheus."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.METRIC,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.UNREACHABLE,
         )
 
 
@@ -1269,26 +1192,6 @@ class InvalidMetricPresetTemplate(BackendAIError, web.HTTPBadRequest):
 
     error_type = "https://api.backend.ai/probs/invalid-metric-preset-template"
     error_title = "Invalid metric preset template."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.METRIC,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class PrometheusQueryEvaluationFailed(BackendAIError, web.HTTPBadRequest):
-    """Raised when Prometheus rejects a rendered PromQL query.
-
-    Used by user-facing flows (e.g., preset preview) to attribute query
-    rejection to the caller's input rather than treating it as a downstream
-    gateway failure (502).
-    """
-
-    error_type = "https://api.backend.ai/probs/prometheus-query-evaluation-failed"
-    error_title = "Prometheus rejected the query."
 
     @override
     def error_code(self) -> ErrorCode:
@@ -1430,45 +1333,6 @@ class RBACTypeConversionError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class PrometheusQueryPresetNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/prometheus-query-preset-not-found"
-    error_title = "The prometheus query preset does not exist."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class PrometheusQueryPresetInvalidLabel(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/prometheus-query-preset-invalid-label"
-    error_title = "Invalid label specified for prometheus query preset execution."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class PrometheusQueryPresetCategoryNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/prometheus-query-preset-category-not-found"
-    error_title = "The prometheus query preset category does not exist."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET_CATEGORY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 

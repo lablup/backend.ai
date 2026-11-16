@@ -1,0 +1,6 @@
+import{a as e}from"./rolldown-runtime-BWaJ3C7D.js";import{Zn as t}from"./icons-Btg1s2wy.js";import{t as n}from"./compiler-runtime-CZQb2eIb.js";import{t as r}from"./jsx-runtime-BapUIyWk.js";import{t as i}from"./preload-helper-BbbETgeG.js";var a=n(),o=e(t(),1),s=r(),c,l=()=>c??(c=i(()=>import(`./purify.es-DjBu1Hu3.js`).then(e=>e.default),[],import.meta.url)),u=e=>{"use memo";
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+*/
+let t=(0,a.c)(12),n,r;t[0]===e?(n=t[1],r=t[2]):({html:n,...r}=e,t[0]=e,t[1]=n,t[2]=r);let i;t[3]===Symbol.for(`react.memo_cache_sentinel`)?(i=l(),t[3]=i):i=t[3];let c=(0,o.use)(i),u;t[4]!==n||t[5]!==c?(u=c.sanitize(n),t[4]=n,t[5]=c,t[6]=u):u=t[6];let d;t[7]===u?d=t[8]:(d={__html:u},t[7]=u,t[8]=d);let f;return t[9]!==r||t[10]!==d?(f=(0,s.jsx)(`div`,{...r,dangerouslySetInnerHTML:d}),t[9]=r,t[10]=d,t[11]=f):f=t[11],f},d=e=>{"use memo";let t=(0,a.c)(11),n,r;t[0]===e?(n=t[1],r=t[2]):({html:n,...r}=e,t[0]=e,t[1]=n,t[2]=r);let i;t[3]===r?i=t[4]:(i=(0,s.jsx)(`div`,{...r}),t[3]=r,t[4]=i);let c;t[5]!==n||t[6]!==r?(c=(0,s.jsx)(u,{html:n,...r}),t[5]=n,t[6]=r,t[7]=c):c=t[7];let l;return t[8]!==i||t[9]!==c?(l=(0,s.jsx)(o.Suspense,{fallback:i,children:c}),t[8]=i,t[9]=c,t[10]=l):l=t[10],l};export{d as t};

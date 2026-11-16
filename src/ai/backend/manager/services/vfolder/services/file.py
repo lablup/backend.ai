@@ -1,4 +1,7 @@
+import uuid
+from collections.abc import Mapping
 from pathlib import PurePosixPath
+from typing import Any
 
 from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
 from ai.backend.common.types import (
@@ -7,6 +10,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -63,6 +67,24 @@ class VFolderFileService:
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
+
+    async def _ensure_modify_allowed(
+        self,
+        vfolder_data: VFolderData,
+        user_uuid: uuid.UUID,
+        keypair_resource_policy: Mapping[str, Any],
+    ) -> None:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.MODIFY,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
 
     async def upload_file(
         self, action: CreateUploadSessionAction
@@ -258,6 +280,9 @@ class VFolderFileService:
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
         # Get user info and check VFolder access using repository
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        await self._ensure_modify_allowed(
+            vfolder_data, action.user_uuid, action.keypair_resource_policy
+        )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -283,6 +308,9 @@ class VFolderFileService:
     ) -> DeleteFilesAsyncActionResult:
         # Get user info and check VFolder access using repository
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        await self._ensure_modify_allowed(
+            vfolder_data, action.user_uuid, action.keypair_resource_policy
+        )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -316,6 +344,9 @@ class VFolderFileService:
 
         # Get VFolder data using repository
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        await self._ensure_modify_allowed(
+            vfolder_data, action.user_id, action.keypair_resource_policy
+        )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)

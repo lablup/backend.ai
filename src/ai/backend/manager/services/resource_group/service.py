@@ -141,11 +141,10 @@ class ResourceGroupService:
         Admin-only. The new default applies to deployments created after
         this call; existing deployments snapshot-copy the old default.
         The repository returns the persisted :class:`DeploymentOptions`
-        via ``UPDATE ... RETURNING`` so this path does a single round-trip
-        and does not re-materialise the surrounding resource group node.
+        without re-materialising the surrounding resource group node.
         """
         options = await self._repository.replace_default_deployment_options(
-            action.resource_group, action.options
+            action.resource_group, action.handler_options, action.agent_selection_policy
         )
         return ReplaceDefaultDeploymentOptionsActionResult(
             resource_group=action.resource_group,

@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.artifact.response import ArtifactNode
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.artifact import (
     ArtifactLook,
     EveryTargetComesBack,
@@ -30,7 +30,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="the description edited at once")
 
 type Edited = PartialBulkPayload[ArtifactNode]
 type ArtifactStep = Scenario[TestSeedingSession, ManyArtifactsAndACaller, ArtifactAdapter, Edited]
@@ -46,7 +46,13 @@ class EditingEveryTarget(When[ManyArtifactsAndACaller, ArtifactAdapter, Edited])
 
     @override
     def describe(self, laid: ManyArtifactsAndACaller) -> str:
-        return f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} changes the description of {len(laid.laid)} artifacts "
+                "at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: ManyArtifactsAndACaller) -> Edited:
@@ -75,9 +81,13 @@ class TheSuperadminEditsSeveralArtifacts(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아티팩트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 "
-            "실패한 것은 없다"
+        return Says(
+            "superadmin 이 아티팩트 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the description of several artifacts at once, all "
+                "come back with the new description and none failed"
+            ),
         )
 
     @override
@@ -103,9 +113,13 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to edit several artifacts at once, nothing is "
+                "edited and all come back in the failed list because there is no permission"
+            ),
         )
 
     @override

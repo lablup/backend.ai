@@ -1,5 +1,4 @@
-Backend.AI Common Package
-=========================
+# Backend.AI Common Package
 
 ← [Back to Backend.AI Architecture](../README.md)
 
@@ -9,7 +8,7 @@ Backend.AI Common Package
 
 ## Overview
 
-The Backend.AI Common package provides utilities, infrastructure, and shared components used across all Backend.AI components (Manager, Agent, Storage Proxy, Webserver, App Proxy, etc.).
+The Backend.AI Common package provides utilities, infrastructure, and shared components used across all Backend.AI components (manager, Agent, storage proxy, webserver, app proxy, and so on).
 
 ## Package Structure
 
@@ -19,14 +18,14 @@ Core event-based communication and asynchronous task processing framework for Ba
 
 - **[events/](./events/README.md)** - Event Dispatcher System
   - Asynchronous event-based communication between components
-  - Broadcast and Anycast event type support
+  - Broadcast and anycast event type support
   - Message queue-based event delivery
   - Event handler registration and routing
 
 - **[bgtask/](./bgtask/README.md)** - Background Task Handler System
   - Process long-running tasks asynchronously
-  - Issue Task IDs and track tasks
-  - Progress monitoring and Heartbeat
+  - Issue task IDs and track tasks
+  - Progress monitoring and heartbeat
   - Notify via event publishing upon completion
 
 ### Infrastructure Components
@@ -35,14 +34,14 @@ Client and abstraction layer for integration with external services and systems.
 
 - **clients/** - External service client wrappers
   - Agent client (ZeroMQ RPC)
-  - Storage Proxy client (HTTP)
+  - Storage proxy client (HTTP)
   - Valkey/Redis client
   - etcd client
 
 - **message_queue/** - Message queue interface and implementation
-  - Provide message publish/subscribe interface
+  - Provide a message publish/subscribe interface
   - Currently implemented based on Valkey/Redis streams
-  - Consumer Group management
+  - Consumer group management
   - Future support for other message queue systems planned
 
 - **service_discovery/** - Service registration and integration
@@ -53,7 +52,7 @@ Client and abstraction layer for integration with external services and systems.
 
 - **resilience/** - Inter-layer communication resilience patterns
   - Generalize request processing between layers
-  - Retry, Timeout, Circuit Breaker
+  - Retry, timeout, circuit breaker
   - Automatic metric collection
   - Fallback support
 
@@ -63,12 +62,12 @@ Common structures for data exchange and type definitions between components.
 
 - **dto/** - Data Transfer Objects (for inter-component communication)
   - Data structures used for inter-component communication
-  - Request/Response models
+  - Request/response models
   - Event payloads
-  - Recommended to use Pydantic-based
+  - We recommend a Pydantic-based approach
 
 - **types.py** - Common type definitions (for internal logic)
-  - Domain types used within components (SessionId, AgentId, AccessKey, etc.)
+  - Domain types used within components (SessionId, AgentId, AccessKey, and so on)
   - Shared Enum types
   - Common constants
   - Mainly used in internal business logic
@@ -83,10 +82,10 @@ Utility modules for development convenience and common functionality.
   - HTTP metrics middleware
 
 - **auth/** - Authentication utilities
-  - Authentication between Webserver (Gateway) and Manager
+  - Authentication between the webserver (gateway) and the manager
   - JWT token generation/verification
   - Signature generation/verification
-  - API Key management
+  - API key management
 
 - **web/** - Web utilities
   - HTTP helper functions
@@ -149,19 +148,19 @@ $ python -m pytest
 ```
 
 With the default halfstack setup, you may need to set the environment variable `BACKEND_ETCD_ADDR`
-to specify the non-standard etcd service port (e.g., `localhost:8110`).
+to specify the non-standard etcd service port (for example, `localhost:8110`).
 
-The tests for `common.redis` module requires availability of local TCP ports 16379, 16380, 16381,
+The tests for the `common.redis` module require availability of local TCP ports 16379, 16380, 16381,
 26379, 26380, and 26381 to launch a temporary Redis sentinel cluster via `docker compose`.
 
 In macOS, they require a local `redis-server` executable to be installed, preferably via `brew`,
 because `docker compose` in macOS does not support host-mode networking and Redis *cannot* be
 configured to use different self IP addresses to announce to the cluster nodes and clients.
 
-## Related Documentation
+## Related documents
 
 - [Event Dispatcher System](./events/README.md)
 - [Background Task Handler System](./bgtask/README.md)
-- [Manager Component](../manager/README.md)
-- [Agent Component](../agent/README.md)
-- [Storage Proxy Component](../storage/README.md)
+- [Manager component](../manager/README.md)
+- [Agent component](../agent/README.md)
+- [Storage proxy component](../storage/README.md)

@@ -17,7 +17,15 @@ from ai.backend.manager.api.adapters.container_registry.adapter import Container
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
     AllowedProjects,
@@ -50,7 +58,14 @@ class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegis
 
     @override
     def describe(self, laid: AProjectAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.allowed_projects.says()} {self.url}로 생성"
+        allowed = self.allowed_projects.says()
+        return Says(
+            f"{laid.caller.username}이 {allowed} {self.url}로 생성합니다",
+            english=(
+                f"{laid.caller.username} creates a container registry at {self.url} "
+                f"{in_language(allowed, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(
@@ -80,9 +95,13 @@ class CreatingWithOnlyTheRequiredValues(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 주소·이름·종류만 지정해 레지스트리를 생성하면, "
-            "나머지 필드가 모두 비어 있는 노드가 반환된다"
+        return Says(
+            "superadmin 이 주소, 이름, 종류만 지정해 컨테이너 레지스트리를 생성하면 "
+            "나머지 필드가 모두 비어 있는 노드가 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a container registry with only an address, "
+                "a name, and a type, the node comes back with every other field empty"
+            ),
         )
 
     @override
@@ -111,7 +130,14 @@ class AllowingAProjectWhileCreating(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다"
+        return Says(
+            "superadmin 이 허용 프로젝트를 함께 지정해 컨테이너 레지스트리를 생성하면 "
+            "그 관계도 함께 생성됩니다",
+            english=(
+                "when the superadmin creates a container registry with an allowed "
+                "project named, that relation is created too"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
@@ -139,9 +165,13 @@ class AProjectThatIsNotThereIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "존재하지 않는 프로젝트를 허용 목록에 넣고 레지스트리를 생성하려 하면, "
-            "그 프로젝트를 찾을 수 없어 거부된다"
+        return Says(
+            "존재하지 않는 프로젝트를 허용 목록에 넣고 컨테이너 레지스트리를 생성하려 하면 "
+            "그 프로젝트를 찾을 수 없어 거부됩니다",
+            english=(
+                "when a container registry is created with a project that does not exist "
+                "in the allow list, it is rejected because the project cannot be found"
+            ),
         )
 
     @override
@@ -169,9 +199,14 @@ class APlainUserMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 생성하려 하면 권한 부족으로 거부된다. "
-            "이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다"
+        return Says(
+            "superadmin 이 아닌 사용자가 컨테이너 레지스트리를 생성하려 하면 권한 부족으로 "
+            "거부됩니다. 이 호출은 호출자가 superadmin 인지만 검사하고 부여된 권한은 보지 않습니다",
+            english=(
+                "when a user who is not the superadmin tries to create a container registry, "
+                "it is rejected for lack of permission. This call checks only whether the "
+                "caller is the superadmin and does not look at the permissions granted"
+            ),
         )
 
     @override

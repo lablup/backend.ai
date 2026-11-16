@@ -109,7 +109,7 @@ def registry(
     policy = AuditLogPolicy([ActionOperationType.SEARCH])
     return ProcessorRegistry(
         ProcessorDependencies(
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
             monitors=ActionMonitors(
                 scope=[ScopeActionAuditLogMonitor(audit_repository, policy, masking)],
             ),

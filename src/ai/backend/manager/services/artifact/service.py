@@ -36,6 +36,7 @@ from ai.backend.manager.dto.response import (
     DelegateScanArtifactsResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.artifact import ArtifactRevisionNotFoundError
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
@@ -401,7 +402,7 @@ class ArtifactService:
         registry_id = registry_meta.registry_id
 
         if registry_type != ArtifactRegistryType.HUGGINGFACE:
-            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+            raise InvalidAPIParameters("Only HuggingFace registry is supported for model retrieval")
 
         reservoir_config = self._config_provider.config.reservoir
         if reservoir_config is None:
@@ -434,7 +435,7 @@ class ArtifactService:
         registry_id = registry_meta.registry_id
 
         if registry_type != ArtifactRegistryType.HUGGINGFACE:
-            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+            raise InvalidAPIParameters("Only HuggingFace registry is supported for model retrieval")
 
         reservoir_config = self._config_provider.config.reservoir
         if reservoir_config is None:

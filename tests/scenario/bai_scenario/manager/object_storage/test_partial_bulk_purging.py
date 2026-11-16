@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
 from ai.backend.common.dto.manager.v2.object_storage.response import ObjectStorageNode
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.object_storage import (
     EveryStorageIsProcessed,
     ManyStoragesAndACaller,
@@ -45,9 +45,18 @@ class PurgingEveryStorage(When[ManyStoragesAndACaller, ObjectStorageAdapter, Pur
 
     @override
     def describe(self, laid: ManyStoragesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return (
-            f"{laid.caller.username}이 object storage {len(laid.laid)}개{besides}를 한 번에 purge"
+        has_missing = self.missing is not None
+        besides_ko = " 와 없는 id 하나" if has_missing else ""
+        besides_en = " and one unknown id" if has_missing else ""
+        return Says(
+            (
+                f"{laid.caller.username} 이 object storage {len(laid.laid)}개{besides_ko}를 한 "
+                "번에 purge 합니다"
+            ),
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} object storages{besides_en} "
+                "at once"
+            ),
         )
 
     @override
@@ -71,9 +80,16 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 object storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 "
-            "목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "superadmin 이 object storage 둘과 없는 id 하나를 한 번에 purge 하면 둘은 purge 된 "
+                "목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when the superadmin purges two object storages and an unknown id at once, the two "
+                "come back in the purged list and the unknown id comes back in the failed list "
+                "because no target answers to it"
+            ),
         )
 
     @override
@@ -99,9 +115,16 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 purge 하려 하면, purge "
-            "된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 purge 하려 하면 "
+                "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when a user granted nothing tries to purge several object storages at once, "
+                "nothing is purged and every one comes back in the failed list because there is no "
+                "permission"
+            ),
         )
 
     @override

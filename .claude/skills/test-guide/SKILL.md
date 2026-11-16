@@ -98,17 +98,11 @@ class TestFeature:
 Verify against the tests you added or changed, not a transitive sweep.
 
 ```bash
-# the specific test(s) for the scenarios you implemented
 pants test tests/manager/repositories/test_feature.py
 pants test tests/.../test_feature.py::TestFeature::test_case
-
-# quality, scoped to your change
-pants fmt --changed-since=HEAD~1
-pants fix --changed-since=HEAD~1
-pants lint --changed-since=HEAD~1
-pants check --changed-since=HEAD~1
-pants test --changed-since=HEAD~1
 ```
+
+- Running them locally is not recommended while working in several worktrees at once. CI runs lint, check and the remaining tests (root `AGENTS.md` "Before committing").
 
 - Add a BUILD file with `python_tests()` to new test directories.
 - Fix all lint, type and test errors; do not use `# noqa`, `# type: ignore` or skip. See `BUILDING.md`.

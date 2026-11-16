@@ -11,7 +11,7 @@ PATH, checks those whole files.
 Term variants and expressions with a qualifier in parentheses have other valid
 meanings, so a match prints as "review:" and does not fail. Code spans, fenced
 blocks, frontmatter, the glossary and `report.md` are not checked. Exits 1 when any
-other match exists. CI runs this via knowledge-check.yml.
+other match exists. CI runs this via knowledge-check.yml, and `scripts/pre-push.sh` before a push.
 """
 
 from __future__ import annotations

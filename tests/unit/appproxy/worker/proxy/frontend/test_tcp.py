@@ -33,7 +33,6 @@ class TestTCPFrontend:
         frontend = TCPFrontend(root_context)
         circuit = mocker.MagicMock(id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372"))
         backend = mocker.MagicMock(circuit=circuit, bind=AsyncMock())
-        frontend.circuits[_PORT] = circuit
         frontend.backends[_PORT] = backend
         return _TCPConnectionSituation(
             frontend=frontend,

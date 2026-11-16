@@ -11,8 +11,8 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [코디네이터에 등록된 처리기가 없으면 빈 목록이 반환된다](#listing-no-registered-handler-lists-nothing) | answered |
-| [코디네이터에 등록된 처리기가 그 이름과 설명으로 반환된다](#listing-the-registered-handler-is-listed) | answered |
+| [when the coordinator has registered no handler, an empty list comes back](#listing-no-registered-handler-lists-nothing) | answered |
+| [the handler the coordinator registered comes back with its name and description](#listing-the-registered-handler-is-listed) | answered |
 
 ### list_session_lifecycle_handlers
 
@@ -20,37 +20,37 @@ Scenario: complete
 
 #### [no-registered-handler-lists-nothing](/tests/scenario/bai_scenario/manager/session_lifecycle_handler/test_listing.py): pass
 
-코디네이터에 등록된 처리기가 없으면 빈 목록이 반환된다
+when the coordinator has registered no handler, an empty list comes back
 
 Given
 
-- 코디네이터에 등록된 처리기가 없다
+- the coordinator has registered no handler
 
 When
 
-- SessionLifecycleHandlerAdapter.list_session_lifecycle_handlers: 세션 처리기 목록을 조회
+- SessionLifecycleHandlerAdapter.list_session_lifecycle_handlers: lists the session handlers
 
 Then
 
-- 빈 목록이 반환된다
+- an empty list comes back
   - items = []
 
 <a id="listing-the-registered-handler-is-listed"></a>
 
 #### [the-registered-handler-is-listed](/tests/scenario/bai_scenario/manager/session_lifecycle_handler/test_listing.py): pass
 
-코디네이터에 등록된 처리기가 그 이름과 설명으로 반환된다
+the handler the coordinator registered comes back with its name and description
 
 Given
 
-- 코디네이터에 세션 종료 처리기가 등록되어 있다
+- the coordinator has registered a session terminator handler
 
 When
 
-- SessionLifecycleHandlerAdapter.list_session_lifecycle_handlers: 세션 처리기 목록을 조회
+- SessionLifecycleHandlerAdapter.list_session_lifecycle_handlers: lists the session handlers
 
 Then
 
-- 세션 종료 처리기 하나가 그 이름과 설명으로 반환된다
+- one session terminator handler comes back with its name and description
   - items = [SessionLifecycleHandlerNode(name='terminate-sessions', description='Terminates the kernels of sessions marked for termination.')]
 

@@ -45,7 +45,7 @@ class TestModelDefinitionInputGQL:
                         health_check=ModelHealthCheckInputGQL(
                             enable=True,
                             interval=1.0,
-                            path="1",
+                            path="/1",
                             max_retries=1,
                             max_wait_time=1.0,
                             expected_status_code=101,
@@ -69,5 +69,5 @@ class TestModelDefinitionInputGQL:
         assert service.port == 8000
         assert service.start_command == "/models/start.sh"
         assert service.health_check is not None
-        assert service.health_check.path == "1"
+        assert service.health_check.path == "/1"
         assert service.health_check.expected_status_code == 101

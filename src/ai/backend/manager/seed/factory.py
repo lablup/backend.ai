@@ -12,6 +12,7 @@ from ai.backend.manager.seed.container_registry_project.seed import (
 )
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
 from ai.backend.manager.seed.domain.seed import DomainSeed
+from ai.backend.manager.seed.domain_admin.seed import DomainAdminSeed
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
 from ai.backend.manager.seed.idle_checker_assignment.seed import IdleCheckerAssignmentSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
@@ -88,6 +89,7 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.ROLE: (1, RoleSeed),
         SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
         SeedKind.PROJECT_MEMBER: (1, ProjectMemberSeed),
+        SeedKind.DOMAIN_ADMIN: (1, DomainAdminSeed),
         SeedKind.RESOURCE_GROUP_FOR_DOMAIN: (1, ResourceGroupForDomainSeed),
         SeedKind.RESOURCE_GROUP_FOR_PROJECT: (1, ResourceGroupForProjectSeed),
         SeedKind.RESOURCE_GROUP_FOR_KEYPAIR: (1, ResourceGroupForKeypairSeed),

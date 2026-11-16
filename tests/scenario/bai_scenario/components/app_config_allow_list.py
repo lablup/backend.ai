@@ -8,6 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
@@ -15,21 +16,29 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 )
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.answers import MissingResponse
-from bai_scenario.components.app_config import UNREGISTERED
+from bai_scenario.components.app_config import (
+    UNREGISTERED,
+    SomeoneGrantedInGlobal,
+    names_of,
+)
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, TestSeedAllowListEntry
 from bai_scenario.seeds.app_config.definition import TestSeedDefinition
@@ -37,8 +46,13 @@ from bai_scenario.seeds.app_config.fragment import TestSeedPublicFragment
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 
-def _who(role: UserRole) -> str:
-    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "권한이 없는 일반 사용자 한 명"
+def _who(role: UserRole) -> Says:
+    if role == UserRole.SUPERADMIN:
+        return Says("superadmin 한 명", english="one superadmin")
+    return Says(
+        "권한이 없는 일반 사용자 한 명",
+        english="one Regular user with no permission",
+    )
 
 
 def in_page_order(
@@ -79,14 +93,31 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
     @override
     def describe(self) -> str:
         who = _who(self.role)
+        who_en = in_language(who, Language.ENGLISH)
         if not self.defined:
-            return f"등록되지 않은 설정 이름과 {who}"
+            return Says(
+                f"등록되지 않은 설정 이름과 {who}",
+                english=f"an unregistered config name and {who_en}",
+            )
         if self.opened is None:
-            return f"allow_list가 없는 설정 정의 하나와 {who}"
-        what = f"{SCOPE_NAMES[self.opened]} 스코프 유형의 allow_list 하나"
+            return Says(
+                f"allow_list 가 없는 설정 정의 하나와 {who}",
+                english=f"one config definition without an allow list, and {who_en}",
+            )
+        scope = SCOPE_NAMES[self.opened]
+        scope_en = in_language(scope, Language.ENGLISH)
         if self.with_fragment:
-            what = f"설정 조각이 있는 {what}"
-        return f"{what}와 {who}"
+            return Says(
+                f"설정 조각이 있는 {scope} 스코프 유형의 allow_list 하나와 {who}",
+                english=(
+                    f"one allow-list entry of the {scope_en} scope kind holding a config "
+                    f"fragment, and {who_en}"
+                ),
+            )
+        return Says(
+            f"{scope} 스코프 유형의 allow_list 하나와 {who}",
+            english=f"one allow-list entry of the {scope_en} scope kind, and {who_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnEntryAndACaller:
@@ -132,9 +163,14 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
 
     @override
     def describe(self) -> str:
-        kinds = "·".join(SCOPE_NAMES[one] for one in self.kinds)
-        return (
-            f"설정 이름 {self.names}개에 각각 {kinds} 스코프 유형의 allow_list와 {_who(self.role)}"
+        kinds_ko = ", ".join(str(SCOPE_NAMES[one]) for one in self.kinds)
+        kinds_en = ", ".join(in_language(SCOPE_NAMES[one], Language.ENGLISH) for one in self.kinds)
+        return Says(
+            f"설정 이름 {self.names}개에 각각 {kinds_ko} 스코프 유형의 allow_list 와 {_who(self.role)}",
+            english=(
+                f"{self.names} config names each with an allow-list entry of the {kinds_en} "
+                f"scope kind, and {in_language(_who(self.role), Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -165,13 +201,34 @@ class TwoEntriesAndACaller:
 
 @dataclass(frozen=True)
 class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
-    """한 설정 이름에 속한 allow_list 둘과 호출자를 준비한다."""
+    """한 설정 이름에 속한 allow_list 둘과 호출자를 준비한다.
+
+    ``granted``가 있으면 호출자가 global 스코프에서 그 권한을 받는다.
+    """
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        return f"한 설정 이름의 PUBLIC·USER allow_list와 {_who(self.role)}"
+        if self.granted:
+            who = Says(
+                f"global 스코프에서 허용 목록 항목에 대한 {names_of(self.granted)} 권한을 "
+                "받은 일반 사용자 한 명",
+                english=(
+                    "one regular user granted the "
+                    f"{names_of(self.granted)} permission on allow-list entries in the global scope"
+                ),
+            )
+        else:
+            who = _who(self.role)
+        return Says(
+            f"한 설정 이름의 PUBLIC, USER allow_list 와 {who}",
+            english=(
+                "the PUBLIC and USER allow-list entries of one config name, and "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoEntriesAndACaller:
@@ -185,7 +242,12 @@ class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
             TestSeedAllowListEntry(scope_type=AppConfigScopeType.USER, name_hint="second"),
             definition,
         )
-        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.granted:
+            caller = await seeding.within(
+                SomeoneGrantedInGlobal(home, AppConfigAllowListEntityType(), granted=self.granted)
+            )
+        else:
+            caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoEntriesAndACaller(
             caller=seeding.made(caller), first=seeding.made(first), second=seeding.made(second)
         )
@@ -200,7 +262,10 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
     @override
     def says(self) -> str:
-        return "준비한 allow_list의 모든 필드가 반환된다"
+        return Says(
+            "준비한 allow_list 의 모든 필드가 반환됩니다",
+            english="every field of the prepared allow-list entry comes back",
+        )
 
     @override
     def look(
@@ -211,7 +276,14 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs[UUID](laid.entry.id, "준비한 ID")),
+            Held(
+                "id",
+                node.id,
+                SameAs[UUID](
+                    laid.entry.id,
+                    Says("준비한 ID", english="the prepared id"),
+                ),
+            ),
             Same("config_name", node.config_name, laid.entry.config_name),
             Same("scope_type", node.scope_type, laid.entry.scope_type),
             Same("rank", node.rank, self.rank if self.rank is not None else laid.entry.rank),
@@ -230,7 +302,10 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 allow_list의 모든 필드가 반환된다"
+        return Says(
+            "생성한 allow_list 의 모든 필드가 반환됩니다",
+            english="every field of the created allow-list entry comes back",
+        )
 
     @override
     def look(
@@ -241,7 +316,10 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped(
+                "id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             Same("config_name", node.config_name, laid.name),
             Same("scope_type", node.scope_type, self.scope_type),
             Same("rank", node.rank, self.rank),
@@ -256,7 +334,10 @@ class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowList
 
     @override
     def says(self) -> str:
-        return "준비한 allow_list만 모두 반환된다"
+        return Says(
+            "준비한 allow_list 만 모두 반환됩니다",
+            english="every prepared allow-list entry comes back, and only those",
+        )
 
     @override
     def look(
@@ -283,7 +364,13 @@ class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigA
 
     @override
     def says(self) -> str:
-        return "커서 다음 allow_list 하나가 오고 앞뒤 페이지가 모두 있다고 응답한다"
+        return Says(
+            "커서 다음 allow_list 하나가 오고 앞뒤 페이지가 모두 있다고 응답합니다",
+            english=(
+                "one allow-list entry after the cursor comes back and the answer says "
+                "pages exist on both sides"
+            ),
+        )
 
     @override
     def look(
@@ -297,7 +384,13 @@ class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigA
             Held[tuple[UUID, ...]](
                 "items",
                 tuple(one.id for one in payload.items),
-                SameAs[tuple[UUID, ...]]((ordered[1].id,), "커서 다음 allow_list 하나"),
+                SameAs[tuple[UUID, ...]](
+                    (ordered[1].id,),
+                    Says(
+                        "커서 다음 allow_list 하나",
+                        english="the one allow-list entry after the cursor",
+                    ),
+                ),
             ),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, True),

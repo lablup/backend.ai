@@ -18,11 +18,14 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Language,
     Refused,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder import (
@@ -53,8 +56,19 @@ class UpdatingTheFirst(When[TwoOwnFoldersAndAnothers, VFolderAdapter, UpdateVFol
 
     @override
     def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
-        name = "둘째 폴더의 이름" if self.taken else RENAMED
-        return f"{laid.caller.username}이 자기 첫 폴더를 {name}으로 바꾸고 복제 가능으로 바꿈"
+        name = (
+            Says("둘째 vfolder 의 이름", english="the second vfolder's name")
+            if self.taken
+            else RENAMED
+        )
+        return Says(
+            f"{laid.caller.username}이 자기 첫 vfolder 를 {name}으로 변경하고 복제 가능으로 "
+            "변경합니다",
+            english=(
+                f"{laid.caller.username} renames their first vfolder to "
+                f"{in_language(name, Language.ENGLISH)} and makes it cloneable"
+            ),
+        )
 
     @override
     async def call(
@@ -75,7 +89,10 @@ class TheFolderIsUpdated(Then[TwoOwnFoldersAndAnothers, UpdateVFolderPayload]):
 
     @override
     def says(self) -> str:
-        return f"첫 폴더가 {RENAMED}이라는 이름과 복제 가능으로 온다"
+        return Says(
+            f"첫 vfolder 가 {RENAMED} 이라는 이름과 복제 가능으로 응답으로 옵니다",
+            english=f"the first vfolder comes back named {RENAMED} and cloneable",
+        )
 
     @override
     def look(
@@ -100,9 +117,13 @@ class AGrantedOwnerUpdatesTheirFolder(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더의 이름과 옵션을 "
-            "바꾸면, 바뀐 폴더가 온다"
+        return Says(
+            "자기 개인 프로젝트에서 vfolder 수정 권한을 받은 사용자가 자기 vfolder 의 이름과 "
+            "옵션을 변경하면, 바뀐 vfolder 가 응답으로 옵니다",
+            english=(
+                "when a user granted vfolder update in their personal project changes the name "
+                "and options of their own vfolder, the changed vfolder comes back"
+            ),
         )
 
     @override
@@ -128,7 +149,13 @@ class ATakenNameIsRefused(
 
     @override
     def describe(self) -> str:
-        return "자기 다른 폴더가 이미 쓰는 이름으로 바꾸려 하면, 잘못된 값으로 거부된다"
+        return Says(
+            "자기 다른 vfolder 가 이미 사용하는 이름으로 변경하려 하면, 잘못된 값으로 거부됩니다",
+            english=(
+                "when the user tries to rename it to a name their other vfolder already uses, "
+                "it is rejected as an invalid value"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoOwnFoldersAndAnothers]:
@@ -153,7 +180,13 @@ class AUserGrantedNothingMayNotUpdate(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 자기 폴더를 바꾸려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 자기 vfolder 를 변경하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to change their own vfolder, it is rejected "
+                "for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoOwnFoldersAndAnothers]:

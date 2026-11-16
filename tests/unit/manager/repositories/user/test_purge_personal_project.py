@@ -1,0 +1,255 @@
+"""The personal project a purged user leaves behind, against a real database."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
+
+import pytest
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
+from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.user.db_source.db_source import UserDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.testutils.db import with_tables
+
+_DOMAIN_NAME = "purge-domain"
+_PROJECT_POLICY = "purge-project-policy"
+_USER_POLICY = "purge-user-policy"
+_RESOURCE_GROUP = "purge-resource-group"
+_OLD = datetime.now(UTC) - timedelta(days=400)
+
+
+@dataclass(frozen=True)
+class _Scope:
+    domain_id: DomainID
+    user_uuid: UUID
+
+
+class TestUserPurgeLeavesPersonalProject:
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ResourceGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ProjectRow,
+                AssocGroupUserRow,
+                ErrorLogRow,
+                BootstrapScriptRow,
+                SessionGroupRow,
+                SessionRow,
+                EndpointRow,
+                ReplicaGroupRow,
+                VFolderRow,
+                VFolderAutoMountRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def db_source(self, db: ExtendedAsyncSAEngine) -> UserDBSource:
+        return UserDBSource(
+            db=db,
+            v2_ops_provider=V2DBOpsProvider(db),
+            share_ops_provider=ShareOpsProvider(db),
+            policy_ops_provider=ResourcePolicyOpsProvider(db),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
+        )
+
+    @pytest.fixture
+    async def scope(self, db: ExtendedAsyncSAEngine) -> _Scope:
+        scope = _Scope(domain_id=DomainID(uuid4()), user_uuid=uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                ProjectResourcePolicyRow(
+                    name=_PROJECT_POLICY,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=0,
+                )
+            )
+            sess.add(
+                UserResourcePolicyRow(
+                    name=_USER_POLICY,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            sess.add(
+                DomainRow(id=scope.domain_id, name=_DOMAIN_NAME, description=None, is_active=True)
+            )
+            sess.add(
+                ResourceGroupRow(
+                    name=_RESOURCE_GROUP,
+                    id=ResourceGroupID(uuid4()),
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ResourceGroupOpts(),
+                )
+            )
+            sess.add(
+                UserRow(
+                    uuid=scope.user_uuid,
+                    username="purge-user",
+                    email="purge@example.com",
+                    need_password_change=False,
+                    full_name="Purge User",
+                    description="",
+                    status=UserStatus.ACTIVE,
+                    status_info="",
+                    domain_name=_DOMAIN_NAME,
+                    role=UserRole.USER,
+                    resource_policy=_USER_POLICY,
+                    domain_id=scope.domain_id,
+                )
+            )
+        return scope
+
+    async def _add_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _Scope,
+        *,
+        name: str,
+        project_type: ProjectType,
+        status: ProjectStatus,
+    ) -> ProjectID:
+        project_id = ProjectID(uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name=name,
+                    description=None,
+                    is_active=status is ProjectStatus.ACTIVE,
+                    domain_name=_DOMAIN_NAME,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    dotfiles=b"\x90",
+                    resource_policy=_PROJECT_POLICY,
+                    type=project_type,
+                    status=status,
+                    creator_id=scope.user_uuid,
+                    updated_at=_OLD,
+                )
+            )
+        return project_id
+
+    async def test_personal_project_is_marked_deleted_and_left_dangling(
+        self,
+        db: ExtendedAsyncSAEngine,
+        db_source: UserDBSource,
+        scope: _Scope,
+    ) -> None:
+        personal_id = await self._add_project(
+            db,
+            scope,
+            name="personal",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.ACTIVE,
+        )
+
+        await db_source.purge_user_by_uuid(scope.user_uuid)
+
+        async with db.begin_readonly_session() as sess:
+            row = (
+                await sess.execute(
+                    sa.select(
+                        ProjectRow.status,
+                        ProjectRow.is_active,
+                        ProjectRow.creator_id,
+                        ProjectRow.updated_at,
+                    ).where(ProjectRow.id == personal_id)
+                )
+            ).one()
+        assert row.status is ProjectStatus.DELETED
+        assert row.is_active is False
+        assert row.creator_id is None
+        assert row.updated_at > _OLD
+        async with db.begin_readonly_session() as sess:
+            assert (
+                await sess.scalar(sa.select(UserRow.uuid).where(UserRow.uuid == scope.user_uuid))
+                is None
+            )
+
+    async def test_general_project_keeps_its_status(
+        self,
+        db: ExtendedAsyncSAEngine,
+        db_source: UserDBSource,
+        scope: _Scope,
+    ) -> None:
+        general_id = await self._add_project(
+            db,
+            scope,
+            name="general",
+            project_type=ProjectType.GENERAL,
+            status=ProjectStatus.ACTIVE,
+        )
+
+        await db_source.purge_user_by_uuid(scope.user_uuid)
+
+        async with db.begin_readonly_session() as sess:
+            status = await sess.scalar(
+                sa.select(ProjectRow.status).where(ProjectRow.id == general_id)
+            )
+        assert status is ProjectStatus.ACTIVE

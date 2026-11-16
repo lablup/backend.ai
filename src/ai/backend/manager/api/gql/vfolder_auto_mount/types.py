@@ -28,6 +28,9 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     VFolderAutoMountFilter as VFolderAutoMountFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    VFolderAutoMountNestedFilter as VFolderAutoMountNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     VFolderAutoMountOrder as VFolderAutoMountOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
@@ -321,6 +324,34 @@ class VFolderAutoMountFilterGQL(PydanticInputMixin[VFolderAutoMountFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Filter selecting vfolders by the auto-mounts set on them. Each relation matches "
+            "one auto-mount at a time."
+        ),
+    ),
+    name="VFolderAutoMountNestedFilter",
+)
+class VFolderAutoMountNestedFilterGQL(PydanticInputMixin[VFolderAutoMountNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "True for a vfolder that has at least one auto-mount, false for one that has none."
+        ),
+        default=None,
+    )
+    some: VFolderAutoMountFilterGQL | None = gql_field(
+        description="At least one auto-mount matches.", default=None
+    )
+    every: VFolderAutoMountFilterGQL | None = gql_field(
+        description="Every auto-mount matches; true when there is none.", default=None
+    )
+    none: VFolderAutoMountFilterGQL | None = gql_field(
+        description="No auto-mount matches.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="One ordering rule for a vfolder auto-mount search.",
     ),
     name="VFolderAutoMountOrderBy",
@@ -337,8 +368,8 @@ class VFolderAutoMountOrderByGQL(PydanticInputMixin[VFolderAutoMountOrderDTO]):
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Scope for the scoped vfolder auto-mount query. The items are OR'd, and every "
-            "scope named is authorized before the read runs. At least one of `project` and "
-            "`user` must be non-empty."
+            "scope named is authorized before the read runs. At least one of `project`, `user` "
+            "and `vfolder` must be non-empty."
         ),
     ),
     name="VFolderAutoMountScope",
@@ -352,6 +383,10 @@ class VFolderAutoMountScopeGQL(PydanticInputMixin[VFolderAutoMountScopeDTO]):
         description=(
             "Users whose own auto-mounts are being read; those of a personal project are not."
         ),
+        default=None,
+    )
+    vfolder: list[UUIDScopeGQL] | None = gql_field(
+        description="VFolders whose auto-mounts are being read, in every scope they are set on.",
         default=None,
     )
 

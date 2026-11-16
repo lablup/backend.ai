@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import os
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +11,10 @@ import janus
 from .asyncio import run_in_executor_with_context
 from .types import Sentinel
 
-__all__ = ("AsyncFileWriter",)
+__all__ = (
+    "AsyncFileWriter",
+    "open_dir_beneath",
+)
 
 
 class AsyncFileWriter:
@@ -65,3 +70,35 @@ class AsyncFileWriter:
 
     async def write(self, item: str | bytes) -> None:
         await self._q.async_q.put(item)
+
+
+@contextmanager
+def open_dir_beneath(
+    root: Path,
+    parts: Sequence[str],
+    *,
+    mkdir_mode: int | None = None,
+    chmod_created: bool = False,
+) -> Iterator[int]:
+    """Open ``root``/``parts`` as a directory fd, refusing a symlink at any of ``parts``.
+
+    ``mkdir_mode`` creates missing directories; ``chmod_created`` sets that mode past the umask.
+    """
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts:
+            created = False
+            if mkdir_mode is not None:
+                try:
+                    os.mkdir(part, mkdir_mode, dir_fd=fd)
+                    created = True
+                except FileExistsError:
+                    pass
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+            if created and chmod_created and mkdir_mode is not None:
+                os.fchmod(fd, mkdir_mode)
+        yield fd
+    finally:
+        os.close(fd)

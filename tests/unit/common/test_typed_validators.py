@@ -4,7 +4,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from ai.backend.common import typed_validators as tv
-from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.exception import BackendAISchemaValidationFailed, InvalidAPIParameters
 from ai.backend.common.typed_validators import HostPortPair
 
 
@@ -66,3 +66,21 @@ def test_hostport_pair_valid(
 def test_hostport_pair_invalid(input: str | list[str] | dict[str, str] | int) -> None:
     with pytest.raises((BackendAISchemaValidationFailed, ValidationError, TypeError)):
         HostPortPair.model_validate(input)
+
+
+class _HealthCheckModel(BaseModel):
+    path: tv.HealthCheckPath
+
+
+class TestHealthCheckPath:
+    @pytest.mark.parametrize(
+        "path",
+        ["health", "@evil.example/x", "//evil.example/x", "http://evil.example/x"],
+    )
+    def test_rejects_path_with_host_or_without_leading_slash(self, path: str) -> None:
+        with pytest.raises(InvalidAPIParameters):
+            _HealthCheckModel.model_validate({"path": path})
+
+    @pytest.mark.parametrize("path", ["/health", "/health?x=1", "/a@b/x"])
+    def test_allows_absolute_path(self, path: str) -> None:
+        assert _HealthCheckModel.model_validate({"path": path}).path == path

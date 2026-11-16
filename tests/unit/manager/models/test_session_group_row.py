@@ -20,7 +20,6 @@ from ai.backend.manager.data.session_group.types import (
 )
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -117,7 +116,6 @@ class TestSessionGroupRow:
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionGroupRow,
                 SessionRow,

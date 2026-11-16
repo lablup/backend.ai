@@ -13,9 +13,11 @@ generated:
 status: stable
 ---
 
-# Notification service — Knowledge
+# Notification service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A channel is somewhere a message can be sent; a rule says which events go to
 which channel. They live in one package because a rule is meaningless without
@@ -24,7 +26,7 @@ anything a user owns.
 
 ## The processor fields
 
-`backend.ai mgr ops list --concern notification_center` prints the wired list. Their output answers the entity type, shape,
+`backend.ai mgr ops list --concern notification_center` prints the connected list. Their output answers the entity type, shape,
 operation, gate and backing.
 
 Two `ProcessorGroup`s are wired, one per entity type. All thirteen REST routes

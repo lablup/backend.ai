@@ -33,3 +33,7 @@ items:
   category: usage_buckets
   retention_period_days: 730
   enabled: false
+- id: b1e5f4a0-0009-4c10-8a01-000000000009
+  category: projects
+  retention_period_days: 30
+  enabled: false

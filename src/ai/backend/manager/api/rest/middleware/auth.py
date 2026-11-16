@@ -72,7 +72,7 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.jwt.validator import JWTValidator
-    from ai.backend.common.plugin.hook import HookPluginContext
+    from ai.backend.common.plugin.hook_context import HookPluginContext
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))

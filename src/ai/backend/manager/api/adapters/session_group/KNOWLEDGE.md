@@ -12,75 +12,55 @@ updated:
   at: 2026-10-22
 status: draft
 ---
-# 세션 그룹 어댑터 — 시나리오
+# session_group adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-세션 그룹은 프로젝트와 소유자 아래에 생긴다. 그래서 세션 그룹 하나를 읽고 고치는 문과 프로젝트에
-세션 그룹을 만드는 문은 권한 그래프가 지키고, 전체 검색은 전역 superadmin 역할이 지킨다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-세션 그룹은 두 가지다. 사용자가 만든 세션 그룹과, 배포가 레플리카 그룹을 만들 때 함께 생겨
-그 레플리카 그룹이 참조하는 세션 그룹이다. 뒤의 것은 배포와 함께 관리된다. 사용자에게 내놓는
-읽기(하나 읽기, 여럿 읽기, 스코프 검색)는 배포의 레플리카 그룹이 참조하는 세션 그룹을 권한이
-있어도 없는 것으로 답하고, 배치 정책 바꾸기와 영구 삭제는 사용 중이라는 것으로 거부한다. 전체
-검색만 두 가지를 함께 보여준다.
+A session group is created under a project and a session group owner. The permission graph therefore checks the calls that read and update one session group and the call that creates a session group in a project, and the global superadmin role checks the unscoped search.
 
-공통 계약(대상 존재, 일괄 구성, 페이지)은 프레임워크 계약 테스트가 확인한다. 여기에는 연산마다
-대표 성공과 대표 실패, 그리고 세션 그룹 규칙이 만드는 차이만 적는다.
+There are two kinds of session group: one the user created, and one created together when a deployment creates a replica group and referenced by that replica group. The second is managed with the deployment. The reads exposed to the user (get one, read several, scope search) respond that a session group referenced by the replica group of a deployment does not exist even with permission, and the placement policy change and purge reject it as in use. Only the unscoped search shows both together.
 
-## 하나 읽기
+Framework contract tests check the common contract (target existence, bulk composition, page). This document records only the representative success and representative failure of each operation and the differences the session group rules make.
 
-마지막 줄에서 사용자는 그 세션 그룹에 대한 읽기 권한도 갖는다. 그래서 거부 이유가 권한이 아니라
-대상 없음이어야 한다.
+## Get one
 
-## 여럿 읽기
+In the last row the user also holds the read permission on that session group. The rejection reason must therefore be a missing target, not a permission.
 
-여럿 읽기는 호출 전체를 거부하지 않고 자리마다 답한다. 배포의 레플리카 그룹이 참조하는 세션 그룹은
-없는 세션 그룹과 같은 빈 값으로 답한다.
+## Read several
 
-없는 id의 줄은 슈퍼관리자가 부른다. 권한 검사는 id마다 권한 그래프를 보는데, 그래프에 없는 id는
-권한을 확인할 수 없어 일반 사용자에게는 권한 부족으로 답한다. 검사를 통과하는 사람이어야 읽기의
-답(빈 값)을 볼 수 있다.
+Reading several does not reject the whole call and responds per entry. A session group referenced by the replica group of a deployment responds with the same empty value as a missing session group.
 
-## 전체 검색
+In the row of a missing id, superadmin performs the call. The permission check reads the permission graph per id, and the permission of an id absent from the graph cannot be checked, so a regular user receives an insufficient permission response. Only a user who passes the check sees the response of the read (the empty value).
 
-전체 검색의 문은 권한 그래프가 아니라 역할이다. 그래서 슈퍼관리자 줄의 행위자가 슈퍼관리자다.
-다른 시나리오가 심은 세션 그룹과 섞이지 않게 프로젝트로 거른다.
+## Unscoped search
 
-## 스코프 검색
+A role, not the permission graph, checks the call of the unscoped search. The requester of the superadmin row is therefore superadmin. The scenario filters by project so the rows do not mix with the session groups another scenario seeded.
 
-스코프 하나라도 권한이 없으면 나머지를 보여주지 않고 검색 전체를 거부한다.
+## Scope search
 
-스코프 여럿은 OR로 합친다. 마지막 줄에서 자기가 만든 첫 프로젝트의 세션 그룹은 사용자 스코프로만,
-다른 사용자가 만든 세션 그룹은 프로젝트 스코프로만 닿는다. 그래서 둘 다 나와야 합친 것이다.
+When even one scope lacks permission, the call rejects the whole search instead of showing the rest.
 
-## 만들기
+Several scopes are combined with OR. In the last row, a session group of the first project the user created is reachable only through the user scope, and a session group another user created only through the project scope. Both must appear for the combination to hold.
 
-세션 그룹이 프로젝트와 만든 사람 아래에 든 것은 답에 나오지 않는다. 테스트가 실행 뒤 데이터베이스에서
-세션 그룹 수, 세션 그룹 노드 수, 그 노드를 가진 프로젝트와 사용자의 수를 센다. 프로젝트 아래에 들어야
-그 프로젝트의 스코프 검색에 나온다.
+## Create
 
-읽기 권한 줄은 만들기가 읽기 권한으로 통과하지 않는다는 것을 보인다. 다른 프로젝트 줄은 생성 권한이
-세션 그룹을 만들 프로젝트에 있어야 한다는 것을 보인다.
+The response does not show that the session group is placed under the project and the creator. After the run the test counts the number of session groups, the number of session group nodes, and the number of projects and users holding those nodes in the database. A group must be placed under a project to appear in the scope search of that project.
 
-## 영구 삭제
+The read permission row shows that create does not pass with the read permission. The other project row shows that the create permission must be held on the project where the session group is created.
 
-세션 그룹과 그래프 노드가 사라진 것, 멤버 세션이 남은 것은 답에 나오지 않는다. 테스트가 실행 뒤
-데이터베이스에서 세션 그룹 수, 세션 그룹 노드 수, 세션 그룹이 있는 세션과 없는 세션의 수를 센다.
+## Purge
 
-배포의 레플리카 그룹이 참조하는 세션 그룹 줄에서 사용자는 그 세션 그룹에 대한 영구 삭제 권한도 갖는다.
-그래서 거부 이유가 권한이 아니라 사용 중이어야 한다.
+The response does not show that the session group and its graph node are gone and its member sessions remain. After the run the test counts the number of session groups, the number of session group nodes, and the number of sessions with and without a session group in the database.
 
-읽기 권한 줄은 영구 삭제가 읽기 권한으로 통과하지 않는다는 것을 보인다. 아무 권한도 없는 줄과
-짝을 이룬다.
+In the row of a session group referenced by the replica group of a deployment, the user also holds the purge permission on that session group. The rejection reason must therefore be in use, not permission.
 
-## 배치 정책 바꾸기
+The read permission row shows that purge does not pass with the read permission. It is paired with the row without any permission.
 
-- 권한 줄의 짝은 같은 사람, 같은 스코프에서 받은 권한만 다르다. 읽기로는 바꿀 수 없다.
-- 배포의 replica group이 가진 세션 그룹은 만든 사용자의 스코프에도 생긴다. 수정 권한을 가진
-  사용자만 이 거부에 닿으므로, 거부 이유는 권한이 아니라 배포가 그 세션 그룹을 쓰고 있다는 것이어야
-  한다.
-- 바꿀 수 있는 항목은 배치 방향과 강제 수준 둘뿐이다. 둘 다 빼고 부르면 요청 형식에서 거부된다.
-- 바뀐 정책은 이후 배치되는 멤버부터 따른다. 스케줄러가 배치할 때마다 세션 그룹 정책을 읽기
-  때문이고, 이미 배치된 멤버는 옮기지 않는다.
+## Changing the placement policy
+
+- The pair of the permission row differs only in the permission received in the same scope by the same user. The read permission does not allow changing the placement policy.
+- A session group the replica group of a deployment holds is created in the scope of the creating user too. Only a user with the update permission reaches this rejection, so the rejection reason must be that the deployment uses the session group, not permission.
+- Only the placement direction and the strictness can change. Calling with both omitted is rejected by the request format.
+- The changed policy applies to members placed afterwards. The scheduler reads the session group policy on every placement, and it does not move members already placed.

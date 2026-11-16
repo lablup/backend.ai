@@ -26,7 +26,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -62,8 +62,12 @@ class ReadingByName(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDe
 
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
-        target = "존재하지 않는 이름" if self.unknown else laid.group.name
-        return f"{laid.caller.username}이 {target}으로 조회"
+        target_ko = "존재하지 않는 이름" if self.unknown else laid.group.name
+        target_en = "a name that does not exist" if self.unknown else laid.group.name
+        return Says(
+            f"{laid.caller.username}이 {target_ko}으로 조회합니다",
+            english=f"{laid.caller.username} reads {target_en}",
+        )
 
     @override
     async def call(
@@ -83,7 +87,14 @@ class ReadingManyByIds(When[ManyGroupsAndACaller, ResourceGroupAdapter, Loaded])
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개와 없는 id 하나를 한 번에 "
+            "조회합니다",
+            english=(
+                f"{laid.caller.username} batch loads {len(laid.laid)} seeded resource groups "
+                "and one unknown id"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Loaded:
@@ -105,7 +116,13 @@ class ReadingTheLaidByIds(When[ManyGroupsAndACaller, ResourceGroupAdapter, Loade
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개를 id로 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개를 id 로 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch loads the {len(laid.laid)} seeded resource "
+                "groups by id"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Loaded:
@@ -123,7 +140,10 @@ class ReadingNoIds(When[ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]):
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} batch loads an empty id list",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Loaded:
@@ -141,7 +161,14 @@ class ReadingManyByNames(When[ManyGroupsAndACaller, ResourceGroupAdapter, Loaded
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 이름 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개와 없는 이름 하나를 한 "
+            "번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch loads {len(laid.laid)} seeded resource groups "
+                "and one unknown name"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Loaded:
@@ -159,7 +186,13 @@ class ReadingTheLaidByNames(When[ManyGroupsAndACaller, ResourceGroupAdapter, Loa
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개를 이름으로 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개를 이름으로 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch loads the {len(laid.laid)} seeded resource "
+                "groups by name"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Loaded:
@@ -177,7 +210,10 @@ class ReadingNoNames(When[ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]):
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 이름 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 이름 목록으로 조회합니다",
+            english=f"{laid.caller.username} batch loads an empty name list",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Loaded:
@@ -197,8 +233,12 @@ class ReadingResourceInfo(When[AGroupAndACaller, ResourceGroupAdapter, ResourceI
 
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
-        target = "존재하지 않는 이름" if self.unknown else laid.group.name
-        return f"{laid.caller.username}이 {target}의 리소스 현황 조회"
+        target_ko = "존재하지 않는 이름" if self.unknown else laid.group.name
+        target_en = "a name that does not exist" if self.unknown else laid.group.name
+        return Says(
+            f"{laid.caller.username}이 {target_ko}의 자원 현황을 조회합니다",
+            english=f"{laid.caller.username} reads the resource info of {target_en}",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller) -> ResourceInfoNode:
@@ -218,7 +258,13 @@ class TheSuperadminReadsAGroup(
 
     @override
     def describe(self) -> str:
-        return "리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다"
+        return Says(
+            "자원 그룹 하나가 있고 superadmin 이 이름으로 조회하면, 그 그룹 전체가 반환됩니다",
+            english=(
+                "one resource group exists and the superadmin reads it by name, so the whole "
+                "group comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -245,9 +291,15 @@ class AUserGrantedReadOnTheGroupReadsIt(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. "
-            "그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다"
+        return Says(
+            "그 자원 그룹에 부여된 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 "
+            "전체가 반환됩니다. 자원 그룹이 자기 스코프이므로 자원 그룹에 부여된 역할이 "
+            "적용됩니다",
+            english=(
+                "a user granted read through the role granted on the resource group reading it "
+                "by name gets the whole group. the resource group is its own scope, so the role "
+                "granted on it applies"
+            ),
         )
 
     @override
@@ -273,7 +325,12 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing reading by name is rejected for not enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -298,7 +355,13 @@ class TheSuperadminReadingAnUnknownNameIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin reads a name nothing answers to, the call is rejected "
+                "because no target answers to it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -323,9 +386,16 @@ class AUserGrantedNothingReadingAnUnknownNameIsNotFoundToo(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 "
-            "없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 "
+            "찾을 수 없다는 이유로 거부됩니다. 이름으로 id 를 찾는 단계는 인증만 확인하고 권한 "
+            "검사는 찾은 뒤에 옵니다",
+            english=(
+                "a user granted nothing reading a name nothing answers to is rejected because no "
+                "target answers to it, not for not enough permission. the step that looks up the "
+                "id by name checks authentication alone and the permission check follows the "
+                "lookup"
+            ),
         )
 
     @override
@@ -353,9 +423,13 @@ class TheSuperadminLoadsLaidAndMissingIds(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 id 하나를 한 번에 조회하면, "
-            "요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "superadmin 이 미리 저장한 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 "
+            "반환되고 없는 id 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "when the superadmin batch loads two seeded groups and one unknown id, the items "
+                "come back in the order requested and the item for the unknown id is empty"
+            ),
         )
 
     @override
@@ -381,7 +455,14 @@ class AUserGrantedNothingIsRefusedPerId(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다"
+        return Says(
+            "아무 권한도 없는 사용자가 그룹 둘을 id 로 한 번에 조회하면, 호출은 거부되지 않고 "
+            "항목마다 권한 부족 거부가 담깁니다",
+            english=(
+                "a user granted nothing batch loading two groups by id is not rejected as a "
+                "call, and every item carries a denial for not enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -406,7 +487,13 @@ class ABatchLoadOfNoIdsAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
+        return Says(
+            "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다",
+            english=(
+                "batch loading an empty id list answers an empty response without calling the "
+                "lower layer"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -433,9 +520,14 @@ class TheSuperadminLoadsLaidAndMissingNames(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 이름 하나를 한 번에 조회하면, "
-            "요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있다"
+        return Says(
+            "superadmin 이 미리 저장한 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 "
+            "순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있습니다",
+            english=(
+                "when the superadmin batch loads two seeded groups and one unknown name, the "
+                "items come back in the order requested and the item for the unknown name is "
+                "empty"
+            ),
         )
 
     @override
@@ -461,7 +553,14 @@ class AUserGrantedNothingIsRefusedPerName(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다"
+        return Says(
+            "아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 "
+            "항목마다 권한 부족 거부가 담깁니다",
+            english=(
+                "a user granted nothing batch loading two groups by name is not rejected as a "
+                "call, and every item carries a denial for not enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -486,7 +585,13 @@ class ABatchLoadOfNoNamesAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
+        return Says(
+            "빈 이름 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다",
+            english=(
+                "batch loading an empty name list answers an empty response without calling the "
+                "lower layer"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -511,7 +616,14 @@ class TheSuperadminReadsAnEmptyResourceInfo(
 
     @override
     def describe(self) -> str:
-        return "에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다"
+        return Says(
+            "에이전트가 없는 그룹의 자원 현황을 superadmin 이 조회하면 용량, 사용량, 여유가 모두 "
+            "비어 있습니다",
+            english=(
+                "when the superadmin reads the resource info of a group without agents, "
+                "capacity, used and free are all empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -536,7 +648,14 @@ class AUserGrantedReadReadsTheResourceInfo(
 
     @override
     def describe(self) -> str:
-        return "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다"
+        return Says(
+            "그 자원 그룹에 부여된 역할로 읽기 권한을 받은 사용자가 자원 현황을 조회하면 "
+            "superadmin 과 같은 응답을 받습니다",
+            english=(
+                "a user granted read through the role granted on the resource group reading the "
+                "resource info gets the same response as the superadmin"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -561,7 +680,13 @@ class AUserGrantedNothingMayNotReadTheResourceInfo(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 현황을 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing reading the resource info is rejected for not enough "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -586,7 +711,14 @@ class TheResourceInfoOfAnUnknownNameIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 이름의 자원 현황을 조회하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin reads the resource info of a name nothing answers to, the "
+                "call is rejected because no target answers to it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:

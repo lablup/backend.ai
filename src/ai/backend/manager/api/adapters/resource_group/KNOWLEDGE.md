@@ -9,102 +9,70 @@ generated:
   at: 2026-09-17
 status: draft
 ---
-# resource_group 어댑터 — 시나리오
+# resource_group adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-리소스 그룹은 어느 스코프에도 속하지 않게 만들어지고, 그 자신이 에이전트와 세션의 스코프다.
-생성과 전체 검색은 호출한 사용자가 슈퍼관리자인지 검사한다(검색은 모니터도 통과한다). 그룹
-하나를 지목하는 조회·수정·완전 삭제는 그 그룹에 부여된 권한을 검사하는데, 그룹이 자기
-스코프이므로 그룹에 앉힌 역할이 그 권한을 준다. 그래서 이 문서의 권한 짝은 슈퍼관리자와 그
-밖의 사용자가 아니라, 그룹에 앉힌 역할을 받은 사용자와 받지 않은 사용자다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-이름으로 id를 찾는 호출은 인증만 확인한다. 그래서 존재하지 않는 이름은 누구에게나 대상을 찾을
-수 없어 거부되고, 권한 검사는 찾은 뒤에야 온다.
+A resource group is created outside every scope, and it is itself the scope of agents and sessions. Create and the unscoped search check whether the calling user is superadmin (a monitor passes the search too). The get, update and purge that refer to one group check the permission granted on that group, and since the group is its own scope, a role granted on the group gives that permission. The permission pairs in this document are therefore not superadmin and other users but a user who received a role granted on the group and a user who did not.
 
-세션이 리소스 그룹에 닿는 길은 셋이다. 도메인에 건 것, 프로젝트에 건 것, 사용자의 키페어에 건
-것. 허용 목록 호출들은 그중 도메인과 프로젝트에 거는 관계를 쓰고 읽는다.
+The call that finds an id by name checks authentication only. An unknown name is therefore rejected for everyone because the target is missing, and the permission check comes only after the lookup.
 
-## 생성
+A session accesses a resource group in three ways: through the domain, through the project and through the user's keypair. The allow list calls write and read the relations to the domain and the project among them.
 
-요청의 `domain_name` 값은 읽지 않는다. 그룹은 어느 도메인에도 걸리지 않은 채 만들어지고, 도메인에
-거는 것은 허용 목록 절의 호출이다.
+## Create
 
-기본 그룹은 하나뿐이다. 둘째 기본 그룹을 만드는 시나리오는 현재 코드에서 실패하므로 실행에서
-제외했다 (BA-7946). 생성 경로는 그것을 지키는 제약의 위반을 이름 중복과 구분하지 않아 둘째 기본
-그룹을 이름 중복으로 거부한다. 수정 경로는 구분한다(수정 절). 시나리오에는 수정 경로와 같은 이유로
-거부되는 결과를 기대값으로 적어 두었다. 고쳐지면 다시 실행에 포함한다.
+The `domain_name` value of the request is not read. The group is created without being added to any domain, and adding it to a domain is done by the calls in the allow list section.
 
-## 조회
+There is one default group. The scenario that creates a second default group fails in the current code and was excluded from the run (BA-7946, duplicate default group constraint violation). The create path does not distinguish the violation of the constraint that enforces it from a duplicate name, so it rejects a second default group as a duplicate name. The update path distinguishes them (see the update section). The scenario records, as its expected value, that the request is rejected for the same reason as on the update path. Include it in the run again when it is fixed.
 
-존재하지 않는 이름은 슈퍼관리자에게도 그 밖의 사용자에게도 같은 이유로 거부된다. 이름으로 id를
-찾는 호출이 인증만 확인하고, 권한 검사는 찾은 id에 대해서만 실행되기 때문이다. 아래 절들의 없는
-이름 시나리오도 모두 같다.
+## Get
 
-리소스 현황은 `ALIVE` 상태이고 스케줄 가능한 에이전트의 `agent_resource` 행을 더한 것이다.
-에이전트가 없는 그룹은 세 값 모두 항목이 없다.
+An unknown name is rejected for the same reason for superadmin and for other users. The call that finds an id by name checks authentication only, and the permission check runs only for the found id. Every unknown name scenario in the sections below is the same.
 
-## 이름으로 id 찾기
+The resource status is the sum of the `agent_resource` rows of schedulable agents in the `ALIVE` status. A group with no agent has no entry in any of the three values.
 
-다른 엔티티의 REST handler와 GQL resolver는 리소스 그룹 이름을 id로 풀 때 이 호출을 먼저 부른다.
+## Finding an id by name
 
-지금은 권한이 없는 사용자에게도 id를 돌려준다. 권한 없는 사용자는 이름으로도 접근하지 못하게
-권한을 보는 조회로 바꿀 예정이며, 뒤따르는 호출의 영향과 함께 리소스 그룹 작업에서 정한다.
+The REST handler and GQL resolver of another entity call this first when resolving a resource group name to an id.
 
-## 검색
+Today it returns the id even to a user without permission. The plan is to change it into a read that checks permission so that a user without permission cannot access the group by name either, and that change is decided in the resource group work together with the effect on the calls that follow.
 
-스코프 검색은 지목한 스코프마다 그 스코프 안에서 리소스 그룹을 읽을 권한이 있어야 한다. 도메인
-스코프의 답은 그 도메인에 건 그룹뿐이다. 슈퍼관리자도 걸지 않은 그룹은 보지 못한다.
+## Search
 
-## 수정
+A scope search needs the permission to read resource groups within each named scope. The response for a domain scope is only the groups added to that domain. Even superadmin does not see a group that is not added.
 
-수정은 id 를 받는다. 설정 수정은 이름으로 id 찾기를 먼저 부르고 같은 수정으로 잇는다. 이름을 받는
-옛 REST 경로와 GQL mutation 도 같은 길이다. 그래서 둘은 같은 권한 검사를 거치고 같은 노드를
-반환하며, 바꿀 수 있는 필드도 같다. 수정 요청 타입의 `name`·`total_resource_slots`·
-`allowed_vfolder_hosts`·`integration_name`·`resource_policy` 값은 어댑터가 읽지 않는다.
+## Update
 
-## 여럿 수정하기
+Update takes an id. The settings update calls find-an-id-by-name first and leads to the same update. The old REST path and GQL mutation that take a name are the same path. So both pass the same permission check, return the same node and change the same fields. The adapter does not read the `name`, `total_resource_slots`, `allowed_vfolder_hosts`, `integration_name` and `resource_policy` values of the update request type.
 
-## 완전 삭제
+## Bulk update
 
-완전 삭제만 있고 soft delete는 없다. `is_active` 값을 false로 바꾸는 것이 그 자리를 대신한다.
-완전 삭제는 id 를 받는다. 이름을 받는 옛 REST 경로와 GQL mutation 은 이름으로 id 찾기를 먼저
-부르고 같은 호출로 잇는다.
+## Purge
 
-## 여럿 완전 삭제
+There is only a purge, no delete. Setting `is_active` to false serves in place of delete. Purge takes an id. The old REST path and GQL mutation that take a name call find-an-id-by-name first and lead to the same call.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 그룹은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+## Bulk purge
 
-## 허용 목록
+A bulk operation does not reject the whole call. Processed groups go into the processed list, and failures are recorded in the failure list with the id and the reason.
 
-도메인 쪽과 프로젝트 쪽, 그리고 그룹 쪽에서 같은 관계를 쓰고 읽는 호출 여덟이다.
+## Allow lists
 
-도메인 쪽과 프로젝트 쪽에서 거는 호출은 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를
-거치므로 슈퍼관리자만 통과한다. 그룹 쪽에서 거는 호출은 이름을 인증만으로 바꾸고, 관계를 쓰는
-자리가 양쪽 스코프의 권한을 검사한다. 어느 쪽이든 아무 권한도 없는 사용자는 거부되지만 이유가
-다르다.
+Eight calls write and read the same relation on the domain side, the project side and the group side.
 
-떼는 쪽의 없는 이름은 양쪽이 다르게 다룬다. 도메인 쪽에서 없는 그룹 이름을 빼면 건너뛰지만,
-그룹 쪽에서 없는 도메인 이름을 빼면 거부된다. 도메인 이름을 id로 바꾸는 자리가 내는 오류를 그
-호출이 잡지 않기 때문이다.
+A call from the domain side or the project side passes only for superadmin, because the step that turns the group name into an id passes the superadmin check. A call from the group side turns the name into an id with authentication only, and the step that writes the relation checks permission on both scopes. A user without any permission is rejected on either side, but for a different reason.
 
-프로젝트의 허용 목록 조회는 호출한 사용자의 도메인·지목한 프로젝트·호출한 사용자 자신, 세
-스코프에서 읽는다. 세 스코프 모두에서 리소스 그룹을 읽을 권한이 있어야 통과하므로, 이 문서는
-슈퍼관리자가 통과하는 것과 아무 권한도 없는 사용자가 거부되는 것만 고정한다.
+The remove calls handle an unknown name differently on the two sides. The domain-side call skips an unknown group name, while the group-side call rejects an unknown domain name. The call does not catch the error raised by the step that turns the domain name into an id.
 
-## fair share 설정
+The project allow list read operation reads from three scopes: the caller's domain, the specified project and the caller. It passes only with the permission to read resource groups in all three scopes, so this document records only that superadmin passes and a user without any permission is rejected.
 
-설정 조회는 그룹을 전체 검색으로 찾으므로 슈퍼관리자 검사를 먼저 거친다. 그룹에 앉힌 읽기
-역할로는 그룹 자체는 읽어도 이 설정은 읽지 못한다. 수정은 그룹을 지목하는 권한 검사만 거치므로
-수정 역할로 통과한다.
+## Fair share settings
 
-`resource_weights`의 항목을 그 그룹 용량에 있는 리소스로 제한하는 검사는 시나리오로 두지 않는다.
-서비스가 판단하고 서비스의 단위 테스트가 검사한다. 수정이 반환하는 노드에는 이 설정이 실리지
-않는다.
+The settings read finds the group by the unscoped search and therefore passes the superadmin check first. A read role granted on the group can read the group itself but not this setting. The update passes only the permission check on the specified group and therefore passes with the update role.
 
-## 기본 옵션
+No scenario checks that the entries of `resource_weights` are limited to the resources in the capacity of that group. The service decides it, and the service unit tests check it. The node returned by the update does not carry this setting.
 
-처리기 이름은 배포 코디네이터와 스케줄 코디네이터에 등록된 것에서 읽는다. 시나리오는 두
-코디네이터를 등록된 처리기만 답하는 대역으로 바꿔 돌린다.
+## Default options
+
+The processor names are read from those registered in the deployment coordinator and the scheduling coordinator. The scenarios run with both coordinators replaced by a mock that responds only with registered processors.

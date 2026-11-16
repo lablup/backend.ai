@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -53,6 +54,7 @@ from ai.backend.manager.api.gql.deployment.types.scopes import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.user import UserNotFound
 
 # Query resolvers
@@ -345,10 +347,11 @@ async def delete_model_deployment(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Fully replace the ``options`` surface of a deployment. "
-            "Replace semantics — the supplied payload is the complete new value."
+            "Replace semantics — the supplied payload is the complete new value, "
+            "except an omitted agent selection policy, which keeps the stored one."
         ),
     )
 )
@@ -359,9 +362,7 @@ async def replace_deployment_options(
 
     GQL input carries the target ``deployment_id`` and the full ``options``
     payload together; REST equivalent carries the id in the path. Only the
-    refreshed options surface is returned (the server path uses
-    ``UPDATE ... RETURNING`` and does not re-read the surrounding
-    deployment node).
+    refreshed options surface is returned.
     """
     gql_pydantic = input.to_pydantic()
     rest_body = ReplaceDeploymentOptionsInput(options=gql_pydantic.options)
@@ -424,5 +425,5 @@ async def deployment_status_changed(
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
     """Subscribe to deployment status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

@@ -1,8 +1,8 @@
-# Backend.AI App Proxy Worker
+# Backend.AI app proxy worker
 
 ## Purpose
 
-The App Proxy Worker is a high-performance reverse proxy that routes user traffic to compute session services (Jupyter, SSH, TensorBoard, etc.) running on agents. It receives routing information from the Coordinator and handles SSL/TLS termination, load balancing, and traffic forwarding.
+The app proxy worker is a high-performance reverse proxy that routes user traffic to session services (Jupyter, SSH, TensorBoard, and so on) running on agents. It receives routing information from the app proxy coordinator and handles SSL/TLS termination, load balancing, and traffic forwarding.
 
 ## Key Responsibilities
 
@@ -13,7 +13,7 @@ The App Proxy Worker is a high-performance reverse proxy that routes user traffi
 - Stream responses efficiently
 
 ### 2. Route Resolution
-- Receive routing tables from Coordinator
+- Receive routing tables from the app proxy coordinator
 - Resolve session services from URLs
 - Cache routing information locally
 - Update routes dynamically
@@ -21,7 +21,7 @@ The App Proxy Worker is a high-performance reverse proxy that routes user traffi
 ### 3. Health Checking
 - Monitor backend service health
 - Detect failed services
-- Report health status to Coordinator
+- Report health status to the app proxy coordinator
 - Handle service failover
 
 ## Architecture
@@ -40,8 +40,8 @@ The App Proxy Worker is a high-performance reverse proxy that routes user traffi
 - Route user requests to session services
 - URL Pattern: `https://<worker-domain>/<session-id>/<service-name>/...`
 
-#### WebSocket Proxy
-- Interactive service communication (Jupyter Kernel, SSH, etc.)
+#### WebSocket Proxying
+- Interactive service communication (Jupyter Kernel, SSH, and so on)
 - Real-time log streaming
 
 **Key Characteristics**:
@@ -85,7 +85,7 @@ User → WS Upgrade Request → Worker
 **Port**: 6040 (default, separate management port)
 
 **Key Features**:
-- Communication with Coordinator
+- Communication with the app proxy coordinator
 - Health check endpoints
 - Metrics exposure (Prometheus)
 - Internal management (no external access)

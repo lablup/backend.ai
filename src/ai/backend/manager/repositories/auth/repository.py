@@ -99,14 +99,6 @@ class AuthRepository:
         await self._db_source.mark_user_and_keypairs_inactive(email)
 
     @auth_repository_resilience.apply()
-    async def get_ssh_public_key(self, access_key: str) -> str | None:
-        return await self._db_source.fetch_ssh_public_key(access_key)
-
-    @auth_repository_resilience.apply()
-    async def update_ssh_keypair(self, access_key: str, public_key: str, private_key: str) -> None:
-        await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
-
-    @auth_repository_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
         """Whether an active keypair holds the given secret key."""
         return await self._db_source.verify_keypair_secret(access_key, secret_key)
@@ -215,13 +207,16 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def delete_login_session_by_token(
+    async def delete_owned_login_session_by_token(
         self,
         session_token: str,
+        user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_session_by_token(session_token, result, client_ip)
+        await self._db_source.delete_owned_session_by_token(
+            session_token, user_id, result, client_ip
+        )
 
     @auth_repository_resilience.apply()
     async def delete_user_login_sessions(
@@ -259,5 +254,6 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
-        await self._db_source.invalidate_active_login_sessions(user_id)
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Return only tokens of this user's sessions invalidated by this call."""
+        return await self._db_source.invalidate_active_login_sessions(user_id)

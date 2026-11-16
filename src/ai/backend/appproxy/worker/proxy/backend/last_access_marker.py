@@ -1,4 +1,4 @@
-"""Periodic task that marks the last-access time of a proxied route."""
+"""Periodic task that marks the last-access time of a proxied target."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Final, override
 from ai.backend.common.cron import PeriodicTask
 
 if TYPE_CHECKING:
-    from ai.backend.appproxy.common.types import RouteInfo
     from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
+    from ai.backend.common.dto.appproxy.v2.ingress.types import IngressTarget
 
 _LAST_ACCESS_MARKER_INTERVAL: Final[float] = 1.5
 
@@ -17,11 +17,11 @@ class LastAccessMarkerTask(PeriodicTask):
     """Refresh the last-used-time marker for an in-flight proxied connection."""
 
     _backend: Final[BaseBackend]
-    _route: Final[RouteInfo]
+    _target: Final[IngressTarget]
 
-    def __init__(self, backend: BaseBackend, route: RouteInfo) -> None:
+    def __init__(self, backend: BaseBackend, target: IngressTarget) -> None:
         self._backend = backend
-        self._route = route
+        self._target = target
 
     @property
     @override
@@ -40,4 +40,4 @@ class LastAccessMarkerTask(PeriodicTask):
 
     @override
     async def run(self) -> None:
-        await self._backend.mark_last_used_time(self._route)
+        await self._backend.mark_last_used_time(self._target)

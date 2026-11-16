@@ -16,7 +16,7 @@ from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapte
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.role_preset import RolePresetOwnerAssignNotAllowed
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.role_preset import (
     APresetAndACaller,
@@ -45,7 +45,10 @@ class Renaming(When[APresetAndACaller, RolePresetAdapter, RolePresetNode]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}의 이름을 {RENAMED}(으)로 바꿈"
+        return Says(
+            f"{laid.caller.username}이 {laid.preset.name}의 이름을 {RENAMED}(으)로 변경합니다",
+            english=f"{laid.caller.username} renames {laid.preset.name} to {RENAMED}",
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -64,7 +67,10 @@ class TurningOwnerAssignOn(When[APresetAndACaller, RolePresetAdapter, RolePreset
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}의 소유자 부여를 켬"
+        return Says(
+            f"{laid.caller.username} 이 {laid.preset.name}의 소유자 부여를 켭니다",
+            english=(f"{laid.caller.username} turns on owner assignment of {laid.preset.name}"),
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -87,7 +93,13 @@ class TheSuperadminRenamesIt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋 이름을 바꾸면, 새 이름을 실은 프리셋 전체가 온다"
+        return Says(
+            "superadmin 이 프리셋 이름을 변경하면, 새 이름을 담은 프리셋 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin renames a preset, "
+                "the whole preset carrying the new name comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -112,7 +124,13 @@ class AUserGrantedNothingMayNotRename(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 프리셋 이름을 바꾸려 하면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋 이름을 변경하려 하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to rename a preset, "
+                "it is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -139,7 +157,13 @@ class AProjectPresetTakesOwnerAssign(
 
     @override
     def describe(self) -> str:
-        return "프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다"
+        return Says(
+            "프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 응답으로 옵니다",
+            english=(
+                "turning on owner assignment of a project-scope preset brings the whole "
+                "preset back turned on"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -164,7 +188,13 @@ class ADomainPresetRefusesOwnerAssign(
 
     @override
     def describe(self) -> str:
-        return "프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다"
+        return Says(
+            "프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부됩니다",
+            english=(
+                "turning on owner assignment of a preset in a scope other than a project "
+                "is rejected because there is no owner"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:

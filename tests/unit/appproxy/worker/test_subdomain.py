@@ -54,48 +54,48 @@ async def serving_subdomain_frontend(
         return web.Response()
 
     frontend = SubdomainFrontend(root_context=root_context)
-    frontend.circuits = {
-        _SUBDOMAIN: Circuit(
-            id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372"),
-            app="vllm",
-            protocol=ProxyProtocol.HTTP,
-            worker=UUID("00000000-0000-0000-0000-000000000000"),
-            app_mode=AppMode.INTERACTIVE,
-            frontend_mode=FrontendMode.WILDCARD_DOMAIN,
-            frontend=SubdomainFrontendInfo(_SUBDOMAIN),
-            port=None,
-            app_info=InferenceAppInfo(
-                endpoint_id=UUID("b9567a3b-3ca1-4d8f-b8eb-a9567073808d"),
-                runtime_variant=RuntimeVariant("vllm"),
-            ),
-            subdomain=_SUBDOMAIN,
+    circuit = Circuit(
+        id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372"),
+        app="vllm",
+        protocol=ProxyProtocol.HTTP,
+        worker=UUID("00000000-0000-0000-0000-000000000000"),
+        app_mode=AppMode.INTERACTIVE,
+        frontend_mode=FrontendMode.WILDCARD_DOMAIN,
+        frontend=SubdomainFrontendInfo(_SUBDOMAIN),
+        port=None,
+        app_info=InferenceAppInfo(
+            endpoint_id=UUID("b9567a3b-3ca1-4d8f-b8eb-a9567073808d"),
             runtime_variant=RuntimeVariant("vllm"),
-            envs={},
-            arguments=None,
-            open_to_public=True,
-            allowed_client_ips=None,
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
-            access_key="AKIAIOSFODNN7EXAMPLE",
-            endpoint_id=None,
-            route_info=[
-                RouteInfo(
-                    route_id=UUID("4eeb260b-6cc5-4362-baf3-ea978388becd"),
-                    session_id=UUID("f5cd34ba-ae53-4537-a813-09f38496443d"),
-                    session_name=None,
-                    kernel_host="127.0.0.1",
-                    kernel_port=30729,
-                    protocol=ProxyProtocol.HTTP,
-                    traffic_ratio=1.0,
-                )
-            ],
-            session_ids=[UUID("f5cd34ba-ae53-4537-a813-09f38496443d")],
-            created_at=datetime(2024, 7, 16, 5, 45, 45, 982446, tzinfo=UTC),
-            updated_at=datetime(2024, 7, 16, 5, 45, 45, 982452, tzinfo=UTC),
-        )
+        ),
+        subdomain=_SUBDOMAIN,
+        runtime_variant=RuntimeVariant("vllm"),
+        envs={},
+        arguments=None,
+        open_to_public=True,
+        allowed_client_ips=None,
+        user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+        access_key="AKIAIOSFODNN7EXAMPLE",
+        endpoint_id=None,
+        route_info=[
+            RouteInfo(
+                route_id=UUID("4eeb260b-6cc5-4362-baf3-ea978388becd"),
+                session_id=UUID("f5cd34ba-ae53-4537-a813-09f38496443d"),
+                session_name=None,
+                kernel_host="127.0.0.1",
+                kernel_port=30729,
+                protocol=ProxyProtocol.HTTP,
+                traffic_ratio=1.0,
+            )
+        ],
+        session_ids=[UUID("f5cd34ba-ae53-4537-a813-09f38496443d")],
+        created_at=datetime(2024, 7, 16, 5, 45, 45, 982446, tzinfo=UTC),
+        updated_at=datetime(2024, 7, 16, 5, 45, 45, 982452, tzinfo=UTC),
+    )
+    frontend.backends = {
+        _SUBDOMAIN: mocker.MagicMock(proxy_http=record_request_body, circuit=circuit)
     }
-    frontend.backends = {_SUBDOMAIN: mocker.MagicMock(proxy_http=record_request_body)}
     root_context.ingress_state.reader.get = mocker.AsyncMock(
-        return_value=frontend.circuits[_SUBDOMAIN].to_ingress(_AUTHORITY)
+        return_value=circuit.to_ingress(_AUTHORITY)
     )
     await frontend.start()
     yield _ServingSubdomainFrontend(

@@ -38,6 +38,8 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
+from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -69,6 +71,7 @@ _TABLES: list[Table | type[HasTable]] = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
+    SSHKeypairRow,
     ProjectRow,
     VirtualEntityRow,
     ScopeBindingRow,
@@ -171,8 +174,9 @@ async def _create_user(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(f"AK{unique}"),
                     secret_key=SecretValue(f"SK{unique}"),
-                    ssh_public_key="ssh-rsa test",
-                    ssh_private_key="test-private-key",
+                ),
+                ssh_keypair=SSHKeypairCreator(
+                    public_key="ssh-rsa test", private_key=None, is_default=True
                 ),
                 keypair_resource_policy="default",
             )

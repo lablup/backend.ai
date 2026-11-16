@@ -14,9 +14,11 @@ generated:
 status: draft
 ---
 
-# Permission controller service — Knowledge
+# Permission controller service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 Roles and the permission entries a role holds. The role is the entity and its
 permission entries are field rows of it. One role group is wired; the operations
@@ -46,7 +48,7 @@ the entity type, shape, operation, gate and backing.
 - Update, soft delete and restore are `single_*_ops`; purge is `entity_purge_ops`.
 - Each has a partial bulk counterpart (`partial_bulk_{update,delete,restore}_ops`,
   `entity_partial_bulk_purge_ops`) that answers per role.
-- A SYSTEM role is refused by the spec's guard on update, soft delete and purge. It is
+- A SYSTEM role is rejected by the spec's guard on update, soft delete and purge. It is
   edited through its preset.
 
 ## A permission entry is a field row of its role
@@ -60,7 +62,7 @@ the entity type, shape, operation, gate and backing.
 - `BulkRemoveRolePermissionsAction` takes entry ids alone. The lookup answers which
   role each belongs to, and entries spanning several roles are checked per role. The
   answer is per entry, the record per role.
-- An unknown id is silently ignored by the API contract. The processor refuses with
+- An unknown id is silently ignored by the API contract. The processor rejects with
   not-found when no owner resolves and answers a missing entry with an error, so the
   adapter short-circuits an empty input and drops not-found from `failed`.
 

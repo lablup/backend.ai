@@ -18,6 +18,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Refused,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -48,7 +49,10 @@ class ReadingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 세션 그룹을 id로 조회"
+        return Says(
+            f"{laid.caller.username} 이 사용자가 생성한 세션 그룹을 id 로 조회합니다",
+            english=(f"{laid.caller.username} reads the session group the user created by id"),
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> SessionGroupNode:
@@ -66,7 +70,13 @@ class ReadingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 배포의 replica group이 가진 세션 그룹을 id로 조회"
+        return Says(
+            f"{laid.caller.username} 이 배포의 replica group 이 가진 세션 그룹을 id 로 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the session group held by the deployment's replica "
+                "group by id"
+            ),
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> SessionGroupNode:
@@ -82,7 +92,10 @@ class TheUsersGroupNode(Then[Laid, SessionGroupNode]):
 
     @override
     def says(self) -> str:
-        return "사용자가 만든 세션 그룹 전체가 온다"
+        return Says(
+            "사용자가 생성한 세션 그룹 전체가 옵니다",
+            english="the whole session group the user created comes back",
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[SessionGroupNode]) -> list[Verdict]:
@@ -104,9 +117,13 @@ class AGrantedUserReadsTheUsersGroup(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 "
-            "id로 조회하면, 그 세션 그룹이 온다"
+        return Says(
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 생성한 세션 그룹을 "
+            "id 로 조회하면, 그 세션 그룹이 옵니다",
+            english=(
+                "when a user granted session group read in that project reads the session group "
+                "the user created by id, that session group comes back"
+            ),
         )
 
     @override
@@ -132,9 +149,13 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, "
-            "권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 사용자가 생성한 세션 그룹을 id 로 조회하면, "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user with no grant reads the session group the user created by id, the "
+                "call is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -160,9 +181,14 @@ class ADeploymentsGroupIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, "
-            "권한이 아니라 대상이 없다는 것으로 거부된다"
+        return Says(
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group 이 가진 "
+            "세션 그룹을 id 로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "when a user granted session group read in that project reads the session group "
+                "held by the deployment's replica group by id, the call is rejected as not found "
+                "rather than for permission"
+            ),
         )
 
     @override

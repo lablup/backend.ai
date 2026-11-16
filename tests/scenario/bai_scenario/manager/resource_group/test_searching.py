@@ -23,7 +23,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import (
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     ADomainGroupsAndACaller,
@@ -54,7 +54,10 @@ class SearchingEveryGroup(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searc
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=(f"{laid.caller.username} searches every resource group without a filter"),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
@@ -72,7 +75,10 @@ class SearchingByName(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 이름 {laid.named.name} 필터로 조회"
+        return Says(
+            f"{laid.caller.username}이 이름 {laid.named.name} 필터로 조회합니다",
+            english=(f"{laid.caller.username} searches with the name {laid.named.name} filter"),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
@@ -94,7 +100,10 @@ class SearchingTheActiveOnes(When[ManyGroupsAndACaller, ResourceGroupAdapter, Se
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 활성 필터로 조회"
+        return Says(
+            f"{laid.caller.username}이 활성 필터로 조회합니다",
+            english=f"{laid.caller.username} searches with the active filter",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
@@ -114,7 +123,10 @@ class SearchingTheFirstOne(When[ManyGroupsAndACaller, ResourceGroupAdapter, Sear
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 앞에서 한 건만 조회"
+        return Says(
+            f"{laid.caller.username}이 앞에서 한 건만 조회합니다",
+            english=f"{laid.caller.username} asks for one item from the front",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
@@ -132,7 +144,10 @@ class SearchingTheDomainScope(When[ADomainGroupsAndACaller, ResourceGroupAdapter
 
     @override
     def describe(self, laid: ADomainGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 도메인 {laid.domain.name} 스코프로 조회"
+        return Says(
+            f"{laid.caller.username}이 도메인 {laid.domain.name} 스코프로 조회합니다",
+            english=(f"{laid.caller.username} searches the domain {laid.domain.name} scope"),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ADomainGroupsAndACaller) -> Searched:
@@ -154,7 +169,13 @@ class TheSuperadminCountsEveryGroup(
 
     @override
     def describe(self) -> str:
-        return "리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다"
+        return Says(
+            "자원 그룹 둘이 있을 때 superadmin 이 필터 없이 조회하면 둘 다 반환됩니다",
+            english=(
+                "when two resource groups exist and the superadmin searches without a filter, "
+                "both come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -179,7 +200,13 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다"
+        return Says(
+            "자원 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환됩니다",
+            english=(
+                "searching with the name of one of two resource groups as the filter answers "
+                "only that group"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -204,7 +231,13 @@ class AnActiveFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다"
+        return Says(
+            "활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환됩니다",
+            english=(
+                "when active and inactive groups are mixed, searching with the active filter "
+                "answers only the active ones"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -229,7 +262,14 @@ class TheFirstPageSaysThereIsMore(
 
     @override
     def describe(self) -> str:
-        return "리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "자원 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 "
+            "응답합니다",
+            english=(
+                "when two resource groups exist and only the first item is asked for, one item "
+                "comes back and the response says there is a next page"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -254,7 +294,12 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다"
+        return Says(
+            "모니터가 필터 없이 조회하면 superadmin 과 같은 응답을 받습니다",
+            english=(
+                "the monitor searching without a filter gets the same response as the superadmin"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -279,7 +324,13 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin searches every resource group without a "
+                "filter, the call is rejected for lacking the role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
@@ -304,9 +355,14 @@ class AUserReadingInTheDomainSearchesItsScope(
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, "
-            "도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다"
+        return Says(
+            "도메인 범위에서 자원 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, "
+            "도메인에 건 자원 그룹 하나만 반환되고 걸지 않은 자원 그룹은 나오지 않습니다",
+            english=(
+                "a user granted the resource group read role in the domain scope searching that "
+                "domain scope gets only the resource group linked to the domain, and the "
+                "unlinked resource group does not come back"
+            ),
         )
 
     @override
@@ -332,7 +388,13 @@ class TheSuperadminSearchesTheDomainScope(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다"
+        return Says(
+            "superadmin 이 도메인 스코프로 조회해도 그 도메인에 건 자원 그룹 하나만 반환됩니다",
+            english=(
+                "the superadmin searching a domain scope gets only the one resource group "
+                "linked to that domain"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
@@ -357,7 +419,13 @@ class AUserGrantedNothingMayNotSearchTheDomainScope(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing searching their own domain scope is rejected for not "
+                "enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:

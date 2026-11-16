@@ -21,7 +21,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AChannelAndACaller,
@@ -36,7 +36,7 @@ type EditingStep = Scenario[
     TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode
 ]
 
-WAS_DESCRIBED = "이미 있던 채널"
+WAS_DESCRIBED = Says("이미 있던 채널", english="a channel that already existed")
 NEW_URL = "https://hooks.example.test/elsewhere"
 
 
@@ -60,20 +60,35 @@ class Editing(When[AChannelAndACaller, NotificationAdapter, NotificationChannelN
 
     @override
     def describe(self, laid: AChannelAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else f"채널 {laid.channel.name}"
-        changes: list[str] = []
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an unknown id"
+        else:
+            target_ko = f"채널 {laid.channel.name}"
+            target_en = f"the channel {laid.channel.name}"
+        changes_ko: list[str] = []
+        changes_en: list[str] = []
         if self.named is not None:
-            changes.append(f"이름을 {self.named}으로")
+            changes_ko.append(f"이름을 {self.named}으로")
+            changes_en.append(f"renaming it to {self.named}")
         if self.clear_description:
-            changes.append("설명을 비움")
+            changes_ko.append("설명을 비움")
+            changes_en.append("clearing the description")
         if self.url is not None:
-            changes.append(f"주소를 {self.url}로")
+            changes_ko.append(f"주소를 {self.url}로")
+            changes_en.append(f"moving the URL to {self.url}")
         if self.empty_spec:
-            changes.append("빈 명세로")
+            changes_ko.append("빈 명세로")
+            changes_en.append("giving an empty spec")
         if self.enabled is not None:
-            changes.append(f"활성을 {self.enabled}로")
-        what = ", ".join(changes) if changes else "아무것도 지정하지 않고"
-        return f"{laid.caller.username}이 {target}을 {what} 수정"
+            changes_ko.append(f"활성을 {self.enabled}로")
+            changes_en.append(f"setting enabled to {self.enabled}")
+        what_ko = ", ".join(changes_ko) if changes_ko else "아무것도 지정하지 않고"
+        what_en = ", ".join(changes_en) if changes_en else "naming no field"
+        return Says(
+            f"{laid.caller.username}이 {target_ko} 을 {what_ko} 수정합니다",
+            english=f"{laid.caller.username} edits {target_en}, {what_en}",
+        )
 
     @override
     async def call(
@@ -112,7 +127,14 @@ class TheSuperadminRenamesAChannel(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 채널 전체가 반환된다"
+        return Says(
+            "superadmin 이 이름만 변경하면 이름은 새 값이고 나머지는 그대로인 채널 전체가 "
+            "응답으로 옵니다",
+            english=(
+                "when the superadmin changes only the name, the whole channel comes back "
+                "with the new name and everything else unchanged"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -139,7 +161,13 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 채널의 설명을 비우면 설명이 비어 있는 채널이 반환된다"
+        return Says(
+            "설명이 있는 채널의 설명을 비우면 설명이 비어 있는 채널이 응답으로 옵니다",
+            english=(
+                "when the description of a channel that has one is cleared, "
+                "the channel comes back with an empty description"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -166,7 +194,13 @@ class ChangingTheSpec(
 
     @override
     def describe(self) -> str:
-        return "webhook 채널의 명세를 다른 주소로 바꾸면 주소가 새 값인 채널이 반환된다"
+        return Says(
+            "webhook 채널의 명세를 다른 주소로 변경하면 주소가 새 값인 채널이 응답으로 옵니다",
+            english=(
+                "when the spec of a webhook channel moves to another URL, "
+                "the channel comes back with the new URL"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -193,7 +227,12 @@ class DisablingAChannel(
 
     @override
     def describe(self) -> str:
-        return "활성 채널을 비활성으로 바꾸면 비활성인 채널이 반환된다"
+        return Says(
+            "활성 채널을 비활성으로 변경하면 비활성인 채널이 응답으로 옵니다",
+            english=(
+                "when an active channel is changed to disabled, a disabled channel comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -220,7 +259,10 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 채널이 반환된다"
+        return Says(
+            "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 채널이 응답으로 옵니다",
+            english=("editing without naming any field brings the channel back unchanged"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -245,7 +287,13 @@ class AnEmptySpecIsRefused(
 
     @override
     def describe(self) -> str:
-        return "webhook도 email도 주지 않은 명세로 수정하려 하면 잘못된 입력으로 거부된다"
+        return Says(
+            "webhook 도 email 도 주지 않은 명세로 수정하려 하면 잘못된 입력으로 거부됩니다",
+            english=(
+                "editing a channel with a spec naming neither webhook nor email "
+                "is rejected as invalid input"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -270,7 +318,13 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits an id nothing answers to, "
+                "it is rejected because no target is found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -295,7 +349,13 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 이름을 변경하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing changes the name, "
+                "it is rejected for not enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:

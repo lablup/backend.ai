@@ -43,6 +43,7 @@ from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
     StorageVolumeServiceAttachmentOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 __all__ = (
     "ServiceCatalogFilterGQL",
@@ -112,7 +113,7 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     @classmethod
     @override

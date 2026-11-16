@@ -16,7 +16,7 @@ from ai.backend.manager.api.adapters.reservoir_registry.adapter import (
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.reservoir_registry import (
     ARegistryAndACaller,
@@ -43,7 +43,10 @@ class Purging(When[ARegistryAndACaller, ReservoirRegistryAdapter, Purged]):
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.registry.name}을 purge 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.registry.name}을 purge 합니다",
+            english=f"{laid.caller.username} purges {laid.registry.name}",
+        )
 
     @override
     async def call(self, adapter: ReservoirRegistryAdapter, laid: ARegistryAndACaller) -> Purged:
@@ -61,7 +64,14 @@ class AUserGrantedPurgePurges(
 
     @override
     def describe(self) -> str:
-        return "레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다"
+        return Says(
+            "Reservoir 레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 Reservoir "
+            "레지스트리의 id 가 옵니다",
+            english=(
+                "when a user granted permission to purge Reservoir registries purges one, the "
+                "id of the purged Reservoir registry comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
@@ -86,7 +96,10 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부됩니다",
+            english="when a user granted nothing tries to purge, it is rejected for lack of permission",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:

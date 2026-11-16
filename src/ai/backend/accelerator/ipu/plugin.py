@@ -80,11 +80,13 @@ class IPUPlugin(AbstractComputePlugin):
     ipu_config: dict[str, Any]
 
     _all_devices: list[IPUDevice] | None
+    _host_ipc: bool
     ipuof_devices: Mapping[str, Any]
     ipuof_attributes: Mapping[str, Any]
     subnet_network_map: Mapping[ipaddress.IPv4Network, str]
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
@@ -398,7 +400,7 @@ class IPUPlugin(AbstractComputePlugin):
             "Env": ["IPUOF_CONFIG_PATH=/etc/ipuof.conf.d/ipuof.conf"],
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [{"Name": "memlock", "Hard": -1, "Soft": -1}],
                 "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "0"},
                 "Devices": [

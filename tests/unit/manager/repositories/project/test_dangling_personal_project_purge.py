@@ -1,0 +1,483 @@
+"""Retention of dangling personal projects, against a real database."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID, uuid4
+
+import pytest
+import sqlalchemy as sa
+
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    SessionTypes,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import (
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
+from ai.backend.manager.errors.resource import PersonalProjectDeletionError
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.testutils.db import with_tables
+
+_NOW = datetime.now(UTC)
+_THRESHOLD = _NOW - timedelta(days=30)
+_OLD = _NOW - timedelta(days=400)
+_NEW = _NOW - timedelta(days=1)
+
+_DOMAIN_NAME = "retention-domain"
+_PROJECT_POLICY = "retention-project-policy"
+_USER_POLICY = "retention-user-policy"
+_RESOURCE_GROUP = "retention-resource-group"
+
+
+@dataclass(frozen=True)
+class _Scope:
+    domain_id: DomainID
+    user_uuid: UUID
+    resource_group_id: ResourceGroupID
+
+
+class TestDanglingPersonalProjectPurge:
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                ResourceGroupRow,
+                UserRow,
+                ProjectRow,
+                ContainerRegistryRow,
+                ImageRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                VFolderRow,
+                EndpointRow,
+                ReplicaGroupRow,
+                RoutingRow,
+                VFolderAutoMountRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def storage_manager(self) -> MagicMock:
+        manager = MagicMock()
+        manager.get_proxy_and_volume.return_value = ("proxy", "volume")
+        manager.get_manager_facing_client.return_value = AsyncMock()
+        return manager
+
+    @pytest.fixture
+    def repository(
+        self, db: ExtendedAsyncSAEngine, storage_manager: MagicMock
+    ) -> ProjectRepository:
+        return ProjectRepository(
+            db,
+            V2DBOpsProvider(db),
+            ResourcePolicyOpsProvider(db),
+            MagicMock(),
+            MagicMock(),
+            storage_manager,
+        )
+
+    @pytest.fixture
+    async def scope(self, db: ExtendedAsyncSAEngine) -> _Scope:
+        scope = _Scope(
+            domain_id=DomainID(uuid4()),
+            user_uuid=uuid4(),
+            resource_group_id=ResourceGroupID(uuid4()),
+        )
+        async with db.begin_session() as sess:
+            sess.add(
+                ProjectResourcePolicyRow(
+                    name=_PROJECT_POLICY,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=0,
+                )
+            )
+            sess.add(
+                UserResourcePolicyRow(
+                    name=_USER_POLICY,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            sess.add(
+                DomainRow(id=scope.domain_id, name=_DOMAIN_NAME, description=None, is_active=True)
+            )
+            sess.add(
+                ResourceGroupRow(
+                    id=scope.resource_group_id,
+                    name=_RESOURCE_GROUP,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ResourceGroupOpts(),
+                )
+            )
+            sess.add(
+                UserRow(
+                    uuid=scope.user_uuid,
+                    username="retention-user",
+                    email="retention@example.com",
+                    need_password_change=False,
+                    full_name="Retention User",
+                    description="",
+                    status=UserStatus.ACTIVE,
+                    status_info="",
+                    domain_name=_DOMAIN_NAME,
+                    role=UserRole.USER,
+                    resource_policy=_USER_POLICY,
+                    domain_id=scope.domain_id,
+                )
+            )
+        return scope
+
+    async def _add_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _Scope,
+        *,
+        name: str,
+        project_type: ProjectType,
+        status: ProjectStatus,
+        creator_id: UUID | None,
+        updated_at: datetime,
+    ) -> ProjectID:
+        project_id = ProjectID(uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name=name,
+                    description=None,
+                    is_active=status is ProjectStatus.ACTIVE,
+                    domain_name=_DOMAIN_NAME,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    dotfiles=b"\x90",
+                    resource_policy=_PROJECT_POLICY,
+                    type=project_type,
+                    status=status,
+                    creator_id=creator_id,
+                    updated_at=updated_at,
+                )
+            )
+        return project_id
+
+    async def _add_terminated_session_with_kernel(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope, project_id: ProjectID
+    ) -> None:
+        session_id = uuid4()
+        async with db.begin_session() as sess:
+            sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"session-{session_id}",
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    domain_name=_DOMAIN_NAME,
+                    domain_id=scope.domain_id,
+                    group_id=project_id,
+                    scaling_group_name=_RESOURCE_GROUP,
+                    resource_group_id=scope.resource_group_id,
+                    user_uuid=scope.user_uuid,
+                    status=SessionStatus.TERMINATED,
+                    status_info="",
+                    target_sgroup_names=[],
+                    vfolder_mounts=[],
+                    environ={},
+                    terminated_at=_OLD,
+                )
+            )
+            sess.add(
+                KernelRow(
+                    session_id=session_id,
+                    domain_name=_DOMAIN_NAME,
+                    group_id=project_id,
+                    user_uuid=scope.user_uuid,
+                    scaling_group=_RESOURCE_GROUP,
+                    resource_group_id=scope.resource_group_id,
+                    occupied_shares={},
+                    vfolder_mounts=[],
+                    status=KernelStatus.TERMINATED,
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    terminated_at=_OLD,
+                )
+            )
+
+    async def _add_project_vfolder(self, db: ExtendedAsyncSAEngine, project_id: ProjectID) -> UUID:
+        vfolder_id = uuid4()
+        async with db.begin_session() as sess:
+            sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    host="local",
+                    domain_name=_DOMAIN_NAME,
+                    quota_scope_id=QuotaScopeID(QuotaScopeType.PROJECT, project_id),
+                    name=f"vf-{vfolder_id.hex[:8]}",
+                    usage_mode=VFolderUsageMode.GENERAL,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
+                    ownership_type=VFolderOwnershipType.GROUP,
+                    group=project_id,
+                )
+            )
+        return vfolder_id
+
+    async def _add_active_endpoint(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope, project_id: ProjectID
+    ) -> None:
+        async with db.begin_session() as sess:
+            sess.add(
+                EndpointRow(
+                    id=uuid4(),
+                    name=f"endpoint-{uuid4().hex[:8]}",
+                    created_user=scope.user_uuid,
+                    session_owner=scope.user_uuid,
+                    domain=_DOMAIN_NAME,
+                    project=project_id,
+                    resource_group=_RESOURCE_GROUP,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                    replicas=0,
+                )
+            )
+
+    async def _project_status(self, db: ExtendedAsyncSAEngine, project_id: ProjectID) -> bool:
+        async with db.begin_readonly_session() as sess:
+            return (
+                await sess.scalar(sa.select(ProjectRow.id).where(ProjectRow.id == project_id))
+                is not None
+            )
+
+    async def test_purges_old_dangling_personal_project_with_its_session_and_kernel(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: ProjectRepository,
+        scope: _Scope,
+    ) -> None:
+        project_id = await self._add_project(
+            db,
+            scope,
+            name="dangling-old",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.DELETED,
+            creator_id=None,
+            updated_at=_OLD,
+        )
+        await self._add_terminated_session_with_kernel(db, scope, project_id)
+
+        result = await repository.purge_dangling_personal_projects(_THRESHOLD, batch_size=10)
+
+        assert result.purged_count == 1
+        assert result.failed_count == 0
+        assert not await self._project_status(db, project_id)
+        async with db.begin_readonly_session() as sess:
+            assert await sess.scalar(sa.select(sa.func.count()).select_from(SessionRow)) == 0
+            assert await sess.scalar(sa.select(sa.func.count()).select_from(KernelRow)) == 0
+
+    async def test_hands_the_project_vfolder_to_storage_deletion(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: ProjectRepository,
+        scope: _Scope,
+        storage_manager: MagicMock,
+    ) -> None:
+        project_id = await self._add_project(
+            db,
+            scope,
+            name="dangling-with-vfolder",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.DELETED,
+            creator_id=None,
+            updated_at=_OLD,
+        )
+        vfolder_id = await self._add_project_vfolder(db, project_id)
+
+        result = await repository.purge_dangling_personal_projects(_THRESHOLD, batch_size=10)
+
+        assert result.purged_count == 1
+        assert not await self._project_status(db, project_id)
+        async with db.begin_readonly_session() as sess:
+            status = await sess.scalar(
+                sa.select(VFolderRow.status).where(VFolderRow.id == vfolder_id)
+            )
+        assert status is VFolderOperationStatus.DELETE_ONGOING
+        storage_manager.get_manager_facing_client.return_value.delete_folder.assert_awaited_once()
+
+    async def test_a_failed_project_does_not_stop_the_rest_of_the_batch(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: ProjectRepository,
+        scope: _Scope,
+    ) -> None:
+        healthy = await self._add_project(
+            db,
+            scope,
+            name="dangling-healthy",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.DELETED,
+            creator_id=None,
+            updated_at=_OLD,
+        )
+        failing = await self._add_project(
+            db,
+            scope,
+            name="dangling-blocked",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.DELETED,
+            creator_id=None,
+            updated_at=_OLD,
+        )
+        await self._add_active_endpoint(db, scope, failing)
+
+        result = await repository.purge_dangling_personal_projects(_THRESHOLD, batch_size=10)
+
+        assert result.purged_count == 1
+        assert result.failed_count == 1
+        assert not await self._project_status(db, healthy)
+        assert await self._project_status(db, failing)
+
+    async def test_preserves_projects_inside_the_period_or_with_a_living_creator(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: ProjectRepository,
+        scope: _Scope,
+    ) -> None:
+        recent = await self._add_project(
+            db,
+            scope,
+            name="dangling-recent",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.DELETED,
+            creator_id=None,
+            updated_at=_NEW,
+        )
+        owned = await self._add_project(
+            db,
+            scope,
+            name="owned-personal",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.ACTIVE,
+            creator_id=scope.user_uuid,
+            updated_at=_OLD,
+        )
+        general = await self._add_project(
+            db,
+            scope,
+            name="general-deleted",
+            project_type=ProjectType.GENERAL,
+            status=ProjectStatus.DELETED,
+            creator_id=None,
+            updated_at=_OLD,
+        )
+
+        result = await repository.purge_dangling_personal_projects(_THRESHOLD, batch_size=10)
+
+        assert result.purged_count == 0
+        for project_id in (recent, owned, general):
+            assert await self._project_status(db, project_id)
+
+    async def test_refuses_a_personal_project_whose_creator_is_alive(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: ProjectRepository,
+        scope: _Scope,
+    ) -> None:
+        project_id = await self._add_project(
+            db,
+            scope,
+            name="owned-personal",
+            project_type=ProjectType.PERSONAL,
+            status=ProjectStatus.DELETED,
+            creator_id=scope.user_uuid,
+            updated_at=_OLD,
+        )
+
+        with pytest.raises(PersonalProjectDeletionError):
+            await repository.purge_group(project_id)
+
+        assert await self._project_status(db, project_id)
+
+    async def test_processes_at_most_one_batch_per_tick(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: ProjectRepository,
+        scope: _Scope,
+    ) -> None:
+        project_ids = [
+            await self._add_project(
+                db,
+                scope,
+                name=f"dangling-{i}",
+                project_type=ProjectType.PERSONAL,
+                status=ProjectStatus.DELETED,
+                creator_id=None,
+                updated_at=_OLD,
+            )
+            for i in range(3)
+        ]
+
+        result = await repository.purge_dangling_personal_projects(_THRESHOLD, batch_size=2)
+
+        assert result.purged_count == 2
+        remaining = [pid for pid in project_ids if await self._project_status(db, pid)]
+        assert len(remaining) == 1

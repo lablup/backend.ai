@@ -2,7 +2,7 @@
 
 
 # Installation
-1. Setup vagrant environment and vagrant machine nodes
+1. Set up the vagrant environment and the vagrant machine nodes.
  ```
  mkdir vagrant_box/
  cd vagrant_box
@@ -11,7 +11,7 @@
  ssh-add -K ~/.vagrant.d/insecure_private_key
  vagrant up
 ```
-2. Login to ceph-admin node and execute ceph-deployment script
+2. Log in to the ceph-admin node and run the ceph deployment script.
 
 ```
 vagrant ssh ceph-admin
@@ -19,19 +19,19 @@ sh /vagrant/install_ceph.sh
 exit
 ```
 
-3. Login to ceph-client and install ceph-fuse and Storage Proxy.
-The Storage proxy is installed at root /vagrant directory which is also shared with Host machine.
-The ceph-fuse mounted path is /mnt/vfroot/ceph-fuse
-Create storage-proxy.toml config file at the vagrant_box/ directory.
-The storage-proxy.toml will contain updated path 
+3. Log in to the ceph-client node and install ceph-fuse and the Storage Proxy.
+The Storage Proxy is installed in the root `/vagrant` directory, which the host machine shares.
+The ceph-fuse mount path is `/mnt/vfroot/ceph-fuse`.
+Create the `storage-proxy.toml` config file in the `vagrant_box/` directory.
+The `storage-proxy.toml` file contains the updated path.
 ```
 [volume.myceph]
 backend="cephfs"
 path="/mnt/vfroot/ceph-fuse"
 ```
-Etcd IP address should be updated to proper one based on Host machine.
+Set the etcd IP address to the correct value for the host machine.
 
-Next run ceph-fuse and installing proxy storage script on ceph-client.
+Then run ceph-fuse and install the Storage Proxy script on the ceph-client node.
 
 ```
 vagrant ssh ceph-client
@@ -39,8 +39,8 @@ sh /vagrant/install_storage_proxy.sh
 ```
 
 4. Manager settings
-In volume .json set the vagrant network ip address of ceph-client node if needed.
-And add ceph volume configueations such as in example below.
+In `volume.json`, set the vagrant network IP address of the ceph-client node if needed.
+Add the ceph volume configurations as in the example below.
 ```
 [volume.myceph]
 # An extended version for CephFS, which supports extended inode attributes
@@ -49,7 +49,7 @@ backend = "cephfs"
 path = "/mnt/vfroot/ceph-fuse"
 ```
 
-Example for volume.json could be
+An example `volume.json` is:
 ```
 {
   "default_host": "local:myceph",
@@ -67,7 +67,7 @@ Example for volume.json could be
 ```
 ./backend.ai mgr etcd put-json volumes volume.json
 ```
-In mgr dbshell update tables fields.
+In the manager dbshell, update the table fields.
 ```
 update domains set allowed_vfolder_hosts = '{"local:myceph": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}';
 
@@ -77,39 +77,39 @@ update keypair_resource_policies set allowed_vfolder_hosts = '{"local:myceph": [
 ```
 
 # Mounting Ceph-Fuse
-On ceph-client machine it is already mounted on install.
+The install step already mounts it on the ceph-client machine.
 ```
 sudo ceph-fuse -n client.admin --keyring=/etc/ceph/ceph.client.admin.keyring  -m ceph-server-1 /mnt/vfroot/ceph-fuse/
 ```
 
-# Setting Quotas setup
-Login to admin machine: 
+# Setting quotas
+Log in to the admin machine: 
 ```
 vagrant ssh ceph-admin
 ceph fs authorize test_fs client.admin / rwp
 ```
 
-Copy the key to the ceph-client at /etc/ceph/ceph.client.admin.keyring
+Copy the key to the ceph-client at `/etc/ceph/ceph.client.admin.keyring`.
 
-At the ceph-client: mount the ceps-fuse with admin or created client account. 
+On the ceph-client, mount the ceph-fuse with the admin account or the created client account.
 ```
 sudo ceph-fuse -n client.admin --keyring=/etc/ceph/ceph.client.admin.keyring  -m ceph-server-1 /mnt/vfroot/ceph-fuse/
 sudo mkdir /mnt/vfroot/ceph-fuse/test/
 sudo setfattr -n ceph.quota.max_bytes -v 100000000 /mnt/vfroot/ceph-fuse/test/
 getfattr -n ceph.quota.max_bytes /mnt/vfroot/ceph-fuse/test/
 ```
-To replace for created client account use example below. However, client keyring should be generated first at admin server.
+To use the created client account instead, use the example below. Generate the client keyring on the admin server first.
 ```
 sudo ceph-fuse -n client.foo --keyring=/etc/ceph/ceph.client.foo.keyring  -m ceph-server-1 /mnt/vfroot/ceph-fuse/
 ```
 
-# Testing quotas using storage proxy
-After setting the volume in etcd and postrges tables the quotas can bet tested usng create vfolder command
+# Testing quotas using the Storage Proxy
+After setting the volume in etcd and the PostgreSQL tables, test the quotas with the create vfolder command.
 
 ```
 ./backend.ai vfolder create myData5 local:volume1 -q 10m
 ```
 
-Alternatively, if Ceph cluster is not setup you may still able to test the cephfs code intitialization and create vfolder with quota logic.
-By applying changes in storage_proxy.toml file by choosing the selected local volume and changend type from 'vfs' to 'cephfs'.
-And then by writting debug log statements in cephfs/__init__.py file intercepting the create vfolder flow and quotas. Also, testing the cephfs initialization for the volume.
+Alternatively, when no Ceph cluster is set up, you can still test the cephfs code initialization and the vfolder creation with quota logic.
+Apply changes in the `storage_proxy.toml` file by selecting the local volume and changing its type from 'vfs' to 'cephfs'.
+Then write debug log statements in the `cephfs/__init__.py` file to intercept the vfolder creation and quota flow. Also test the cephfs initialization for the volume.

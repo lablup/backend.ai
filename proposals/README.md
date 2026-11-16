@@ -51,14 +51,14 @@ Version format: `YY.Sprint.Patch` (e.g., 26.1.0 = Year 2026, Sprint 1, Patch 0)
 
 ## Writing Guide
 
-For section structure, Decision Log lifecycle, AI context blocks,
+For section structure, length limits, AI context blocks,
 and document segmentation details, see the `/bep-guide` skill.
 
 ### Quick Reference
 
 1. Copy `proposals/BEP-0000-template.md`
 2. Fill metadata (Author, Status, Created, Created-Version)
-3. Write sections in order: Motivation → Current → Proposed → Migration → Plan
+3. Write sections in order: Goals → Non-goals → Design → Impact → Implementation Order
 4. Submit PR on branch `bep/XXXX-short-title`
 
 ## BEP Number Registry
@@ -150,6 +150,7 @@ BEP numbers start from 1000.
 | [1077](BEP-1077-project-scoped-ownership.md) | Project-Scoped Ownership and Access | HyeokJin Kim | Draft |
 | [1078](BEP-1078-storage-proxy-enhancement.md) | Storage Proxy Enhancement | Sanghun Lee | Draft |
 | [1079](BEP-1079-vxlan-overlay-cluster-network.md) | VXLAN Overlay Cluster Network | Daemyung Jang | Draft |
+| [1080](BEP-1080-aggregate-ops.md) | Aggregate Ops | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
@@ -163,7 +164,7 @@ Each sub-document of a segmented BEP is a pair too, such as `BEP-1033/00-overvie
 - Both files keep the same headings in the same order.
 - Update both files in the same change.
 
-### Single-File BEP (< 500 lines)
+### Single-File BEP (up to 300 lines)
 
 For short proposals, use a single markdown file:
 
@@ -172,14 +173,14 @@ proposals/
 └── BEP-1018-simple-proposal.md         # All content in one file
 ```
 
-### Segmented BEP (>= 500 lines)
+### Segmented BEP (over 300 lines)
 
-When a BEP exceeds ~500 lines or covers 3+ distinct components, split into a **main document + sub-documents**. Each sub-document should represent one independent work unit.
+When a BEP exceeds 300 lines or covers 3+ distinct components, split into a **main document + sub-documents**. Each sub-document should represent one independent work unit.
 
 **Segmentation criteria** (any one triggers):
-- Total document exceeds ~500 lines
-- Proposed Design has 3+ distinct components
-- Implementation Plan has 3+ independent phases
+- Total document exceeds 300 lines
+- Design has 3+ distinct components
+- Implementation Order has 3+ independent steps
 - Document covers multiple subsystems
 
 ```
@@ -196,7 +197,7 @@ proposals/
 
 **Registry link rule**: Always link to the main `.md` file, not the directory.
 
-**Main document role**: Concise entry point serving as overview — metadata, motivation, document index table, Decision Log, and Open Questions. Keep under ~200 lines.
+**Main document role**: Concise entry point: metadata, goals, non-goals and the document index table. Keep under 200 lines.
 
 **Sub-document rules**:
 - Each sub-document = one work unit (implementable independently)
@@ -204,7 +205,6 @@ proposals/
 - Self-contained: include enough context to understand without reading others
 - Use descriptive file names: `data-model.md`, `config-schema.md`, `event-registration.md`
 - Cross-reference other sub-documents by relative link
-- Open Questions go in the main document only (single source of truth)
 
 ### Supporting Files Only
 

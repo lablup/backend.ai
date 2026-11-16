@@ -75,6 +75,7 @@ pyzmq~=26.4
 PyJWT~=2.15.1
 PyYAML~=6.0
 pyasn1>=0.6.5
+oauthlib>=4.0.1
 pydantic[email]~=2.13.5
 packaging>=24.1
 huggingface-hub~=0.34.3
@@ -137,4 +138,4 @@ types-tqdm<4.70
 backend.ai-krunner-alpine==5.4.0
 backend.ai-krunner-static-gnu==4.4.0
 
-etcd-client-py~=0.5.1
+etcd-client-py~=0.6.1

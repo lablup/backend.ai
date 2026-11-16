@@ -17,7 +17,6 @@ from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
@@ -71,7 +70,6 @@ class TestSearchRoleAssignmentsInScope:
                 KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRow,
-                KeyPairRow,
                 UserRoleRow,
             ],
         ):

@@ -163,11 +163,10 @@ class AdminDeleteKeypairInput(BaseRequestModel):
 
 
 class AdminRegisterSSHKeypairInput(BaseRequestModel):
-    """Admin request to register (overwrite) a user's SSH keypair."""
+    """Admin request to register (overwrite) a user's SSH public key."""
 
-    access_key: str = Field(description="Access key whose SSH keypair will be replaced.")
+    access_key: str = Field(description="Access key whose SSH public key will be replaced.")
     ssh_public_key: str = Field(description="PEM-encoded SSH public key.")
-    ssh_private_key: str = Field(description="PEM-encoded SSH private key.")
 
 
 class AdminDeleteSSHKeypairInput(BaseRequestModel):

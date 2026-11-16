@@ -9,23 +9,20 @@ generated:
   at: 2026-10-16
 status: draft
 ---
-# idle_checker_assignment 어댑터 — 시나리오
+# idle_checker_assignment adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-할당은 스코프와 유휴 검사기를 잇는 relation 이다. 쓰기는 양쪽 엔티티의 권한을 모두 본다.
-여럿 연산은 항목마다 단건 쓰기를 따로 돌린다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 여럿 수정하기
+An assignment is a relation that links a scope and an idle checker. A write checks the permission of both entities. A bulk operation runs the single write separately per entry.
 
-## 여럿 purge
+## Updating several
 
-권한 없는 사용자에게는 할당 id 를 찾는 단계가 없는 id 와 같은 답을 준다. 할당이 있는지 드러내지
-않기 위해서다. 슈퍼관리자에게는 없는 id 가 대상 없음으로 온다.
+## Purging several
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 할당은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+For a user without permission, the step that finds the assignment id gives the same response as a missing id, so the call does not reveal whether an assignment exists. For superadmin, a missing id comes as a missing target.
 
-할당 id 는 데이터베이스가 만든다. 시나리오는 슈퍼관리자 한 명으로 할당을 검색해 id 를 얻은 뒤
-호출자로 부른다.
+A bulk operation does not reject the whole call. Processed assignments go into the processed list, and entries that could not be processed go into the failure list with the id and the reason.
+
+The database creates the assignment id. The scenario obtains an id by searching assignments as one superadmin, then calls as the caller.

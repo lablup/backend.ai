@@ -27,6 +27,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -43,7 +44,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="a description edited at once")
 
 type Edited = PartialBulkPayload[DomainNode]
 type DomainStep = Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Edited]
@@ -59,7 +60,13 @@ class EditingEveryTarget(When[ManyDomainsAndACaller, DomainAdapter, Edited]):
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        return f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} edits the description of "
+                f"{len(laid.elsewhere())} domains at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Edited:
@@ -84,7 +91,10 @@ class EveryTargetIsEdited(Then[ManyDomainsAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "대상 도메인이 모두 새 설명으로 오고, 실패한 것은 없다"
+        return Says(
+            "대상 도메인이 모두 새 설명으로 오고, 실패한 것은 없습니다",
+            english="every target domain comes back with the new description and none failed",
+        )
 
     @override
     def look(self, laid: ManyDomainsAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -117,9 +127,15 @@ class FlippingTheActiveFlagOfEach(When[ManyDomainsAndACaller, DomainAdapter, Edi
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 둘째 도메인을 soft delete 한 뒤, 첫째는 활성 플래그를 "
-            "내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림"
+            "비활성화하고 둘째는 활성화하며 둘의 설명을 변경하고, 없는 id 하나의 활성 플래그를 "
+            "비활성화합니다",
+            english=(
+                f"{laid.caller.username} soft deletes the second domain, then deactivates "
+                "the active flag of the first, activates the second, changes the "
+                "description of both, and deactivates the active flag of one missing id"
+            ),
         )
 
     @override
@@ -155,9 +171,14 @@ class EachFlagIsFlipped(Then[ManyDomainsAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return (
-            "둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, 없는 id 는 대상이 없다는 "
-            "이유로 실패 목록에 온다"
+        return Says(
+            "둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, "
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "both come back with the new description, the first is inactive and "
+                "the second is active, and the missing id comes back in the failed list "
+                "because there is no such target"
+            ),
         )
 
     @override
@@ -176,7 +197,14 @@ class EachFlagIsFlipped(Then[ManyDomainsAndACaller, Edited]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -195,10 +223,16 @@ class TheActiveFlagSoftDeletesOrRestoresEach(
 
     @override
     def describe(self) -> str:
-        return (
-            "활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft "
-            "delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 "
-            "없다는 이유로 실패 목록에 온다"
+        return Says(
+            "활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 수정하면, 플래그를 비활성화한 것은 "
+            "soft delete 되고 활성화한 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 "
+            "대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when several domains are edited at once with a mix of active flags and "
+                "descriptions, the one deactivated is soft-deleted and the one activated "
+                "is restored, both come back with the new description, and the missing id "
+                "comes back in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -226,7 +260,14 @@ class TheSuperadminEditsSeveralDomains(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 도메인 여럿의 설명을 한 번에 변경하면, "
+            "모두 새 설명으로 오고 실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the description of several domains at once, "
+                "all of them come back with the new description and none failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
@@ -251,9 +292,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 수정하려 하면, "
+            "수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing edits several domains at once, "
+                "none is edited and every one comes back in the failed list for lack "
+                "of permission"
+            ),
         )
 
     @override

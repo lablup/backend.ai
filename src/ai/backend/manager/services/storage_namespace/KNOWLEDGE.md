@@ -15,9 +15,11 @@ generated:
 status: stable
 ---
 
-# Storage namespace service — Knowledge
+# Storage namespace service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A storage namespace is the bucket an object storage exposes or the subpath a VFS
 storage exposes. The package exists because artifacts record where they were
@@ -40,9 +42,9 @@ super-admin operations, so no read here is open to a regular user.
 - Registration exposes `(storage_id, namespace)`, which is the table's unique
   constraint but not its primary key, and purge specs key on a single primary
   value.
-- Rather than teach the purge a second addressing mode, the caller resolves the
-  pair through `lookup` and passes the id — a lookup already rejects a
-  second match instead of answering with an arbitrary row.
+- Rather than add a second addressing mode to the purge, the caller resolves the
+  pair through `lookup` and passes the id; a lookup already rejects a
+  second match instead of returning an arbitrary row.
 - The translation lives in the adapter, so the API keeps naming a namespace the
   way it was registered.
 
@@ -51,7 +53,7 @@ super-admin operations, so no read here is open to a regular user.
 - `storage_id` points at either `object_storages` or `vfs_storages`, and the row
   carries no discriminator to say which.
 - `artifact_revision/service.py` therefore reads the object storage first and
-  falls back to the VFS storage on exception — failure used as a branch.
+  falls back to the VFS storage on exception. It uses failure as a branch.
 - The ORM models only half of it: `StorageNamespaceRow.object_storage_row` joins
   `ObjectStorageRow` alone, so a VFS-owned namespace resolves to nothing.
 

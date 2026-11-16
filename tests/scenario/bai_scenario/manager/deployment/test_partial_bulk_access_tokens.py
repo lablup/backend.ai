@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import AccessTokenNode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.access_token import (
     EveryTokenComesBack,
     NoTokenIsProcessed,
@@ -43,8 +43,15 @@ class PurgingEveryToken(When[TokensOfADeploymentAndACaller, DeploymentAdapter, A
 
     @override
     def describe(self, laid: TokensOfADeploymentAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 토큰 {len(laid.tokens)}개{besides}를 한 번에 purge 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one unknown id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username} 이 배포 토큰 {len(laid.tokens)}개{besides_ko}를 한 번에 purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.tokens)} deployment tokens"
+                f"{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller) -> Answer:
@@ -69,9 +76,14 @@ class PurgingAnswersForTheMissingToken(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 영구 삭제 권한을 받은 사용자가 토큰 둘과 없는 id 하나를 한 번에 purge 하면, "
-            "둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "배포 영구 삭제 권한을 받은 사용자가 배포 토큰 둘과 없는 id 하나를 한 번에 purge 하면, "
+            "둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted deployment purge purges two deployment tokens and one "
+                "unknown id at once, the two come back in the processed list and the unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -97,9 +109,14 @@ class AUserGrantedNothingPurgesNoToken(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 배포 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user with no grant tries to purge several deployment tokens at once, "
+                "nothing is purged and every token comes back in the failed list because the user "
+                "lacks permission"
+            ),
         )
 
     @override

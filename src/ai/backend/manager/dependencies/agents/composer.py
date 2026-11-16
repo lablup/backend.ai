@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool

@@ -22,11 +22,11 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressFrontendKey,
     IngressFrontendKind,
     IngressKey,
-    IngressTarget,
     IngressTargetGroup,
     IngressTargetGroupID,
-    IngressTargetID,
+    SessionIngressTarget,
 )
+from ai.backend.common.types import SessionId
 
 AUTHORITY = IngressAuthority("worker-1")
 CIRCUIT_ID = UUID("11111111-1111-1111-1111-111111111111")
@@ -35,7 +35,10 @@ USER_ID = UUID("33333333-3333-3333-3333-333333333333")
 ENDPOINT_ID = UUID("44444444-4444-4444-4444-444444444444")
 ROUTE_ID = UUID("55555555-5555-5555-5555-555555555555")
 SESSION_ID = UUID("66666666-6666-6666-6666-666666666666")
+OTHER_ROUTE_ID = UUID("77777777-7777-7777-7777-777777777777")
+OTHER_SESSION_ID = UUID("88888888-8888-8888-8888-888888888888")
 CREATED_AT = datetime(2026, 1, 1, tzinfo=UTC)
+ROUTE_TARGET = SessionIngressTarget(host="10.0.0.5", port=8000, session_id=SessionId(SESSION_ID))
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,14 @@ class _AccessCase:
     protocol: ProxyProtocol
     open_to_public: bool
     access_mode: IngressAccessMode
+
+
+@dataclass(frozen=True)
+class _RouteTargetCase:
+    name: str
+    route_id: UUID | None
+    traffic_ratio: float
+    expected_targets: list[SessionIngressTarget]
 
 
 @dataclass(frozen=True)
@@ -96,6 +107,25 @@ def serialized_circuit(route: RouteInfo) -> SerializableCircuit:
 @pytest.fixture
 def circuit(serialized_circuit: SerializableCircuit) -> Circuit:
     return Circuit.from_serialized_circuit(serialized_circuit)
+
+
+@pytest.fixture
+def circuit_with_two_routes(serialized_circuit: SerializableCircuit, route: RouteInfo) -> Circuit:
+    other_route = route.model_copy(
+        update={
+            "route_id": OTHER_ROUTE_ID,
+            "session_id": OTHER_SESSION_ID,
+            "kernel_host": "10.0.0.6",
+        }
+    )
+    return Circuit.from_serialized_circuit(
+        serialized_circuit.model_copy(
+            update={
+                "route_info": [route, other_route],
+                "session_ids": [SESSION_ID, OTHER_SESSION_ID],
+            }
+        )
+    )
 
 
 @pytest.fixture
@@ -229,15 +259,73 @@ class TestCircuit:
             ip_network("192.168.0.1/32"),
         ]
 
-    def test_to_ingress_carries_every_route_as_a_target_of_one_group(
-        self, circuit: Circuit
+    @pytest.fixture
+    def route_target_case_circuit(
+        self, route_target_case: _RouteTargetCase, serialized_circuit: SerializableCircuit
+    ) -> Circuit:
+        route = serialized_circuit.route_info[0].model_copy(
+            update={
+                "route_id": route_target_case.route_id,
+                "traffic_ratio": route_target_case.traffic_ratio,
+            }
+        )
+        return Circuit.from_serialized_circuit(
+            serialized_circuit.model_copy(update={"route_info": [route]})
+        )
+
+    @pytest.mark.parametrize(
+        "route_target_case",
+        [
+            _RouteTargetCase(
+                name="model-service-route",
+                route_id=ROUTE_ID,
+                traffic_ratio=1.0,
+                expected_targets=[ROUTE_TARGET],
+            ),
+            _RouteTargetCase(
+                name="interactive-app-route",
+                route_id=None,
+                traffic_ratio=1.0,
+                expected_targets=[ROUTE_TARGET],
+            ),
+            _RouteTargetCase(
+                name="half-traffic-route",
+                route_id=ROUTE_ID,
+                traffic_ratio=0.5,
+                expected_targets=[ROUTE_TARGET],
+            ),
+            _RouteTargetCase(
+                name="no-traffic-route",
+                route_id=ROUTE_ID,
+                traffic_ratio=0.0,
+                expected_targets=[],
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    def test_to_ingress_makes_a_route_with_traffic_a_session_target_of_one_group(
+        self, route_target_case: _RouteTargetCase, route_target_case_circuit: Circuit
     ) -> None:
-        assert circuit.to_ingress(AUTHORITY).backend.target_groups == [
+        assert route_target_case_circuit.to_ingress(AUTHORITY).backend.target_groups == [
+            IngressTargetGroup(
+                id=IngressTargetGroupID(str(UUID(int=0))),
+                weight=1,
+                targets=route_target_case.expected_targets,
+            )
+        ]
+
+    def test_to_ingress_puts_every_route_in_one_group(
+        self, circuit_with_two_routes: Circuit
+    ) -> None:
+        assert circuit_with_two_routes.to_ingress(AUTHORITY).backend.target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,
                 targets=[
-                    IngressTarget(id=IngressTargetID(str(UUID(int=0))), host="10.0.0.5", port=8000)
+                    ROUTE_TARGET,
+                    SessionIngressTarget(
+                        host="10.0.0.6", port=8000, session_id=SessionId(OTHER_SESSION_ID)
+                    ),
                 ],
             )
         ]

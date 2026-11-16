@@ -26,29 +26,31 @@ status: draft
 
 A user sits under a domain, so creation is scope-shaped with the domain as the scope,
 and an operation naming an existing user is single-entity. A keypair is a field row of
-the user, so every operation over a keypair is answered for by the owning user.
+the user, so the owning user answers for every operation over a keypair.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## The shape of the keypair operations
 
 A keypair row carries no membership of its own. A request naming a keypair by its
 access key reads the owning user through the key owner lookup first, and the operation
-that follows names the user. Every write is an UPDATE — adding and removing a keypair
+that follows names the user. Every write is an UPDATE. Adding and removing a keypair
 row is a change to that user.
 
 ## Bootstrap scripts and dotfiles
 
-- `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`. `user_default_bootstrap_scripts` points at a user's default script, zero or one per user.
+- `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`. `user_default_bootstrap_scripts` references a user's default script, zero or one per user.
 - A script's content lives in `bootstrap_script_revisions`, which only ever gain rows: an update appends the next `revision_number` with the requester as `creator_id`, and the latest revision is the current content.
-- The legacy API and session creation use the latest revision of the user's live default script. Without a default, a read answers an empty script and a legacy update creates a script and sets it as the default.
+- The legacy API and session creation use the latest revision of the user's live default script. Without a default, a read returns an empty script and a legacy update creates a script and sets it as the default.
 - v2 session creation fills a request without a script from the user's default script, then from the resource group's default execution spec.
 - In `processors.bootstrap_script`, the operations naming a script by id (get, bulk get, add revision, purge) are in a dangling lookup field group: the owner lookup finds the owner from the row's `entity_type`, and that owner answers for the operation. The operations taking the owner by name are user single-entity actions (create, switch default, unset default) and a user scope search. A deleted script is read and purged like a live one; switch-default and add-revision answer not found for it.
 
 | Operation | Rule | Why |
 |---|---|---|
 | create | Always non-default, with revision 1 in the same transaction | The default moves only through switch-default |
-| add-revision | Appends the next revision to a live script, default or not; the creator's precondition refuses a deleted one | Revisions only ever gain rows |
+| add-revision | Appends the next revision to a live script, default or not; the creator's precondition rejects a deleted one | Revisions only ever gain rows |
 | switch-default | Upserts the user's designation row to a live script set on that user | One designation row per user |
-| purge | Refused on the designated default; its revisions go by cascade | Same as the default keypair: switch the default first |
+| purge | Rejected on the designated default; its revisions go by cascade | Same as the default keypair: switch the default first |
 | unset default | Deletes the designation row; the script stays | A user may have no default |
 
 - `auto_generated_files` stores one file per row with `entity_type`, `entity_id`, `path`, `perm`, `data`, and `is_default`. Each entity has at most one default row per path; user APIs and sessions use these rows.
@@ -66,8 +68,8 @@ row is a change to that user.
 
 Creation (which creates a keypair with the user), purge (which cleans up vfolders,
 sessions and endpoints), the bulk operation set, every keypair operation, the monthly
-statistics and the dotfile write set stay in the service. The four reads — global, by
-domain, by project, by role — go straight to ops.
+statistics and the dotfile write set stay in the service. The four reads go straight to ops: global, by
+domain, by project, by role.
 
 ## A role is not a scope a user sits in
 

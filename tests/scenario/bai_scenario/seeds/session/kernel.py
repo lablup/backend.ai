@@ -26,6 +26,7 @@ from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel_group.creators import KernelGroupCreator
 from ai.backend.manager.models.resource_slot.creators import KernelResourceAllocationCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import TestSeedFieldCreator, TestSeedFieldWithNestedRows
 from bai_scenario.seeds.session.session import session_spec
 
@@ -56,7 +57,7 @@ class TestSeedMainKernelGroupOf(TestSeedFieldCreator[SessionEntityData, KernelGr
 
     @override
     def kind(self) -> str:
-        return "main 커널 그룹 하나를 갖는다"
+        return Says("main 커널 그룹 하나를 갖습니다", english="has one main kernel group")
 
     @override
     def owner_id(self, owner: SessionEntityData) -> SessionID:
@@ -89,7 +90,10 @@ class TestSeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo
     @override
     def kind(self) -> str:
         asked = ", ".join(f"{name} {amount}" for name, amount in self.slots)
-        return f"요구량이 {asked}인 커널 하나를 갖는다"
+        return Says(
+            f"요구량이 {asked}인 커널 하나를 갖습니다",
+            english=f"has one kernel asking for {asked}",
+        )
 
     @override
     def owner_id(self, owner: SessionEntityData) -> SessionID:

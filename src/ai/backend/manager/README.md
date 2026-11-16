@@ -4,21 +4,21 @@
 
 ## Purpose
 
-The Manager is the central orchestrator of the Backend.AI cluster. It schedules computing sessions (sessions and kernels), allocates resources, manages the lifecycle of sessions, and provides API gateway functionality through REST and GraphQL interfaces.
+The manager is the central orchestrator of the Backend.AI cluster. It schedules sessions and kernels, allocates resources, manages the session lifecycle, and provides the API gateway through REST and GraphQL.
 
 ## Key Responsibilities
 
 ### 1. API Gateway
-- Provide REST API and GraphQL API to clients
-- Request authentication and authorization
-- Rate limiting and quota management
-- API versioning management
+- Serve the REST API and the GraphQL API to clients
+- Authenticate and authorize requests
+- Apply rate limits and manage quotas
+- Manage API versions
 
 ### 2. Session Scheduling
-- Allocate computing resources for user compute session requests
-- Select optimal agents based on various scheduling algorithms
-- Manage session lifecycle (creation, execution, termination)
-- Cluster-mode session scheduling and management
+- Allocate computing resources for session requests
+- Select the best agents through various scheduling algorithms
+- Manage the session lifecycle (creation, execution, termination)
+- Schedule and manage cluster-mode sessions
 
 ### 3. Resource Management
 - Track cluster-wide resource status
@@ -27,57 +27,57 @@ The Manager is the central orchestrator of the Backend.AI cluster. It schedules 
 - Handle resource presets and quotas
 
 ### 4. User and Organization Management
-- User account and authentication management
-- Group and domain organization management
-- Permission and role-based access control
-- Credential (access key/secret key) management
+- Manage user accounts and authentication
+- Manage projects, domains, and their organization
+- Manage permissions and role-based access control
+- Manage credentials (access key and secret key)
 
-### 5. Virtual Folder Management
+### 5. vfolder management
 - Provide persistent storage to users
 - Integrate various storage backends
-- Manage file upload/download
-- Manage folder sharing and permissions
+- Manage file upload and download
+- Manage vfolder sharing and permissions
 
 ### 6. Image Registry Management
-- Manage container image repositories
+- Manage container registries
 - Scan and synchronize image metadata
 - Validate and manage image versions
 - Control allowed images per domain
 
 ## Entry Points
 
-The Manager accepts and processes external requests through 4 entry points.
+The manager accepts and processes external requests through four entry points.
 
 ### 1. REST API
 
-**Framework**: aiohttp (async HTTP web framework)
+**Framework**: aiohttp (asynchronous HTTP web framework)
 
 **Location**: `src/ai/backend/manager/api/`
 
 **Key Features**:
 - HTTP/HTTPS-based communication
 - JSON request/response format
-- JWT or API Key-based authentication
-- Validation and authentication via middleware stack
+- JWT or API key authentication
+- Validation and authentication through the middleware stack
 
 **Processing Flow**:
 ```
 HTTP Request → Middleware Stack → REST Handler → Action Processor → Service → Repository → DB
 ```
 
-**Related Documentation**: [REST API Documentation](./api/README.md)
+**Related documents**: [REST API documentation](./api/README.md)
 
 ### 2. GraphQL API
 
-**Framework**: Strawberry (current) + Graphene (Legacy, DEPRECATED)
+**Framework**: Strawberry (current) and Graphene (legacy, deprecated)
 
 **Location**:
 - Strawberry: `src/ai/backend/manager/api/gql/`
-- Graphene (Legacy): `src/ai/backend/manager/api/gql_legacy/`
+- Graphene (legacy): `src/ai/backend/manager/api/gql_legacy/`
 
-**Related Documentation**:
+**Related documents**:
 - [GraphQL API (Strawberry)](./api/gql/README.md)
-- [Legacy GraphQL (Graphene)](./api/gql_legacy/README.md) - DEPRECATED
+- [Legacy GraphQL (Graphene)](./api/gql_legacy/README.md) - deprecated
 
 ### 3. Event Dispatcher
 
@@ -86,15 +86,15 @@ HTTP Request → Middleware Stack → REST Handler → Action Processor → Serv
 **Location**: `src/ai/backend/common/events/`
 
 **Event Types**:
-- **Broadcast Events**: Received by all Manager instances
-- **Anycast Events**: Received by only one Manager instance
+- **Broadcast Events**: Received by every manager instance
+- **Anycast Events**: Received by only one manager instance
 
 **Processing Flow**:
 ```
 Event Producer → Event Dispatcher → Event Handler → Service
 ```
 
-**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+**Related documents**: [Event Dispatcher System](../common/events/README.md)
 
 ### 4. Background Task Handler
 
@@ -103,18 +103,18 @@ Event Producer → Event Dispatcher → Event Handler → Service
 **Location**: `src/ai/backend/common/bgtask/`
 
 **Purpose**:
-Handles long-running tasks asynchronously. Issues Task IDs that allow clients to subscribe to progress updates or results via events.
+Handles long-running tasks asynchronously. It issues a task ID that lets a client subscribe to progress updates or results through events.
 
 **Processing Flow**:
 ```
 Task Request → Background Task Handler → Task Execute → Event Notification
 ```
 
-**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+**Related documents**: [Background Task Handler System](../common/bgtask/README.md)
 
 ### Entry Point Interactions
 
-Each entry point operates independently, but service logic can trigger background tasks or publish events as needed.
+Each entry point runs independently, but service logic can start a background task or publish an event when needed.
 
 **Interaction Examples**:
 ```
@@ -227,49 +227,49 @@ manager/
 ## Core Concepts
 
 ### Sessions
-Sessions represent user compute requests and are composed of one or more kernels:
+A session is a user compute request and has one or more kernels:
 - **Session ID**: Unique identifier for the session
-- **Access Key**: Owner's API access key
-- **Status**: Session state (PENDING, RUNNING, TERMINATED, etc.)
-- **Resource Allocation**: Allocated CPU, memory, GPU resources
+- **Access Key**: The owner's API access key
+- **Status**: Session status (PENDING, RUNNING, TERMINATED, and others)
+- **Resource Allocation**: Allocated CPU, memory, and GPU resources
 - **Cluster Size**: Number of kernels in multi-container mode
 
 Session Lifecycle:
-1. User creates session via API
-2. Manager schedules and allocates resources
-3. Agent creates and starts kernel containers
-4. User executes code and uses services
-5. Session terminates (user request or timeout)
-6. Resources are returned to the pool
+1. A user creates a session through the API.
+2. The manager schedules it and allocates resources.
+3. The Agent creates and starts the kernel containers.
+4. The user executes code and uses services.
+5. The session terminates (user request or timeout).
+6. Resources return to the pool.
 
 ### Agents
-Agents are compute node workers that execute kernels:
+Agents run kernels on nodes:
 - **Agent ID**: Unique identifier for the agent
-- **Status**: Agent state (ALIVE, LOST, TERMINATED)
-- **Available Resources**: CPU, memory, GPU capacity
-- **Occupied Slots**: Currently allocated resources
-- **Scaling Group**: Group to which the agent belongs
+- **Status**: Agent status (ALIVE, LOST, TERMINATED)
+- **Available Resources**: CPU, memory, and GPU capacity
+- **Occupied Slots**: Resources allocated at the moment
+- **Resource Group**: The resource group to which the agent belongs
 
-Agent Monitoring:
-- Manager periodically checks agent health
-- Agent heartbeat and resource status updates
-- Automatic detection of lost agents
-- Kernel rebalancing during failures
+Agent monitoring:
+- The manager checks agent health periodically.
+- The Agent sends agent heartbeats and resource status updates.
+- Lost agents are detected automatically.
+- Kernels are rebalanced during a failure.
 
-### Scaling Groups
-Scaling groups manage agent clusters logically:
-- **Group Name**: Unique identifier for the scaling group
-- **Scheduler Type**: Scheduling algorithm (FIFO, LIFO, DRF, etc.)
-- **Agent Members**: Agents belonging to the group
-- **Allowed vFolder Hosts**: Permitted storage backends
-- **Resource Limits**: Per-group resource limits
+### Resource Groups
+A resource group manages a set of agents logically:
+- **Name**: Unique identifier for the resource group
+- **Scheduler Type**: Scheduling algorithm (FIFO, LIFO, DRF, and others)
+- **Agent Members**: Agents in the resource group
+- **Allowed vfolder hosts**: Permitted storage backends
+- **Resource Limits**: Resource limits per resource group
 
-### Virtual Folders (VFolders)
-VFolders provide persistent storage:
+### vfolders
+A vfolder provides persistent storage:
 - **Folder Name**: User-defined folder name
 - **Host**: Storage backend location
-- **Ownership**: User or group ownership
-- **Permissions**: Read/write permissions
+- **Ownership**: User or project ownership
+- **Permissions**: Read and write permissions
 - **Quota**: Storage capacity limit
 
 ## Infrastructure Dependencies
@@ -279,9 +279,9 @@ VFolders provide persistent storage:
 #### PostgreSQL (Persistent Data)
 - **Purpose**:
   - Store all Backend.AI metadata
-  - User/Group/Domain information
+  - User, project, and domain information
   - Session and kernel history
-  - VFolder metadata
+  - vfolder metadata
   - Resource allocation records
 - **Halfstack Port**: 8101 (host) → 5432 (container)
 - **Key Tables**:
@@ -289,8 +289,8 @@ VFolders provide persistent storage:
   - `groups`, `domains` - Organization structure
   - `kernels`, `sessions` - Session information
   - `agents` - Agent status
-  - `vfolders` - VFolder metadata
-  - `scaling_groups` - Scaling group configuration
+  - `vfolders` - vfolder metadata
+  - `scaling_groups` - Resource group configuration
 
 #### Valkey (Caching and Real-time Data)
 - **Purpose**:
@@ -320,13 +320,13 @@ VFolders provide persistent storage:
 - **Internal Port**: 18080 (separate from main API port 8091)
 - **Exposed Endpoints**:
   - `http://localhost:18080/metrics` - Prometheus metrics endpoint
-  - `http://localhost:18080/metrics/service_discovery` - Service discovery endpoint for automated metrics collection configuration
+  - `http://localhost:18080/metrics/service_discovery` - Service discovery endpoint that automates the metrics collection configuration
 - **Key Metrics**:
   - `backendai_api_request_count` - Total API requests
   - `backendai_api_request_duration_sec` - Request processing time
   - `backendai_scheduler_enqueue_success` - Successful scheduling count
   - `backendai_agent_registry_count` - Number of agents
-- **Note**: The service discovery endpoint provides automated configuration for Prometheus to discover all Backend.AI component endpoints
+- **Note**: The service discovery endpoint gives Prometheus the configuration to discover every Backend.AI component endpoint automatically
 
 #### Loki (Log Aggregation)
 - **Purpose**:
@@ -377,7 +377,7 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 
 ### Halfstack Configuration
 
-**Recommended**: Use the `./scripts/install-dev.sh` script for development environment setup.
+**Recommended**: use the `./scripts/install-dev.sh` script to set up the development environment.
 
 #### Starting Development Environment
 ```bash
@@ -397,20 +397,20 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 
 ### Prometheus Metrics
 
-The Manager component exposes Prometheus metrics at the `/metrics` endpoint for monitoring system health and performance.
+The manager exposes Prometheus metrics at the `/metrics` endpoint to monitor system health and performance.
 
 #### Label Conventions
 
-Many metrics share common labels for error tracking and classification:
+Many metrics share labels for error tracking and classification:
 
-**Error-related Labels** (populated only when errors occur):
-- `domain`: Error domain categorizing the error source (e.g., "session", "agent", "storage")
-- `operation`: Specific operation that failed (e.g., "create", "terminate", "allocate")
+**Error-related Labels** (populated only when an error occurs):
+- `domain`: Error domain that classifies the error source (for example, "session", "agent", "storage")
+- `operation`: Operation that failed (for example, "create", "terminate", "allocate")
 - `error_detail`: Detailed error information for debugging
 
 **Status Labels**:
-- `status`: Operation outcome - typically "success" or "failure"
-- `success`: Boolean string ("True" or "False") indicating operation success
+- `status`: Result of the operation, usually "success" or "failure"
+- `success`: Boolean string ("True" or "False") that tells whether the operation succeeded
 
 #### API Metrics
 
@@ -420,11 +420,11 @@ REST API request monitoring metrics.
 - **Description**: Total number of REST API requests received
 - **Labels**:
   - `method`: HTTP method (GET, POST, PUT, DELETE, PATCH)
-  - `endpoint`: API endpoint path (e.g., "/v1/session/create")
+  - `endpoint`: API endpoint path (for example, "/v1/session/create")
   - `domain`: Error domain (empty if successful)
   - `operation`: Error operation (empty if successful)
   - `error_detail`: Error details (empty if successful)
-  - `status_code`: HTTP response status code (200, 400, 500, etc.)
+  - `status_code`: HTTP response status code (200, 400, 500, and others)
 
 **`backendai_api_request_duration_sec`** (Histogram)
 - **Description**: API request processing time in seconds
@@ -457,13 +457,13 @@ Internal event processing metrics.
 **`backendai_event_count`** (Counter)
 - **Description**: Total number of events processed
 - **Labels**:
-  - `event_type`: Type of event (e.g., "session_terminated", "kernel_started")
+  - `event_type`: Type of event (for example, "session_terminated", "kernel_started")
 
 **`backendai_event_failure_count`** (Counter)
 - **Description**: Number of failed event processing attempts
 - **Labels**:
   - `event_type`: Type of event that failed
-  - `exception`: Exception class name (e.g., "SessionNotFound", "AgentError")
+  - `exception`: Exception class name (for example, "SessionNotFound", "AgentError")
   - `domain`: Error domain
   - `operation`: Error operation
   - `error_detail`: Error details
@@ -484,7 +484,7 @@ Periodic and scheduled task execution metrics.
 **`backendai_bgtask_count`** (Gauge)
 - **Description**: Number of currently running background tasks
 - **Labels**:
-  - `task_name`: Background task identifier (e.g., "recalc_agent_resource_occupancy")
+  - `task_name`: Background task identifier (for example, "recalc_agent_resource_occupancy")
 
 **`backendai_bgtask_done_count`** (Counter)
 - **Description**: Total number of completed background tasks
@@ -506,8 +506,8 @@ High-level business operation metrics.
 **`backendai_action_count`** (Counter)
 - **Description**: Total number of actions executed
 - **Labels**:
-  - `entity_type`: Type of entity being operated on (e.g., "session", "kernel", "agent")
-  - `operation_type`: Type of operation (e.g., "create", "terminate", "restart")
+  - `entity_type`: Type of entity being operated on (for example, "session", "kernel", "agent")
+  - `operation_type`: Type of operation (for example, "create", "terminate", "restart")
   - `status`: "success" or "failure"
   - `domain`: Error domain (empty if successful)
   - `operation`: Error operation (empty if successful)
@@ -526,8 +526,8 @@ Granular metrics for operations at each architectural layer.
 - **Description**: Number of layer operations currently in progress
 - **Labels**:
   - `domain`: Domain type (valkey, repository, client)
-  - `layer`: Specific layer (e.g., "session_repository", "agent_client", "valkey_live")
-  - `operation`: Operation name (e.g., "fetch_session", "create_kernel")
+  - `layer`: Specific layer (for example, "session_repository", "agent_client", "valkey_live")
+  - `operation`: Operation name (for example, "fetch_session", "create_kernel")
 
 **`backendai_layer_operation_count`** (Counter)
 - **Description**: Total number of layer operations completed
@@ -569,7 +569,7 @@ System resource usage metrics.
 - **Labels**: None
 
 **`backendai_cpu_usage_percent`** (Gauge)
-- **Description**: CPU usage percentage of the Manager process
+- **Description**: CPU usage percentage of the manager process
 - **Labels**: None
 
 **`backendai_memory_used_rss`** (Gauge)
@@ -587,7 +587,7 @@ Resource cleanup and garbage collection metrics.
 **`backendai_sweep_session_count`** (Counter)
 - **Description**: Total number of session cleanup operations
 - **Labels**:
-  - `status`: Session status being cleaned (e.g., "TERMINATED", "ERROR")
+  - `status`: Session status being cleaned (for example, "TERMINATED", "ERROR")
   - `success`: "True" or "False"
 
 **`backendai_sweep_kernel_count`** (Counter)
@@ -629,22 +629,22 @@ Development and debugging metrics for tracking execution stages.
 
 ### Prometheus Query Examples
 
-The following examples demonstrate common Prometheus queries for Manager metrics. Note that Counter metrics use the `_total` suffix and Histogram metrics use `_bucket`, `_sum`, `_count` suffixes in actual queries.
+The examples below show common Prometheus queries for manager metrics. Counter metrics take the `_total` suffix, and Histogram metrics take the `_bucket`, `_sum` and `_count` suffixes in an actual query.
 
 **Important Notes:**
-- When using `increase()` or `rate()` functions, the time range must be at least 2-4x longer than your Prometheus scrape interval to get reliable data. If the time range is too short, metrics may not appear or show incomplete data.
-- Default Prometheus scrape interval is typically 15s-30s
+- A query with `increase()` or `rate()` needs a time range at least 2-4 times the Prometheus scrape interval for reliable data. A shorter range may show metrics as absent or incomplete.
+- The default Prometheus scrape interval is usually 15s-30s.
 - **Time range selection trade-offs**:
-  - Shorter ranges (e.g., `[1m]`): Detect changes faster with more granular data, but more sensitive to noise and short-term fluctuations
-  - Longer ranges (e.g., `[5m]`): Smoother graphs with reduced noise, better for identifying trends, but slower to detect sudden changes
-  - For real-time alerting: Use shorter ranges like `[1m]` or `[2m]`
-  - For dashboards and trend analysis: Use longer ranges like `[5m]` or `[10m]`
+  - Shorter ranges (for example, `[1m]`): detect a change faster with finer data, but are more sensitive to noise and short-term fluctuation
+  - Longer ranges (for example, `[5m]`): smoother graphs with less noise, better for identifying a trend, but slower to detect a sudden change
+  - For real-time alerting: use a shorter range such as `[1m]` or `[2m]`
+  - For dashboards and trend analysis: use a longer range such as `[5m]` or `[10m]`
 
 #### API Request Rate
 
 **API Request Rate by Endpoint**
 
-Calculate the per-second rate of API requests grouped by endpoint and status. This shows how many requests per second each endpoint receives. Use this to identify high-traffic endpoints and monitor overall API load.
+Calculate the per-second rate of API requests grouped by API endpoint and status. It shows how many requests per second each API endpoint receives. Use it to find high-traffic endpoints and monitor the overall API load.
 
 ```promql
 sum(rate(backendai_api_request_count_total{service_group="$service_groups"}[1m])) by (method, endpoint, status_code)
@@ -652,7 +652,7 @@ sum(rate(backendai_api_request_count_total{service_group="$service_groups"}[1m])
 
 **Failed API Requests (5xx Errors)**
 
-Monitor failed API requests (5xx errors) to identify service issues. This helps detect when the Manager is experiencing internal errors.
+Monitor failed API requests (5xx errors) to find service issues and detect internal errors in the manager.
 
 ```promql
 sum(rate(backendai_api_request_count_total{service_group="$service_groups", status_code=~"5.."}[5m])) by (endpoint)
@@ -662,7 +662,7 @@ sum(rate(backendai_api_request_count_total{service_group="$service_groups", stat
 
 **P95 API Request Latency**
 
-Calculate 95th percentile (P95) latency for API requests. This shows the response time that 95% of requests complete within. Use this to identify slow endpoints and set SLA targets.
+Calculate the 95th percentile (P95) latency of API requests. It shows the response time within which 95% of requests complete. Use it to find slow endpoints and set SLA targets.
 
 ```promql
 histogram_quantile(0.95,
@@ -672,7 +672,7 @@ histogram_quantile(0.95,
 
 **Average API Request Duration**
 
-Calculate average request duration per endpoint. This provides a simple overview of typical response times.
+Calculate the average request duration per endpoint. It gives a simple view of typical response times.
 
 ```promql
 sum(rate(backendai_api_request_duration_sec_sum{service_group="$service_groups"}[5m])) by (endpoint)
@@ -684,7 +684,7 @@ sum(rate(backendai_api_request_duration_sec_count{service_group="$service_groups
 
 **GraphQL Query Rate by Operation**
 
-Monitor GraphQL query rate by operation type and field. Use this to understand which GraphQL queries are most frequently used.
+Monitor the GraphQL query rate by operation type and field. Use it to see which GraphQL queries run most often.
 
 ```promql
 sum(rate(backendai_graphql_request_count_total{service_group="$service_groups"}[5m])) by (operation_type, field_name)
@@ -692,7 +692,7 @@ sum(rate(backendai_graphql_request_count_total{service_group="$service_groups"}[
 
 **Failed GraphQL Queries**
 
-Track failed GraphQL queries with error details. This helps identify problematic queries and common error patterns.
+Track failed GraphQL queries with error details. It finds problematic queries and common error patterns.
 
 ```promql
 sum(rate(backendai_graphql_request_count_total{service_group="$service_groups", success="False"}[5m])) by (field_name, error_detail)
@@ -702,7 +702,7 @@ sum(rate(backendai_graphql_request_count_total{service_group="$service_groups", 
 
 **P95 Valkey Operation Latency**
 
-Monitor Valkey operation latency (P95) by layer and operation. This helps identify slow Valkey operations that may cause bottlenecks. Exclude broadcast/stream operations as they have different performance characteristics.
+Monitor Valkey operation latency (P95) by layer and operation. It finds slow Valkey operations that may cause a bottleneck. Broadcast and stream operations are excluded because their performance characteristics differ.
 
 ```promql
 histogram_quantile(0.95,
@@ -712,7 +712,7 @@ histogram_quantile(0.95,
 
 **P95 Database Repository Latency**
 
-Monitor database repository operation latency (P95). Use this to identify slow database queries and optimize data access patterns.
+Monitor database repository operation latency (P95). Use it to find slow database queries and optimize data access.
 
 ```promql
 histogram_quantile(0.95,
@@ -722,7 +722,7 @@ histogram_quantile(0.95,
 
 **P95 Agent RPC Call Latency**
 
-Monitor Agent RPC call latency (P95). This shows how long it takes to communicate with compute agents.
+Monitor Agent RPC call latency (P95). It shows how long communication with an agent takes.
 
 ```promql
 histogram_quantile(0.95,
@@ -732,7 +732,7 @@ histogram_quantile(0.95,
 
 **Failed Layer Operations**
 
-Track failed layer operations to identify integration issues. High error rates indicate problems with external dependencies or internal bugs.
+Track failed layer operations to find integration issues. A high error rate points to an external dependency problem or an internal defect.
 
 ```promql
 sum(rate(backendai_layer_operation_count_total{success="False"}[5m])) by (domain, layer, operation)
@@ -742,7 +742,7 @@ sum(rate(backendai_layer_operation_count_total{success="False"}[5m])) by (domain
 
 **Currently Running Background Tasks**
 
-Monitor currently running background tasks. Gauge metric shows real-time count of active tasks. Use this to ensure background tasks are running and detect stuck tasks.
+Monitor background tasks that are running. The Gauge metric shows the live count of active tasks. Use it to confirm that background tasks run and to detect a stuck task.
 
 ```promql
 sum(backendai_bgtask_count) by (task_name)
@@ -750,7 +750,7 @@ sum(backendai_bgtask_count) by (task_name)
 
 **Background Task Completion Rate**
 
-Track background task completion rate and success/failure status. This shows how frequently tasks complete and their success rate.
+Track the background task completion rate and the success or failure status. It shows how often tasks complete and their success rate.
 
 ```promql
 sum(rate(backendai_bgtask_done_count_total[5m])) by (task_name, status)
@@ -758,7 +758,7 @@ sum(rate(backendai_bgtask_done_count_total[5m])) by (task_name, status)
 
 **Failed Background Tasks**
 
-Monitor failed background tasks with error details. Use this to identify recurring task failures and debug issues.
+Monitor failed background tasks with error details. Use it to find recurring task failures and debug them.
 
 ```promql
 sum(rate(backendai_bgtask_done_count_total{status="failure"}[5m])) by (task_name, error_detail)
@@ -768,7 +768,7 @@ sum(rate(backendai_bgtask_done_count_total{status="failure"}[5m])) by (task_name
 
 **Event Processing Rate by Type**
 
-Monitor event processing rate by event type. This shows how many events are being processed per second. Use this to understand event throughput and detect processing delays.
+Monitor the event processing rate by event type. It shows how many events are processed per second. Use it to see event throughput and detect a processing delay.
 
 ```promql
 sum(rate(backendai_event_count_total[5m])) by (event_type)
@@ -776,7 +776,7 @@ sum(rate(backendai_event_count_total[5m])) by (event_type)
 
 **Event Processing Failures**
 
-Track event processing failures by exception type. This helps identify problematic event handlers and common error patterns.
+Track event processing failures by exception type. It finds problematic event handlers and common error patterns.
 
 ```promql
 sum(rate(backendai_event_failure_count[5m])) by (event_type, exception)
@@ -784,7 +784,7 @@ sum(rate(backendai_event_failure_count[5m])) by (event_type, exception)
 
 **P95 Event Processing Duration**
 
-Calculate P95 event processing duration. This shows how long it takes to process different types of events. Use this to identify slow event handlers that may cause delays.
+Calculate P95 event processing duration. It shows the processing time per event type. Use it to find slow event handlers that may cause a delay.
 
 ```promql
 histogram_quantile(0.95,
@@ -796,7 +796,7 @@ histogram_quantile(0.95,
 
 **Action Execution Rate**
 
-Monitor action execution rate grouped by entity and operation type. This shows the rate of high-level business operations like session creation. Use this to understand system activity and user behavior patterns.
+Monitor the action execution rate grouped by entity and operation type. It shows the rate of operations such as session creation. Use it to see system activity and user behavior.
 
 ```promql
 sum(rate(backendai_action_count_total[5m])) by (entity_type, operation_type, status)
@@ -804,7 +804,7 @@ sum(rate(backendai_action_count_total[5m])) by (entity_type, operation_type, sta
 
 **Failed Actions**
 
-Track failed actions with detailed error information. This helps identify which operations are failing and why.
+Track failed actions with detailed error information. It shows which operations fail and why.
 
 ```promql
 sum(rate(backendai_action_count_total{status="failure"}[5m])) by (entity_type, operation_type, error_detail)
@@ -812,7 +812,7 @@ sum(rate(backendai_action_count_total{status="failure"}[5m])) by (entity_type, o
 
 **P95 Action Execution Duration**
 
-Calculate P95 action execution duration. This shows how long key operations take to complete. Use this to set performance expectations and identify slow operations.
+Calculate P95 action execution duration. It shows how long key operations take. Use it to set performance expectations and find slow operations.
 
 ```promql
 histogram_quantile(0.95,
@@ -822,25 +822,25 @@ histogram_quantile(0.95,
 
 #### System Resources
 
-Monitor active asyncio tasks in the event loop. High task counts may indicate resource leaks or excessive concurrency.
+Monitor active asyncio tasks in the event loop. A high task count may point to a resource leak or excessive concurrency.
 
 ```promql
 backendai_async_task_count
 ```
 
-Monitor CPU usage percentage of the Manager process. Use this to detect CPU bottlenecks and capacity planning.
+Monitor the CPU usage percentage of the manager process. Use it to detect a CPU bottleneck and plan capacity.
 
 ```promql
 backendai_cpu_usage_percent
 ```
 
-Monitor Resident Set Size (physical memory usage). This shows actual RAM usage by the Manager process.
+Monitor the Resident Set Size (physical memory usage). It shows the actual RAM usage of the manager process.
 
 ```promql
 backendai_memory_used_rss
 ```
 
-Monitor Virtual Memory Size (total allocated memory). This includes swapped memory and memory-mapped files.
+Monitor the Virtual Memory Size (total allocated memory). It includes swapped memory and memory-mapped files.
 
 ```promql
 backendai_memory_used_vms
@@ -848,22 +848,22 @@ backendai_memory_used_vms
 
 #### Session Sweeper
 
-Monitor session cleanup operations by session status. This shows how many sessions are being cleaned up and success rate. Use this to ensure proper resource cleanup and identify cleanup issues.
+Monitor session cleanup operations by session status. It shows how many sessions are cleaned up and the success rate. Use it to confirm that resources are cleaned up and to find a cleanup issue.
 
 ```promql
 sum(rate(backendai_sweep_session_count_total[5m])) by (status, success)
 ```
 
-Monitor kernel cleanup operation rate. This tracks orphaned kernel cleanup operations.
+Monitor the kernel cleanup operation rate. It tracks cleanup of orphaned kernels.
 
 ```promql
 sum(rate(backendai_sweep_kernel_count_total[5m])) by (success)
 ```
 
 ### Logs
-- API request/response logs
+- API request and response logs
 - Session scheduling decision logs
-- Resource allocation/release events
+- Resource allocation and release events
 - Authentication and authorization events
 - Background task execution logs
 - Error and exception stack traces
@@ -877,8 +877,8 @@ sum(rate(backendai_sweep_kernel_count_total[5m])) by (success)
 
 ### Storage Proxy Communication
 - **Protocol**: HTTP
-- **Port**: 6021 (client API), 6022 (manager API)
-- **Main Operations**: VFolder management, file upload/download, file listing
+- **Port**: 6021 (storage proxy client API), 6022 (storage proxy manager API)
+- **Main Operations**: vfolder management, file upload and download, file listing
 
 ### etcd Communication
 - **Protocol**: gRPC (etcd v3 API)
@@ -892,16 +892,16 @@ See [README.md](./README.md) for development setup instructions.
 ## Manager Architecture Documentation
 
 ### Internal Architecture
-- **[Sokovan Orchestration System](./sokovan/README.md)**: Session scheduling orchestrator with 3-tier architecture
+- **[Sokovan Orchestration System](./sokovan/README.md)**: Session scheduling orchestrator with a three-tier architecture
   - [Scheduler](./sokovan/scheduler/README.md): Core scheduling engine for session placement and resource allocation
-  - [Scheduling Controller](./sokovan/scheduling_controller/README.md): Validation and preparation logic for scheduling
+  - [Scheduling Controller](./sokovan/scheduling_controller/README.md): Validation and preparation for scheduling
   - [Deployment Controller](./sokovan/deployment/README.md): Deployment lifecycle management
 - **[Services Layer](./services/README.md)**: Business logic patterns, design principles, and implementation guidelines
 - **[Repositories Layer](./repositories/README.md)**: Data access patterns, query optimization, and transaction management
 - **[Actions Layer](./actions/README.md)**: Permission validation, monitoring, and request handling
 
-### Related Components
-- [Agent Component](../agent/README.md): Kernel lifecycle management on compute nodes
-- [Storage Proxy Component](../storage/README.md): Virtual folder and storage backend management
+### Related documents
+- [Agent Component](../agent/README.md): Kernel lifecycle management on nodes
+- [Storage Proxy Component](../storage/README.md): vfolder and storage backend management
 - [Webserver Component](../web/README.md): Web UI hosting and session management
 - [Overall Architecture](../README.md): System-wide architecture and component interactions

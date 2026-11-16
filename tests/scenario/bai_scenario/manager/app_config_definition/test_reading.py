@@ -25,7 +25,7 @@ from ai.backend.manager.api.adapters.app_config_definition.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_definition import (
@@ -54,8 +54,15 @@ class ReadingById(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppCon
 
     @override
     def describe(self, laid: ADefinitionAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else laid.definition.config_name
-        return f"{laid.caller.username}이 {called}(으)로 조회"
+        if self.other is not None:
+            return Says(
+                f"{laid.caller.username} 이 존재하지 않는 ID 로 조회합니다",
+                english=f"{laid.caller.username} reads by a missing id",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.definition.config_name} 로 조회합니다",
+            english=f"{laid.caller.username} reads {laid.definition.config_name} by id",
+        )
 
     @override
     async def call(
@@ -83,7 +90,13 @@ class TheSuperadminReadsIt(
 
     @override
     def describe(self) -> str:
-        return "설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다"
+        return Says(
+            "설정 정의 하나가 있고 superadmin 이 ID 로 조회하면, 그 정의의 모든 필드가 반환됩니다",
+            english=(
+                "when one config definition exists and the superadmin reads it by id, "
+                "every field of the definition comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
@@ -115,9 +128,13 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 "
-            "거부된다"
+            "거부됩니다",
+            english=(
+                "when a regular user with no permission reads the same config definition, "
+                "it is rejected because the user has no entity read permission"
+            ),
         )
 
     @override
@@ -150,9 +167,13 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
-            "권한 검사를 통과하는 사용자만 이 응답을 본다"
+        return Says(
+            "superadmin 이 존재하지 않는 ID 로 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. "
+            "권한 검사를 통과하는 사용자만 이 응답을 봅니다",
+            english=(
+                "when the superadmin reads by a missing id, it is rejected because no such "
+                "target exists. Only a user who passes the permission check sees this answer"
+            ),
         )
 
     @override
@@ -188,7 +209,13 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return "RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다"
+        return Says(
+            "RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있습니다",
+            english=(
+                "turning RBAC enforcement off lets a regular user with no permission "
+                "read a config definition"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

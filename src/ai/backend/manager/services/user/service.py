@@ -8,6 +8,7 @@ from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.types import SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
@@ -247,7 +248,7 @@ class UserService:
         # Handle active sessions
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
             await self._scheduling_controller.mark_sessions_for_termination(
-                [session.id for session in active_sessions],
+                [SessionId(session.id) for session in active_sessions],
                 reason=KernelLifecycleEventReason.USER_PURGED,
                 forced=True,
             )
@@ -345,11 +346,9 @@ class UserService:
     async def admin_register_ssh_keypair(
         self, action: AdminRegisterSSHKeypairAction
     ) -> AdminRegisterSSHKeypairActionResult:
-        """Admin registers (overwrites) a user's SSH keypair."""
-        await self._user_repository.admin_update_ssh_keypair(
-            access_key=action.access_key,
-            ssh_public_key=action.ssh_public_key,
-            ssh_private_key=action.ssh_private_key,
+        """Admin registers (overwrites) a user's SSH public key."""
+        await self._user_repository.replace_default_ssh_keypair(
+            action.user_id, action.ssh_public_key, None
         )
         return AdminRegisterSSHKeypairActionResult(access_key=action.access_key)
 
@@ -357,19 +356,17 @@ class UserService:
         self, action: AdminDeleteSSHKeypairAction
     ) -> AdminDeleteSSHKeypairActionResult:
         """Admin clears a user's SSH keypair."""
-        await self._user_repository.admin_clear_ssh_keypair(access_key=action.access_key)
+        await self._user_repository.purge_default_ssh_keypair(action.user_id)
         return AdminDeleteSSHKeypairActionResult(access_key=action.access_key)
 
     async def admin_get_ssh_keypair(
         self, action: AdminGetSSHKeypairAction
     ) -> AdminGetSSHKeypairActionResult:
         """Admin retrieves a user's SSH public key (never the private key)."""
-        ssh_public_key = await self._user_repository.admin_get_ssh_public_key(
-            access_key=action.access_key
-        )
+        ssh_keypair = await self._user_repository.default_ssh_keypair(action.user_id)
         return AdminGetSSHKeypairActionResult(
             access_key=action.access_key,
-            ssh_public_key=ssh_public_key,
+            ssh_public_key=ssh_keypair.public_key if ssh_keypair is not None else None,
         )
 
     async def create_auto_generated_file(
