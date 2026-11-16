@@ -14,7 +14,7 @@ from ai.backend.logging.types import LogLevel
 
 from .config import AgentConfigLoaderDependency, AgentConfigLoaderInput
 from .etcd import AgentEtcdDependency
-from .redis_config import RedisConfigDependency
+from .redis_config import RedisConfigDependency, RedisConfigInput
 
 
 @dataclass
@@ -33,7 +33,7 @@ class AgentBootstrapInput:
 class AgentBootstrapResources:
     """Container for agent bootstrap stage resources.
 
-    Holds loaded config, initialized etcd client, and redis config from etcd.
+    Holds loaded config, initialized etcd client, and the redis config (local or from etcd).
     """
 
     config: AgentUnifiedConfig
@@ -47,7 +47,7 @@ class AgentBootstrapComposer(DependencyComposer[AgentBootstrapInput, AgentBootst
     Composes the three-stage bootstrap initialization matching server.py:
     1. Config loader: Load and validate AgentUnifiedConfig (same as server.py main())
     2. Etcd: Initialize etcd client (same as server.py etcd_ctx())
-    3. Redis config: Read redis config from etcd (same as server.py read_agent_config())
+    3. Redis config: Use the local redis config if set, else read it from etcd
     """
 
     @property
@@ -86,11 +86,11 @@ class AgentBootstrapComposer(DependencyComposer[AgentBootstrapInput, AgentBootst
             config,
         )
 
-        # Stage 3: Read redis config from etcd
-        # (same as server.py read_agent_config() lines 457-473)
+        # Stage 3: Use the local redis config if set, else read it from etcd
+        # (same as server.py read_agent_config())
         redis_config = await stack.enter_dependency(
             RedisConfigDependency(),
-            etcd,
+            RedisConfigInput(etcd=etcd, local_redis_config=config.redis),
         )
 
         # Yield bootstrap resources
