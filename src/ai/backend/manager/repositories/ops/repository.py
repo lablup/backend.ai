@@ -23,7 +23,8 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.base.field import FieldNotFoundError
-from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.scopes import AggregateScopeTarget, OperationScope
+from ai.backend.manager.models.specs.aggregate.aggregator import AggregateResult, Aggregator
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     EntityCreator,
@@ -331,6 +332,20 @@ class OpsRepository[TData]:
         """
         async with self._ops.read_ops() as r:
             return await r.search_in_global(searcher)
+
+    @_ops_repository_resilience.apply()
+    async def aggregate_in_global(self, aggregator: Aggregator[Any]) -> AggregateResult:
+        """Count across the entire table, with no scope filter."""
+        async with self._ops.read_ops() as r:
+            return await r.aggregate_in_global(aggregator)
+
+    @_ops_repository_resilience.apply()
+    async def aggregate_in_scopes(
+        self, targets: Sequence[AggregateScopeTarget], aggregator: Aggregator[Any]
+    ) -> list[AggregateResult]:
+        """Count within each target on its own; one result per target, in order."""
+        async with self._ops.read_ops() as r:
+            return await r.aggregate_in_scopes(targets, aggregator)
 
     @_ops_repository_resilience.apply()
     async def create_global_entity(self, creator: GlobalEntityCreator[Any, TData]) -> TData:

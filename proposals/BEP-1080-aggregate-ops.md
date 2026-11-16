@@ -98,7 +98,7 @@ How values are computed (today, on read) lives only in the repository's measures
 |---|---|
 | Group slot | Group per value type. Empty for sensitive values and Text, JSON and array columns |
 | Value slot | Value type, source table, ordering by aggregate value |
-| Scope Target | A (scope_id, row_id) pair select besides `to_condition()`. The RBAC path, not the owner column |
+| Scope Target | A (scope_id, row_id) pair select besides `to_condition()`. Each Target declares it. An entity uses the RBAC path, not the owner column; a row outside the RBAC graph (audit log) uses its own column |
 | `ToManyCorrelation` | A (row_id, child value) pair select besides EXISTS. Used by `ToManyGroup` |
 | Session nested | Add `resource_allocations` under kernels (depth 2) |
 
@@ -109,7 +109,7 @@ Rejected: adding slots to `SearchableField` means changing all 978 declarations 
 - Existing usage APIs (implementation steps 3 and 4): the response shape stays, only the computation changes
 - Scope membership (steps 3 and 4): sessions reached by a share are included, so values can differ from today
 - `activeResourceOverview` session count (step 4): counted on kernels with active allocations, so the filter changes
-- Consistency: the queries of the measures run in one REPEATABLE READ transaction
+- Consistency: the total and the groups are computed in one query at the default isolation level (READ COMMITTED)
 - Limits: the number of requested scopes, groupBy fields and groups is capped by config
 
 ## Implementation Order
