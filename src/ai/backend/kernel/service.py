@@ -135,15 +135,15 @@ class ServiceParser:
 
         # Convert a script into cmdargs
         start_command = service.command
-        if isinstance(start_command, str):
-            # Interpolate before splitting, so ``{{ var }}`` is not cut at its spaces.
-            # Interpolate return command wrapped in a list, so [0] gives the interpolated string
-            start_command = interpolator.apply([start_command])[0]
-            shell = service.shell
-            if shell:
-                start_command = [shell, "-c", start_command]
-            else:
-                start_command = shlex.split(start_command)
+        shell = service.shell
+        if isinstance(start_command, str) and legacy:
+            # Split, then interpolate, so a value with spaces stays one argument.
+            split = [shell, "-c", start_command] if shell else shlex.split(start_command)
+            start_command = interpolator.apply(split)
+        elif isinstance(start_command, str):
+            # Interpolate, then split, so ``{{ var }}`` is not cut at its spaces.
+            interpolated = interpolator.apply([start_command])[0]
+            start_command = [shell, "-c", interpolated] if shell else shlex.split(interpolated)
         else:
             start_command = interpolator.apply(list(start_command))
         extra_args: list[str] = []

@@ -53,6 +53,17 @@ class TestModelServiceStringCommand:
 
         assert cmdargs == ["/usr/bin/python3", "-m", "server"]
 
+    async def test_without_shell_legacy_keeps_spaced_value_as_one_arg(self) -> None:
+        service_parser = ServiceParser({"ports": "11001 11002"})
+        service_parser.add_model_service(
+            "model",
+            {"start_command": "serve --ports {ports}", "shell": None, "pre_start_actions": []},
+        )
+
+        cmdargs, _ = await service_parser.start_service("model", set(), {})
+
+        assert cmdargs == ["serve", "--ports", "11001 11002"]
+
     async def test_with_shell_uses_shell_c(self, service_parser: ServiceParser) -> None:
         service_parser.add_model_service(
             "model",
