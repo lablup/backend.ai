@@ -24,12 +24,8 @@ from ai.backend.common.data.entity.types import (
     RuntimeEntityID,
 )
 from ai.backend.manager.actions.registry.types import Concern, WiredProcessor
-from ai.backend.manager.actions.types import (
-    ActionBacking,
-    ActionGate,
-    ActionKind,
-    ActionOperationType,
-)
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.catalog import load_wiring_catalog
 
 _COLUMNS: Final[tuple[str, ...]] = (

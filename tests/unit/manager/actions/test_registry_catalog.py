@@ -62,7 +62,7 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
     ProcessorDependencies,
 )
-from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import (
     BaseNestedFieldSearchAction,
