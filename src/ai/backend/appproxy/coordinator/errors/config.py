@@ -32,8 +32,7 @@ class MissingTraefikConfigError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-<<<<<<< HEAD
-class InvalidTraefikEtcdCredentialsError(BackendAIError):
+class InvalidTraefikEtcdCredentialsError(BackendAIError, web.HTTPInternalServerError):
     """Raised when only one of the Traefik etcd user and password is set."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-traefik-etcd-credentials"
@@ -48,10 +47,7 @@ class InvalidTraefikEtcdCredentialsError(BackendAIError):
         )
 
 
-class MissingDatabaseURLError(BackendAIError):
-=======
 class MissingDatabaseURLError(BackendAIError, web.HTTPInternalServerError):
->>>>>>> f7d92556 (fix(BA-9045): give every AppProxy error class an HTTP status (#17125))
     """Raised when database URL is missing from configuration."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-database-url"
@@ -229,21 +225,3 @@ class MissingHealthCheckInfoError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
-<<<<<<< HEAD
-=======
-
-
-class UnsupportedServiceDiscoveryTypeError(BackendAIError, web.HTTPInternalServerError):
-    """Raised when the configured service discovery type is not supported by the coordinator."""
-
-    error_type = "https://api.backend.ai/probs/appproxy/unsupported-service-discovery-type"
-    error_title = "Service discovery type is not supported."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.SETUP,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
->>>>>>> f7d92556 (fix(BA-9045): give every AppProxy error class an HTTP status (#17125))
