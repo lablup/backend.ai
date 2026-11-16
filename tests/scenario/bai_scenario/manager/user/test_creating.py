@@ -241,7 +241,337 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
+<<<<<<< HEAD
 SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
+=======
+@dataclass(frozen=True)
+class ASecretIsFilled(Condition[str]):
+    """비밀 키가 빈 값이 아니다. 값은 실행마다 새로 만들어진다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "매니저가 만든 비밀 키가 채워져 있습니다",
+            english="the secret key the manager made is filled",
+        )
+
+    @override
+    def holds(self, got: str) -> bool:
+        return bool(got)
+
+
+def _created_user_verdicts(
+    started: datetime,
+    laid: ADomainACallerAndThePolicies,
+    node: UserNode,
+    main_access_key: Condition[str | None] | None,
+) -> list[Verdict]:
+    written = WrittenByThisRun(started)
+    key: Verdict = (
+        Held(
+            "user.organization.main_access_key", node.organization.main_access_key, main_access_key
+        )
+        if main_access_key is not None
+        else Held(
+            "user.organization.main_access_key", node.organization.main_access_key, AKeyIsThere()
+        )
+    )
+    return [
+        Skipped("user.id", Says("데이터베이스가 생성합니다", english="the database generates it")),
+        Held(
+            "user.entity_id",
+            node.entity_id,
+            SameAs(node.id, Says("그 사용자의 id", english="the user's own id")),
+        ),
+        Same("user.basic_info.username", node.basic_info.username, MADE),
+        Same("user.basic_info.email", node.basic_info.email, f"{MADE}@scenario.local"),
+        Same("user.basic_info.full_name", node.basic_info.full_name, None),
+        Same("user.basic_info.description", node.basic_info.description, None),
+        Same("user.basic_info.integration_name", node.basic_info.integration_name, None),
+        Same("user.status.status", str(node.status.status), "active"),
+        Same("user.status.status_info", node.status.status_info, None),
+        Same("user.status.need_password_change", node.status.need_password_change, False),
+        Same("user.organization.domain_name", node.organization.domain_name, laid.domain.name),
+        Held[object](
+            "user.organization.domain_id",
+            node.organization.domain_id,
+            SameAs(
+                laid.domain.id,
+                Says("미리 저장한 도메인의 id", english="the id of the domain seeded in advance"),
+            ),
+        ),
+        Same("user.organization.role", str(node.organization.role), "user"),
+        Same(
+            "user.organization.resource_policy", node.organization.resource_policy, laid.user_policy
+        ),
+        key,
+        Same("user.security.allowed_client_ip", node.security.allowed_client_ip, None),
+        Same("user.security.totp_activated", node.security.totp_activated, False),
+        Same("user.security.totp_activated_at", node.security.totp_activated_at, None),
+        Same("user.security.sudo_session_enabled", node.security.sudo_session_enabled, False),
+        Same("user.container.container_uid", node.container.container_uid, None),
+        Same("user.container.container_main_gid", node.container.container_main_gid, None),
+        Same("user.container.container_gids", node.container.container_gids, None),
+        Held("user.timestamps.created_at", node.timestamps.created_at, written),
+        Held("user.timestamps.modified_at", node.timestamps.modified_at, written),
+    ]
+
+
+def _created_keypair_verdicts(
+    started: datetime,
+    laid: ADomainACallerAndThePolicies,
+    payload: CreateKeypairPayload,
+    owner: UserNode,
+    at: str,
+) -> list[Verdict]:
+    node = payload.keypair
+    written = WrittenByThisRun(started)
+    return [
+        Skipped(
+            f"{at}keypair.id",
+            Says(
+                "매니저가 만든 access key 입니다", english="it is the access key the manager made"
+            ),
+        ),
+        Skipped(
+            f"{at}keypair.field_id",
+            Says("데이터베이스가 생성합니다", english="the database generates it"),
+        ),
+        Skipped(
+            f"{at}keypair.access_key",
+            Says("매니저가 만듭니다", english="the manager creates it"),
+        ),
+        Same(f"{at}keypair.is_active", node.is_active, True),
+        Same(f"{at}keypair.is_admin", node.is_admin, False),
+        Same(f"{at}keypair.is_default", node.is_default, True),
+        Same(f"{at}keypair.rate_limit", node.rate_limit, RATE_LIMIT),
+        Same(f"{at}keypair.resource_policy", node.resource_policy, laid.keypair_policy),
+        Same(f"{at}keypair.ssh_public_key", node.ssh_public_key, None),
+        Same(f"{at}keypair.num_queries", node.num_queries, 0),
+        Same(f"{at}keypair.last_used", node.last_used, None),
+        Held(
+            f"{at}keypair.user_id",
+            node.user_id,
+            SameAs(owner.id, Says("방금 만든 사용자", english="the user just created")),
+        ),
+        Held(f"{at}keypair.created_at", node.created_at, written),
+        Held(f"{at}keypair.modified_at", node.modified_at, written),
+        Held(f"{at}secret_key", payload.secret_key, ASecretIsFilled()),
+    ]
+
+
+@dataclass(frozen=True)
+class TheCreatedUserAndItsKeypair(Then[ADomainACallerAndThePolicies, Any]):
+    """만든 사용자와 그 사용자의 기본 키가 통째로 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "만든 사용자 전체와, 그 사용자의 기본 키가 비밀 키와 함께 응답으로 옵니다",
+            english=(
+                "the whole user just created and its default keypair with the secret key come back"
+            ),
+        )
+
+    @override
+    def look(self, laid: ADomainACallerAndThePolicies, answered: Answered[Any]) -> list[Verdict]:
+        payload = answered.response
+        if not isinstance(payload, CreateUserPayload):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        return [
+            *_created_user_verdicts(
+                self.started,
+                laid,
+                payload.user,
+                SameAs(
+                    payload.keypair.keypair.access_key,
+                    Says("이 호출이 만든 키", english="the keypair this call made"),
+                ),
+            ),
+            *_created_keypair_verdicts(self.started, laid, payload.keypair, payload.user, ""),
+        ]
+
+
+@dataclass(frozen=True)
+class TheBulkCreatedUser(Then[ADomainACallerAndThePolicies, Any]):
+    """일괄 생성이 만든 사용자 하나가 온다. 실패 목록은 비어 있다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "만든 사용자 하나가 응답으로 오고, 실패한 것은 없습니다",
+            english="the user just created comes back and none failed",
+        )
+
+    @override
+    def look(self, laid: ADomainACallerAndThePolicies, answered: Answered[Any]) -> list[Verdict]:
+        payload = answered.response
+        if not isinstance(payload, BulkCreateUsersPayload):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        verdicts: list[Verdict] = [
+            Same("created_users.length", len(payload.created_users), 1),
+            Same("failed", payload.failed, []),
+        ]
+        for node in payload.created_users:
+            verdicts.extend(_created_user_verdicts(self.started, laid, node, None))
+        return verdicts
+
+
+@dataclass(frozen=True)
+class TheBulkCreatedUserWithItsKeypair(Then[ADomainACallerAndThePolicies, Any]):
+    """일괄 생성이 만든 사용자와 키가 함께 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "만든 사용자와 그 기본 키가 비밀 키와 함께 응답으로 오고, 실패한 것은 없습니다",
+            english=(
+                "the user just created and its default keypair with the secret key come back "
+                "and none failed"
+            ),
+        )
+
+    @override
+    def look(self, laid: ADomainACallerAndThePolicies, answered: Answered[Any]) -> list[Verdict]:
+        payload = answered.response
+        if not isinstance(payload, BulkCreateUsersWithKeypairPayload):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        verdicts: list[Verdict] = [
+            Same("created.length", len(payload.created), 1),
+            Same("failed", payload.failed, []),
+        ]
+        for item in payload.created:
+            verdicts.extend(
+                _created_user_verdicts(
+                    self.started,
+                    laid,
+                    item.user,
+                    SameAs(
+                        item.keypair.keypair.access_key,
+                        Says("이 호출이 만든 키", english="the keypair this call made"),
+                    ),
+                )
+            )
+            verdicts.extend(
+                _created_keypair_verdicts(
+                    self.started, laid, item.keypair, item.user, "created[0]."
+                )
+            )
+        return verdicts
+
+
+@dataclass(frozen=True)
+class AGrantedCreatorMakesAUser(
+    Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-create-on-a-domain-makes-a-user-in-it"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "도메인 스코프에서 사용자 읽기와 생성 권한을 받은 사용자가 그 도메인에 사용자를 "
+            "만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 옵니다",
+            english=(
+                "when a user granted the read and create permissions on users in the domain "
+                "scope creates a user in that domain, the whole user just created and its "
+                "default keypair with the secret key come back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
+        return SomeoneWithThePolicies(granted=(Permission.READ, Permission.CREATE))
+
+    @override
+    def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
+        return CreatingAUserUnderThePolicies()
+
+    @override
+    def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
+        return TheCreatedUserAndItsKeypair(started=self.started)
+
+
+@dataclass(frozen=True)
+class TheSuperadminBulkCreatesAUser(
+    Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-bulk-creates-a-user"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 사용자 하나를 일괄 생성하면, 만든 사용자 하나가 오고 실패한 것은 "
+            "없습니다",
+            english=(
+                "when the superadmin bulk creates one user, the user just created comes back "
+                "and none failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
+        return SomeoneWithThePolicies(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
+        return BulkCreatingAUserUnderThePolicies(with_keypair=False)
+
+    @override
+    def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
+        return TheBulkCreatedUser(started=self.started)
+
+
+@dataclass(frozen=True)
+class TheSuperadminBulkCreatesAUserWithItsKeypair(
+    Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-bulk-creates-a-user-and-gets-its-keypair"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 키를 함께 받는 일괄 생성으로 사용자 하나를 만들면, 만든 사용자와 "
+            "그 기본 키가 비밀 키와 함께 오고 실패한 것은 없습니다",
+            english=(
+                "when the superadmin bulk creates one user through the keypair-returning call, "
+                "the user just created and its default keypair with the secret key come back "
+                "and none failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
+        return SomeoneWithThePolicies(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
+        return BulkCreatingAUserUnderThePolicies(with_keypair=True)
+
+    @override
+    def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
+        return TheBulkCreatedUserWithItsKeypair(started=self.started)
+
+
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
+>>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
     AUserGrantedNothingMayNotCreateAUser(),
     ANameNoDomainHoldsMayNotHoldAUser(),
     OnlyTheSuperadminMayBulkCreate(),

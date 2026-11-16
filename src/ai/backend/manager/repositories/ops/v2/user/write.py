@@ -31,7 +31,11 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.creators import ProjectCreator
+<<<<<<< HEAD
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+=======
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+>>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
