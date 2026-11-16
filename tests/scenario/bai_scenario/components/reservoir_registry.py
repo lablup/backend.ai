@@ -24,8 +24,8 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,

@@ -3,9 +3,7 @@ from collections.abc import Mapping
 from typing import Any, cast, override
 
 from ai.backend.common.bgtask.types import BgtaskNameBase
-from ai.backend.common.exception import (
-    BgtaskNotRegisteredError,
-)
+from ai.backend.common.errors.bgtask import BgtaskNotRegisteredError
 
 from .base import (
     BaseBackgroundTaskHandler,

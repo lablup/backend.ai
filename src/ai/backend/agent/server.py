@@ -116,7 +116,7 @@ from ai.backend.common.metrics.http import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import load_configured_wheelhouse
+from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.process.crashdump import enable_crash_dump
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (

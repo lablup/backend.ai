@@ -16,9 +16,9 @@ from ai.backend.manager.data.reservoir_registry.types import (
     ReservoirRegistryConnectionData,
     ReservoirRegistryData,
 )
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER, TOKEN_PLACEHOLDER
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER, TOKEN_PLACEHOLDER
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
