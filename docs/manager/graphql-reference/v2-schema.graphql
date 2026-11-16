@@ -17642,10 +17642,8 @@ type ResourceGroupSchedulerOptions {
   """
   allowFractionalResourceFragmentation: Boolean!
 
-  """
-  Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically.
-  """
-  routeCleanupTargetStatuses: [String!]!
+  """Route health statuses whose routes are cleaned up automatically."""
+  routeCleanupTargetStatuses: [ReplicaHealthStatus!]!
 }
 
 """

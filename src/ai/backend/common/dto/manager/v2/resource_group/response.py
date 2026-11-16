@@ -13,6 +13,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
@@ -217,11 +218,8 @@ class ResourceGroupSchedulerOptionsInfo(BaseResponseModel):
             "Whether an agent may start a kernel that fragments a fractional resource request."
         )
     )
-    route_cleanup_target_statuses: list[str] = Field(
-        description=(
-            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
-            " automatically."
-        )
+    route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
+        description="Route health statuses whose routes are cleaned up automatically."
     )
 
 

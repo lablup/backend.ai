@@ -122,6 +122,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment_options import (
     DeploymentOptionsInfoGQL,
     DeploymentOptionsInputGQL,
 )
+from ai.backend.manager.api.gql.deployment.types.replica import ReplicaHealthStatusGQL
 from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
 from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
@@ -372,11 +373,8 @@ class ResourceGroupSchedulerOptionsGQL(PydanticOutputMixin[ResourceGroupSchedule
             "Whether an agent may start a kernel that fragments a fractional resource request."
         )
     )
-    route_cleanup_target_statuses: list[str] = gql_field(
-        description=(
-            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
-            " automatically."
-        )
+    route_cleanup_target_statuses: list[ReplicaHealthStatusGQL] = gql_field(
+        description="Route health statuses whose routes are cleaned up automatically."
     )
 
 

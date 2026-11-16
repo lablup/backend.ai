@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
@@ -279,7 +280,7 @@ class TestResourceGroupGQLResourceInfoResolver:
                         config=ResourceGroupSchedulerOptionsConfigInfo(num_retries_to_skip=None),
                         agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                         allow_fractional_resource_fragmentation=True,
-                        route_cleanup_target_statuses=["unhealthy"],
+                        route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
                     ),
                 )
             ),

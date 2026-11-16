@@ -16,6 +16,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -462,7 +463,7 @@ class GroupLook:
     num_retries_to_skip: int | None | Kept = KEPT
     agent_selection_strategy: AgentSelectionStrategy | Kept = KEPT
     allow_fractional_resource_fragmentation: bool | Kept = KEPT
-    route_cleanup_target_statuses: list[str] | Kept = KEPT
+    route_cleanup_target_statuses: list[RouteHealthStatus] | Kept = KEPT
 
     def verdicts(
         self, prefix: str, node: ResourceGroupDetailNode, seed: ResourceGroupData
@@ -580,7 +581,10 @@ class GroupLook:
                 node.scheduler.options.route_cleanup_target_statuses,
                 _or(
                     self.route_cleanup_target_statuses,
-                    seed.scheduler.options.route_cleanup_target_statuses,
+                    [
+                        RouteHealthStatus(stored_status)
+                        for stored_status in seed.scheduler.options.route_cleanup_target_statuses
+                    ],
                 ),
             ),
             Skipped(
@@ -620,7 +624,7 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
     num_retries_to_skip: int | None = None
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     allow_fractional_resource_fragmentation: bool = True
-    route_cleanup_target_statuses: tuple[str, ...] = ("unhealthy",)
+    route_cleanup_target_statuses: tuple[RouteHealthStatus, ...] = (RouteHealthStatus.UNHEALTHY,)
 
     @override
     def says(self) -> str:
