@@ -91,7 +91,7 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
@@ -1001,7 +1001,10 @@ class ModelServingRepository:
                     vfolders.c.usage_mode == VFolderUsageMode.MODEL
                 )
             matched_vfolders = await query_reachable_vfolders(
-                conn, owner_scope, model_condition, owner_held
+                conn,
+                owner_scope,
+                model_condition & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES),
+                owner_held,
             )
             if len(matched_vfolders) == 0:
                 raise VFolderNotFound("Cannot find model folder")
