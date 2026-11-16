@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
@@ -22,6 +23,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Language,
     Refused,
     Same,
     Says,
@@ -29,10 +31,12 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.domain import (
     ADomainAndACaller,
     ATargetAndSomeone,
+    DomainLook,
     TargetHolds,
     TheCallIsRefused,
 )
@@ -160,6 +164,42 @@ class Purging(When[ADomainAndACaller, DomainAdapter, Deleted]):
 
 
 @dataclass(frozen=True)
+class ItSaysItWasDoneAndAnswersWithTheDomain(Then[ADomainAndACaller, Deleted]):
+    """했다는 답과 함께 그 도메인이 ``active`` 상태로 온다."""
+
+    called: str
+    started: datetime
+    active: bool
+
+    @override
+    def says(self) -> str:
+        state = (
+            Says("활성", english="active") if self.active else Says("비활성", english="inactive")
+        )
+        return Says(
+            f"했다는 응답과 함께 그 도메인이 {state} 상태로 옵니다",
+            english=(
+                f"the answer says it was done and the domain comes back "
+                f"{in_language(state, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    def look(self, laid: ADomainAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(EntityNotFoundError, answered.raised)]
+        if not isinstance(payload, (DeleteDomainPayload, RestoreDomainPayload)):
+            return [Same("payload", type(payload).__name__, "a delete or restore answer")]
+        return [
+            Same(self.called, getattr(payload, self.called), True),
+            *DomainLook(self.started, active=self.active).verdicts(
+                "domain.", payload.domain, laid.domain
+            ),
+        ]
+
+
+@dataclass(frozen=True)
 class ItSaysItWasDone(Then[ADomainAndACaller, Deleted]):
     """했다는 답이 온다. 답이 실은 것은 그 한 가지뿐이다."""
 
@@ -184,6 +224,8 @@ class ItSaysItWasDone(Then[ADomainAndACaller, Deleted]):
 class TheSuperadminSoftDeletesADomain(
     Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
         return "the-superadmin-soft-deletes-a-domain"
@@ -191,8 +233,12 @@ class TheSuperadminSoftDeletesADomain(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답이 옵니다",
-            english="when the superadmin soft deletes a domain, the answer says it was done",
+            "superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답과 함께 그 도메인이 "
+            "비활성 상태로 옵니다",
+            english=(
+                "when the superadmin soft deletes a domain, the answer says it was done and "
+                "the domain comes back inactive"
+            ),
         )
 
     @override
@@ -205,13 +251,17 @@ class TheSuperadminSoftDeletesADomain(
 
     @override
     def then(self) -> Then[ADomainAndACaller, Deleted]:
-        return ItSaysItWasDone("deleted")
+        return ItSaysItWasDoneAndAnswersWithTheDomain(
+            called="deleted", started=self.started, active=False
+        )
 
 
 @dataclass(frozen=True)
 class RestoringSaysItRestored(
     Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
         return "restoring-answers-that-it-restored"
@@ -219,8 +269,12 @@ class RestoringSaysItRestored(
     @override
     def describe(self) -> str:
         return Says(
-            "soft delete 된 도메인을 restore 하면, restore 했다는 응답이 옵니다",
-            english="when a soft-deleted domain is restored, the answer says it was restored",
+            "soft delete 된 도메인을 restore 하면, restore 했다는 응답과 함께 그 도메인이 활성 "
+            "상태로 옵니다",
+            english=(
+                "when a soft-deleted domain is restored, the answer says it was restored and "
+                "the domain comes back active"
+            ),
         )
 
     @override
@@ -233,7 +287,9 @@ class RestoringSaysItRestored(
 
     @override
     def then(self) -> Then[ADomainAndACaller, Deleted]:
-        return ItSaysItWasDone("restored")
+        return ItSaysItWasDoneAndAnswersWithTheDomain(
+            called="restored", started=self.started, active=True
+        )
 
 
 @dataclass(frozen=True)
@@ -324,6 +380,8 @@ class AUserGrantedNothingMayNotSoftDelete(
 class SoftDeletingASoftDeletedDomainAgain(
     Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
         return "soft-deleting-a-domain-already-soft-deleted"
@@ -332,10 +390,10 @@ class SoftDeletingASoftDeletedDomainAgain(
     def describe(self) -> str:
         return Says(
             "이미 soft delete 된 도메인을 superadmin 이 다시 soft delete 하면, "
-            "soft delete 했다는 응답이 옵니다",
+            "soft delete 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다",
             english=(
                 "when the superadmin soft deletes an already soft-deleted domain again, "
-                "the answer says it was done"
+                "the answer says it was done and the domain comes back inactive"
             ),
         )
 
@@ -349,7 +407,9 @@ class SoftDeletingASoftDeletedDomainAgain(
 
     @override
     def then(self) -> Then[ADomainAndACaller, Deleted]:
-        return ItSaysItWasDone("deleted")
+        return ItSaysItWasDoneAndAnswersWithTheDomain(
+            called="deleted", started=self.started, active=False
+        )
 
 
 @dataclass(frozen=True)
@@ -384,6 +444,8 @@ class AUserGrantedNothingMayNotRestore(
 class RestoringAnActiveDomain(
     Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
         return "restoring-a-domain-that-is-not-soft-deleted"
@@ -392,10 +454,10 @@ class RestoringAnActiveDomain(
     def describe(self) -> str:
         return Says(
             "soft delete 되지 않은 도메인을 superadmin 이 restore 하면, "
-            "restore 했다는 응답이 옵니다",
+            "restore 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다",
             english=(
                 "when the superadmin restores a domain that is not soft-deleted, "
-                "the answer says it was restored"
+                "the answer says it was restored and the domain comes back active"
             ),
         )
 
@@ -409,7 +471,9 @@ class RestoringAnActiveDomain(
 
     @override
     def then(self) -> Then[ADomainAndACaller, Deleted]:
-        return ItSaysItWasDone("restored")
+        return ItSaysItWasDoneAndAnswersWithTheDomain(
+            called="restored", started=self.started, active=True
+        )
 
 
 @dataclass(frozen=True)
@@ -527,14 +591,14 @@ class PurgingANameNothingAnswersToIsNotFound(
 
 
 SCENARIOS: list[DomainStep] = [
-    TheSuperadminSoftDeletesADomain(),
-    RestoringSaysItRestored(),
+    TheSuperadminSoftDeletesADomain(started=datetime.now(UTC)),
+    RestoringSaysItRestored(started=datetime.now(UTC)),
     PurgingADomainNothingRefersTo(),
     ANameNothingAnswersToIsNotFound(),
     AUserGrantedNothingMayNotSoftDelete(),
-    SoftDeletingASoftDeletedDomainAgain(),
+    SoftDeletingASoftDeletedDomainAgain(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRestore(),
-    RestoringAnActiveDomain(),
+    RestoringAnActiveDomain(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotPurge(),
     ADomainHoldingAProjectIsNotPurged(),
     ADomainHoldingAUserIsNotPurged(),

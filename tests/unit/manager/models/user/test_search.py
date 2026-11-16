@@ -192,11 +192,6 @@ class TestKeyPairOwnFields:
         assert field.filter is None
         assert field.order is None
 
-    def test_ssh_private_key_declares_neither_slot(self) -> None:
-        field = KeyPairSearchableFields.own.ssh_private_key
-        assert field.filter is None
-        assert field.order is None
-
     def test_access_key_is_open(self) -> None:
         field = KeyPairSearchableFields.own.access_key
         assert field.filter is not None

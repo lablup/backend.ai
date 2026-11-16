@@ -7,8 +7,8 @@ from uuid import UUID
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
-from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.types import BackendAISchema, SessionTypes
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import InvalidArgument
 
@@ -99,7 +99,7 @@ class TaskTemplate(_TemplateDocument):
             if path is None:
                 continue
             name = path.removeprefix("/home/work/")
-            if name in RESERVED_VFOLDERS or any(p.match(name) for p in RESERVED_VFOLDER_PATTERNS):
+            if not verify_mount_destination(name):
                 raise InvalidArgument(f"Path {name} is reserved for internal operations.")
         return self
 

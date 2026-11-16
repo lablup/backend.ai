@@ -30,6 +30,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
@@ -40,7 +41,6 @@ from ai.backend.common.types import (
     DeviceName,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
@@ -49,6 +49,7 @@ from ai.backend.common.types import (
     ServicePort,
     SessionId,
     SlotName,
+    VFolderMount,
     current_resource_slots,
 )
 
@@ -235,6 +236,25 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> None:
         delay = self.creation_ctx_config["delay"]["mount-krunner"]
         await asyncio.sleep(delay)
+
+    @override
+    async def mount_vfolders(
+        self,
+        vfolders: Sequence[VFolderMount],
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        for vfolder in vfolders:
+            if self.internal_data.get("prevent_vfolder_mounts", False):
+                if vfolder.name != ".logs":
+                    continue
+            resource_spec.mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    Path(vfolder.host_path),
+                    Path(vfolder.kernel_path),
+                    vfolder.mount_perm,
+                )
+            )
 
 
 class DummyAgent(

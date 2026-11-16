@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from warnings import deprecated
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.deployment import (
@@ -29,8 +30,12 @@ from ai.backend.common.dto.manager.deployment import (
     UpsertDeploymentPolicyRequest,
     UpsertDeploymentPolicyResponse,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
+@deprecated(
+    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `V2DeploymentClient` (`V2ClientRegistry.deployment`)."
+)
 class DeploymentClient(BaseDomainClient):
     API_PREFIX = "/deployments"
 

@@ -31,7 +31,6 @@ from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -108,7 +107,6 @@ class TestReplicaGroupHistoryRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 EndpointRow,
                 ReplicaGroupRow,

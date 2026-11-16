@@ -20,6 +20,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import text
 
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
@@ -84,8 +85,9 @@ from ai.backend.manager.repositories.rbac.relation_repository import RbacRelatio
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
-from ai.backend.testutils.db import with_global_entities, with_tables
-from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
+from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db_global import with_global_entities
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @dataclass
@@ -257,12 +259,32 @@ async def resource_policy_fixture(
 
 @pytest.fixture
 async def domain_fixture(
-    domain_factory: DomainFactory,
     database_engine: ExtendedAsyncSAEngine,
     database_fixture: None,
 ) -> DomainFixtureData:
     """Insert a test domain and yield its identifiers."""
-    return await domain_factory(database_engine, name=f"domain-{secrets.token_hex(6)}")
+    async with database_engine.begin() as conn:
+        result = await conn.execute(
+            sa.insert(DomainRow.__table__)
+            .values(
+                name=f"domain-{secrets.token_hex(6)}",
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot({}),
+                allowed_vfolder_hosts=VFolderHostPermissionMap({}),
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            .returning(DomainRow.__table__.c.id, DomainRow.__table__.c.name)
+        )
+        row = result.one()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=DomainEntityType(), entity_id=row.id
+            )
+        )
+    return DomainFixtureData(domain_name=DomainName(row.name), domain_id=DomainID(row.id))
     # Cleanup handled by database_fixture TRUNCATE CASCADE
 
 

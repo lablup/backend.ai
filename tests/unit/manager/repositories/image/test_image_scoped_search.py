@@ -29,7 +29,6 @@ from ai.backend.manager.models.image.scopes import (
     ProjectImageTarget,
     PublicImageTarget,
 )
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -95,7 +94,6 @@ class TestImageScopedSearch:
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,

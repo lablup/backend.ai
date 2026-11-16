@@ -543,8 +543,6 @@ _USERS: dict[str, dict[str, Any]] = {
                 "is_default": True,
                 "resource_policy_id": "0198a5a0-0000-7000-8000-00000000b003",
                 "rate_limit": 30000,
-                "ssh_public_key": "ssh-ed25519 AAAA admin",
-                "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----",
             },
             {
                 "access_key": "AKIAADMINSECOND00002",

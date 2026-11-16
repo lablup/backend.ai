@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.auth.types import (
     AuthCredentialInfo,
     PasswordChangeInfo,
     RoleInfo,
-    SSHKeypairInfo,
 )
 
 __all__ = (
@@ -20,7 +19,6 @@ __all__ = (
     "GetSSHKeypairPayload",
     "SignoutPayload",
     "SignupPayload",
-    "SSHKeypairPayload",
     "UpdateFullNamePayload",
     "UpdatePasswordNoAuthPayload",
     "UpdatePasswordPayload",
@@ -89,9 +87,3 @@ class GetSSHKeypairPayload(BaseResponseModel):
     """Payload for retrieving the SSH keypair (public key only)."""
 
     ssh_public_key: str = Field(description="SSH public key associated with the access key")
-
-
-class SSHKeypairPayload(BaseResponseModel):
-    """Payload for generate/upload SSH keypair (both keys returned)."""
-
-    keypair: SSHKeypairInfo = Field(description="Generated or uploaded SSH keypair data")

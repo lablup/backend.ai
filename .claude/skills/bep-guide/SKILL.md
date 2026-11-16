@@ -1,7 +1,7 @@
 ---
 name: bep-guide
-description: Guide for writing and managing BEPs (Backend.AI Enhancement Proposals) - creation workflow, document segmentation, context-for-ai blocks, Decision Log
-version: 1.1.0
+description: Guide for writing and managing BEPs (Backend.AI Enhancement Proposals) - creation workflow, template sections and length limits, document segmentation, context-for-ai blocks
+version: 1.2.0
 tags:
   - bep
   - proposal
@@ -13,8 +13,9 @@ tags:
 
 Guide for creating and managing Backend.AI Enhancement Proposals (BEPs).
 
-This skill is the **process guide** — how to structure, write, and manage BEPs.
-The template (`proposals/BEP-0000-template.md`) is the **blank document** to copy and fill in.
+- Rules for the content: `proposals/AGENTS.md`.
+- The blank document to copy: `proposals/BEP-0000-template.md` (sections, placeholders and length limits).
+- This skill: the workflow, segmentation and the AI context block.
 
 ## When to Write a BEP
 
@@ -27,12 +28,12 @@ The template (`proposals/BEP-0000-template.md`) is the **blank document** to cop
 ## Workflow
 
 ```
-1. Reserve Number → 2. Create JIRA → 3. Create Branch → 4. Write BEP → 5. Submit PR → 6. Discussion → 7. Accept/Reject
+1. Reserve number → 2. Create issue → 3. Create branch → 4. Write BEP → 5. Review → 6. Submit PR → 7. Accept/Reject
 ```
 
 ### Step 1: Reserve BEP Number
 
-Edit `proposals/README.md` — add entry to the **BEP Number Registry** table:
+Add an entry to the **BEP Number Registry** table in `proposals/README.md`:
 
 ```markdown
 | 1046 | Your Proposal Title | Your Name | Draft |
@@ -40,19 +41,18 @@ Edit `proposals/README.md` — add entry to the **BEP Number Registry** table:
 
 Numbers start from 1000. Pick the next available number.
 
-### Step 2: Create JIRA Issue
+### Step 2: Create Issue
 
-Create a JIRA issue for the BEP and link it in the Related Issues section.
+Create an issue for the BEP and list it in the Related issue cells of the goals table.
 
 ### Step 3: Create Document
 
-**Short BEP (estimated < 500 lines):** Single file.
-
 ```bash
 cp proposals/BEP-0000-template.md proposals/BEP-XXXX-title.md
+cp proposals/BEP-0000-template.ko.md proposals/BEP-XXXX-title.ko.md
 ```
 
-**Long BEP (estimated >= 500 lines):** Use segmented structure. See [Document Segmentation](#document-segmentation).
+Over 300 lines, use the segmented structure. See Document Segmentation below.
 
 ### Step 4: Fill Metadata
 
@@ -69,66 +69,26 @@ Implemented-Version:
 
 ### Step 5: Write Sections
 
-A BEP is a **readable tech spec, not an implementation log** — describe interfaces, contracts, and decisions; leave concrete code, SQL, and file-by-file steps to the PR (see "Writing style" in the root `AGENTS.md`).
+Write in the template order: Goals, Non-goals, Design, Impact, Implementation Order, References.
 
-Each section has a specific purpose. Write in this order:
+| Section | Holds |
+|---|---|
+| Goals | What the BEP achieves, and a table of the capabilities it provides with the current state, the done condition and the issue |
+| Non-goals | Items the BEP does not cover or settle, and where they are covered |
+| Design | One subsection per component that resolves a goal: an SVG, contract tables, a short explanation and the rejected alternative |
+| Impact | Compatibility, permission, performance and metrics, only when they apply |
+| Implementation Order | One step per issue, each with the goal or result it resolves |
+| References | Related BEPs and documents |
 
-| Section | Purpose | Length | Avoid |
-|---------|---------|--------|-------|
-| Related Issues | JIRA/GitHub links | 2-5 lines | — |
-| Motivation | Why this change is needed | 10-30 lines | how to implement it |
-| Current Design | What exists today | 10-50 lines | full source dumps |
-| Proposed Design | The new design | Main body, be specific | step-by-step code, class-by-class listings |
-| Migration / Compatibility | Breaking changes, migration plan | 10-30 lines | full SQL/script bodies |
-| Implementation Plan | Phased steps | 10-30 lines | line-by-line tasks, code |
-| Decision Log | Key decisions with rationale | append | re-arguing settled decisions |
-| Open Questions | Unresolved items | update | — |
-| References | Related docs, BEPs | 2-10 lines | — |
-
-**Decision Log / Open Questions lifecycle:**
-- When an Open Question is resolved, add a row to Decision Log and remove from Open Questions.
+- The template comments set the length limits. `scripts/knowledge/check_bep_length.py` checks them from BEP-1080.
+- Settle open questions in the review and write the result into the design. The BEP keeps no decision log.
+- Before requesting the review, run `/glossary-review`.
 
 ### Step 6: Submit PR and Iterate
 
 - Create branch: `bep/XXXX-short-title`
-- Submit PR with the BEP document
+- Submit the PR with both language files
 - Iterate based on review feedback
-
-## Tech-spec BEP Format
-
-For **implementation-level** BEPs — those that specify how an existing feature is
-built across the layers (as opposed to high-level motivation/spec BEPs) — use the
-tech-spec format below. Reference the upstream motivation BEP instead of expanding it.
-
-### What goes in the BEP vs. the PR
-
-The boundary is **"does this need a structural design decision?"** — not "does it
-cross teams." Internal-only structural decisions still belong in the BEP.
-
-| In the BEP (tech spec) | In the PR (implementer's discretion) |
-|------------------------|--------------------------------------|
-| Component responsibilities & boundaries, layer placement | Exact dataclass fields / function signatures |
-| Observable contracts: state transitions, API / config field *meaning*, why a piece of data is needed | File / function / line anchors |
-| Design decisions and their rationale (including internal ones) | Algorithm optimizations, data-structure choices |
-| The core flow across layers | Marker/storage locations, wiring details |
-
-Symbol/file references in the "current design" section are **status evidence**
-(pointers for the reader), not implementation detail — keep them minimal but allowed.
-
-### Recommended structure
-
-| Section | Purpose |
-|---------|---------|
-| Goal | The problem + what this BEP defines (link the upstream motivation BEP) |
-| Current design & scope, by area | Split by area (e.g. API / DB / Scheduler); within each, separate **✅ exists** vs **➕ to add** |
-| Implementation design | Contract-level: component responsibilities, the core flow, design decisions |
-| Decision Summary | Settled decisions in one table |
-| Open Questions | Unresolved items |
-| References | Upstream BEP, prior art |
-
-The **by-area current-design table** is the distinguishing element: it makes "what
-exists vs. what is missing" explicit per area, which a single prose "Current Design"
-section obscures. Reference example: `BEP-1055-preemption-scheduler-mechanics.md`.
 
 ## English and Korean Pairs
 
@@ -145,38 +105,34 @@ Each sub-document of a segmented BEP is a pair too, such as `component-a.md` and
 ### When to Segment
 
 Segment a BEP when **any** of these apply:
-- Total document exceeds ~500 lines
-- Proposed Design has 3+ distinct components
-- Implementation Plan has 3+ independent phases
+- Total document exceeds 300 lines
+- Design has 3+ distinct components
+- Implementation Order has 3+ independent steps
 - Document covers multiple subsystems
 
 ### Segmented Structure
 
 ```
 proposals/
-├── BEP-XXXX-title.md              # Main: overview + motivation + index (< 200 lines)
+├── BEP-XXXX-title.md              # Main: goals, non-goals, index (< 200 lines)
 └── BEP-XXXX/                     # Directory uses BEP number only
-    ├── component-a.md             # Component A detailed design
-    ├── component-b.md             # Component B detailed design
-    ├── migration.md               # Migration plan (if complex)
-    └── diagrams/                  # Images, schemas
+    ├── component-a.md             # Component A design
+    ├── component-b.md             # Component B design
+    └── <diagram-name>.svg         # Diagrams
 ```
 
-Main document serves as overview. Directory name uses BEP number only (e.g., `BEP-1046/`).
-Use descriptive file names without number prefixes.
-Separate `overview.md` file is optional for very large BEPs (5+ sub-documents).
+Directory name uses the BEP number only (e.g., `BEP-1046/`). Use descriptive file names without number prefixes.
 
 ### Main Document (BEP-XXXX-title.md)
 
-The main file must be **concise** (under ~200 lines) — overview + index only. Beyond the standard sections (Step 5), segmented-main adds a `context-for-ai` master block and a Document Index:
+The main file holds the context-for-ai block, Goals, Non-goals, the Document Index, Implementation Order and References:
 
 ```markdown
 <!-- context-for-ai
 type: master-bep
 scope: One-line summary
-detail-docs: [component-a.md, component-b.md, migration.md]
-key-constraints: [constraint 1, constraint 2]
-key-decisions: [decision 1 (from Decision Log)]
+detail-docs: [component-a.md, component-b.md]
+key-constraints: [non-goal 1, constraint 1]
 phases: 3
 -->
 
@@ -188,19 +144,11 @@ phases: 3
 |----------|-------------|
 | [component-a](./BEP-XXXX/component-a.md) | Data model and queries |
 | [component-b](./BEP-XXXX/component-b.md) | API design and handlers |
-
-## Decision Log
-
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-01-15 | Event-driven over polling | Lower latency |
-
-(+ standard sections — Motivation, Implementation Plan, Open Questions, References — per Step 5)
 ```
 
 ### Sub-Document Template
 
-Each sub-document is self-contained and focused on one work unit:
+Each sub-document follows the Design section of the template for one work unit:
 
 ```markdown
 <!-- context-for-ai
@@ -208,108 +156,64 @@ type: detail-doc
 parent: BEP-XXXX (Title)
 scope: one-line scope description
 depends-on: [other-component.md]
-key-decisions:
-  - reference relevant Decision Log entries in main doc
 -->
 
 # BEP-XXXX: Component Name
 
-## Summary
-(1-3 sentences: what this component does)
+## Design
+(Subsections as in the template's Design section)
 
-## Current Design
-(What exists today for this component)
-
-## Proposed Design
-(Detailed design for this component)
-
-## Interface / API
-(Public interfaces, data models, function signatures)
-
-## Implementation Notes
-(Constraints, dependencies on other components)
+## Impact
+(Only when it applies)
 ```
 
 ### Sub-Document Guidelines
 
 - **Each sub-document = one work unit** that can be implemented independently
-- Keep each sub-document under ~300 lines
+- The same length limits apply to each sub-document
 - Include enough context to understand without reading other sub-documents
 - Cross-reference other sub-documents by relative link when needed
-- Use descriptive file names: `data-model.md`, `config-schema.md`, `event-registration.md`
-- **Open Questions go in the main document only** — keeps all unresolved items in one place
 
 ## AI Context Block
 
-Add `<!-- context-for-ai -->` to main document and each sub-document. This block is read by AI agents to quickly understand scope and constraints without parsing the entire document. Use key-value format for consistent parsing.
+Add `<!-- context-for-ai -->` to the main document and each sub-document of a segmented BEP. AI agents read it to understand scope and constraints without parsing the whole document.
 
-**Main document (`type: master-bep`):**
-
-| Key | Purpose |
-|-----|---------|
-| `scope` | One-line summary of the proposal |
-| `detail-docs` | List of sub-document file names |
-| `key-constraints` | Non-goals and hard constraints |
-| `key-decisions` | Critical decisions from Decision Log |
-| `phases` | Number of implementation phases |
-
-**Sub-document (`type: detail-doc`):**
-
-| Key | Purpose |
-|-----|---------|
-| `parent` | Parent BEP number and title |
-| `scope` | What this document covers |
-| `depends-on` | Other sub-documents this depends on |
-| `key-decisions` | Relevant Decision Log entries from main doc |
+| Key | Document | Purpose |
+|-----|---|---------|
+| `scope` | both | One-line summary |
+| `detail-docs` | main | Sub-document file names |
+| `key-constraints` | main | Non-goals and hard constraints |
+| `phases` | main | Number of implementation steps |
+| `parent` | sub | Parent BEP number and title |
+| `depends-on` | sub | Other sub-documents this depends on |
 
 ## Status Management
 
-See `proposals/README.md` for the full status lifecycle, transition rules, and version fields.
+See `proposals/README.md` for the status lifecycle, transition rules and version fields.
 
 ## AI Agent Working Pattern
 
-These patterns apply when an AI agent (e.g., Claude) works with BEPs.
-They also serve as guidelines for humans assigning BEP-related tasks to AI agents.
-
 ### Reading an Existing BEP
 
-1. **Read main document first** — get motivation, context-for-ai block, and document index
-2. **Read only the relevant sub-document** — based on the task at hand
-3. **Check Decision Log** in main document before making implementation choices
-4. **Do not read all sub-documents** unless explicitly needed
-
-### Writing a New BEP
-
-1. Check existing BEPs: search `proposals/README.md` registry for related proposals
-2. Reserve number in registry
-3. Decide structure: single file (< 500 lines) or segmented
-4. If segmented: write main document with index first, then sub-documents one at a time
-5. Add `<!-- context-for-ai -->` block to every document
-6. Each sub-document should be a complete, reviewable unit
+1. **Read the main document first**: goals, non-goals, context-for-ai block and document index
+2. **Read only the relevant sub-document** for the task at hand
 
 ### Updating an Existing BEP
 
-1. Read main document to locate the relevant sub-document
-2. Read and edit only the targeted sub-document
-3. If a question is resolved, move it from Open Questions to Decision Log in main document
-4. Update main document index/status if structure changed
+1. Read the main document to locate the relevant sub-document
+2. Edit only the targeted sub-document, and both language files
+3. Update the main document index if the structure changed
 
 ### Receiving Implementation Tasks from a BEP
 
-When assigned work based on a BEP:
-
-1. **Read main document** — get context-for-ai block, Decision Log, Implementation Plan
-2. **Read only the sub-documents relevant to the assigned phase/scope**
-3. **Follow Decision Log** — decisions already made should not be revisited
-4. **Check Open Questions** — if your task touches an unresolved item, flag it before proceeding
-
-Example task prompt:
-> Implement Phase 1 of BEP-1046.
-> Follow the Decision Log in the main document.
-> Refer to config-schema.md and event-registration.md for details.
+1. **Read the main document**: goals, non-goals, Implementation Order
+2. **Read only the sub-documents of the assigned step**
+3. **Follow the design.** If the task needs a decision the design does not make, raise it before proceeding
 
 ## Cross-References
 
-- `proposals/README.md` — BEP process, number registry, file structure rules
-- `proposals/BEP-0000-template.md` — Blank template to copy (sections with example content)
-- `/test-guide` — Test scenarios for implementation phase
+- `proposals/AGENTS.md`: content rules
+- `proposals/README.md`: process, number registry, file structure
+- `proposals/BEP-0000-template.md`: template with placeholders and length limits
+- `/glossary-review`: glossary review before the review request
+- `/test-guide`: test scenarios for the implementation step

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import strawberry
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import Connection, Edge
 
@@ -27,6 +26,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 from .types import (
     DeploymentHistory,
@@ -202,7 +202,7 @@ async def session_scheduling_histories(
 ) -> SessionSchedulingHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
+        raise SuperadminRequired("Only superadmin can access scheduling history.")
     result = await info.context.adapters.scheduling_history.admin_search_session_history(
         AdminSearchSessionHistoriesInput(
             filter=filter.to_pydantic() if filter else None,
@@ -339,7 +339,7 @@ async def deployment_histories(
 ) -> DeploymentHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
+        raise SuperadminRequired("Only superadmin can access scheduling history.")
     result = await info.context.adapters.scheduling_history.admin_search_deployment_history(
         AdminSearchDeploymentHistoriesInput(
             filter=filter.to_pydantic() if filter else None,
@@ -424,7 +424,7 @@ async def route_histories(
 ) -> RouteHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
+        raise SuperadminRequired("Only superadmin can access scheduling history.")
     result = await info.context.adapters.scheduling_history.admin_search_route_history(
         AdminSearchRouteHistoriesInput(
             filter=filter.to_pydantic() if filter else None,

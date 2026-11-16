@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
 
-시나리오: 미완성 2 / 14
+시나리오: 미완성 1 / 14
 
 - ops 구성 (10)
   - admin_create_slot_type: 대표 성공 ✓ · 대표 거부 ✓
@@ -14,7 +14,7 @@
   - scoped_search_agent_resources: 대표 성공 ✓ · 대표 거부 ✓
   - search_agent_resources: 대표 성공 ✓ · 대표 거부 ✓
   - search_allocations: 대표 성공 ✓ · 대표 거부 ✓
-  - search_slot_types: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - search_slot_types: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (4)
   - get_agent_resource: 성공 있음 2 · 거부 있음 6 (single_entity)
   - get_domain_resource_overview: 성공 있음 3 · 거부 있음 3 (scope)
@@ -123,6 +123,7 @@
 | [자원 슬롯 유형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 자원 슬롯 유형만 남습니다](#searching-a-name-filter-narrows-the-answer-to-the-slot-type-it-names) | 성공 |
 | [자원 슬롯 유형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계됩니다](#searching-a-user-granted-nothing-counts-every-slot-type-laid) | 성공 |
 | [자원 슬롯 유형 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답합니다](#searching-omitting-the-page-size-answers-ten-slot-types-and-a-next-page) | 성공 |
+| [로그인 문맥 없이 자원 슬롯 유형을 조회하면 거부됩니다](#searching-searching-slot-types-without-login-is-refused) | 거부 |
 
 **get_agent_resource**
 
@@ -2161,6 +2162,37 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching-searching-slot-types-without-login-is-refused"></a>
+
+#### [searching-slot-types-without-login-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py): pass
+
+로그인 문맥 없이 자원 슬롯 유형을 조회하면 거부됩니다
+
+Given
+
+- 자원 슬롯 종류 2개와, 일반 사용자 한 명
+  - 자원 슬롯 유형 wanted-1: count 유형
+  - 자원 슬롯 유형 other-1: count 유형
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.search_slot_types: 로그인 문맥 없이 전체를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### get_agent_resource
 

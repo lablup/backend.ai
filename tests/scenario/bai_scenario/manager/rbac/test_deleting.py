@@ -8,6 +8,8 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeleteRolePayload,
@@ -30,7 +32,7 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.domain import TheCallIsRefused
-from bai_scenario.components.rbac import RolesAndACaller, RolesAndSomeone
+from bai_scenario.components.rbac import Granted, RolesAndACaller, RolesAndSomeone
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -315,6 +317,66 @@ class AUserGrantedNothingMayNotPurge(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class AUserGrantedUpdateOnlyMayNotSoftDelete(
+    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-update-only-may-not-soft-delete-a-role"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대상 도메인에서 역할 수정 권한만 받은 사용자는 역할을 soft delete 할 수 없습니다",
+            english=(
+                "a user granted only role update permission in a domain cannot soft delete a role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
+        return RolesAndSomeone(grant=(Granted(RoleEntityType(), Permission.UPDATE),))
+
+    @override
+    def when(self) -> When[RolesAndACaller, RBACAdapter, Deleted]:
+        return SoftDeleting()
+
+    @override
+    def then(self) -> Then[RolesAndACaller, Deleted]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AUserGrantedSoftDeleteOnlyMayNotPurge(
+    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-soft-delete-only-may-not-purge-a-role"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대상 도메인에서 역할 soft delete 권한만 받은 사용자는 역할을 purge 할 수 없습니다",
+            english=(
+                "a user granted only role soft delete permission in a domain cannot purge a role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
+        return RolesAndSomeone(grant=(Granted(RoleEntityType(), Permission.SOFT_DELETE),))
+
+    @override
+    def when(self) -> When[RolesAndACaller, RBACAdapter, Deleted]:
+        return Purging()
+
+    @override
+    def then(self) -> Then[RolesAndACaller, Deleted]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[RoleStep] = [
     TheSuperadminSoftDeletesARole(),
     AUserGrantedNothingMayNotSoftDelete(),
@@ -322,6 +384,8 @@ SCENARIOS: list[RoleStep] = [
     AUserGrantedNothingMayNotRestore(),
     TheSuperadminPurgesARole(),
     AUserGrantedNothingMayNotPurge(),
+    AUserGrantedUpdateOnlyMayNotSoftDelete(),
+    AUserGrantedSoftDeleteOnlyMayNotPurge(),
 ]
 
 

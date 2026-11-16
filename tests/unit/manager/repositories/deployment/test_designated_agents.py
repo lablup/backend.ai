@@ -12,7 +12,9 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupID,
+)
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -22,7 +24,6 @@ from ai.backend.manager.models.deployment_designated_agent.row import (
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -56,7 +57,6 @@ class TestDeploymentDesignatedAgents:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 EndpointRow,
@@ -174,7 +174,7 @@ class TestDeploymentDesignatedAgents:
     ) -> None:
         deployment_id = deployment_ids[0]
 
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert set(designated[deployment_id]) == set(agent_uuids[:2])
@@ -186,9 +186,9 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
-        await repository.replace_designated_agents(deployment_id, {agent_uuids[2]})
+        await repository.set_designated_agents(deployment_id, {agent_uuids[2]})
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == [agent_uuids[2]]
@@ -200,9 +200,9 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
-        await repository.replace_designated_agents(deployment_id, set())
+        await repository.set_designated_agents(deployment_id, set())
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == []
@@ -218,7 +218,7 @@ class TestDeploymentDesignatedAgents:
         agent_count: int,
     ) -> None:
         with pytest.raises(EndpointNotFound):
-            await repository.replace_designated_agents(
+            await repository.set_designated_agents(
                 DeploymentID(uuid.uuid4()), set(agent_uuids[:agent_count])
             )
 
@@ -229,7 +229,7 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         with_agents, without_agents = deployment_ids
-        await repository.replace_designated_agents(with_agents, set(agent_uuids[:2]))
+        await repository.set_designated_agents(with_agents, set(agent_uuids[:2]))
 
         designated = await repository.fetch_designated_agents_by_deployment_ids(set(deployment_ids))
 
@@ -244,7 +244,7 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(sa.delete(EndpointRow).where(EndpointRow.id == deployment_id))
@@ -263,7 +263,7 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(sa.delete(AgentRow).where(AgentRow.uuid == agent_uuids[0]))

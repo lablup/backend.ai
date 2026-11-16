@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from changelog_files import CHANGELOG_DIR, changelog_filename
+from changelog_fragments import FragmentDirectory
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
@@ -80,25 +81,6 @@ def render_config(config: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def has_fragments(config: dict[str, Any]) -> bool:
-    """Tell whether ``changes/`` holds any file towncrier would consume.
-
-    Mirrors towncrier's own basename parsing: a fragment name is dot-separated
-    and carries a known type directory in any position but the first, which
-    excludes ``README.md`` and ``template.md``.
-    """
-    type_names = {entry["directory"] for entry in config.get("type", [])}
-    fragment_dir = REPO_ROOT / config["directory"]
-    if not fragment_dir.is_dir():
-        return False
-    for path in fragment_dir.iterdir():
-        if not path.is_file():
-            continue
-        if type_names.intersection(path.name.split(".")[1:]):
-            return True
-    return False
-
-
 def towncrier_lockset() -> str:
     match = INTERPRETER_RE.search(PANTS_TOML_PATH.read_text())
     if match is None:
@@ -142,7 +124,7 @@ def main() -> int:
 
     try:
         config = load_towncrier_config()
-        if not has_fragments(config):
+        if not FragmentDirectory(REPO_ROOT).has_numbered_fragments():
             print(
                 f"No news fragments in {config['directory']}; skipping towncrier.",
                 file=sys.stderr,

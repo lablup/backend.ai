@@ -65,8 +65,6 @@ class _KeyPairOwnFields(RowDataConverter[KeyPairRow, KeyPairData]):
         IntConditions(KeyPairRow.rate_limit),
         ColumnOrder(KeyPairRow.rate_limit),
     )
-    ssh_public_key = SearchableField(KeyPairRow.ssh_public_key, None, None)
-    ssh_private_key = SearchableField(KeyPairRow.ssh_private_key, None, None)
     last_used = SearchableField(
         KeyPairRow.last_used,
         DateTimeConditions(KeyPairRow.last_used),
@@ -92,8 +90,6 @@ class _KeyPairOwnFields(RowDataConverter[KeyPairRow, KeyPairData]):
             modified_at=self.modified_at.read(row),
             resource_policy_name=self.resource_policy_name.read(row),
             rate_limit=self.rate_limit.read(row),
-            ssh_public_key=self.ssh_public_key.read(row),
-            ssh_private_key=self.ssh_private_key.read(row),
             last_used=self.last_used.read(row),
             num_queries=self.num_queries.read(row),
         )

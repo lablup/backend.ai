@@ -36,6 +36,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.storage_volume.types import StorageVolumeFilterGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.service_catalog.types import (
@@ -142,7 +143,7 @@ class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAt
         StorageVolumeGQL,
         strawberry.lazy("ai.backend.manager.api.gql.storage_volume.types"),
     ]:
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     @gql_field(description="The service the volume is attached to.")  # type: ignore[misc]
     async def service_catalog(
@@ -151,7 +152,7 @@ class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAt
         ServiceCatalogGQL,
         strawberry.lazy("ai.backend.manager.api.gql.service_catalog.types"),
     ]:
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     @classmethod
     @override
@@ -162,7 +163,7 @@ class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAt
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[StorageVolumeServiceAttachmentGQL | None]:
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
 
 @gql_connection_type(

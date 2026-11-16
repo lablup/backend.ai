@@ -81,21 +81,24 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images) | 성공 |
-| [살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면 둘은 삭제됨 상태로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one) | 성공 |
+| [레지스트리에서 이미지 소프트 삭제 권한을 받은 사용자가 이미지 여럿을 한 번에 소프트 삭제하면 모두 삭제됨 상태로 오고 실패한 것은 없습니다](#partial_bulk_forgetting-a-user-granted-soft-delete-forgets-several-images-at-once) | 성공 |
+| [자기 개인 프로젝트에서 이미지 소프트 삭제 권한을 받은 사용자가 자기 이미지와 다른 사용자의 이미지를 한 번에 소프트 삭제하면, 자기 이미지만 삭제됨 상태로 오고 다른 사용자의 이미지는 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_forgetting-a-user-granted-soft-delete-is-denied-on-another-users-image) | 성공 |
+| [살아 있는 이미지와 이미 삭제된 이미지를 한 번에 소프트 삭제하면, 살아 있는 것만 삭제됨 상태로 오고 이미 삭제된 것은 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_forgetting-forgetting-several-leaves-the-already-deleted-one) | 성공 |
 
 **partial_bulk_restore**
 
 | 시나리오 | 판정 |
 |---|---|
-| [소프트 삭제한 이미지 여럿을 한 번에 복원하면 모두 살아 있는 상태로 옵니다](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | 성공 |
+| [자기 개인 프로젝트에서 이미지 소프트 삭제 권한을 받은 사용자가 자기 이미지와 다른 사용자의 이미지를 한 번에 복원하면, 자기 이미지만 살아 있는 상태로 오고 다른 사용자의 이미지는 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_forgetting-a-user-granted-soft-delete-restores-only-their-own-image) | 성공 |
+| [레지스트리에서 이미지 소프트 삭제 권한을 받은 사용자가 삭제된 이미지 여럿을 한 번에 복원하면 모두 살아 있는 상태로 오고 실패한 것은 없습니다](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | 성공 |
+| [삭제된 이미지와 완전 삭제 중인 이미지를 한 번에 복원하면, 삭제된 것만 살아 있는 상태로 오고 완전 삭제 중인 것은 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_forgetting-restoring-several-leaves-the-one-being-purged) | 성공 |
 
 **partial_bulk_update**
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 수정하려 하면 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images) | 성공 |
-| [superadmin 이 이미지 여럿의 태그를 한 번에 변경하면 모두 새 태그로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-edits-several-images-at-once) | 성공 |
+| [이미지 수정 권한을 받은 사용자가 이미지 여럿의 태그를 한 번에 변경하면 모두 새 태그로 오고 실패한 것은 없습니다](#partial_bulk_editing-a-user-granted-update-edits-several-images-at-once) | 성공 |
+| [자기 개인 프로젝트에서 이미지 수정 권한을 받은 사용자가 자기 이미지와 다른 사용자의 이미지를 한 번에 수정하면, 자기 이미지만 새 태그로 오고 다른 사용자의 이미지는 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-update-is-denied-on-another-users-image) | 성공 |
 
 **restore**
 
@@ -190,7 +193,7 @@ superadmin 이 크기와 오프셋 없이 커서만 지정해 검색하면 지�
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 3개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 3개(상태는 ALIVE, ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -290,7 +293,7 @@ superadmin 이 한 이미지의 이름으로 검색하면 그 이미지만 반�
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 3개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 3개(상태는 ALIVE, ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -386,7 +389,7 @@ superadmin 이 페이지 크기를 생략하고 검색하면 50개까지만 반�
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 51개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 51개(상태는 ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -466,7 +469,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 4개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 4개(상태는 ALIVE, ALIVE, ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -499,7 +502,7 @@ superadmin 이 조건 없이 검색하면 미리 저장한 이미지가 모두 �
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -530,7 +533,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -558,7 +561,7 @@ superadmin 이 아닌 사용자가 이미지를 검색하려 하면 superadmin �
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -588,7 +591,7 @@ superadmin 이 커서로 앞에서부터 조회하면 지정한 개수만 반환
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 3개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 3개(상태는 ALIVE, ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -620,7 +623,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -648,7 +651,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -767,7 +770,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -795,7 +798,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 1개(상태는 ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -823,7 +826,7 @@ superadmin 이 미리 저장한 이미지 2개와 어느 이미지도 가리키�
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -854,7 +857,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1187,15 +1190,15 @@ Then
 
 ### partial_bulk_delete
 
-<a id="partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images"></a>
+<a id="partial_bulk_forgetting-a-user-granted-soft-delete-forgets-several-images-at-once"></a>
 
-#### [a-user-granted-nothing-forgets-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+#### [a-user-granted-soft-delete-forgets-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
-아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
+레지스트리에서 이미지 소프트 삭제 권한을 받은 사용자가 이미지 여럿을 한 번에 소프트 삭제하면 모두 삭제됨 상태로 오고 실패한 것은 없습니다
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), user 1명, 그 레지스트리에서 이미지 권한을 받은
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1205,6 +1208,10 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
 
 When
 
@@ -1212,40 +1219,7 @@ When
 
 Then
 
-- 처리된 이미지 없이 대상이 모두 실패 목록에 옵니다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 이미지의 id 와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 이미지의 id 와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
-<a id="partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one"></a>
-
-#### [forgetting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
-
-살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면 둘은 삭제됨 상태로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-0-1: x86_64 이미지
-  - 이미지 image-1-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ImageAdapter.partial_bulk_delete: user-1이 이미지 2개와 없는 id 하나를 한 번에 소프트 삭제합니다
-
-Then
-
-- 대상 이미지가 모두 DELETED 상태로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
+- 대상 이미지가 모두 DELETED 상태로 오고, 실패한 것은 없습니다
   - successes count = 2
   - id: 미리 저장한 이미지의 ID 와 같다
   - name = 'image-0-1'
@@ -1305,6 +1279,75 @@ Then
   - identity.namespace = 'image-1-1'
   - identity.architecture = 'x86_64'
   - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed = []
+
+<a id="partial_bulk_forgetting-a-user-granted-soft-delete-is-denied-on-another-users-image"></a>
+
+#### [a-user-granted-soft-delete-is-denied-on-another-users-image](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+
+자기 개인 프로젝트에서 이미지 소프트 삭제 권한을 받은 사용자가 자기 이미지와 다른 사용자의 이미지를 한 번에 소프트 삭제하면, 자기 이미지만 삭제됨 상태로 오고 다른 사용자의 이미지는 권한이 없다는 이유로 실패 목록에 옵니다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개(상태는 ALIVE)와 다른 사용자가 커밋한 커스텀 이미지 1개(상태는 ALIVE), 호출자 개인 프로젝트에서만 이미지 권한 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 커밋한 이미지 mine-1: 커스텀 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 커밋한 이미지 theirs-1: 커스텀 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.partial_bulk_delete: user-1이 이미지 2개를 한 번에 소프트 삭제합니다
+
+Then
+
+- 대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다
+  - successes count = 1
+  - id: 미리 저장한 이미지의 ID 와 같다
+  - name = 'mine-1'
+  - image = 'mine-1'
+  - registry = 'host-1'
+  - registry_id: 미리 저장한 레지스트리의 ID 와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - is_local = False
+  - customized = True
+  - creator_id: 이미지를 커밋한 사용자의 ID 와 같다
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 건너뜀: 세션이 기록하는 값이라 이 실행에서는 알 수 없습니다
+  - identity.canonical_name = 'mine-1'
+  - identity.namespace = 'mine-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -1314,33 +1357,176 @@ Then
   - requirements.supported_accelerators = ['*']
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id 와 같다
+  - failed[0].id: 처리되지 않은 대상 이미지의 id 와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_forgetting-forgetting-several-leaves-the-already-deleted-one"></a>
+
+#### [forgetting-several-leaves-the-already-deleted-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+
+살아 있는 이미지와 이미 삭제된 이미지를 한 번에 소프트 삭제하면, 살아 있는 것만 삭제됨 상태로 오고 이미 삭제된 것은 대상이 없다는 이유로 실패 목록에 옵니다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, DELETED), user 1명, 그 레지스트리에서 이미지 권한을 받은
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지
+  - 이미지 image-1-1: x86_64 이미지, 상태는 DELETED
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.partial_bulk_delete: user-1이 이미지 2개를 한 번에 소프트 삭제합니다
+
+Then
+
+- 대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다
+  - successes count = 1
+  - id: 미리 저장한 이미지의 ID 와 같다
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: 미리 저장한 레지스트리의 ID 와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 건너뜀: 세션이 기록하는 값이라 이 실행에서는 알 수 없습니다
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: 처리되지 않은 대상 이미지의 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
 ### partial_bulk_restore
+
+<a id="partial_bulk_forgetting-a-user-granted-soft-delete-restores-only-their-own-image"></a>
+
+#### [a-user-granted-soft-delete-restores-only-their-own-image](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+
+자기 개인 프로젝트에서 이미지 소프트 삭제 권한을 받은 사용자가 자기 이미지와 다른 사용자의 이미지를 한 번에 복원하면, 자기 이미지만 살아 있는 상태로 오고 다른 사용자의 이미지는 권한이 없다는 이유로 실패 목록에 옵니다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개(상태는 DELETED)와 다른 사용자가 커밋한 커스텀 이미지 1개(상태는 ALIVE), 호출자 개인 프로젝트에서만 이미지 권한 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 커밋한 이미지 mine-1: 커스텀 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다, 상태는 DELETED
+  - 커밋한 이미지 theirs-1: 커스텀 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.partial_bulk_restore: user-1이 이미지 2개를 한 번에 복원합니다
+
+Then
+
+- 대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다
+  - successes count = 1
+  - id: 미리 저장한 이미지의 ID 와 같다
+  - name = 'mine-1'
+  - image = 'mine-1'
+  - registry = 'host-1'
+  - registry_id: 미리 저장한 레지스트리의 ID 와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - is_local = False
+  - customized = True
+  - creator_id: 이미지를 커밋한 사용자의 ID 와 같다
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 건너뜀: 세션이 기록하는 값이라 이 실행에서는 알 수 없습니다
+  - identity.canonical_name = 'mine-1'
+  - identity.namespace = 'mine-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: 처리되지 않은 대상 이미지의 id 와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk_forgetting-restoring-several-brings-them-back-alive"></a>
 
 #### [restoring-several-brings-them-back-alive](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
-소프트 삭제한 이미지 여럿을 한 번에 복원하면 모두 살아 있는 상태로 옵니다
+레지스트리에서 이미지 소프트 삭제 권한을 받은 사용자가 삭제된 이미지 여럿을 한 번에 복원하면 모두 살아 있는 상태로 오고 실패한 것은 없습니다
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 DELETED, DELETED), user 1명, 그 레지스트리에서 이미지 권한을 받은
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-0-1: x86_64 이미지
-  - 이미지 image-1-1: x86_64 이미지
+  - 이미지 image-0-1: x86_64 이미지, 상태는 DELETED
+  - 이미지 image-1-1: x86_64 이미지, 상태는 DELETED
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
 
 When
 
-- ImageAdapter.partial_bulk_restore: user-1이 이미지 2개를 한 번에 소프트 삭제했다가 한 번에 복원합니다
+- ImageAdapter.partial_bulk_restore: user-1이 이미지 2개를 한 번에 복원합니다
 
 Then
 
@@ -1414,17 +1600,85 @@ Then
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
   - failed = []
 
-### partial_bulk_update
+<a id="partial_bulk_forgetting-restoring-several-leaves-the-one-being-purged"></a>
 
-<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images"></a>
+#### [restoring-several-leaves-the-one-being-purged](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
-#### [a-user-granted-nothing-edits-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
-
-아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 수정하려 하면 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
+삭제된 이미지와 완전 삭제 중인 이미지를 한 번에 복원하면, 삭제된 것만 살아 있는 상태로 오고 완전 삭제 중인 것은 대상이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 DELETED, PURGING), user 1명, 그 레지스트리에서 이미지 권한을 받은
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지, 상태는 DELETED
+  - 이미지 image-1-1: x86_64 이미지, 상태는 PURGING
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.partial_bulk_restore: user-1이 이미지 2개를 한 번에 복원합니다
+
+Then
+
+- 대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다
+  - successes count = 1
+  - id: 미리 저장한 이미지의 ID 와 같다
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: 미리 저장한 레지스트리의 ID 와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 건너뜀: 세션이 기록하는 값이라 이 실행에서는 알 수 없습니다
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: 처리되지 않은 대상 이미지의 id 와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-update-edits-several-images-at-once"></a>
+
+#### [a-user-granted-update-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
+
+이미지 수정 권한을 받은 사용자가 이미지 여럿의 태그를 한 번에 변경하면 모두 새 태그로 오고 실패한 것은 없습니다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), user 1명, 그 레지스트리에서 이미지 권한을 받은
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1434,39 +1688,10 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ImageAdapter.partial_bulk_update: user-1이 이미지 2개의 태그를 한 번에 수정합니다
-
-Then
-
-- 처리된 이미지 없이 대상이 모두 실패 목록에 옵니다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 이미지의 id 와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 이미지의 id 와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
-<a id="partial_bulk_editing-the-superadmin-edits-several-images-at-once"></a>
-
-#### [the-superadmin-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
-
-superadmin 이 이미지 여럿의 태그를 한 번에 변경하면 모두 새 태그로 오고 실패한 것은 없습니다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-0-1: x86_64 이미지
-  - 이미지 image-1-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
 
 When
 
@@ -1543,6 +1768,77 @@ Then
   - requirements.supported_accelerators = ['*']
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
   - failed = []
+
+<a id="partial_bulk_editing-a-user-granted-update-is-denied-on-another-users-image"></a>
+
+#### [a-user-granted-update-is-denied-on-another-users-image](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
+
+자기 개인 프로젝트에서 이미지 수정 권한을 받은 사용자가 자기 이미지와 다른 사용자의 이미지를 한 번에 수정하면, 자기 이미지만 새 태그로 오고 다른 사용자의 이미지는 권한이 없다는 이유로 실패 목록에 옵니다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개(상태는 ALIVE)와 다른 사용자가 커밋한 커스텀 이미지 1개(상태는 ALIVE), 호출자 개인 프로젝트에서만 이미지 권한 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 커밋한 이미지 mine-1: 커스텀 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 커밋한 이미지 theirs-1: 커스텀 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 image-keeper-1: image 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.partial_bulk_update: user-1이 이미지 2개의 태그를 한 번에 수정합니다
+
+Then
+
+- 대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다
+  - successes count = 1
+  - id: 미리 저장한 이미지의 ID 와 같다
+  - name = 'mine-1'
+  - image = 'mine-1'
+  - registry = 'host-1'
+  - registry_id: 미리 저장한 레지스트리의 ID 와 같다
+  - project = None
+  - tag = 'edited-together'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - is_local = False
+  - customized = True
+  - creator_id: 이미지를 커밋한 사용자의 ID 와 같다
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 건너뜀: 세션이 기록하는 값이라 이 실행에서는 알 수 없습니다
+  - identity.canonical_name = 'mine-1'
+  - identity.namespace = 'mine-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: 처리되지 않은 대상 이미지의 id 와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
 
 ### restore
 
@@ -3016,7 +3312,7 @@ Then
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -3047,7 +3343,7 @@ superadmin 이 아닌 사용자가 별칭을 검색하려 하면 superadmin 권�
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+- 레지스트리 1개와 그 안의 이미지 2개(상태는 ALIVE, ALIVE), user 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지

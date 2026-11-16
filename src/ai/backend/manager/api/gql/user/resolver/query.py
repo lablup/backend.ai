@@ -26,6 +26,7 @@ from ai.backend.manager.api.gql.user.types.scopes import (
     UserScopeGQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import AuthenticationRequired
 
 
 @gql_root_field(
@@ -236,9 +237,7 @@ async def my_user_v2(
 ) -> UserV2GQL | None:
     me = current_user()
     if me is None:
-        from aiohttp import web
-
-        raise web.HTTPUnauthorized(reason="Authentication required")
+        raise AuthenticationRequired()
 
     payload = await info.context.adapters.user.get(me.user_id)
     return UserV2GQL.from_pydantic(payload.user)

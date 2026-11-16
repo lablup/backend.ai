@@ -57,7 +57,6 @@ class HealthResponse(BackendAISchema):
     """
 
     status: HealthStatus = Field(description="Overall service status")
-    version: str = Field(description="Version of the component")
     component: str = Field(
         description="Component name (e.g., 'agent', 'manager', 'storage-proxy', 'webserver', 'appproxy-coordinator', 'appproxy-worker')"
     )

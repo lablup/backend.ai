@@ -24,10 +24,12 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     SessionTagsModel,
     TagsModel,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
-    PrometheusConnectionError,
 )
 from ai.backend.common.types import (
     AutoScalingMetricSource,

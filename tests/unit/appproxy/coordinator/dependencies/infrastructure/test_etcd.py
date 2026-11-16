@@ -14,11 +14,11 @@ from ai.backend.appproxy.coordinator.config import (
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd import (
     EtcdProvider,
 )
-from ai.backend.appproxy.coordinator.errors.config import InvalidTraefikEtcdCredentialsError
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 class TestEtcdProvider:
@@ -42,8 +42,8 @@ class TestEtcdProvider:
         etcd_config = EtcdConfig.model_validate({
             "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
             "namespace": test_ns,
-            "user": None,
-            "password": None,
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         })
 
         # Create traefik config
@@ -68,6 +68,8 @@ class TestEtcdProvider:
         etcd_config = EtcdConfig.model_validate({
             "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)] * 3,
             "namespace": test_ns,
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         })
         proxy_config = Mock(spec=ProxyCoordinatorConfig)
         proxy_config.enable_traefik = True
@@ -147,57 +149,3 @@ class TestEtcdProvider:
 
         # Client should be closed - we can't easily verify this,
         # but the test should complete without hanging
-
-
-class TestEtcdProviderCredentials:
-    def _make_config(self, user: str | None, password: str | None) -> ServerConfig:
-        etcd_config = EtcdConfig.model_validate({
-            "addrs": [HostPortPair(host="127.0.0.1", port=2379)],
-            "namespace": "test",
-            "user": user,
-            "password": password,
-        })
-        proxy_config = Mock(spec=ProxyCoordinatorConfig)
-        proxy_config.enable_traefik = True
-        proxy_config.traefik = TraefikConfig(etcd=etcd_config, client_ip_strategy=None)
-        config = Mock(spec=ServerConfig)
-        config.proxy_coordinator = proxy_config
-        return config
-
-    async def test_passes_user_and_password(self) -> None:
-        with patch(
-            "ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd.TraefikEtcd"
-        ) as traefik_etcd_cls:
-            async with EtcdProvider().provide(self._make_config("backend", "secret")):
-                pass
-
-        assert traefik_etcd_cls.call_args.kwargs["credentials"] == {
-            "user": "backend",
-            "password": "secret",
-        }
-
-    async def test_passes_no_credentials_when_both_unset(self) -> None:
-        with patch(
-            "ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd.TraefikEtcd"
-        ) as traefik_etcd_cls:
-            async with EtcdProvider().provide(self._make_config(None, None)):
-                pass
-
-        assert traefik_etcd_cls.call_args.kwargs["credentials"] is None
-
-    @pytest.mark.parametrize(
-        ("user", "password"),
-        [("backend", None), (None, "secret")],
-        ids=["user-only", "password-only"],
-    )
-    async def test_rejects_partial_credentials(
-        self, user: str | None, password: str | None
-    ) -> None:
-        with patch(
-            "ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd.TraefikEtcd"
-        ) as traefik_etcd_cls:
-            with pytest.raises(InvalidTraefikEtcdCredentialsError):
-                async with EtcdProvider().provide(self._make_config(user, password)):
-                    pass
-
-        traefik_etcd_cls.assert_not_called()

@@ -37,7 +37,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.deprecated_search import (
     DeprecatedRoleConditions,
@@ -102,7 +101,6 @@ class TestSearchRoles:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 PermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -637,7 +635,6 @@ class TestSearchRolesTotalCountNotInflated:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 PermissionRow,
             ],
         ):

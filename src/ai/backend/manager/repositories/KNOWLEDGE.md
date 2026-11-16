@@ -3,9 +3,10 @@ name: repository-tx-and-ops
 type: design-rationale
 description: choosing between v2 ops, generic OpsRepository, and db objects, rationale for single-method transactions, single-table specs with field creators, batch_query_with_scopes as the read default
 scope: src/ai/backend/manager/repositories
-keywords: [V2DBOpsProvider, transaction, spec, FieldCreator, batch_query_with_scopes, EmptyOperationScopeError]
+keywords: [V2DBOpsProvider, transaction, spec, FieldCreator, batch_query_with_scopes, EmptyOperationScopeError, session_groups, deleted_at, retention]
 sources:
   - src/ai/backend/manager/repositories/ops
+  - src/ai/backend/manager/repositories/retention
 generated:
   by: claude-code/fable-5
   at: 2026-08-10
@@ -50,9 +51,11 @@ pass-through would remain.
   scoped spec cannot flow through a registration-free path.
 - There is no `delete`: which column marks a row deleted is domain knowledge, so a
   delete action carries a `DataUpdater` and runs the update path.
-- `OpsRepository` turns a missing row into `EntityNotFoundError` / `FieldNotFoundError`
-  rather than `None`: that seam is the only thing it adds over ops. The error's domain
-  is read off the identifier the spec carries, or off the lookup for a row named by key.
+- `OpsRepository` adds two things over ops. It turns a missing row into
+  `EntityNotFoundError` / `FieldNotFoundError` rather than `None`; the error's domain is
+  read off the identifier the spec carries, or off the lookup for a row named by key.
+  It retries a call that fails with an error other than `BackendAIError`, such as a
+  connection that could not be opened.
 
 ## Gradual migration to the ops provider
 
@@ -74,3 +77,18 @@ Hiding multi-table writes in a spec obscures ordering and dependencies. The owne
 
 `batch_query_with_scopes` is the default in order to enforce RBAC scopes. `batch_query_in_global`
 bypasses the filter, so restrict it to superadmin/internal paths, and block empty scopes with `EmptyOperationScopeError`.
+
+## The session group retention boundary
+
+- `session_groups.deleted_at` is the boundary the deployments retention category drains on.
+  A NULL row is never selected, so a group the sweep must keep carries NULL: one a live
+  replica group still holds, and one a user created.
+- Two write paths stamp it, and both only touch a row whose `deleted_at` is still NULL:
+  the lifecycle reconcile when a replica group reaches a terminal lifecycle
+  (`ReplicaGroupLifecycle.terminal_statuses()`), and the endpoint destroy retire pass,
+  which covers a replica group purged before the drain reaches a terminal lifecycle.
+- The migration backfills only the groups a terminal replica group still references. A
+  group no replica group ever referenced belongs to a user, and a group whose replica
+  group rows were purged before the migration leaves no trace. Both keep NULL and are not
+  collected by the deployments category.
+

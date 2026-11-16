@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, Mock
@@ -39,17 +40,17 @@ def mock_etcd() -> Mock:
 
 
 @pytest.fixture
-def base_agent_config() -> AgentUnifiedConfig:
+def base_agent_config(rpc_auth_key_config: dict[str, Path]) -> AgentUnifiedConfig:
     """Create a base agent configuration for testing."""
     return AgentUnifiedConfig(  # type: ignore[call-arg]
-        agent=AgentConfig(backend=AgentBackend.DOCKER),  # type: ignore[call-arg]
+        agent=AgentConfig.model_validate({"backend": AgentBackend.DOCKER, **rpc_auth_key_config}),
         container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),  # type: ignore[call-arg]
         resource=ResourceConfig(),  # type: ignore[call-arg]
         etcd=EtcdConfig.model_validate({
             "namespace": "test",
             "addrs": [HostPortPair(host="127.0.0.1", port=2379)],
-            "user": None,
-            "password": None,
+            "user": "test",
+            "password": "test",
         }),
     )
 

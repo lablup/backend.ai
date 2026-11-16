@@ -174,8 +174,6 @@ async def owner(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(access_key),
                     secret_key=SecretValue(secret_key),
-                    ssh_public_key="ssh-rsa test",
-                    ssh_private_key="test-private-key",
                 ),
                 keypair_resource_policy=resource_policy_fixture,
             )

@@ -258,10 +258,17 @@ class SessionTerminator:
                     is_running = await client.check_running(kernel_info.id)
                 if is_running is False:
                     dead_kernel_ids.append(KernelId(kernel_info.id))
+                    log.info(
+                        "stale kernel found",
+                        kernel_id=kernel_info.id,
+                        session_id=kernel_info.session.session_id,
+                    )
             except Exception as e:
-                log.warning("kernel status check failed", kernel_id=kernel_info.id, exc_info=e)
-
-        if dead_kernel_ids:
-            log.info("stale kernels found", kernel_count=len(dead_kernel_ids))
+                log.warning(
+                    "kernel status check failed",
+                    kernel_id=kernel_info.id,
+                    session_id=kernel_info.session.session_id,
+                    exc_info=e,
+                )
 
         return dead_kernel_ids

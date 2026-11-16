@@ -79,6 +79,7 @@ def registry_snapshot(
 ) -> tuple[object, ...]:
     return (
         registry.id,
+        registry.entity_id if isinstance(registry, ContainerRegistryNode) else registry.entity_id(),
         registry.url,
         registry.registry_name,
         registry.type,

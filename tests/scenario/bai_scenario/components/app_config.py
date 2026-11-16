@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.app_config import AppConfigEntityType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -27,6 +28,7 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigDefinitionData,
 )
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
@@ -148,6 +150,50 @@ class SomeoneGrantedOn[Seat](TestSeedNest[Laid[UserData]]):
         if not self.granted:
             return someone
         role = seed.creating_from(TestSeedRole(self.seat_id, name_hint="seated"), self.seat)
+        for one in self.granted:
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedInGlobal(TestSeedNest[Laid[UserData]]):
+    """global 스코프에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
+
+    global 스코프에서 만들어지는 엔티티의 권한은 global 스코프의 역할로만 부여된다.
+    """
+
+    domain: Laid[DomainData]
+    entity_type: EntityType
+    granted: tuple[Permission, ...] = ()
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
+        if not self.granted:
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"global 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in the global scope"
+            ),
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        if not self.granted:
+            return someone
+        role = seed.creating_from(
+            TestSeedRole(lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="global"),
+            someone,
+        )
         for one in self.granted:
             seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))

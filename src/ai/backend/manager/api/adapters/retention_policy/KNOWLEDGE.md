@@ -33,7 +33,7 @@ A non-existent id is rejected for different reasons for superadmin and for other
 
 ## Search
 
-There are only the eight categories listed in the create section, so policies cannot exceed eight either. A scenario that creates more than 10 rows to check the next page cannot exist, so there is none.
+There are only the nine categories listed in the create section, so policies cannot exceed nine either. A scenario that creates more than 10 rows to check the next page cannot exist, so there is none.
 
 A monitor role passes the superadmin check for reads only. The pair that shows the difference in this entity is "a monitor role user searches" and "a monitor role user creates".
 
