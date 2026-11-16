@@ -43,7 +43,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 멤버 목록에 오릅니다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | 성공 |
-| [다른 프로젝트 스코프의 역할로 사용자를 배정하면, 그 프로젝트의 역할이 아니므로 거부됩니다](#project-assigning-a-user-with-a-role-of-another-project-is-refused) | 거부 |
+| [다른 프로젝트 스코프의 역할로 사용자를 배정하면, 배정할 프로젝트의 역할이 아니므로 거부됩니다](#project-assigning-a-user-with-a-role-of-another-project-is-refused) | 거부 |
 
 **partial_bulk_update**
 
@@ -257,7 +257,7 @@ Then
 
 #### [assigning-a-user-with-a-role-of-another-project-is-refused](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-다른 프로젝트 스코프의 역할로 사용자를 배정하면, 그 프로젝트의 역할이 아니므로 거부됩니다
+다른 프로젝트 스코프의 역할로 사용자를 배정하면, 배정할 프로젝트의 역할이 아니므로 거부됩니다
 
 Given
 

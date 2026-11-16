@@ -376,11 +376,11 @@ class AssigningWithARoleOfAnotherProjectIsRefused(
     @override
     def describe(self) -> str:
         return Says(
-            "다른 프로젝트 스코프의 역할로 사용자를 배정하면, 그 프로젝트의 역할이 아니므로 "
+            "다른 프로젝트 스코프의 역할로 사용자를 배정하면, 배정할 프로젝트의 역할이 아니므로 "
             "거부됩니다",
             english=(
                 "assigning a user with a role in another project's scope is rejected, because "
-                "the role is not one of the project's roles"
+                "the role is not one of the roles of the project assigned to"
             ),
         )
 

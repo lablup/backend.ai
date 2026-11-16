@@ -352,6 +352,67 @@ class TestEnrollUsersInProject:
         return role_id
 
     @pytest.fixture
+    async def other_project_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        personal_project: ProjectID,
+    ) -> RoleID:
+        role_id = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"other-role-{role_id.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=personal_project,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    @pytest.fixture
+    async def domain_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> RoleID:
+        role_id = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            await VirtualEntitySeeder().provision(
+                session, DomainEntityType(), test_domain.domain_id
+            )
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"domain-role-{role_id.hex[:8]}",
+                    scope_type=DomainEntityType(),
+                    scope_id=test_domain.domain_id,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    @pytest.fixture
+    async def inactive_project_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: ProjectID,
+    ) -> RoleID:
+        role_id = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"inactive-role-{role_id.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=test_project,
+                    status=RoleStatus.INACTIVE,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    @pytest.fixture
     def roster_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -396,28 +457,19 @@ class TestEnrollUsersInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        personal_project: ProjectID,
+        other_project_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """A role enrolled in another project is not granted through this project's
         roster."""
-        other_role = RoleID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                RoleRow(
-                    id=other_role,
-                    name=f"other-role-{other_role.hex[:8]}",
-                    scope_type=ProjectEntityType(),
-                    scope_id=personal_project,
-                )
-            )
-
         with pytest.raises(ProjectRoleNotGrantableError):
-            await roster_repository.join_members(test_project, [same_domain_user_1], other_role)
+            await roster_repository.join_members(
+                test_project, [same_domain_user_1], other_project_role
+            )
 
         async with db_with_cleanup.begin_readonly_session() as session:
             granted = await session.scalar(
-                sa.select(UserRoleRow).where(UserRoleRow.role_id == other_role)
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == other_project_role)
             )
             assert granted is None
 
@@ -426,25 +478,11 @@ class TestEnrollUsersInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_domain: DomainFixtureData,
+        domain_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """A role held at the domain scope, such as the domain's admin role, is not
         granted through a project's roster."""
-        domain_role = RoleID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as session:
-            await VirtualEntitySeeder().provision(
-                session, DomainEntityType(), test_domain.domain_id
-            )
-            session.add(
-                RoleRow(
-                    id=domain_role,
-                    name=f"domain-role-{domain_role.hex[:8]}",
-                    scope_type=DomainEntityType(),
-                    scope_id=test_domain.domain_id,
-                )
-            )
-
         with pytest.raises(ProjectRoleNotGrantableError):
             await roster_repository.join_members(test_project, [same_domain_user_1], domain_role)
 
@@ -456,25 +494,15 @@ class TestEnrollUsersInProject:
 
     async def test_enroll_refuses_an_inactive_role_of_the_project(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
+        inactive_project_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
-        inactive_role = RoleID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                RoleRow(
-                    id=inactive_role,
-                    name=f"inactive-role-{inactive_role.hex[:8]}",
-                    scope_type=ProjectEntityType(),
-                    scope_id=test_project,
-                    status=RoleStatus.INACTIVE,
-                )
-            )
-
         with pytest.raises(ProjectRoleNotGrantableError):
-            await roster_repository.join_members(test_project, [same_domain_user_1], inactive_role)
+            await roster_repository.join_members(
+                test_project, [same_domain_user_1], inactive_project_role
+            )
 
     async def test_enroll_refuses_a_role_that_is_not_there(
         self,

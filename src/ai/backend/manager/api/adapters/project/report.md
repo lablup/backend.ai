@@ -43,7 +43,7 @@ Scenario: incomplete 14 / 17
 | scenario | verdict |
 |---|---|
 | [when a project and a role in its scope are in place and a user is assigned, the user is put on the roster](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | answered |
-| [assigning a user with a role in another project's scope is rejected, because the role is not one of the project's roles](#project-assigning-a-user-with-a-role-of-another-project-is-refused) | rejected |
+| [assigning a user with a role in another project's scope is rejected, because the role is not one of the roles of the project assigned to](#project-assigning-a-user-with-a-role-of-another-project-is-refused) | rejected |
 
 **partial_bulk_update**
 
@@ -257,7 +257,7 @@ Then
 
 #### [assigning-a-user-with-a-role-of-another-project-is-refused](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-assigning a user with a role in another project's scope is rejected, because the role is not one of the project's roles
+assigning a user with a role in another project's scope is rejected, because the role is not one of the roles of the project assigned to
 
 Given
 
