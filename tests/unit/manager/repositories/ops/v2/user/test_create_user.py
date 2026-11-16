@@ -40,11 +40,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.user import UserRow
-=======
-from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -176,11 +172,8 @@ async def _create_user(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(f"AK{unique}"),
                     secret_key=SecretValue(f"SK{unique}"),
-<<<<<<< HEAD
                     ssh_public_key="ssh-rsa test",
                     ssh_private_key="test-private-key",
-=======
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
                 ),
                 keypair_resource_policy="default",
             )

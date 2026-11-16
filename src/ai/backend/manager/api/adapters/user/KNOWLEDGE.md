@@ -160,29 +160,16 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 
 | 값 | 어디서 오는가 | 근거 |
 |---|---|---|
-<<<<<<< HEAD
 | 키페어 리소스 정책 | 기본 표시가 붙은 정책 하나를 조회한다. 이 조회는 대체될 예정이라 시나리오에서 다루지 않는다 | `db_source.py:159-166` |
 | 사용자 리소스 정책 | 요청의 기본값 `"default"` | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
 | 개인 프로젝트의 리소스 정책 | 코드가 못박은 이름 `"default"` | `models/project/creators.py:66-67` |
 | 개인 프로젝트 이름 | 사용자 이름. 겹치면 `-2`부터 `-999`, 그래도 겹치면 사용자 id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key, SSH 키쌍 | 생성한다. secret은 키 제공자 풀로 암호화한다 | `models/keypair/row.py:158-202` |
+| access key, secret key | 생성한다. secret은 키 제공자 풀로 암호화한다. SSH 키쌍은 만들지 않는다 | `models/keypair/row.py:173-180` |
 | 기본 키페어의 활성, 관리자 표시 | 사용자 상태가 ACTIVE인지, 역할이 SUPERADMIN이나 ADMIN인지 | `write.py:106-107` |
 | 비밀번호 해시 설정 | 매니저 설정 `auth.password_hash_*` | `adapter.py:491-496` |
 | 도메인 id | 이름으로 조회한다 | `adapter.py:217-220` |
 | 새로 발급하는 키페어의 활성, 관리자, 정책, 요청 한도 | 사용자의 기본 키를 따른다 | `db_source.py:896-901` |
 | 관리자 퍼지의 관리자 사용자 | 요청 외 인자. 공유 폴더와 엔드포인트를 넘겨받는다 | `services/user/service.py:185-259` |
-=======
-| keypair resource policy | reads the one policy carrying the default marker. This read is to be replaced and is not covered by a scenario | `db_source.py:159-166` |
-| user resource policy | the default `"default"` of the request | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
-| resource policy of the personal project | the name `"default"` fixed by the code | `models/project/creators.py:66-67` |
-| personal project name | the user name. On a collision `-2` through `-999`, and on a further collision the user id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key | created. The secret is encrypted with the key provider pool | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py` |
-| active and admin markers of the default keypair | whether the user status is ACTIVE and whether the role is SUPERADMIN or ADMIN | `write.py:106-107` |
-| password hash setting | the manager setting `auth.password_hash_*` | `adapter.py:491-496` |
-| domain id | read by name | `adapter.py:217-220` |
-| active flag, admin flag, policy and rate limit of a newly issued keypair | follow the default key of the user | `db_source.py:896-901` |
-| admin user of the admin purge | an argument outside the request. It receives the shared vfolders and deployment endpoints | `services/user/service.py:185-259` |
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 
 ## 5. 통째로 써야 하는 합성 연산
 

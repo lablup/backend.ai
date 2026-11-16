@@ -47,12 +47,8 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-<<<<<<< HEAD
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserStatus, users
-=======
-from ai.backend.manager.models.session.row import SessionRow
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -151,11 +147,8 @@ async def owner(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(access_key),
                     secret_key=SecretValue(secret_key),
-<<<<<<< HEAD
                     ssh_public_key="ssh-rsa test",
                     ssh_private_key="test-private-key",
-=======
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
                 ),
                 keypair_resource_policy=resource_policy_fixture,
             )

@@ -22,10 +22,7 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.data.user.types import UserStatus
-<<<<<<< HEAD
 from ai.backend.manager.models.hasher.types import PasswordInfo
-=======
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue

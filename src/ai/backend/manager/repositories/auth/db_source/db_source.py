@@ -56,12 +56,7 @@ from ai.backend.manager.models.keypair.row import (
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
-<<<<<<< HEAD
 from ai.backend.manager.models.user import (
-=======
-from ai.backend.manager.models.user.creators import UserCreator
-from ai.backend.manager.models.user.row import (
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
     UserRole,
     UserRow,
     UserStatus,
@@ -71,10 +66,6 @@ from ai.backend.manager.models.user.row import (
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-<<<<<<< HEAD
-=======
-from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator

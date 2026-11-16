@@ -77,15 +77,8 @@ from ai.backend.manager.models.session import (
     by_status,
     by_user_id,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
-=======
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
-from ai.backend.manager.models.session.searchers import SessionSearcher
-from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -105,10 +98,6 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-<<<<<<< HEAD
-=======
-from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
->>>>>>> 07042686 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,

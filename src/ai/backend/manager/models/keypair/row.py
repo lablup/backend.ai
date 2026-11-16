@@ -172,6 +172,18 @@ def generate_ssh_keypair() -> tuple[str, str]:
 
 async def generate_keypair_data(key_provider_pool: KeyProviderPool) -> KeyPairSecrets:
     ak, sk = generate_keypair()
+    return KeyPairSecrets(
+        access_key=ak,
+        secret_key=await key_provider_pool.encrypt(sk, KEYPAIR_SECRET_KEY_CONTEXT),
+        ssh_public_key=None,
+        ssh_private_key=None,
+    )
+
+
+async def generate_keypair_data_with_ssh_keypair(
+    key_provider_pool: KeyProviderPool,
+) -> KeyPairSecrets:
+    ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
     return KeyPairSecrets(
         access_key=ak,
