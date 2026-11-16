@@ -34,6 +34,25 @@ class TestModelServiceStringCommand:
         assert cmdargs == ["python", "service.py", "--flag", "a b"]
         assert env == {}
 
+    async def test_without_shell_interpolates_before_split(self) -> None:
+        service_parser = ServiceParser({"runtime_path": "/usr/bin/python3"})
+        service_parser.add_model_service(
+            "model",
+            {
+                "start_command": "{{ runtime_path }} -m server",
+                "shell": None,
+                "pre_start_actions": [],
+            },
+        )
+
+        cmdargs, _ = await service_parser.start_service(
+            "model",
+            set(),
+            {"interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]}},
+        )
+
+        assert cmdargs == ["/usr/bin/python3", "-m", "server"]
+
     async def test_with_shell_uses_shell_c(self, service_parser: ServiceParser) -> None:
         service_parser.add_model_service(
             "model",

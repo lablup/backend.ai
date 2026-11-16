@@ -136,12 +136,17 @@ class ServiceParser:
         # Convert a script into cmdargs
         start_command = service.command
         if isinstance(start_command, str):
+            # Interpolate before splitting, so ``{{ var }}`` is not cut at its spaces.
+            # Interpolate return command wrapped in a list, so [0] gives the interpolated string
+            start_command = interpolator.apply([start_command])[0]
             shell = service.shell
             if shell:
                 start_command = [shell, "-c", start_command]
             else:
                 start_command = shlex.split(start_command)
-        cmdargs = [*start_command]
+        else:
+            start_command = interpolator.apply(list(start_command))
+        extra_args: list[str] = []
         env = {}
 
         additional_arguments = dict(service.default_arguments)
@@ -153,12 +158,12 @@ class ServiceParser:
                     )
                 additional_arguments[argname] = argvalue
         for arg_name, arg_value in additional_arguments.items():
-            cmdargs.append(arg_name)
+            extra_args.append(arg_name)
             if isinstance(arg_value, str):
-                cmdargs.append(arg_value)
+                extra_args.append(arg_value)
             elif isinstance(arg_value, list):
-                cmdargs += arg_value
-        cmdargs = interpolator.apply(cmdargs)
+                extra_args += arg_value
+        cmdargs = [*start_command, *interpolator.apply(extra_args)]
 
         if "envs" in opts.keys() and opts["envs"]:
             for env_name, env_value in opts["envs"].items():
