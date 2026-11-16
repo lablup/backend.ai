@@ -6,6 +6,7 @@ import tomli
 
 from ai.backend.common.config import (
     DEFAULT_SHELL,
+    DefaultModelDefinition,
     ModelConfig,
     ModelConfigDraft,
     ModelDefinition,
@@ -466,13 +467,40 @@ class TestModelServiceArgumentInterpolation:
             ("{", "}"),
         ]
 
+    def test_runtime_variant_baseline_interpolation_reaches_revision(self) -> None:
+        baseline = DefaultModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "service": {
+                        "port": 8080,
+                        "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
+                    },
+                }
+            ]
+        })
+        override = ModelDefinitionDraft.model_validate({"models": [{"model_path": "/models"}]})
+
+        service = baseline.to_draft().merge(override).to_resolved().models[0].service
+
+        assert service is not None
+        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("{{", "}}")]
+
+    def test_runtime_variant_baseline_rejects_empty_delimiters(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            DefaultModelDefinition.model_validate({
+                "models": [
+                    {"name": "demo", "service": {"port": 8080, "interpolation": {"delimiters": []}}}
+                ]
+            })
+
     @pytest.mark.parametrize(
         "interpolation",
-        [{"delimiters": []}, {"delimiters": [{"start": "", "end": "}}"}]}],
+        [{}, {"delimiters": []}, {"delimiters": [{"start": "", "end": "}}"}]}],
     )
-    def test_rejects_empty_delimiters(self, interpolation: dict[str, Any]) -> None:
+    def test_draft_rejects_empty_delimiters(self, interpolation: dict[str, Any]) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            ModelServiceConfig.model_validate({"port": 8080, "interpolation": interpolation})
+            ModelServiceConfigDraft.model_validate({"interpolation": interpolation})
 
 
 class TestHealthCheckJudgment:

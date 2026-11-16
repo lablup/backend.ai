@@ -61,6 +61,10 @@ class TestModelServiceStringCommand:
             pytest.param(
                 {"interpolation": {"delimiters": list(LEGACY_DELIMITERS)}}, id="explicit-legacy"
             ),
+            pytest.param(
+                {"interpolation": {"delimiters": list(reversed(LEGACY_DELIMITERS))}},
+                id="explicit-legacy-reversed",
+            ),
         ],
     )
     async def test_without_shell_legacy_keeps_spaced_value_as_one_arg(

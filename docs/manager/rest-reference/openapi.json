@@ -50274,7 +50274,7 @@
         "additionalProperties": true,
         "properties": {
           "delimiters": {
-            "description": "Delimiters that mark the variables to fill in the service arguments. Defaults to ``${{ }}`` and ``{ }``.",
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
             "items": {
               "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiter"
             },
@@ -50283,6 +50283,9 @@
             "type": "array"
           }
         },
+        "required": [
+          "delimiters"
+        ],
         "title": "ServiceArgumentInterpolation",
         "type": "object"
       },

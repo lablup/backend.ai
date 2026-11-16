@@ -19338,6 +19338,11 @@ type RuntimeVariantModelServiceConfig {
 
   """Default model service health-check settings."""
   healthCheck: RuntimeVariantModelHealthCheck
+
+  """
+  Added in 26.10.0. Default variable syntax of the service arguments. Null when the runtime variant leaves it unset.
+  """
+  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.4.2. Order specification."""

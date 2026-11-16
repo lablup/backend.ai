@@ -206,15 +206,8 @@ class ServiceArgumentInterpolationDelimiter(BaseConfigModel):
 
 class ServiceArgumentInterpolation(BaseConfigModel):
     delimiters: list[ServiceArgumentInterpolationDelimiter] = Field(
-        default_factory=lambda: [
-            ServiceArgumentInterpolationDelimiter(start="${{", end="}}"),
-            ServiceArgumentInterpolationDelimiter(start="{", end="}"),
-        ],
         min_length=1,
-        description=(
-            "Delimiters that mark the variables to fill in the service arguments. "
-            "Defaults to ``${{ }}`` and ``{ }``."
-        ),
+        description="Delimiters that mark the variables to fill in the service arguments.",
     )
 
 
@@ -325,8 +318,16 @@ class ModelServiceConfig(BaseConfigModel):
         description="Health check configuration for the model service.",
     )
     interpolation: ServiceArgumentInterpolation = Field(
-        default_factory=ServiceArgumentInterpolation,
-        description=f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments.",
+        default_factory=lambda: ServiceArgumentInterpolation(
+            delimiters=[
+                ServiceArgumentInterpolationDelimiter(start="${{", end="}}"),
+                ServiceArgumentInterpolationDelimiter(start="{", end="}"),
+            ]
+        ),
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Defaults to ``${{ }}`` and ``{ }``."
+        ),
     )
 
     @model_validator(mode="before")
@@ -823,6 +824,7 @@ class DefaultModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int = Field(gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
