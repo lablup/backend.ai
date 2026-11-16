@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload, with_expression
+from sqlalchemy.orm import with_expression
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
@@ -14,9 +14,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
-)
-from ai.backend.manager.models.deployment_policy.searchable_fields import (
-    DeploymentPolicySearchableFields,
 )
 from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
@@ -69,33 +66,23 @@ def current_revision_id_subquery() -> sa.ScalarSelect[Any]:
 
 @dataclass
 class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
-    """The deployment rows a page read returns.
-
-    The active revision and the policy live on other rows, so the groups holding them
-    are loaded with the page and read onto the projection.
-    """
+    """The deployment rows a page read returns, with the active revision read onto the
+    projection. The policy lives on its own row: the DeploymentDBSource searches fill it."""
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
         return sa.select(EndpointRow).options(
             with_expression(EndpointRow.current_revision_id, current_revision_id_subquery()),
-            selectinload(EndpointRow.deployment_policy),
         )
 
     @override
     def to_data(self, row: EndpointRow) -> ModelDeploymentData:
         data = DeploymentSearchableFields.own.to_data(row)
         current_revision_id = row.current_revision_id
-        policy = (
-            DeploymentPolicySearchableFields.own.to_data(row.deployment_policy)
-            if row.deployment_policy is not None
-            else None
-        )
         return replace(
             data,
             current_revision_id=current_revision_id,
             revision_history_ids=[current_revision_id] if current_revision_id is not None else [],
-            policy=policy,
         )
 
 

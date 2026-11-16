@@ -228,6 +228,9 @@ from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
 )
+from ai.backend.manager.services.deployment.actions.search_deployments import (
+    GlobalSearchDeploymentsAction,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
     BulkGetDeploymentPresetsAction,
@@ -1361,6 +1364,8 @@ _OPS_ACTIONS_WIRED_TO_A_SERVICE: dict[type[Any], str] = {
     PurgeAppConfigDefinitionAction: "purges the definition's allow-list entries and fragments first",
     PurgeAppConfigAllowListAction: "purges the fragments the entry admits first",
     UpdateDeploymentPresetAction: "replaces the preset's resource slots in the same transaction",
+    ScopedSearchDeploymentsAction: "reads each deployment's policy in the same transaction",
+    GlobalSearchDeploymentsAction: "reads each deployment's policy in the same transaction",
     CreatePresetAction: "validates the query template before insert",
     CreateRolePresetAction: "validates that the role name template renders",
     UpdateRolePresetAction: "validates the template and re-syncs the derived roles",

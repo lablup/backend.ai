@@ -79,6 +79,7 @@ from ai.backend.manager.data.deployment.types import (
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
     ModelRevisionData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -220,6 +221,7 @@ from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, SearcherResult
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
@@ -1215,6 +1217,30 @@ class DeploymentDBSource:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def scoped_search_deployments(
+        self, scoped: ScopedSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of the deployments the scopes reach, each with its policy."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.scoped_search(scoped)
+            return await self._attach_policies(r, result)
+
+    async def global_search_deployments(
+        self, global_searcher: GlobalSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of every deployment, each with its policy."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.global_search(global_searcher)
+            return await self._attach_policies(r, result)
+
+    async def _attach_policies(
+        self, r: V2ReadOps, result: SearcherResult[ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """``result`` with the policy of each deployment that has one."""
+        policies = await self._read_policies(r, [item.id for item in result.items])
+        items = [replace(item, policy=policies.get(item.id)) for item in result.items]
+        return replace(result, items=items)
 
     async def get_endpoint_id_by_session(
         self,
