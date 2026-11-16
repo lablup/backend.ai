@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import sqlalchemy as sa
-from pydantic import AnyUrl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
@@ -618,15 +617,14 @@ class EndpointRepository:
         preferred_port: int | None = None
         preferred_subdomain: str | None = None
         worker_id: UUID | None = None
-        if item.tags.endpoint.existing_url:
-            url = URL(item.tags.endpoint.existing_url)
+        existing_url = item.tags.endpoint.existing_url
+        if existing_url is not None:
             (
                 worker_id,
                 preferred_port,
                 preferred_subdomain,
-            ) = await self._match_worker_for_existing_url(sess, url)
+            ) = await self._match_worker_for_existing_url(sess, URL(str(existing_url)))
 
-        existing_url = item.tags.endpoint.existing_url
         session_cfg = SessionConfig(
             id=None,
             access_key=None,
@@ -637,7 +635,7 @@ class EndpointRepository:
         endpoint_cfg = EndpointConfig(
             id=item.tags.endpoint.id,
             runtime_variant=RuntimeVariant(item.tags.endpoint.runtime_variant),
-            existing_url=AnyUrl(existing_url) if existing_url is not None else None,
+            existing_url=existing_url,
         )
 
         circuit, _worker = await add_circuit(

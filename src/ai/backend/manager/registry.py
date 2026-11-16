@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from pydantic import AnyUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
 from typeguard import check_type
@@ -1964,7 +1965,7 @@ class AgentRegistry:
                 endpoint=EndpointTagsModel(
                     id=DeploymentID(endpoint.id),
                     runtime_variant=variant_name,
-                    existing_url=str(endpoint.url) if endpoint.url else None,
+                    existing_url=AnyUrl(endpoint.url) if endpoint.url else None,
                 ),
             ),
             open_to_public=endpoint.open_to_public,

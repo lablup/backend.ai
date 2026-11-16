@@ -70,7 +70,7 @@ class EndpointTagsModel(BaseFieldModel):
             "``RuntimeVariantID`` at the wire boundary."
         ),
     )
-    existing_url: str | None = Field(
+    existing_url: AnyUrl | None = Field(
         default=None,
         description=(
             "Caller-supplied URL to reuse for this endpoint (e.g. for "

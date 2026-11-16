@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal, DecimalException
 from uuid import UUID
 
+from pydantic import AnyUrl
+
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
@@ -511,7 +513,9 @@ class DeploymentExecutor:
                 endpoint=EndpointTagsModel(
                     id=deployment.id,
                     runtime_variant=variant.name,
-                    existing_url=str(deployment.network.url) if deployment.network.url else None,
+                    existing_url=(
+                        AnyUrl(deployment.network.url) if deployment.network.url else None
+                    ),
                 ),
             ),
             open_to_public=deployment.network.open_to_public,
