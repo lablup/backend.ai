@@ -25,6 +25,7 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.resource import ProjectRoleNotGrantableError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -105,8 +106,18 @@ class ADomainAndAPolicy(Given[Any, ADomainAPolicyAndACaller]):
 class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
     """프로젝트 하나와 그 스코프의 역할, 올릴 사람, 그리고 슈퍼관리자."""
 
+    role_in_another_project: bool = False
+
     @override
     def describe(self) -> str:
+        if self.role_in_another_project:
+            return Says(
+                "프로젝트 하나와 다른 프로젝트 스코프의 역할, 배정할 사용자, 그리고 superadmin",
+                english=(
+                    "one project, a role in another project's scope, the user to assign, "
+                    "and the superadmin"
+                ),
+            )
         return Says(
             "프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 superadmin",
             english="one project, the role in its scope, the user to assign, and the superadmin",
@@ -118,8 +129,13 @@ class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
         policy = await seeding.once(TestSeedProjectPolicy())
         project = await seeding.creating_from_two(TestSeedProject(name_hint=MADE), domain, policy)
         member = await seeding.within(SomeoneOf(domain))
+        role_holder = project
+        if self.role_in_another_project:
+            role_holder = await seeding.creating_from_two(
+                TestSeedProject(name_hint="other"), domain, policy
+            )
         role = await seeding.creating_from(
-            TestSeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), project
+            TestSeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), role_holder
         )
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         return AProjectAMemberAndACaller(
@@ -349,10 +365,43 @@ class AssigningAUserPutsThemOnTheRoster(
         return TheRosterHoldsTheMember()
 
 
+@dataclass(frozen=True)
+class AssigningWithARoleOfAnotherProjectIsRefused(
+    Scenario[TestSeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "assigning-a-user-with-a-role-of-another-project-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "다른 프로젝트 스코프의 역할로 사용자를 배정하면, 그 프로젝트의 역할이 아니므로 "
+            "거부됩니다",
+            english=(
+                "assigning a user with a role in another project's scope is rejected, because "
+                "the role is not one of the project's roles"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAMemberAndACaller]:
+        return AProjectAndAMember(role_in_another_project=True)
+
+    @override
+    def when(self) -> When[AProjectAMemberAndACaller, ProjectAdapter, Answer]:
+        return AssigningTheMember()
+
+    @override
+    def then(self) -> Then[AProjectAMemberAndACaller, Answer]:
+        return TheCallIsRefused(ProjectRoleNotGrantableError)
+
+
 SCENARIOS: list[Scenario[TestSeedingSession, Any, ProjectAdapter, Answer]] = [
     TheSuperadminMakesAProject(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotMakeAProject(),
     AssigningAUserPutsThemOnTheRoster(),
+    AssigningWithARoleOfAnotherProjectIsRefused(),
 ]
 
 

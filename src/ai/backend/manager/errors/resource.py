@@ -95,6 +95,20 @@ class ProjectMemberNotJoinableError(EntityError, web.HTTPBadRequest):
         )
 
 
+class ProjectRoleNotGrantableError(EntityError, web.HTTPBadRequest):
+    """Raised when the role named for a project's roster is not an active role enrolled
+    in that project."""
+
+    error_type = "https://api.backend.ai/probs/project-role-not-grantable"
+    error_title = "The role is not one of the project's roles."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
 class ModelStoreProjectLeaveError(EntityError, web.HTTPConflict):
     """Raised when a write would take a user off a model-store project's roster."""
 
