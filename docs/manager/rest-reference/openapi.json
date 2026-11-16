@@ -69420,24 +69420,6 @@
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
-      "patch": {
-        "operationId": "auth.generate_ssh_keypair",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
-      },
       "post": {
         "operationId": "auth.upload_ssh_keypair",
         "tags": [

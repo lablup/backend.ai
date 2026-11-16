@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -13,9 +13,6 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
 from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-)
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
 )
@@ -96,38 +93,6 @@ async def test_get_ssh_keypair_nonexistent_key(
 
     assert result.public_key == ""
     mock_user_repository.default_ssh_keypair.assert_called_once_with(action.user_id)
-
-
-# Test Generate SSH Keypair
-async def test_generate_ssh_keypair(
-    auth_service: AuthService,
-    mock_user_repository: AsyncMock,
-) -> None:
-    """Test SSH keypair generation"""
-    action = GenerateSSHKeypairAction(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        access_key="AKIA1234567890ABCDEF",
-    )
-
-    # Mock the keypair generation
-    mock_pubkey = "ssh-rsa AAAAB3NzaC1yc2EGENERATED..."
-    mock_privkey = "-----BEGIN RSA PRIVATE KEY-----\nGENERATED...\n-----END RSA PRIVATE KEY-----"
-
-    with patch(
-        "ai.backend.manager.services.auth.service.generate_ssh_keypair",
-        return_value=(mock_pubkey, mock_privkey),
-    ):
-        result = await auth_service.generate_ssh_keypair(action)
-
-    # Verify repository was called with generated keys
-    mock_user_repository.replace_default_ssh_keypair.assert_called_once_with(
-        action.user_id,
-        mock_pubkey,
-        mock_privkey,
-    )
-
-    assert result.ssh_keypair.ssh_public_key == mock_pubkey
-    assert result.ssh_keypair.ssh_private_key == mock_privkey
 
 
 # Test Upload SSH Keypair
