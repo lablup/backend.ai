@@ -380,8 +380,6 @@ class BackendAIError(web.HTTPError, metaclass=ErrorMeta):
         self, extra_msg: str | None = None, extra_data: Any | None = None, **kwargs: Any
     ) -> None:
         if self.status_code == web.HTTPException.status_code:
-            # A status declared on this class would precede a subclass's web.HTTP* base in the
-            # MRO, so a subclass without one gets 500 on the instance instead.
             self.status_code = web.HTTPInternalServerError.status_code
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
