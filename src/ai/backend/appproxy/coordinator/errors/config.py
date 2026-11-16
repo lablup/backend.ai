@@ -17,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class MissingTraefikConfigError(BackendAIError):
+class MissingTraefikConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when Traefik configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-traefik-config"
@@ -32,6 +32,7 @@ class MissingTraefikConfigError(BackendAIError):
         )
 
 
+<<<<<<< HEAD
 class InvalidTraefikEtcdCredentialsError(BackendAIError):
     """Raised when only one of the Traefik etcd user and password is set."""
 
@@ -48,6 +49,9 @@ class InvalidTraefikEtcdCredentialsError(BackendAIError):
 
 
 class MissingDatabaseURLError(BackendAIError):
+=======
+class MissingDatabaseURLError(BackendAIError, web.HTTPInternalServerError):
+>>>>>>> f7d92556 (fix(BA-9045): give every AppProxy error class an HTTP status (#17125))
     """Raised when database URL is missing from configuration."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-database-url"
@@ -62,7 +66,7 @@ class MissingDatabaseURLError(BackendAIError):
         )
 
 
-class MissingConfigFileError(BackendAIError):
+class MissingConfigFileError(BackendAIError, web.HTTPInternalServerError):
     """Raised when configuration file is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-config-file"
@@ -77,7 +81,7 @@ class MissingConfigFileError(BackendAIError):
         )
 
 
-class MissingFrontendConfigError(BackendAIError):
+class MissingFrontendConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when frontend configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-frontend-config"
@@ -92,7 +96,7 @@ class MissingFrontendConfigError(BackendAIError):
         )
 
 
-class InvalidURLError(BackendAIError):
+class InvalidURLError(BackendAIError, web.HTTPBadRequest):
     """Raised when URL is invalid or missing required components."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-url"
@@ -122,7 +126,7 @@ class InvalidSessionParameterError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidEnumTypeError(BackendAIError):
+class InvalidEnumTypeError(BackendAIError, web.HTTPInternalServerError):
     """Raised when enum type is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-enum-type"
@@ -137,7 +141,7 @@ class InvalidEnumTypeError(BackendAIError):
         )
 
 
-class TransactionResultError(BackendAIError):
+class TransactionResultError(BackendAIError, web.HTTPInternalServerError):
     """Raised when transaction did not produce a result."""
 
     error_type = "https://api.backend.ai/probs/appproxy/transaction-result-error"
@@ -152,7 +156,7 @@ class TransactionResultError(BackendAIError):
         )
 
 
-class LockContextNotInitializedError(BackendAIError):
+class LockContextNotInitializedError(BackendAIError, web.HTTPInternalServerError):
     """Raised when lock context is not initialized."""
 
     error_type = "https://api.backend.ai/probs/appproxy/lock-context-not-initialized"
@@ -167,7 +171,7 @@ class LockContextNotInitializedError(BackendAIError):
         )
 
 
-class CleanupContextNotInitializedError(BackendAIError):
+class CleanupContextNotInitializedError(BackendAIError, web.HTTPInternalServerError):
     """Raised when cleanup context is not initialized."""
 
     error_type = "https://api.backend.ai/probs/appproxy/cleanup-context-not-initialized"
@@ -182,7 +186,7 @@ class CleanupContextNotInitializedError(BackendAIError):
         )
 
 
-class MissingProfilingConfigError(BackendAIError):
+class MissingProfilingConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when profiling configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-profiling-config"
@@ -197,7 +201,7 @@ class MissingProfilingConfigError(BackendAIError):
         )
 
 
-class MissingRouteInfoError(BackendAIError):
+class MissingRouteInfoError(BackendAIError, web.HTTPInternalServerError):
     """Raised when route connection info is missing from Redis."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-route-info"
@@ -212,7 +216,7 @@ class MissingRouteInfoError(BackendAIError):
         )
 
 
-class MissingHealthCheckInfoError(BackendAIError):
+class MissingHealthCheckInfoError(BackendAIError, web.HTTPInternalServerError):
     """Raised when health check info is missing from Redis."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-health-check-info"
@@ -225,3 +229,21 @@ class MissingHealthCheckInfoError(BackendAIError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+<<<<<<< HEAD
+=======
+
+
+class UnsupportedServiceDiscoveryTypeError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the configured service discovery type is not supported by the coordinator."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/unsupported-service-discovery-type"
+    error_title = "Service discovery type is not supported."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+>>>>>>> f7d92556 (fix(BA-9045): give every AppProxy error class an HTTP status (#17125))
