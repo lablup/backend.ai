@@ -38,18 +38,11 @@ from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-<<<<<<< HEAD
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
     keypair_owner_association_stmt,
 )
 from ai.backend.manager.models.user import (
-=======
-from ai.backend.manager.models.specs.lookup import DataLookup
-from ai.backend.manager.models.specs.querier import DataQuerier
-from ai.backend.manager.models.user.creators import UserCreator
-from ai.backend.manager.models.user.row import (
->>>>>>> 070426869 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
     UserRole,
     UserRow,
     UserStatus,
@@ -57,7 +50,6 @@ from ai.backend.manager.models.user.row import (
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-<<<<<<< HEAD
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.types import SearchScope
@@ -66,15 +58,6 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
     RoleManager,
     UserSystemRoleSpec,
 )
-=======
-from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
-from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.views.auth import UserCredential
->>>>>>> 070426869 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -153,7 +136,6 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-<<<<<<< HEAD
         user_data: dict[str, Any],
         keypair_data: dict[str, Any],
     ) -> UserData:
@@ -180,24 +162,6 @@ class AuthDBSource:
             await conn.execute(keypair_query)
             await conn.execute(
                 keypair_owner_association_stmt(user_row.uuid, keypair_data["access_key"])
-=======
-        user_spec: UserCreator,
-        project_ids: Collection[ProjectID],
-        *,
-        keypair_resource_policy: str,
-        keypair_rate_limit: int | None = None,
-    ) -> UserCreationData:
-        """Provision a signup user in one transaction: the row, its default keypair,
-        and its domain/project (model-store included) scope enrollments."""
-        async with self._user_ops_provider.write_ops() as w:
-            result = await w.create_user(
-                FullUserCreator(
-                    user=user_spec,
-                    keypair_secrets=await generate_keypair_data(self._key_provider_pool),
-                    keypair_resource_policy=keypair_resource_policy,
-                    keypair_rate_limit=keypair_rate_limit,
-                )
->>>>>>> 070426869 (fix(BA-9042): stop generating an SSH keypair when a user is created (#17109))
             )
 
             # Create RBAC system role and map user to role
