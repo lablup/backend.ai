@@ -4,6 +4,8 @@ Configuration-related exceptions for the worker.
 
 from __future__ import annotations
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -13,7 +15,7 @@ from ai.backend.common.exception import (
 )
 
 
-class MissingTraefikConfigError(BackendAIError):
+class MissingTraefikConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when Traefik configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-traefik-config"
@@ -27,7 +29,7 @@ class MissingTraefikConfigError(BackendAIError):
         )
 
 
-class MissingAnnounceAddressError(BackendAIError):
+class MissingAnnounceAddressError(BackendAIError, web.HTTPInternalServerError):
     """Raised when announce address is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-announce-address"
@@ -41,7 +43,7 @@ class MissingAnnounceAddressError(BackendAIError):
         )
 
 
-class MissingProfilingConfigError(BackendAIError):
+class MissingProfilingConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when profiling configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-profiling-config"
@@ -55,7 +57,7 @@ class MissingProfilingConfigError(BackendAIError):
         )
 
 
-class MissingPortConfigError(BackendAIError):
+class MissingPortConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when port configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-port-config"
@@ -69,7 +71,7 @@ class MissingPortConfigError(BackendAIError):
         )
 
 
-class MissingPortProxyConfigError(BackendAIError):
+class MissingPortProxyConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when port proxy configuration is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-port-proxy-config"
@@ -83,7 +85,7 @@ class MissingPortProxyConfigError(BackendAIError):
         )
 
 
-class CleanupContextNotInitializedError(BackendAIError):
+class CleanupContextNotInitializedError(BackendAIError, web.HTTPInternalServerError):
     """Raised when cleanup context is not initialized."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/cleanup-context-not-initialized"

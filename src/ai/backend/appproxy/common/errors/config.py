@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -11,7 +13,7 @@ from ai.backend.common.exception import (
 )
 
 
-class ConfigValidationError(BackendAIError):
+class ConfigValidationError(BackendAIError, web.HTTPInternalServerError):
     """Base class for configuration validation errors."""
 
     error_type = "https://api.backend.ai/probs/appproxy/config-validation-error"
@@ -25,7 +27,7 @@ class ConfigValidationError(BackendAIError):
         )
 
 
-class InvalidUIDTypeError(BackendAIError):
+class InvalidUIDTypeError(BackendAIError, web.HTTPInternalServerError):
     """Raised when UID type is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-uid-type"
@@ -39,7 +41,7 @@ class InvalidUIDTypeError(BackendAIError):
         )
 
 
-class UserNotFoundError(BackendAIError):
+class UserNotFoundError(BackendAIError, web.HTTPInternalServerError):
     """Raised when specified user is not found in system."""
 
     error_type = "https://api.backend.ai/probs/appproxy/user-not-found"
@@ -53,7 +55,7 @@ class UserNotFoundError(BackendAIError):
         )
 
 
-class InvalidGIDTypeError(BackendAIError):
+class InvalidGIDTypeError(BackendAIError, web.HTTPInternalServerError):
     """Raised when GID type is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-gid-type"
@@ -67,7 +69,7 @@ class InvalidGIDTypeError(BackendAIError):
         )
 
 
-class GroupNotFoundError(BackendAIError):
+class GroupNotFoundError(BackendAIError, web.HTTPInternalServerError):
     """Raised when specified group is not found in system."""
 
     error_type = "https://api.backend.ai/probs/appproxy/group-not-found"
@@ -81,7 +83,7 @@ class GroupNotFoundError(BackendAIError):
         )
 
 
-class MissingAnnotationError(BackendAIError):
+class MissingAnnotationError(BackendAIError, web.HTTPInternalServerError):
     """Raised when field annotation is missing."""
 
     error_type = "https://api.backend.ai/probs/appproxy/missing-annotation"
