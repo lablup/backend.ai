@@ -122,7 +122,7 @@ class AllowDomainContainerRegistriesInput(BaseRequestModel):
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_ids: NonEmptyList[UUID] = Field(
-        description="IDs of the container registries to allow for the domain."
+        description="IDs of the container registries to allow for the domain. At least one."
     )
 
 
@@ -131,7 +131,7 @@ class DisallowDomainContainerRegistriesInput(BaseRequestModel):
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_ids: NonEmptyList[UUID] = Field(
-        description="IDs of the container registries to disallow for the domain."
+        description="IDs of the container registries to disallow for the domain. At least one."
     )
 
 

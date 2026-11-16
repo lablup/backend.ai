@@ -179,7 +179,7 @@ class AllowDomainContainerRegistriesInputGQL(
 ):
     domain_id: UUID = gql_field(description="ID of the domain.")
     container_registry_ids: list[UUID] = gql_field(
-        description="IDs of the container registries to allow for the domain."
+        description="IDs of the container registries to allow for the domain. At least one."
     )
 
 
@@ -195,7 +195,7 @@ class DisallowDomainContainerRegistriesInputGQL(
 ):
     domain_id: UUID = gql_field(description="ID of the domain.")
     container_registry_ids: list[UUID] = gql_field(
-        description="IDs of the container registries to disallow for the domain."
+        description="IDs of the container registries to disallow for the domain. At least one."
     )
 
 

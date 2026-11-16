@@ -969,7 +969,7 @@ input AllowDomainContainerRegistriesInput
   """ID of the domain."""
   domainId: UUID!
 
-  """IDs of the container registries to allow for the domain."""
+  """IDs of the container registries to allow for the domain. At least one."""
   containerRegistryIds: [UUID!]!
 }
 
@@ -7507,7 +7507,9 @@ input DisallowDomainContainerRegistriesInput
   """ID of the domain."""
   domainId: UUID!
 
-  """IDs of the container registries to disallow for the domain."""
+  """
+  IDs of the container registries to disallow for the domain. At least one.
+  """
   containerRegistryIds: [UUID!]!
 }
 
