@@ -830,27 +830,9 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-<<<<<<< HEAD
-            model_store_project_gids = (
-                (
-                    await db_session.execute(
-                        sa.select(ProjectRow.id).where(
-                            (ProjectRow.type == ProjectType.MODEL_STORE)
-                            & (ProjectRow.domain_name == graph_ctx.user["domain_name"])
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
             additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
-                VFolderRow.group.in_(model_store_project_gids)
+                cls._visible_condition(graph_ctx.user["domain_name"])
             )
-=======
-            additional_cond = (
-                VFolderRow.status.not_in(VFolderOperationStatus.dead())
-            ) & cls._visible_condition(graph_ctx.user["domain_name"])
->>>>>>> 9d8684d8 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
             query = query.where(additional_cond)
             cnt_query = cnt_query.where(additional_cond)
             query = query.options(
