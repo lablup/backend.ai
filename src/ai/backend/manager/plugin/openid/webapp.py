@@ -30,7 +30,7 @@ from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
+from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
     keypair_owner_association_stmt,
@@ -129,7 +129,6 @@ def generate_keypair_data(
     token: Mapping[str, Any], user_uuid: uuid.UUID, resource_policy: str
 ) -> Mapping[str, Any]:
     ak, sk = generate_keypair()
-    pubkey, privkey = generate_ssh_keypair()
     return {
         "user_id": token["email"],
         "access_key": ak,
@@ -140,8 +139,6 @@ def generate_keypair_data(
         "rate_limit": 10000,
         "num_queries": 0,
         "user": user_uuid,
-        "ssh_public_key": pubkey,
-        "ssh_private_key": privkey,
     }
 
 
@@ -217,8 +214,6 @@ async def create_user_if_not_exists(
                 rate_limit=keypair_data["rate_limit"],
                 num_queries=keypair_data["num_queries"],
                 user=keypair_data["user"],
-                ssh_public_key=keypair_data["ssh_public_key"],
-                ssh_private_key=keypair_data["ssh_private_key"],
             )
             dbsess.add(keypair)
             await dbsess.flush()

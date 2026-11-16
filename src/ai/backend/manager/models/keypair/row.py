@@ -244,6 +244,16 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, o
 
 def generate_keypair_data() -> KeyPairSecrets:
     ak, sk = generate_keypair()
+    return KeyPairSecrets(
+        access_key=ak,
+        secret_key=sk,
+        ssh_public_key=None,
+        ssh_private_key=None,
+    )
+
+
+def generate_keypair_data_with_ssh_keypair() -> KeyPairSecrets:
+    ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
     return KeyPairSecrets(
         access_key=ak,
