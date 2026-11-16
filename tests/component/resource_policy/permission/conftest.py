@@ -73,7 +73,6 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -373,9 +372,6 @@ async def seeded_caller(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(access_key),
                     secret_key=SecretValue(secret_key),
-                ),
-                ssh_keypair=SSHKeypairCreator(
-                    public_key="ssh-rsa test", private_key=None, is_default=True
                 ),
                 keypair_resource_policy=resource_policy_fixture,
             )

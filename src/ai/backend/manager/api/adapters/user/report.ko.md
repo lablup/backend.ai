@@ -503,7 +503,7 @@ Then
   - items[0].is_default = True
   - items[0].rate_limit = 10000
   - items[0].resource_policy = 'keypair-policy-1'
-  - items[0].ssh_public_key = ''
+  - items[0].ssh_public_key = None
   - items[0].num_queries = 0
   - items[0].last_used = None
   - items[0].user_id: 키 소유자와 같다
@@ -516,7 +516,7 @@ Then
   - items[1].is_default = True
   - items[1].rate_limit = 10000
   - items[1].resource_policy = 'keypair-policy-2'
-  - items[1].ssh_public_key = ''
+  - items[1].ssh_public_key = None
   - items[1].num_queries = 0
   - items[1].last_used = None
   - items[1].user_id: 키 소유자와 같다
@@ -529,7 +529,7 @@ Then
   - items[2].is_default = True
   - items[2].rate_limit = 10000
   - items[2].resource_policy = 'keypair-policy-3'
-  - items[2].ssh_public_key = ''
+  - items[2].ssh_public_key = None
   - items[2].num_queries = 0
   - items[2].last_used = None
   - items[2].user_id: 키 소유자와 같다
@@ -1183,7 +1183,7 @@ Then
   - items[0].is_default = True
   - items[0].rate_limit = 10000
   - items[0].resource_policy = 'keypair-policy-1'
-  - items[0].ssh_public_key = ''
+  - items[0].ssh_public_key = None
   - items[0].num_queries = 0
   - items[0].last_used = None
   - items[0].user_id: 키 소유자와 같다
@@ -2276,7 +2276,7 @@ Then
   - is_default = False
   - rate_limit = 10000
   - resource_policy = 'granted-policy-1'
-  - ssh_public_key = ''
+  - ssh_public_key = None
   - num_queries = 0
   - last_used = None
   - user_id: 키 소유자와 같다
@@ -2355,7 +2355,7 @@ Then
   - is_default = False
   - rate_limit = 45000
   - resource_policy = 'granted-policy-1'
-  - ssh_public_key = ''
+  - ssh_public_key = None
   - num_queries = 0
   - last_used = None
   - user_id: 키 소유자와 같다
@@ -2605,7 +2605,7 @@ Then
   - created[0].keypair.is_default = True
   - created[0].keypair.rate_limit = 10000
   - created[0].keypair.resource_policy = 'default-keypair-policy-1'
-  - created[0].keypair.ssh_public_key: 건너뜀: 매니저가 만든 RSA 키입니다
+  - created[0].keypair.ssh_public_key = None
   - created[0].keypair.num_queries = 0
   - created[0].keypair.last_used = None
   - created[0].keypair.user_id: 방금 만든 사용자와 같다
@@ -2931,7 +2931,7 @@ Then
   - keypair.is_default = True
   - keypair.rate_limit = 10000
   - keypair.resource_policy = 'default-keypair-policy-1'
-  - keypair.ssh_public_key: 건너뜀: 매니저가 만든 RSA 키입니다
+  - keypair.ssh_public_key = None
   - keypair.num_queries = 0
   - keypair.last_used = None
   - keypair.user_id: 방금 만든 사용자와 같다
@@ -4294,7 +4294,7 @@ Then
 
 - access key 와 공개키만 응답으로 옵니다
   - keypair.access_key: 대상의 기본 키와 같다
-  - keypair.ssh_public_key = ''
+  - keypair.ssh_public_key = None
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key"></a>
 
