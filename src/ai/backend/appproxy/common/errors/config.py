@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-=======
-from typing import override
-
 from aiohttp import web
 
->>>>>>> f7d925561 (fix(BA-9045): give every AppProxy error class an HTTP status (#17125))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,

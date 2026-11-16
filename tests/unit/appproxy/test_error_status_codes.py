@@ -33,10 +33,8 @@ from ai.backend.appproxy.common.errors import http as common_http_errors
 from ai.backend.appproxy.common.errors import service as common_service_errors
 from ai.backend.appproxy.coordinator.errors import circuit as coordinator_circuit_errors
 from ai.backend.appproxy.coordinator.errors import config as coordinator_config_errors
-from ai.backend.appproxy.coordinator.errors import ingress as coordinator_ingress_errors
 from ai.backend.appproxy.worker.errors import circuit as worker_circuit_errors
 from ai.backend.appproxy.worker.errors import config as worker_config_errors
-from ai.backend.appproxy.worker.errors import ingress as worker_ingress_errors
 from ai.backend.appproxy.worker.errors import process as worker_process_errors
 from ai.backend.common.exception import BackendAIError
 
@@ -75,10 +73,8 @@ def error_classes_in_appproxy_error_modules() -> list[type[BackendAIError]]:
         common_service_errors,
         coordinator_circuit_errors,
         coordinator_config_errors,
-        coordinator_ingress_errors,
         worker_circuit_errors,
         worker_config_errors,
-        worker_ingress_errors,
         worker_process_errors,
     ]
     return [
