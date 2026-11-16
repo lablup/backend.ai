@@ -20,11 +20,11 @@ from ai.backend.appproxy.common.events import (
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
-    IngressDeliveryMode,
     ProxyProtocol,
     SerializableCircuit,
 )
 from ai.backend.appproxy.worker import server
+from ai.backend.appproxy.worker.config import IngressLayerType
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.ingress.validating import ValidatingIngressWriter
@@ -79,8 +79,8 @@ class _WorkerHoldingAnIngressInMemory:
 
 
 @dataclass(frozen=True)
-class _DeliveryModeCase:
-    delivery_mode: IngressDeliveryMode
+class _IngressLayersCase:
+    layers: list[IngressLayerType]
     subscribes_to_invalidation: bool
 
 
@@ -377,30 +377,32 @@ class TestHandleIngressInvalidatedEvent:
 
 class TestEventHandlerCtx:
     @pytest.fixture
-    def root_context_of_the_delivery_mode(self, case: _DeliveryModeCase) -> MagicMock:
+    def root_context_reading_the_ingress_layers(self, case: _IngressLayersCase) -> MagicMock:
         root_context = MagicMock()
-        root_context.local_config.proxy_worker.ingress.delivery_mode = case.delivery_mode
+        root_context.local_config.proxy_worker.ingress.layers = case.layers
         return root_context
 
     @pytest.mark.parametrize(
         "case",
         [
-            _DeliveryModeCase(
-                delivery_mode=IngressDeliveryMode.REDIS, subscribes_to_invalidation=True
+            _IngressLayersCase(
+                layers=[IngressLayerType.IN_MEMORY, IngressLayerType.REDIS],
+                subscribes_to_invalidation=True,
             ),
-            _DeliveryModeCase(
-                delivery_mode=IngressDeliveryMode.API, subscribes_to_invalidation=False
+            _IngressLayersCase(
+                layers=[IngressLayerType.IN_MEMORY], subscribes_to_invalidation=False
             ),
+            _IngressLayersCase(layers=[IngressLayerType.REDIS], subscribes_to_invalidation=False),
         ],
-        ids=lambda case: case.delivery_mode.value,
+        ids=lambda case: "+".join(layer.value for layer in case.layers),
     )
-    async def test_subscribes_to_ingress_invalidation_only_in_the_redis_delivery_mode(
-        self, case: _DeliveryModeCase, root_context_of_the_delivery_mode: MagicMock
+    async def test_subscribes_to_ingress_invalidation_only_with_redis_after_in_memory(
+        self, case: _IngressLayersCase, root_context_reading_the_ingress_layers: MagicMock
     ) -> None:
-        async with server.event_handler_ctx(root_context_of_the_delivery_mode):
+        async with server.event_handler_ctx(root_context_reading_the_ingress_layers):
             subscribed_events = [
                 call.args[0]
-                for call in root_context_of_the_delivery_mode.event_dispatcher.subscribe.call_args_list
+                for call in root_context_reading_the_ingress_layers.event_dispatcher.subscribe.call_args_list
             ]
 
         assert (

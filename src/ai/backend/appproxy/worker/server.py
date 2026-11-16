@@ -72,7 +72,6 @@ from ai.backend.appproxy.common.types import (
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
-    IngressDeliveryMode,
     ProxyProtocol,
     WebMiddleware,
     WebRequestHandler,
@@ -141,7 +140,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
-from .config import ServerConfig
+from .config import IngressLayerType, ServerConfig
 from .config import load as load_config
 from .coordinator_client import (
     deregister_worker,
@@ -453,19 +452,17 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
-    match root_ctx.local_config.proxy_worker.ingress.delivery_mode:
-        case IngressDeliveryMode.REDIS:
-            handlers.append(
-                root_ctx.event_dispatcher.subscribe(
-                    AppProxyIngressInvalidatedEvent,
-                    root_ctx,
-                    handle_ingress_invalidated_event,
-                    name="proxy-worker-ingress-invalidation",
-                )
+    ingress_layers = root_ctx.local_config.proxy_worker.ingress.layers
+    # The in-memory layer keeps the Redis hits only when Redis is read after it.
+    if IngressLayerType.IN_MEMORY in ingress_layers and IngressLayerType.REDIS in ingress_layers:
+        handlers.append(
+            root_ctx.event_dispatcher.subscribe(
+                AppProxyIngressInvalidatedEvent,
+                root_ctx,
+                handle_ingress_invalidated_event,
+                name="proxy-worker-ingress-invalidation",
             )
-        case IngressDeliveryMode.API:
-            # The coordinator pushes ingresses to the in-memory layer, which Redis does not hold.
-            pass
+        )
     try:
         yield
     finally:
