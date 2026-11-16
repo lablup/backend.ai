@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from ai.backend.kernel.interpolation.interpolator import LEGACY_DELIMITERS
 from ai.backend.kernel.service import (
     ServiceDefinition,
     ServiceOptions,
@@ -53,14 +54,25 @@ class TestModelServiceStringCommand:
 
         assert cmdargs == ["/usr/bin/python3", "-m", "server"]
 
-    async def test_without_shell_legacy_keeps_spaced_value_as_one_arg(self) -> None:
+    @pytest.mark.parametrize(
+        "opts",
+        [
+            pytest.param({}, id="unset"),
+            pytest.param(
+                {"interpolation": {"delimiters": list(LEGACY_DELIMITERS)}}, id="explicit-legacy"
+            ),
+        ],
+    )
+    async def test_without_shell_legacy_keeps_spaced_value_as_one_arg(
+        self, opts: ServiceOptions
+    ) -> None:
         service_parser = ServiceParser({"ports": "11001 11002"})
         service_parser.add_model_service(
             "model",
             {"start_command": "serve --ports {ports}", "shell": None, "pre_start_actions": []},
         )
 
-        cmdargs, _ = await service_parser.start_service("model", set(), {})
+        cmdargs, _ = await service_parser.start_service("model", set(), opts)
 
         assert cmdargs == ["serve", "--ports", "11001 11002"]
 

@@ -22,6 +22,7 @@ from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .meta.meta import NEXT_RELEASE_VERSION
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
@@ -198,6 +199,25 @@ class PreStartAction(BaseConfigModel):
     )
 
 
+class ServiceArgumentInterpolationDelimiter(BaseConfigModel):
+    start: str = Field(min_length=1, description="Opening delimiter.", examples=["{{"])
+    end: str = Field(min_length=1, description="Closing delimiter.", examples=["}}"])
+
+
+class ServiceArgumentInterpolation(BaseConfigModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiter] = Field(
+        default_factory=lambda: [
+            ServiceArgumentInterpolationDelimiter(start="${{", end="}}"),
+            ServiceArgumentInterpolationDelimiter(start="{", end="}"),
+        ],
+        min_length=1,
+        description=(
+            "Delimiters that mark the variables to fill in the service arguments. "
+            "Defaults to ``${{ }}`` and ``{ }``."
+        ),
+    )
+
+
 class ModelHealthCheck(BaseConfigModel):
     enable: bool = Field(
         default=False,
@@ -303,6 +323,10 @@ class ModelServiceConfig(BaseConfigModel):
     health_check: ModelHealthCheck | None = Field(
         default=None,
         description="Health check configuration for the model service.",
+    )
+    interpolation: ServiceArgumentInterpolation = Field(
+        default_factory=ServiceArgumentInterpolation,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments.",
     )
 
     @model_validator(mode="before")
@@ -456,6 +480,7 @@ def _merge_service_config(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick(base.port, override.port, "port" in s),
         health_check=health_check,
+        interpolation=_pick(base.interpolation, override.interpolation, "interpolation" in s),
     )
 
 
@@ -599,6 +624,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -687,6 +713,9 @@ def _merge_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
+        interpolation=_pick_non_null_override(
+            base.interpolation, override.interpolation, "interpolation" in s
+        ),
     )
 
 
@@ -833,6 +862,7 @@ class PresetModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -870,6 +900,7 @@ class PresetModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -919,6 +950,9 @@ def _merge_preset_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
+        interpolation=_pick_non_null_override(
+            base.interpolation, override.interpolation, "interpolation" in s
+        ),
     )
 
 
