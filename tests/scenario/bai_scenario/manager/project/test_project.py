@@ -9,6 +9,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.group.request import (
     AssignUsersToProjectInput,
@@ -21,6 +22,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
@@ -52,7 +54,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
-from bai_scenario.seeds.rbac.role import TestSeedRole
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 
 MADE = "research"
@@ -138,6 +140,50 @@ class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
             TestSeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), role_holder
         )
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        return AProjectAMemberAndACaller(
+            seeding.made(project),
+            seeding.made(role),
+            seeding.made(member),
+            seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class AProjectAMemberAndAUserReader(Given[Any, AProjectAMemberAndACaller]):
+    """프로젝트 하나와 그 스코프의 역할, 올릴 사람, 그리고 도메인에서 사용자를 읽기만 하는
+    일반 사용자."""
+
+    granted: tuple[Permission, ...] = (Permission.READ,)
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 그 도메인에서 "
+            "사용자 읽기 권한만 받은 일반 사용자",
+            english=(
+                "one project, the role in its scope, the user to assign, and a regular user "
+                "granted only the permission to read users in that domain"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AProjectAMemberAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint=MADE), domain, policy)
+        member = await seeding.within(SomeoneOf(domain))
+        role = await seeding.creating_from(
+            TestSeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), project
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        caller_role = await seeding.creating_from(
+            TestSeedRole(lambda one: one.id, name_hint="user-reader"), domain
+        )
+        for permission in self.granted:
+            await seeding.adding(TestSeedPermission(UserEntityType(), permission), caller_role)
+        await seeding.granting(
+            caller_role, caller, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
+        )
         return AProjectAMemberAndACaller(
             seeding.made(project),
             seeding.made(role),
@@ -397,10 +443,44 @@ class AssigningWithARoleOfAnotherProjectIsRefused(
         return TheCallIsRefused(ProjectRoleNotGrantableError)
 
 
+@dataclass(frozen=True)
+class AUserReaderMayNotAssignAUser(
+    Scenario[TestSeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-only-reads-users-may-not-assign-a-user-to-the-project"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "배정은 프로젝트에 사용자를 추가할 권한이 지키므로, 사용자 읽기 권한만 받은 사용자는 "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "an assignment is guarded by the permission to add users to the project, so a "
+                "user granted only the permission to read users is rejected for lack of "
+                "permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAMemberAndACaller]:
+        return AProjectAMemberAndAUserReader()
+
+    @override
+    def when(self) -> When[AProjectAMemberAndACaller, ProjectAdapter, Answer]:
+        return AssigningTheMember()
+
+    @override
+    def then(self) -> Then[AProjectAMemberAndACaller, Answer]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[Scenario[TestSeedingSession, Any, ProjectAdapter, Answer]] = [
     TheSuperadminMakesAProject(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotMakeAProject(),
     AssigningAUserPutsThemOnTheRoster(),
+    AUserReaderMayNotAssignAUser(),
     AssigningWithARoleOfAnotherProjectIsRefused(),
 ]
 
