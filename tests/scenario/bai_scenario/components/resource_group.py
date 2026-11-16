@@ -16,6 +16,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -465,9 +466,8 @@ class GroupLook:
     pending_timeout: float | Kept = KEPT
     num_retries_to_skip: int | None | Kept = KEPT
     agent_selection_strategy: AgentSelectionStrategy | Kept = KEPT
-    agent_selector_config: dict[str, Any] | Kept = KEPT
     allow_fractional_resource_fragmentation: bool | Kept = KEPT
-    route_cleanup_target_statuses: list[str] | Kept = KEPT
+    route_cleanup_target_statuses: list[RouteHealthStatus] | Kept = KEPT
 
     def verdicts(
         self, prefix: str, node: ResourceGroupDetailNode, seed: ResourceGroupData
@@ -573,11 +573,6 @@ class GroupLook:
                 _or(self.agent_selection_strategy, seed.scheduler.options.agent_selection_strategy),
             ),
             Same(
-                f"{prefix}scheduler.options.agent_selector_config",
-                node.scheduler.options.agent_selector_config,
-                _or(self.agent_selector_config, dict(seed.scheduler.options.agent_selector_config)),
-            ),
-            Same(
                 f"{prefix}scheduler.options.allow_fractional_resource_fragmentation",
                 node.scheduler.options.allow_fractional_resource_fragmentation,
                 _or(
@@ -630,7 +625,7 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
     num_retries_to_skip: int | None = None
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     allow_fractional_resource_fragmentation: bool = True
-    route_cleanup_target_statuses: tuple[str, ...] = ("unhealthy",)
+    route_cleanup_target_statuses: tuple[RouteHealthStatus, ...] = (RouteHealthStatus.UNHEALTHY,)
 
     @override
     def says(self) -> str:
@@ -700,11 +695,6 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
                 "scheduler.options.agent_selection_strategy",
                 node.scheduler.options.agent_selection_strategy,
                 self.agent_selection_strategy,
-            ),
-            Same(
-                "scheduler.options.agent_selector_config",
-                node.scheduler.options.agent_selector_config,
-                {},
             ),
             Same(
                 "scheduler.options.allow_fractional_resource_fragmentation",

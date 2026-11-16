@@ -606,9 +606,6 @@ class ResourceGroupAdapter(BaseAdapter):
             agent_selection_strategy=scheduler_options.and_optional(
                 lambda options: options.agent_selection_strategy
             ),
-            agent_selector_config=scheduler_options.and_optional(
-                lambda options: options.agent_selector_config
-            ),
             allow_fractional_resource_fragmentation=scheduler_options.and_optional(
                 lambda options: options.allow_fractional_resource_fragmentation
             ),
@@ -1137,7 +1134,6 @@ class ResourceGroupAdapter(BaseAdapter):
                         ),
                     ),
                     agent_selection_strategy=data.scheduler.options.agent_selection_strategy,
-                    agent_selector_config=dict(data.scheduler.options.agent_selector_config),
                     allow_fractional_resource_fragmentation=(
                         data.scheduler.options.allow_fractional_resource_fragmentation
                     ),

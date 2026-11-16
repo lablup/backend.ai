@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.exception import ResourceGroupConflict
 from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import DeploymentOptions
@@ -102,7 +103,7 @@ class TestScalingGroupService:
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
                     allow_fractional_resource_fragmentation=True,
-                    route_cleanup_target_statuses=["unhealthy"],
+                    route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
                 ),
             ),
             fair_share_spec=FairShareResourceGroupSpec(
@@ -313,7 +314,7 @@ class TestGetWsproxyVersion:
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
                     allow_fractional_resource_fragmentation=True,
-                    route_cleanup_target_statuses=["unhealthy"],
+                    route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
                 ),
             ),
             fair_share_spec=FairShareResourceGroupSpec(

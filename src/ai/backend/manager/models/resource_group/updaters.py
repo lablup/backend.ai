@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
@@ -69,14 +70,11 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
     agent_selection_strategy: OptionalState[AgentSelectionStrategy] = field(
         default_factory=OptionalState[AgentSelectionStrategy].nop
     )
-    agent_selector_config: OptionalState[Mapping[str, Any]] = field(
-        default_factory=OptionalState[Mapping[str, Any]].nop
-    )
     allow_fractional_resource_fragmentation: OptionalState[bool] = field(
         default_factory=OptionalState[bool].nop
     )
-    route_cleanup_target_statuses: OptionalState[list[str]] = field(
-        default_factory=OptionalState[list[str]].nop
+    route_cleanup_target_statuses: OptionalState[list[RouteHealthStatus]] = field(
+        default_factory=OptionalState[list[RouteHealthStatus]].nop
     )
     fair_share_spec: TriState[FairShareResourceGroupSpec] = field(
         default_factory=TriState[FairShareResourceGroupSpec].nop
@@ -149,15 +147,12 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
         self.agent_selection_strategy.map(lambda strategy: strategy.value).update_dict(
             values_by_scheduler_opts_key, "agent_selection_strategy"
         )
-        self.agent_selector_config.map(dict).update_dict(
-            values_by_scheduler_opts_key, "agent_selector_config"
-        )
         self.allow_fractional_resource_fragmentation.update_dict(
             values_by_scheduler_opts_key, "allow_fractional_resource_fragmentation"
         )
-        self.route_cleanup_target_statuses.update_dict(
-            values_by_scheduler_opts_key, "route_cleanup_target_statuses"
-        )
+        self.route_cleanup_target_statuses.map(
+            lambda statuses: [status.value for status in statuses]
+        ).update_dict(values_by_scheduler_opts_key, "route_cleanup_target_statuses")
 
         stored_scheduler_opts = sa.literal_column("scheduler_opts", type_=JSONB)
         patched_scheduler_opts: sa.ColumnElement[Any] = stored_scheduler_opts

@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
@@ -88,9 +89,8 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
                 pending_timeout=0.0,
                 config=ResourceGroupSchedulerOptionsConfigInfo(num_retries_to_skip=None),
                 agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
-                agent_selector_config={},
                 allow_fractional_resource_fragmentation=True,
-                route_cleanup_target_statuses=["unhealthy"],
+                route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
             ),
         ),
         default_deployment_options=DeploymentOptionsInfo(

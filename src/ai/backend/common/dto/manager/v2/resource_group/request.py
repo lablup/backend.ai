@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
@@ -176,10 +177,6 @@ class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
         default=UNSET,
         description="How agents are chosen for a session's kernels. Omit to leave unchanged.",
     )
-    agent_selector_config: dict[str, Any] | None | Unset = Field(
-        default=UNSET,
-        description="Options of the agent selector. Omit to leave unchanged.",
-    )
     allow_fractional_resource_fragmentation: bool | None | Unset = Field(
         default=UNSET,
         description=(
@@ -187,11 +184,11 @@ class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
             " Omit to leave unchanged."
         ),
     )
-    route_cleanup_target_statuses: list[str] | None | Unset = Field(
+    route_cleanup_target_statuses: list[RouteHealthStatus] | None | Unset = Field(
         default=UNSET,
         description=(
-            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
-            " automatically. Omit to leave unchanged."
+            "Route health statuses whose routes are cleaned up automatically."
+            " Omit to leave unchanged."
         ),
     )
 

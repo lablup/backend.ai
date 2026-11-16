@@ -8,6 +8,7 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -201,9 +202,8 @@ class EditingTheSchedulerOptions(
                             num_retries_to_skip=3
                         ),
                         agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-                        agent_selector_config={"kernel_counts_weight": 2},
                         allow_fractional_resource_fragmentation=False,
-                        route_cleanup_target_statuses=["degraded"],
+                        route_cleanup_target_statuses=[RouteHealthStatus.DEGRADED],
                     ),
                 ),
             )
@@ -627,9 +627,8 @@ class TheSuperadminChangesTheSchedulerOptions(
                 pending_timeout=60.0,
                 num_retries_to_skip=3,
                 agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-                agent_selector_config={"kernel_counts_weight": 2},
                 allow_fractional_resource_fragmentation=False,
-                route_cleanup_target_statuses=["degraded"],
+                route_cleanup_target_statuses=[RouteHealthStatus.DEGRADED],
             )
         )
 

@@ -11,7 +11,6 @@ from uuid import UUID
 import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
-from strawberry.scalars import JSON
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import RuntimeEntityID
@@ -129,6 +128,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment_options import (
     DeploymentOptionsInfoGQL,
     DeploymentOptionsInputGQL,
 )
+from ai.backend.manager.api.gql.deployment.types.replica import ReplicaHealthStatusGQL
 from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
 from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
@@ -376,17 +376,13 @@ class ResourceGroupSchedulerOptionsGQL(PydanticOutputMixin[ResourceGroupSchedule
     agent_selection_strategy: AgentSelectionStrategyGQL = gql_field(
         description="How agents are chosen for a session's kernels."
     )
-    agent_selector_config: JSON = gql_field(description="Options of the agent selector.")
     allow_fractional_resource_fragmentation: bool = gql_field(
         description=(
             "Whether an agent may start a kernel that fragments a fractional resource request."
         )
     )
-    route_cleanup_target_statuses: list[str] = gql_field(
-        description=(
-            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
-            " automatically."
-        )
+    route_cleanup_target_statuses: list[ReplicaHealthStatusGQL] = gql_field(
+        description="Route health statuses whose routes are cleaned up automatically."
     )
 
 
@@ -939,10 +935,6 @@ class UpdateResourceGroupSchedulerOptionsInputGQL(
         description="How agents are chosen for a session's kernels. Omit to leave unchanged.",
         default=UNSET,
     )
-    agent_selector_config: JSON | None = gql_field(
-        description="Options of the agent selector. Omit to leave unchanged.",
-        default=UNSET,
-    )
     allow_fractional_resource_fragmentation: bool | None = gql_field(
         description=(
             "Whether an agent may start a kernel that fragments a fractional resource request."
@@ -950,10 +942,10 @@ class UpdateResourceGroupSchedulerOptionsInputGQL(
         ),
         default=UNSET,
     )
-    route_cleanup_target_statuses: list[str] | None = gql_field(
+    route_cleanup_target_statuses: list[ReplicaHealthStatusGQL] | None = gql_field(
         description=(
-            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
-            " automatically. Omit to leave unchanged."
+            "Route health statuses whose routes are cleaned up automatically."
+            " Omit to leave unchanged."
         ),
         default=UNSET,
     )
