@@ -4,6 +4,13 @@ Process-related exceptions for the worker.
 
 from __future__ import annotations
 
+<<<<<<< HEAD
+=======
+from typing import override
+
+from aiohttp import web
+
+>>>>>>> f7d925561 (fix(BA-9045): give every AppProxy error class an HTTP status (#17125))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -13,7 +20,7 @@ from ai.backend.common.exception import (
 )
 
 
-class SubprocessPipeError(BackendAIError):
+class SubprocessPipeError(BackendAIError, web.HTTPInternalServerError):
     """Raised when subprocess pipe is not available."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/subprocess-pipe-error"
