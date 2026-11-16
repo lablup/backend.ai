@@ -404,7 +404,7 @@ def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[
         Same("is_default", node.is_default, True),
         Same("rate_limit", node.rate_limit, SERVER_RATE_LIMIT),
         Same("resource_policy", node.resource_policy, laid.key_policy),
-        Same("ssh_public_key", node.ssh_public_key, ""),
+        Same("ssh_public_key", node.ssh_public_key, None),
         Same("num_queries", node.num_queries, 0),
         Same("last_used", node.last_used, None),
         Held("user_id", node.user_id, SameAs(laid.caller.id, "키의 주인")),
@@ -415,7 +415,11 @@ def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[
 
 def _extra_key(key: KeyPairData, *, is_active: bool = True) -> KeyPairData:
     return replace(
-        key, is_active=is_active, is_default=False, rate_limit=SERVER_RATE_LIMIT, ssh_public_key=""
+        key,
+        is_active=is_active,
+        is_default=False,
+        rate_limit=SERVER_RATE_LIMIT,
+        ssh_public_key=None,
     )
 
 
@@ -658,7 +662,7 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
                         Same("is_default", left.is_default, True),
                         Same("rate_limit", left.rate_limit, SERVER_RATE_LIMIT),
                         Same("resource_policy", left.resource_policy, laid.key_policy),
-                        Skipped("ssh_public_key", "매니저가 만든 RSA 키다"),
+                        Same("ssh_public_key", left.ssh_public_key, None),
                         Same("num_queries", left.num_queries, 0),
                         Same("last_used", left.last_used, None),
                         Held("user_id", left.user_id, SameAs(laid.caller.id, "키의 주인")),

@@ -172,8 +172,6 @@ async def _create_user(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(f"AK{unique}"),
                     secret_key=SecretValue(f"SK{unique}"),
-                    ssh_public_key="ssh-rsa test",
-                    ssh_private_key="test-private-key",
                 ),
                 keypair_resource_policy="default",
             )

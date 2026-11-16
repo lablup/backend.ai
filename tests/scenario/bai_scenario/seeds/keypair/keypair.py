@@ -42,8 +42,6 @@ class SeedKeypair(SeedField[UserData, KeyPairData]):
             secrets=KeyPairSecrets(
                 access_key=AccessKey(f"AK{token}"),
                 secret_key=SecretValue(f"sk-{token}"),
-                ssh_public_key="",
-                ssh_private_key="",
             ),
             is_active=self.active,
             is_admin=False,

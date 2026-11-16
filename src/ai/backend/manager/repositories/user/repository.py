@@ -34,7 +34,7 @@ from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
-from ai.backend.manager.models.keypair.row import generate_keypair_data_with_ssh_keypair
+from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -268,7 +268,7 @@ class UserRepository:
             keypair = await w.create_field(
                 user_id,
                 KeypairCreator(
-                    secrets=await generate_keypair_data_with_ssh_keypair(self._key_provider_pool),
+                    secrets=await generate_keypair_data(self._key_provider_pool),
                     is_active=creator.is_active,
                     is_admin=creator.is_admin,
                     resource_policy=creator.resource_policy,

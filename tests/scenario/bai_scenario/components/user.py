@@ -206,7 +206,7 @@ class KeypairNodeLook:
         rate_limit: int,
         resource_policy: str,
     ) -> list[Verdict]:
-        """방금 만들어진 키. 키 값과 SSH 키는 매니저가 만든다."""
+        """방금 만들어진 키. 키 값은 매니저가 만든다."""
         written = WrittenByThisRun(self.started)
         return [
             Skipped("id", "매니저가 만든 access key다"),
@@ -216,7 +216,7 @@ class KeypairNodeLook:
             Same("is_default", node.is_default, is_default),
             Same("rate_limit", node.rate_limit, rate_limit),
             Same("resource_policy", node.resource_policy, resource_policy),
-            Skipped("ssh_public_key", "매니저가 만든 RSA 키다"),
+            Same("ssh_public_key", node.ssh_public_key, None),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
             Held("user_id", node.user_id, SameAs(owner.id, "키의 주인")),

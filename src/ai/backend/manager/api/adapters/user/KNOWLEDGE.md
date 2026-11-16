@@ -164,7 +164,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 사용자 리소스 정책 | 요청의 기본값 `"default"` | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
 | 개인 프로젝트의 리소스 정책 | 코드가 못박은 이름 `"default"` | `models/project/creators.py:66-67` |
 | 개인 프로젝트 이름 | 사용자 이름. 겹치면 `-2`부터 `-999`, 그래도 겹치면 사용자 id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key | 생성한다. secret은 키 제공자 풀로 암호화한다. SSH 키쌍은 만들지 않는다 | `models/keypair/row.py:173-180` |
+| access key, secret key | 생성한다. secret은 키 제공자 풀로 암호화한다. SSH 키쌍은 만들지 않는다 | `models/keypair/row.py:173-178` |
 | 기본 키페어의 활성, 관리자 표시 | 사용자 상태가 ACTIVE인지, 역할이 SUPERADMIN이나 ADMIN인지 | `write.py:106-107` |
 | 비밀번호 해시 설정 | 매니저 설정 `auth.password_hash_*` | `adapter.py:491-496` |
 | 도메인 id | 이름으로 조회한다 | `adapter.py:217-220` |
@@ -196,7 +196,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|
 | 중복 검사 | 없음 | 있음 |
 | 키페어 정책 | 앞 단계가 만든 정책 | 기본 표시 정책 조회(대체 예정) |
-| 키 값 | 평문, SSH 키는 빈 문자열 | 생성, 암호화 |
+| 키 값 | 평문 | 생성, 암호화 |
 | 프로젝트 등재 | 없음 | 있음 |
 
 ## 6. 어댑터가 요구하는 의존성
@@ -259,7 +259,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | `is_active`, `is_admin`, `is_default`, `rate_limit`, `resource_policy` | 값으로 본다 |
 | `num_queries` | 0 |
 | `last_used` | None |
-| `ssh_public_key` | 생성 경로면 무시(생성한 RSA 키), 심은 키면 빈 문자열 |
+| `ssh_public_key` | None |
 | `created_at`, `modified_at` | 이 실행이 쓴 시각 |
 | `user_id` | 소유 사용자와 같다 |
 | 발급 답의 secret key | 무시. 매번 새로 만든다 |
@@ -428,7 +428,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 권한 받은 사용자가 남의 SSH 키를 지우면 그 access key가 온다 | 대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다 | 권한 받은 사용자 | 등록 성공 행과 같음 | access key가 대상 기본 키와 같다, 뒤이은 SSH 키 읽기에서 공개키 None |
 | 권한 없는 사용자는 남의 SSH 키를 지울 수 없다 | 역할 없이 지우려 하면, 소유자 조회 단계가 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `GenericBadRequest` |
 | 읽기 권한만 받은 사용자는 남의 SSH 키를 지울 수 없다 | READ만 받고 지우려 하면, 엔티티 권한 문이 막는다 | 권한 받은 사용자 | READ만 준 역할 | `NotEnoughPermission` |
-| 권한 받은 사용자가 남의 SSH 공개키를 읽는다 | 대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 READ를 준 역할 | access key가 대상 기본 키와 같다, 공개키는 심은 빈 문자열 |
+| 권한 받은 사용자가 남의 SSH 공개키를 읽는다 | 대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 READ를 준 역할 | access key가 대상 기본 키와 같다, 공개키는 None |
 | 권한 없는 사용자는 남의 SSH 공개키를 읽을 수 없다 | 역할 없이 읽으려 하면, 소유자 조회 단계가 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `GenericBadRequest` |
 | 슈퍼관리자가 모든 키를 훑으면 사용자와 무관하게 전부 온다 | 전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 오고 limit 자리는 비어서 온다 | 슈퍼관리자 | 도메인 하나, 사용자 둘 | 목록 세 키(슈퍼관리자 포함), 전체 셋, offset 0, limit None |
 | 슈퍼관리자가 아니면 모든 키를 훑을 수 없다 | 권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다 | 권한 받은 사용자 | 도메인 하나, 행위자 하나, 도메인 스코프에 READ를 준 역할 | `InsufficientPrivilege` |
