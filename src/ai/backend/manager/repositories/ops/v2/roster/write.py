@@ -22,31 +22,19 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
-<<<<<<< HEAD
-from ai.backend.common.exception import InvalidAPIParameters
-=======
 from ai.backend.manager.data.permission.status import RoleStatus
->>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import (
     ModelStoreProjectLeaveError,
     PersonalProjectMemberAdditionError,
     ProjectNotFound,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
-=======
-from ai.backend.manager.errors.role import RoleNotFound
-from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.user.row import UserRow
->>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
@@ -92,15 +80,9 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         if not user_ids:
             return []
         await self._refuse_personal_project(project_id)
-<<<<<<< HEAD
-        if role_id is not None and not await self._role_exists(role_id):
-            raise InvalidAPIParameters(f"Role not found: {role_id}")
-        rows = await self._joinable_users(project_id, user_ids)
-=======
         if role_id is not None:
             await self._refuse_role_outside_project(project_id, role_id)
-        rows = await self._domain_users(project_id, user_ids, include_joined=False)
->>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
+        rows = await self._joinable_users(project_id, user_ids)
         if not rows:
             return []
         for row in rows:

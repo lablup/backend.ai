@@ -9,12 +9,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
-<<<<<<< HEAD
-from ai.backend.common.data.entity.domain import DomainID, DomainName
-=======
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
->>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
@@ -23,23 +18,12 @@ from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
-<<<<<<< HEAD
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-=======
-from ai.backend.manager.errors.resource import (
-    PersonalProjectMemberAdditionError,
-    ProjectMemberNotJoinableError,
-)
-from ai.backend.manager.errors.role import RoleNotFound
-from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.endpoint.row import EndpointRow
->>>>>>> 7e7d8291 (fix(BA-8896): check the role a project roster assignment grants (#16605))
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
