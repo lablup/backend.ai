@@ -1,8 +1,6 @@
 """Relate each domain to the container registries its allowed_docker_registries names.
 
-A name matches every global registry whose registry_name is that name. A non-global
-registry belongs to the projects allowed on it, and the domain-scope image access applies
-the names to global registries only.
+A name matches every registry whose registry_name is that name, global or not.
 Each relation also gets the graph edges the relation ops write: the domain governs the
 registry under READ, and the registry holds READ on the domain. Without them the domain
 reads nothing of the registry.
@@ -41,7 +39,7 @@ def upgrade() -> None:
         SELECT d.id, cr.id
         FROM domains AS d
         JOIN container_registries AS cr
-          ON cr.registry_name = ANY(d.allowed_docker_registries) AND cr.is_global
+          ON cr.registry_name = ANY(d.allowed_docker_registries)
         ON CONFLICT DO NOTHING
     """)
     )
