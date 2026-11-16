@@ -576,6 +576,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         deployment=DeploymentService(
             args.deployment_controller,
             repositories.deployment.repository,
+            agent_repository=repositories.agent.repository,
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
             appproxy_client_pool=args.appproxy_client_pool,

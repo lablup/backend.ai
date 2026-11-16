@@ -4646,6 +4646,23 @@
             "title": "Resource Group Name",
             "type": "string"
           },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.",
+            "title": "Designated Agent Ids"
+          },
           "name": {
             "anyOf": [
               {
@@ -6743,6 +6760,22 @@
             ],
             "description": "Updated deployment strategy. Omit to leave unchanged.",
             "title": "Default Deployment Strategy"
+          },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.",
+            "title": "Designated Agent Ids"
           }
         },
         "title": "UpdateDeploymentInput",
