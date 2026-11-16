@@ -25,6 +25,7 @@ from ai.backend.appproxy.common.defs import (
 )
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.common.utils import strip_permit_cookie
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
@@ -176,8 +177,14 @@ class HTTPBackend(BaseBackend):
         # copy frontend request headers without hop-by-hop headers,
         # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
-            if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
-                backend_rqst_hdrs.add(key, value)
+            if key in HOP_ONLY_HEADERS or key in _FORWARDING_HEADERS:
+                continue
+            if key.lower() == "cookie":
+                cookie_value = strip_permit_cookie(value)
+                if cookie_value is None:
+                    continue
+                value = cookie_value
+            backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
         backend_rqst_hdrs[X_FORWARDED_PROTO_HEADER] = protocol
         if self.circuit.app == "rstudio":

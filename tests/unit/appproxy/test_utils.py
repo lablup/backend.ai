@@ -9,11 +9,14 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel
 
-from ai.backend.appproxy.common.config import HostPortPair
+from ai.backend.appproxy.common.config import HostPortPair, PermitHashConfig
 from ai.backend.appproxy.common.utils import (
+    calculate_permit_hash,
     config_key_to_kebab_case,
     ensure_json_serializable,
+    is_permit_valid,
     mime_match,
+    strip_permit_cookie,
 )
 
 
@@ -104,3 +107,56 @@ def test_mime_match(base_array: str, compare: str, strict: bool, expected: bool)
     the base_array and compare inputs, with and without the strict parameter.
     """
     assert mime_match(base_array, compare, strict) == expected
+
+
+_PERMIT_USER_ID = UUID("6a1e4c2c-9f0d-4b8e-a0b6-8a7d1f2e3c4b")
+
+
+@pytest.fixture
+def permit_hash_config() -> PermitHashConfig:
+    return PermitHashConfig(secret=b"permit-secret")
+
+
+def test_is_permit_valid_accepts_matching_permit(permit_hash_config: PermitHashConfig) -> None:
+    permit = calculate_permit_hash(permit_hash_config, _PERMIT_USER_ID)
+    assert is_permit_valid(permit_hash_config, _PERMIT_USER_ID, permit)
+
+
+@pytest.mark.parametrize(
+    "permit",
+    [
+        "",
+        "not-a-permit",
+        "\u00e9",
+    ],
+)
+def test_is_permit_valid_rejects_wrong_permit(
+    permit_hash_config: PermitHashConfig, permit: str
+) -> None:
+    assert not is_permit_valid(permit_hash_config, _PERMIT_USER_ID, permit)
+
+
+def test_is_permit_valid_rejects_other_users_permit(
+    permit_hash_config: PermitHashConfig,
+) -> None:
+    other_permit = calculate_permit_hash(
+        permit_hash_config, UUID("0b5f1d7e-3c2a-4e9b-8d6f-1a2b3c4d5e6f")
+    )
+    assert not is_permit_valid(permit_hash_config, _PERMIT_USER_ID, other_permit)
+
+
+@pytest.mark.parametrize(
+    "cookie_header, expected",
+    [
+        ("appproxy_permit=abc", None),
+        ("appproxy_permit=abc; session=xyz", "session=xyz"),
+        ("session=xyz; appproxy_permit=abc; _xsrf=123", "session=xyz; _xsrf=123"),
+        ("session=xyz;appproxy_permit=abc", "session=xyz"),
+        ("session=xyz; _xsrf=123", "session=xyz; _xsrf=123"),
+        ("appproxy_permit_other=abc; session=xyz", "appproxy_permit_other=abc; session=xyz"),
+        ("session=appproxy_permit", "session=appproxy_permit"),
+        ("", None),
+    ],
+)
+def test_strip_permit_cookie(cookie_header: str, expected: str | None) -> None:
+    assert strip_permit_cookie(cookie_header) == expected
