@@ -19,7 +19,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **session**: user(enqueue, get, project-search, terminate, start-service, shutdown-service, logs, update) | admin(search) | my(search)
   - admin sub: kernel(search, inspect, restart)
 
-## Compute & Serving
+## Compute and Serving
 
 - **deployment**: user(project-search, get, create, update, delete) | admin(search) | my(search)
   - admin sub: revision(search, add, get, current, activate), replica(search, scale-up, scale-down)
@@ -36,7 +36,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **storage-namespace**: user(register, unregister, search, get-by-storage)
 - **object-storage**: user(create, get, update, search, delete)
 
-## Registries & Artifacts
+## Registries and Artifacts
 
 - **container-registry**: admin(search, create, update, delete)
 - **artifact**: user(get, update, delete, restore) | admin(search, purge)
@@ -45,7 +45,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **huggingface-registry**: user(create, search, get, update, delete) | admin(search)
 - **reservoir-registry**: user(create, search, get, update, delete) | admin(search)
 
-## Access Control & Auth
+## Access Control and Auth
 
 - **rbac**: sub: role(search, get, create, delete), permission(search), assignment(search, assign, revoke), entity(search)
 - **keypair**: admin(search, get, create, update, delete) | my(search, create, issue, delete)
@@ -62,7 +62,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **resource-usage**: sub: domain(search), project(search), user(search)
 - **retention-policy**: admin(search, get, create, update, delete, purge)
 
-## Monitoring & Audit
+## Monitoring and Audit
 
 - **audit-log**: user(search) | admin(search)
 - **scheduling-history**: sub: session(search, search-scoped), deployment(search, search-scoped), route(search, search-scoped)

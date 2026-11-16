@@ -208,6 +208,7 @@ def _role_presets() -> list[RolePresetNode]:
             name=f"role-preset-{n}",
             scope_type=DomainEntityType(),
             auto_assign=False,
+            auto_assign_to_owner=False,
             deleted=False,
             created_at=_NOW,
             updated_at=_NOW,

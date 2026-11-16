@@ -18,7 +18,14 @@ def _ingress_payload(frontend: dict[str, Any], **extra: Any) -> dict[str, Any]:
                 {
                     "id": "group-1",
                     "weight": 1,
-                    "targets": [{"id": "target-1", "host": "10.0.0.1", "port": 8080}],
+                    "targets": [
+                        {
+                            "kind": "session",
+                            "host": "10.0.0.1",
+                            "port": 8080,
+                            "session_id": "00000000-0000-0000-0000-000000000001",
+                        }
+                    ],
                 }
             ],
         },

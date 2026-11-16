@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.storage_backend import StorageBackendID
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
-    ServiceStorageStatus,
+    StorageAnomaly,
     StorageVolumeUsageExposure,
 )
 from ai.backend.manager.models.base import (
@@ -96,11 +96,11 @@ class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
         ),
         primary_key=True,
     )
-    status: Mapped[ServiceStorageStatus] = mapped_column(
-        "status", StrEnumType(ServiceStorageStatus), nullable=False
+    status: Mapped[StorageAnomaly] = mapped_column(
+        "status", StrEnumType(StorageAnomaly), nullable=False
     )
     # When the service measured ``status``, not when its heartbeat delivered it.
-    # Null exactly while ``status`` is not_checked.
+    # Null while the service has not checked the volume yet.
     status_checked_at: Mapped[datetime | None] = mapped_column(
         "status_checked_at", sa.DateTime(timezone=True), nullable=True
     )

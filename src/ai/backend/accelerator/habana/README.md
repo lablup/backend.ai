@@ -1,24 +1,21 @@
-Backend.AI Accelerator Plugin for Habana
-======================================
+# Backend.AI Accelerator Plugin for Habana
 
-Just install this along with Backend.AI agents, using the same virtual environment.
-This will allow the agents to detect Habana devices on their hosts and make them
-available to Backend.AI kernel sessions.
+Install this package in the same virtual environment as the Backend.AI agents.
+The agents then detect Habana devices on their hosts and make them available to
+Backend.AI kernel sessions.
 
 ```console
 $ pip install -e <Path to this repository>
 ```
 
-This open-source edition of Habana plugins support allocation of one or more Habana
-devices to a container, slot-by-slot.
+This open-source edition of the Habana plugin supports allocating one or more Habana
+devices to a container, slot by slot.
 
-Compatibility Matrix
---------------------
+## Compatibility Matrix
 
 TBD
 
-Generating Docker macvlan interfaces for inter-container network 
-----------------------------------------------------------------
+## Generating Docker macvlan interfaces for inter-container networking
 ```sh
 #! /bin/bash
 set -e

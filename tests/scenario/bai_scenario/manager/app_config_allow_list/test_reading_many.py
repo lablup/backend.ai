@@ -29,6 +29,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -62,10 +63,17 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
     @override
     def describe(self, laid: TwoEntriesAndACaller) -> str:
         if self.nothing:
-            return f"{laid.caller.username}이 빈 ID 목록으로 조회"
-        if self.duplicate_first:
-            return f"{laid.caller.username}이 첫 번째 allow_list의 ID를 두 번 조회"
-        return f"{laid.caller.username}이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회"
+            doing_ko, doing_en = "빈 ID 목록으로 조회합니다", "loads with an empty ID list"
+        elif self.duplicate_first:
+            doing_ko = "첫 번째 allow_list 의 ID 를 두 번 조회합니다"
+            doing_en = "loads the ID of the first allow_list twice"
+        else:
+            doing_ko = "allow_list 둘과 존재하지 않는 ID 를 한 번에 조회합니다"
+            doing_en = "loads both allow_lists and a missing ID in one call"
+        return Says(
+            f"{laid.caller.username}이 {doing_ko}",
+            english=f"{laid.caller.username} {doing_en}",
+        )
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Loaded:
@@ -85,7 +93,13 @@ class EveryIdIsRefused(Then[TwoEntriesAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 ID 둘과 없는 ID 모두 각 위치에 권한 오류가 반환된다"
+        return Says(
+            "있는 ID 둘과 없는 ID 모두 각 위치에 권한 오류가 반환됩니다",
+            english=(
+                "a permission error comes back at each position, "
+                "for the two existing IDs and the missing ID alike"
+            ),
+        )
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -110,7 +124,10 @@ class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 ID 둘은 노드로, 없는 ID는 None으로 반환된다"
+        return Says(
+            "있는 ID 둘은 노드로, 없는 ID 는 None 으로 반환됩니다",
+            english=("the two existing IDs come back as nodes and the missing ID as None"),
+        )
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -125,12 +142,18 @@ class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "준비한 첫 번째 ID"),
+                SameAs[object](
+                    laid.first.id,
+                    Says("준비한 첫 번째 ID", english="the first ID seeded in advance"),
+                ),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.second.id, "준비한 두 번째 ID"),
+                SameAs[object](
+                    laid.second.id,
+                    Says("준비한 두 번째 ID", english="the second ID seeded in advance"),
+                ),
             ),
             Same("items[2]", items[2], None),
         ]
@@ -142,7 +165,7 @@ class NothingIsAnswered(Then[TwoEntriesAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty response comes back")
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -158,7 +181,10 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "중복 ID의 두 위치에 같은 allow_list가 반환된다"
+        return Says(
+            "중복 ID 의 두 위치에 같은 allow_list 가 반환됩니다",
+            english="the same allow_list comes back at both positions of the duplicate ID",
+        )
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -173,12 +199,18 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "준비한 첫 번째 ID"),
+                SameAs[object](
+                    laid.first.id,
+                    Says("준비한 첫 번째 ID", english="the first ID seeded in advance"),
+                ),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.first.id, "준비한 첫 번째 ID"),
+                SameAs[object](
+                    laid.first.id,
+                    Says("준비한 첫 번째 ID", english="the first ID seeded in advance"),
+                ),
             ),
         ]
 
@@ -193,9 +225,13 @@ class APlainUserIsRefusedPerId(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 "
-            "엔티티 읽기 권한 오류가 반환된다"
+        return Says(
+            "권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 "
+            "위치에 엔티티 읽기 권한 오류가 반환됩니다",
+            english=(
+                "when a plain user without permission loads both allow_lists and one missing "
+                "ID together, an entity read permission error comes back at each input position"
+            ),
         )
 
     @override
@@ -221,9 +257,13 @@ class TheSuperadminSeesBoth(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 "
-            "None이 반환된다"
+        return Says(
+            "superadmin 이 allow_list 둘과 없는 ID 하나를 함께 조회하면, "
+            "입력 순서대로 노드 둘과 None 이 반환됩니다",
+            english=(
+                "when the superadmin loads both allow_lists and one missing ID together, "
+                "two nodes and None come back in input order"
+            ),
         )
 
     @override
@@ -249,7 +289,14 @@ class DuplicateIdsKeepTheirPositions(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다"
+        return Says(
+            "superadmin 이 같은 allow_list 의 ID 를 두 번 조회하면, "
+            "같은 노드가 두 위치에 반환됩니다",
+            english=(
+                "when the superadmin loads the ID of the same allow_list twice, "
+                "the same node comes back at both positions"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
@@ -274,7 +321,10 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 ID 목록으로 조회하면 빈 목록이 반환된다"
+        return Says(
+            "빈 ID 목록으로 조회하면 빈 목록이 반환됩니다",
+            english="loading with an empty ID list answers an empty list",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:

@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -51,6 +52,11 @@ if TYPE_CHECKING:
         ResourceGroupConnection,
         ResourceGroupFilterGQL,
         ResourceGroupOrderByGQL,
+    )
+    from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
+        VFolderAutoMountConnectionGQL,
+        VFolderAutoMountFilterGQL,
+        VFolderAutoMountOrderByGQL,
     )
 
 
@@ -361,6 +367,69 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             ),
             count=payload.total_count,
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "VFolders auto-mounted into every session this user creates. Those of the "
+                "user's personal project are not included."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def vfolder_auto_mounts(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            VFolderAutoMountFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                VFolderAutoMountOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            VFolderAutoMountConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+            ScopedSearchVFolderAutoMountsInput,
+        )
+        from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
+            VFolderAutoMountScope,
+        )
+        from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+            build_vfolder_auto_mount_connection,
+        )
+
+        payload = await info.context.adapters.vfolder_auto_mount.scoped_search(
+            ScopedSearchVFolderAutoMountsInput(
+                scope=VFolderAutoMountScope(user=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return build_vfolder_auto_mount_connection(payload)
 
     @classmethod
     @override

@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
     PermissionSearchableFields,
@@ -124,7 +129,7 @@ class _RoleOwnFields(RowDataConverter[RoleRow, RoleData]):
 
 
 class _RoleNestedFields:
-    """The permission entries the role owns, read under the role's own permission.
+    """The permission entries and labels the role owns, read under the role's own permission.
 
     A permission entry is the role's field row, so one permission answers for the pair.
     """
@@ -132,6 +137,10 @@ class _RoleNestedFields:
     permissions = NestedSearchableField(
         PermissionSearchableFields.own,
         ToManyCorrelation(PermissionRow, RoleRow, PermissionRow.role_id == RoleRow.id),
+    )
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(RoleRow, RoleEntityType(), RoleRow.id),
     )
 
 

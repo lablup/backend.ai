@@ -29,6 +29,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -58,7 +59,10 @@ class PurgingTheUsersGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayl
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.owner.username}이 사용자가 만든 세션 그룹을 영구 삭제"
+        return Says(
+            f"{laid.owner.username} 이 사용자가 생성한 세션 그룹을 영구 삭제합니다",
+            english=f"{laid.owner.username} purges the session group the user created",
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> PurgeSessionGroupPayload:
@@ -76,7 +80,13 @@ class PurgingTheDeploymentGroup(When[Laid, SessionGroupAdapter, PurgeSessionGrou
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.owner.username}이 배포의 replica group이 가진 세션 그룹을 영구 삭제"
+        return Says(
+            f"{laid.owner.username} 이 배포의 replica group 이 가진 세션 그룹을 영구 삭제합니다",
+            english=(
+                f"{laid.owner.username} purges the session group held by the deployment's replica "
+                "group"
+            ),
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> PurgeSessionGroupPayload:
@@ -90,7 +100,10 @@ class TheUsersGroupIsNamed(Then[Laid, PurgeSessionGroupPayload]):
 
     @override
     def says(self) -> str:
-        return "지운 사용자가 만든 세션 그룹의 id가 온다"
+        return Says(
+            "삭제한 사용자가 생성한 세션 그룹의 id 가 옵니다",
+            english="the id of the purged session group the user created comes back",
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[PurgeSessionGroupPayload]) -> list[Verdict]:
@@ -101,7 +114,13 @@ class TheUsersGroupIsNamed(Then[Laid, PurgeSessionGroupPayload]):
             Held[UUID](
                 "entity_id",
                 payload.entity_id,
-                SameAs(laid.users_group.id, "사용자가 만든 세션 그룹의 id"),
+                SameAs(
+                    laid.users_group.id,
+                    Says(
+                        "사용자가 생성한 세션 그룹의 id",
+                        english="the id of the session group the user created",
+                    ),
+                ),
             )
         ]
 
@@ -116,9 +135,14 @@ class TheOwnerPurgesTheUsersGroup(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, "
-            "그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다"
+        return Says(
+            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 생성한 세션 그룹을 "
+            "삭제하면, 그 세션 그룹의 id 가 오고 멤버 세션은 세션 그룹이 비워진 채 남습니다",
+            english=(
+                "when a user granted session group purge in their own scope deletes the session "
+                "group they created, the id of that session group comes back and the member "
+                "sessions stay with their session group cleared"
+            ),
         )
 
     @override
@@ -144,9 +168,15 @@ class ADeploymentsGroupIsInUse(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, "
-            "replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다"
+        return Says(
+            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group 이 가진 "
+            "세션 그룹을 삭제하면, replica group 이 사용 중이라는 것으로 거부되고 세션 그룹은 "
+            "남습니다",
+            english=(
+                "when a user granted session group purge in their own scope deletes the session "
+                "group held by the deployment's replica group, the call is rejected because the "
+                "replica group is using it and the session group stays"
+            ),
         )
 
     @override
@@ -172,9 +202,14 @@ class AReaderMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, "
-            "권한 부족으로 거부되고 세션 그룹은 남는다"
+        return Says(
+            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 생성한 세션 그룹을 "
+            "삭제하면, 권한 부족으로 거부되고 세션 그룹은 남습니다",
+            english=(
+                "when a user granted only session group read in their own scope deletes the "
+                "session group they created, the call is rejected for lack of permission and the "
+                "session group stays"
+            ),
         )
 
     @override
@@ -200,9 +235,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 "
-            "세션 그룹은 남는다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 자기가 생성한 세션 그룹을 삭제하면, 권한 부족으로 "
+            "거부되고 세션 그룹은 남습니다",
+            english=(
+                "when a user with no grant deletes the session group they created, the call is "
+                "rejected for lack of permission and the session group stays"
+            ),
         )
 
     @override

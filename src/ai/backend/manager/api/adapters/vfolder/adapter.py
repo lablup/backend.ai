@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -86,6 +87,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import VFolderAutoMountFilter
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
@@ -138,6 +140,9 @@ from ai.backend.manager.models.vfolder.scopes import (
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
+from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
+    VFolderAutoMountSearchableFields,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
@@ -148,6 +153,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
 )
@@ -336,6 +344,32 @@ class VFolderAdapter(BaseAdapter):
             answers.append([dto for dto in PermissionBitDTO if bits & Permission[dto.name]])
         return answers
 
+    async def batch_load_mount_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> list[VFolderPermissionField | Exception | None]:
+        """The level the caller mounts each vfolder at, in the given order.
+
+        An id naming no folder answers ``None``.
+        """
+        if not vfolder_ids:
+            return []
+        result = await self._vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(vfolder_ids=vfolder_ids)
+        )
+        levels = result.values()
+        errors = result.errors()
+        mount_permissions: list[VFolderPermissionField | Exception | None] = []
+        for vfolder_id in vfolder_ids:
+            error = self.batch_load_failure(errors.get(vfolder_id))
+            if error is not None:
+                mount_permissions.append(error)
+                continue
+            level = levels.get(vfolder_id)
+            mount_permissions.append(
+                VFolderPermissionField(level.value) if level is not None else None
+            )
+        return mount_permissions
+
     # -------------------------------------------------------------------------
     # Search
     # -------------------------------------------------------------------------
@@ -393,7 +427,7 @@ class VFolderAdapter(BaseAdapter):
         return scopes
 
     def _usage(self, usage: VFolderUsage | None) -> list[UsedBy]:
-        """The uses the request named, deployments before model cards."""
+        """The uses the request named, deployments before model cards before sessions."""
         if usage is None or usage.used_by is None:
             return []
         used_by = usage.used_by
@@ -407,6 +441,7 @@ class VFolderAdapter(BaseAdapter):
                 linked.model_cards.used_by(ModelCardID(entity_id))
                 for entity_id in used_by.model_card or ()
             ),
+            *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
         ]
 
     def _scoped_search_action(
@@ -954,6 +989,11 @@ class VFolderAdapter(BaseAdapter):
                 VFolderSearchableFields.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
+            *self.apply_to_many_filter(
+                f.auto_mounts,
+                VFolderSearchableFields.nested.auto_mounts.correlation,
+                self._convert_vfolder_auto_mount_filter,
+            ),
         ]
         if f.AND:
             for sub in f.AND:
@@ -969,6 +1009,37 @@ class VFolderAdapter(BaseAdapter):
         if f.NOT:
             for sub in f.NOT:
                 sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_vfolder_auto_mount_filter(self, f: VFolderAutoMountFilter) -> list[QueryCondition]:
+        fields = VFolderAutoMountSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
+            *self.apply_enum_filter(f.scope_type, fields.scope_type.filter),
+            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
+            *self.apply_uuid_filter(f.vfolder_id, fields.vfolder_id.filter),
+            *self.apply_string_filter(f.mount_destination, fields.mount_destination.filter),
+            *self.apply_enum_filter(f.mount_permission, fields.mount_permission.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.updated_at, fields.updated_at.filter),
+            *self.apply_nullable_datetime_filter(f.deleted_at, fields.deleted_at.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_vfolder_auto_mount_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_vfolder_auto_mount_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_vfolder_auto_mount_filter(sub)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions

@@ -253,9 +253,14 @@ class TestCreateDownloadSessionReq:
 
 class TestCreateUploadSessionReq:
     def test_basic(self) -> None:
-        req = CreateUploadSessionReq(path="/uploads/file.txt", size=1024)
-        assert req.path == "/uploads/file.txt"
+        req = CreateUploadSessionReq(path="uploads/file.txt", size=1024)
+        assert req.path == "uploads/file.txt"
         assert req.size == 1024
+
+    @pytest.mark.parametrize("path", ["", ".", "..", "../x", "a/../../x", "/x"])
+    def test_path_outside_vfolder_raises(self, path: str) -> None:
+        with pytest.raises(ValidationError):
+            CreateUploadSessionReq(path=path, size=1024)
 
 
 class TestRenameFileReq:

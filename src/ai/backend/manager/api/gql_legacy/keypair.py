@@ -13,14 +13,18 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
-    KeyPairRow,
     keypairs,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
+from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 
 from .session import ComputeSession
 
@@ -39,22 +43,27 @@ __all__ = (
     "UserInfo",
 )
 
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import agg_to_array
-from ai.backend.manager.services.user.actions.keypair_ops import AdminCreateKeypairAction
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    PurgeKeypairAction,
+    UpdateKeypairAction,
+)
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
+from ai.backend.manager.services.user.actions.lookup_keypair import LookupKeypairByAccessKeyAction
+from ai.backend.manager.types import OptionalState
 
 from .base import (
     Item,
     PaginatedList,
     batch_multiresult,
     batch_result,
-    set_if_set,
-    simple_db_mutate,
 )
 
 
@@ -118,7 +127,13 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     user = graphene.UUID()
     projects = graphene.List(lambda: graphene.String)
 
-    ssh_public_key = graphene.String()
+    ssh_public_key = graphene.String(
+        description="The public key of the owner's default SSH keypair.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. An SSH keypair belongs to the user, "
+            "not to a keypair."
+        ),
+    )
 
     vfolders = graphene.List("ai.backend.manager.api.gql_legacy.vfolder.VirtualFolder")
     compute_sessions = graphene.List(
@@ -137,11 +152,13 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     )
 
     async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
-        """The stored secret key as plaintext; the column holds it encrypted once a
-        write provider is named."""
+        """The stored secret key as plaintext, only to its owner and superadmins;
+        the column holds it encrypted once a write provider is named."""
         if self.secret_key is None:
             return None
         ctx: GraphQueryContext = info.context
+        if ctx.user["role"] != UserRole.SUPERADMIN and self.user != ctx.user["uuid"]:
+            return None
         return await ctx.key_provider_pool.decrypt(self.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def resolve_user_info(
@@ -153,8 +170,9 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         return cast(UserInfo, await loader.load(self.user))
 
     @classmethod
-    def from_data(cls, data: KeyPairData) -> Self:
+    def from_data(cls, data: KeyPairData, ssh_public_key: str | None) -> Self:
         return cls(
+            ssh_public_key=ssh_public_key,
             access_key=data.access_key,
             secret_key=data.secret_key,
             is_active=data.is_active,
@@ -164,7 +182,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             created_at=data.created_at,
             rate_limit=data.rate_limit,
             user=data.user_id,
-            ssh_public_key=data.ssh_public_key,
         )
 
     @classmethod
@@ -186,7 +203,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             created_at=row.created_at,
             rate_limit=row.rate_limit,
             user=row.user,
-            ssh_public_key=row.ssh_public_key,
             concurrency_limit=0,  # deprecated
             projects=row._mapping.get("groups_name", []),
         )
@@ -280,7 +296,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         "last_used": ("keypairs_last_used", dtparse),
         "rate_limit": ("keypairs_rate_limit", None),
         "num_queries": ("keypairs_num_queries", None),
-        "ssh_public_key": ("keypairs_ssh_public_key", None),
         "projects": ("groups_name", None),
     }
 
@@ -511,6 +526,15 @@ class ModifyKeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=False)
 
+    def to_action(self, keypair_id: KeyPairID) -> UpdateKeypairAction:
+        return UpdateKeypairAction(
+            keypair_id=keypair_id,
+            is_active=OptionalState.from_graphql(self.is_active),
+            is_admin=OptionalState.from_graphql(self.is_admin),
+            resource_policy=OptionalState.from_graphql(self.resource_policy),
+            rate_limit=OptionalState.from_graphql(self.rate_limit),
+        )
+
 
 class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -537,7 +561,19 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
         result = await graph_ctx.processors.user.admin_create_keypair.run(
             AdminCreateKeypairAction(user_id=UserID(owner.entity_id()), creator=props.to_creator())
         )
-        keypair = KeyPair.from_data(result.generated_data.keypair)
+        ssh_keypairs = await graph_ctx.processors.user.search_ssh_keypairs.run(
+            SearchSSHKeypairsAction(
+                user_ids=[UserID(owner.entity_id())],
+                searcher=SSHKeypairSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                ),
+            )
+        )
+        keypair = KeyPair.from_data(
+            result.generated_data.keypair,
+            ssh_keypairs.items[0].public_key if ssh_keypairs.items else None,
+        )
         keypair.user_id = user_id
         return cls(ok=True, msg="success", keypair=keypair)
 
@@ -560,19 +596,15 @@ class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
         access_key: AccessKey,
         props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
-        ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "is_admin")
-        set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "rate_limit")
+        graph_ctx: GraphQueryContext = info.context
+        keypair = await graph_ctx.processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
+        )
         # props.concurrency_limit is always ignored
-        update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
-        if data.get("is_active") is False:
-            # An inactive default keypair locks its user out, so the marker is a
-            # precondition carried in the statement.
-            update_query = update_query.where(sa.not_(keypairs.c.is_default))
-        return await simple_db_mutate(cls, ctx, update_query)
+        await graph_ctx.processors.user.update_keypair.run(
+            props.to_action(KeyPairID(keypair.field_id))
+        )
+        return cls(ok=True, msg="success")
 
 
 class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
@@ -591,20 +623,11 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
-        ctx: GraphQueryContext = info.context
-        async with ctx.db.begin_readonly_session() as db_session:
-            is_default = await db_session.scalar(
-                sa.select(KeyPairRow.is_default).where(KeyPairRow.access_key == access_key)
-            )
-            if is_default:
-                return DeleteKeyPair(
-                    False, "the keypair is used as the default access key by a user"
-                )
-        # The marker is re-evaluated inside the DELETE, so a keypair that becomes the
-        # default after the read above is not removed.
-        delete_query = (
-            sa.delete(keypairs)
-            .where(keypairs.c.access_key == access_key)
-            .where(sa.not_(keypairs.c.is_default))
+        graph_ctx: GraphQueryContext = info.context
+        keypair = await graph_ctx.processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
         )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        await graph_ctx.processors.user.purge_keypair.run(
+            PurgeKeypairAction(keypair_id=KeyPairID(keypair.field_id))
+        )
+        return cls(ok=True, msg="success")

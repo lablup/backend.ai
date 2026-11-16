@@ -229,6 +229,7 @@ def _create_session(
             ),
             metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
             metadata=KernelMetadata(callback_url=None, internal_data=None),
+            kernel_group_id=None,
         )
         kernel_infos.append(kernel_info)
 
@@ -328,6 +329,7 @@ def _create_kernel(
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 
@@ -399,12 +401,6 @@ def mock_scheduling_controller() -> AsyncMock:
 # =============================================================================
 # Pre-created Session Fixtures for ScheduleSessionsLifecycleHandler
 # =============================================================================
-
-
-@pytest.fixture
-def pending_session() -> SessionWithKernels:
-    """Single PENDING session for basic scheduling tests."""
-    return _create_session(status=SessionStatus.PENDING)
 
 
 @pytest.fixture
@@ -563,35 +559,6 @@ def running_kernels_five() -> list[KernelInfo]:
         _create_kernel(status=KernelStatus.RUNNING),
         _create_kernel(status=KernelStatus.RUNNING),
     ]
-
-
-@pytest.fixture
-def kernel_without_agent() -> KernelInfo:
-    """Kernel without agent for edge case tests."""
-    kernel = _create_kernel(status=KernelStatus.RUNNING)
-    # Override resource to remove agent
-    return KernelInfo(
-        id=kernel.id,
-        session=kernel.session,
-        user_permission=kernel.user_permission,
-        image=kernel.image,
-        network=kernel.network,
-        cluster=kernel.cluster,
-        resource=ResourceInfo(
-            resource_group=kernel.resource.resource_group,
-            resource_group_id=kernel.resource.resource_group_id,
-            agent=None,  # No agent assigned
-            agent_addr=None,
-            container_id=None,
-            occupied_shares={},
-            attached_devices={},
-            resource_opts={},
-        ),
-        runtime=kernel.runtime,
-        lifecycle=kernel.lifecycle,
-        metrics=kernel.metrics,
-        metadata=kernel.metadata,
-    )
 
 
 # =============================================================================

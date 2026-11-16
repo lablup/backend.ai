@@ -31,6 +31,7 @@ __all__ = (
     "DeleteFieldOpsAction",
     "RestoreFieldOpsAction",
     "PurgeFieldOpsAction",
+    "RuntimeGetFieldOpsAction",
     "PartialBulkGetFieldOpsAction",
     "PartialBulkPurgeFieldOpsAction",
     "NestedFieldSearchOpsAction",
@@ -106,6 +107,17 @@ class PurgeFieldOpsAction[
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+
+class RuntimeGetFieldOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
+    BaseRuntimeSingleFieldAction[TFieldID], FieldGetOpsAction[TRow, TData], ABC
+):
+    """A read of one field row whose owning entity is polymorphic."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 class RuntimeUpdateFieldOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](

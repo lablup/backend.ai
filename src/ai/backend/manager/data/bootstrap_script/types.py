@@ -11,9 +11,16 @@ from ai.backend.common.data.entity.user import UserID
 class BootstrapScriptData(FieldData):
     id: BootstrapScriptID
     entity: RuntimeEntityID
-    is_default: bool
     created_at: datetime
     deleted_at: datetime | None
+
+
+@dataclass(frozen=True)
+class UserDefaultBootstrapScriptData(FieldData):
+    """The script a user's default points at."""
+
+    user_id: UserID
+    script_id: BootstrapScriptID
 
 
 @dataclass(frozen=True)

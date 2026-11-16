@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "ClusterModeEnum",
@@ -169,6 +170,10 @@ class SessionUses(BaseRequestModel):
     )
     resource_group: list[UUID] | None = Field(
         default=None, description="Resource groups the session runs in"
+    )
+    vfolder: list[UUID] | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Vfolders the session's kernel groups mount",
     )
 
 

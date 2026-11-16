@@ -10,7 +10,6 @@ from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironValueSource,
 )
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
-from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
@@ -51,11 +50,6 @@ class _SystemSessionEnvironOwnFields(
         UUIDConditions(SystemSessionEnvironRow.scope_id),
         ColumnOrder(SystemSessionEnvironRow.scope_id),
     )
-    enabled = SearchableField(
-        SystemSessionEnvironRow.enabled,
-        BoolConditions(SystemSessionEnvironRow.enabled),
-        ColumnOrder(SystemSessionEnvironRow.enabled),
-    )
     created_at = SearchableField(
         SystemSessionEnvironRow.created_at,
         DateTimeConditions(SystemSessionEnvironRow.created_at),
@@ -66,6 +60,11 @@ class _SystemSessionEnvironOwnFields(
         DateTimeConditions(SystemSessionEnvironRow.updated_at),
         ColumnOrder(SystemSessionEnvironRow.updated_at),
     )
+    deleted_at = SearchableField(
+        SystemSessionEnvironRow.deleted_at,
+        DateTimeConditions(SystemSessionEnvironRow.deleted_at),
+        ColumnOrder(SystemSessionEnvironRow.deleted_at),
+    )
 
     @override
     def to_data(self, row: SystemSessionEnvironRow) -> SystemSessionEnvironData:
@@ -74,9 +73,9 @@ class _SystemSessionEnvironOwnFields(
             value_source=self.value_source.read(row),
             key=self.key.read(row),
             scope_id=self.scope_type.read(row).to_owner(self.scope_id.read(row)),
-            enabled=self.enabled.read(row),
             created_at=self.created_at.read(row),
             updated_at=self.updated_at.read(row),
+            deleted_at=self.deleted_at.read(row),
         )
 
 

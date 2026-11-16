@@ -24,6 +24,9 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.v2.kernel_group.request import ScopedSearchKernelGroupsInput
+from ai.backend.common.dto.manager.v2.kernel_group.types import KernelGroupScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput as BatchConfigInputDTO,
 )
@@ -138,6 +141,15 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2EdgeGQL,
     KernelV2GQL,
     ResourceAllocationGQL,
+)
+from ai.backend.manager.api.gql.kernel_group.types import (
+    KernelGroupConnectionGQL,
+    KernelGroupEdgeGQL,
+    KernelGroupEnvironNestedFilterGQL,
+    KernelGroupFilterGQL,
+    KernelGroupGQL,
+    KernelGroupOrderByGQL,
+    KernelGroupResourceSlotNestedFilterGQL,
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -473,6 +485,20 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by the reserved start time requested at creation.",
+        ),
+        default=None,
+    )
+    kernel_group_environ: KernelGroupEnvironNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the environ rows of the session's kernel groups.",
+        ),
+        default=None,
+    )
+    kernel_group_resource_slots: KernelGroupResourceSlotNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the resource slot rows of the session's kernel groups.",
         ),
         default=None,
     )
@@ -824,6 +850,61 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The main kernel group of this session.",
+        )
+    )  # type: ignore[misc]
+    async def main_kernel_group(self, info: Info[StrawberryGQLContext]) -> KernelGroupGQL | None:
+        return await info.context.data_loaders.main_kernel_group_by_session_id_loader.load(
+            SessionID(UUID(str(self.id)))
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The kernel groups of this session, one per role.",
+        )
+    )  # type: ignore[misc]
+    async def kernel_groups(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: KernelGroupFilterGQL | None = None,
+        order_by: list[KernelGroupOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> KernelGroupConnectionGQL | None:
+        payload = await info.context.adapters.session.scoped_search_kernel_groups(
+            ScopedSearchKernelGroupsInput(
+                scope=KernelGroupScope(session=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [KernelGroupGQL.from_pydantic(item) for item in payload.items]
+        edges = [KernelGroupEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return KernelGroupConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
                 "The model deployment replica served by this session: a single replica "
@@ -1113,6 +1194,16 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
         default=None,
     )
     attach_network: ID | None = gql_field(default=None, description="Network UUID to attach.")
+    session_group_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            description=(
+                "Session group UUID the session joins. The group must belong to the "
+                "session's owner and project."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
 
     tag: str | None = gql_field(default=None, description="User-defined tag.")
     callback_url: str | None = gql_field(default=None, description="Webhook URL.")
@@ -1390,6 +1481,13 @@ class SessionUsesGQL(PydanticInputMixin[SessionUses]):
     )
     resource_group: list[UUID] | None = gql_field(
         default=None, description="Resource groups the session runs in."
+    )
+    vfolder: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Vfolders the session's kernel groups mount.",
+        ),
+        default=None,
     )
 
 

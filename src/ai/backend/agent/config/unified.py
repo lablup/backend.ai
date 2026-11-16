@@ -45,6 +45,9 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
@@ -132,6 +135,52 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="10.0", prod="30.0"),
+        ),
+    ]
+
+
+class SocketRelayHealthCheckConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Add a healthcheck to the socket relay container that reports it unhealthy "
+                "when the agent socket file in the container is missing or not a socket. "
+                "The healthcheck only reports the status and does not restart the container."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, ge=0.001),
+        BackendAIConfigMeta(
+            description="Seconds between healthcheck runs.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    timeout: Annotated[
+        float,
+        Field(default=30.0, ge=0.001),
+        BackendAIConfigMeta(
+            description="Seconds a healthcheck run may take before it counts as a failure.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    retries: Annotated[
+        int,
+        Field(default=3, ge=1),
+        BackendAIConfigMeta(
+            description=(
+                "Number of consecutive failed healthcheck runs before the container is "
+                "reported unhealthy."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="3", prod="3"),
         ),
     ]
 
@@ -255,6 +304,23 @@ class SocketRelayConfig(BaseConfigSchema):
             ),
             added_version="26.10.0",
             example=ConfigExample(local="1.0", prod="1.0"),
+        ),
+    ]
+    health_check: Annotated[
+        SocketRelayHealthCheckConfig,
+        Field(
+            default_factory=SocketRelayHealthCheckConfig,
+            validation_alias=AliasChoices("health-check", "health_check"),
+            serialization_alias="health-check",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Healthcheck of the socket relay container. The settings apply when the "
+                "relay container is created, so remove the backendai-socket-relay.<agent id> "
+                "container before restarting the agent after changing them."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -597,7 +663,7 @@ class DebugConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Logs the kernel configuration sent to containers at startup. "
-                "Shows environment variables, mount points, and execution settings. "
+                "Shows environment variable names (values masked), mount points, and execution settings. "
                 "Helpful for debugging container initialization or configuration issues."
             ),
             added_version="25.12.0",
@@ -859,9 +925,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices(
                 "rpc-auth-manager-public-key", "rpc_auth_manager_public_key"
             ),
@@ -871,7 +936,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the manager's public key file for authenticating RPC messages. "
                 "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
-                "Part of the RPC security mechanism for preventing unauthorized access."
+                "Part of the RPC security mechanism for preventing unauthorized access. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -881,9 +947,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
             serialization_alias="rpc-auth-agent-keypair",
         ),
@@ -891,7 +956,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the agent's keypair file for RPC authentication. "
                 "Contains both public and private keys used for ZeroMQ CURVE authentication. "
-                "The private key must be kept secure as it proves the agent's identity."
+                "The private key must be kept secure as it proves the agent's identity. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -926,8 +992,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "User, privilege, and resource limits of the socket relay container "
-                "that connects kernel containers to the agent socket."
+                "User, privilege, resource limits, and healthcheck of the socket relay "
+                "container that connects kernel containers to the agent socket."
             ),
             added_version="26.10.0",
             composite=CompositeType.FIELD,
@@ -2327,6 +2393,18 @@ class AgentGlobalConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the agent starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
     logging: Annotated[
         LoggingConfig,
         Field(default_factory=LoggingConfig),
@@ -2455,6 +2533,32 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Plugin settings are managed centrally in etcd and distributed to agents automatically."
             ),
             added_version="25.12.0",
+        ),
+    ]
+    volume_status_check: Annotated[
+        VolumeStatusCheckConfig,
+        Field(
+            default_factory=VolumeStatusCheckConfig,
+            validation_alias=AliasChoices("volume-status-check", "volume_status_check"),
+            serialization_alias="volume-status-check",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic status checks of the volumes.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    storage_status_report: Annotated[
+        StorageStatusReportConfig,
+        Field(
+            default_factory=StorageStatusReportConfig,
+            validation_alias=AliasChoices("storage-status-report", "storage_status_report"),
+            serialization_alias="storage-status-report",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic storage status report to the manager.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
     redis: Annotated[

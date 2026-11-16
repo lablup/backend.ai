@@ -18,6 +18,7 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 class TestEtcdProvider:
@@ -41,8 +42,8 @@ class TestEtcdProvider:
         etcd_config = EtcdConfig.model_validate({
             "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
             "namespace": test_ns,
-            "user": None,
-            "password": None,
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         })
 
         # Create traefik config
@@ -67,6 +68,8 @@ class TestEtcdProvider:
         etcd_config = EtcdConfig.model_validate({
             "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)] * 3,
             "namespace": test_ns,
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         })
         proxy_config = Mock(spec=ProxyCoordinatorConfig)
         proxy_config.enable_traefik = True

@@ -31,19 +31,19 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
     Given,
     Held,
-    Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
 )
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.image.image import TestSeedAlias, TestSeedCommittedImage, TestSeedImage
@@ -159,7 +159,7 @@ class ARegistryWithImages(TestSeedNest[tuple[ContainerRegistryData, tuple[Laid[I
 
     @override
     def kind(self) -> str:
-        return "이미지를 담을 레지스트리 준비"
+        return Says("이미지를 담을 레지스트리 준비", english="Prepare a registry to hold images")
 
     @override
     def lay(self, seed: TestSeeder) -> tuple[Any, tuple[Laid[ImageData], ...]]:
@@ -181,8 +181,13 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
 
     @override
     def describe(self) -> str:
-        marked = "" if self.status is ImageStatus.ALIVE else f", 상태는 {self.status.value}"
-        return f"레지스트리 1개와 그 안의 이미지 1개{marked}, {self.role.value} 1명"
+        status = self.status.value
+        marked_ko = "" if self.status is ImageStatus.ALIVE else f", 상태는 {status}"
+        marked_en = "" if self.status is ImageStatus.ALIVE else f", status {status}"
+        return Says(
+            f"레지스트리 1개와 그 안의 이미지 1개{marked_ko}, {self.role.value} 1명",
+            english=f"one registry and one image in it{marked_en}, one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -203,8 +208,12 @@ class AnUncustomizedImageAndSomeone(Given[Any, AnImageAndACaller]):
 
     @override
     def describe(self) -> str:
-        holds = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
-        return f"커스텀 이미지가 아닌 이미지 1개, {holds}인 사용자 1명"
+        holds_ko = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
+        holds_en = "with permission on that image" if self.granted else "with no permission"
+        return Says(
+            f"커스텀 이미지가 아닌 이미지 1개, {holds_ko}인 사용자 1명",
+            english=f"one image that is not customized and one user {holds_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -229,9 +238,15 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
 
     @override
     def describe(self) -> str:
-        marked = "" if self.status is ImageStatus.ALIVE else f", 상태는 {self.status.value}"
-        return (
-            f"호출자가 커밋한 커스텀 이미지 1개{marked}, 호출자 개인 프로젝트에서 이미지 권한 있음"
+        status = self.status.value
+        marked_ko = "" if self.status is ImageStatus.ALIVE else f", 상태는 {status}"
+        marked_en = "" if self.status is ImageStatus.ALIVE else f", status {status}"
+        return Says(
+            f"호출자가 커밋한 커스텀 이미지 1개{marked_ko}, 호출자 개인 프로젝트에서 이미지 권한 있음",
+            english=(
+                f"one custom image the caller committed{marked_en}, with image permission in the "
+                "caller's personal project"
+            ),
         )
 
     @override
@@ -256,9 +271,13 @@ class AnImageSomeoneElseMade(Given[Any, AnImageAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "다른 사용자가 커밋한 커스텀 이미지 1개, "
-            "호출자는 자기 개인 프로젝트에서만 이미지 권한 있음"
+            "호출자는 자기 개인 프로젝트에서만 이미지 권한 있음",
+            english=(
+                "one custom image another user committed and the caller holds image permission "
+                "only in their own personal project"
+            ),
         )
 
     @override
@@ -279,24 +298,46 @@ class AnImageSomeoneElseMade(Given[Any, AnImageAndACaller]):
 
 @dataclass(frozen=True)
 class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
-    """레지스트리 1개 안의 이미지 여러 개와 호출자 1명."""
+    """레지스트리 1개 안의 이미지 여러 개와 호출자 1명.
+
+    `statuses`를 주면 그 상태의 이미지를 그 순서로 만든다. `granted`를 주면 호출자가
+    레지스트리에서 그 권한들을 받는다.
+    """
 
     role: UserRole = UserRole.SUPERADMIN
     count: int = 2
+    statuses: tuple[ImageStatus, ...] | None = None
+    granted: tuple[Permission, ...] | None = None
 
     @override
     def describe(self) -> str:
-        return f"레지스트리 1개와 그 안의 이미지 {self.count}개, {self.role.value} 1명"
+        statuses = self.statuses or (ImageStatus.ALIVE,) * self.count
+        status = ", ".join(one.value for one in statuses)
+        holds = "" if self.granted is None else ", 그 레지스트리에서 이미지 권한을 받은"
+        holds_en = "" if self.granted is None else ", granted image permission on the registry"
+        return Says(
+            f"레지스트리 1개와 그 안의 이미지 {len(statuses)}개(상태는 {status}), "
+            f"{self.role.value} 1명{holds}",
+            english=(
+                f"one registry and {len(statuses)} images in it (statuses {status}), "
+                f"one {self.role.value}{holds_en}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        statuses = self.statuses or (ImageStatus.ALIVE,) * self.count
         domain = await seeding.creating(TestSeedDomain(name_hint="home"))
         registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         images = [
-            await seeding.creating_from(TestSeedImage(name_hint=f"image-{index}"), registry)
-            for index in range(self.count)
+            await seeding.creating_from(
+                TestSeedImage(name_hint=f"image-{index}", status=status), registry
+            )
+            for index, status in enumerate(statuses)
         ]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        if self.granted is not None:
+            await seeding.within(SomeoneReachingImages(registry, caller, permissions=self.granted))
         return ManyImagesAndACaller(
             laid=tuple(seeding.made(one) for one in images),
             named=seeding.made(images[0]),
@@ -311,7 +352,10 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "살아 있는 이미지 1개와 삭제된 이미지 1개, superadmin 1명"
+        return Says(
+            "살아 있는 이미지 1개와 삭제된 이미지 1개, superadmin 1명",
+            english="one alive image and one deleted image, one superadmin",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
@@ -342,7 +386,13 @@ class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "호출자가 커밋한 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명"
+        return Says(
+            "호출자가 커밋한 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명",
+            english=(
+                "one custom image the caller committed and one image that is not customized, "
+                "one superadmin"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
@@ -377,7 +427,13 @@ class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "호출자가 커밋한 커스텀 이미지 1개와 다른 사용자가 커밋한 커스텀 이미지 1개, superadmin 1명"
+        return Says(
+            "호출자가 커밋한 커스텀 이미지 1개와 다른 사용자가 커밋한 커스텀 이미지 1개, superadmin 1명",
+            english=(
+                "one custom image the caller committed and one custom image another user "
+                "committed, one superadmin"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
@@ -406,6 +462,67 @@ class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
+class CustomImagesOfTwoMakers(Given[Any, ManyImagesAndACaller]):
+    """호출자가 커밋한 커스텀 이미지와 다른 사용자가 커밋한 커스텀 이미지.
+
+    호출자는 자기 개인 프로젝트에서만 `granted` 권한을 받는다. `laid`의 첫째는 호출자의
+    이미지, 둘째는 다른 사용자의 이미지다.
+    """
+
+    own_status: ImageStatus = ImageStatus.ALIVE
+    other_status: ImageStatus = ImageStatus.ALIVE
+    granted: Permission = Permission.SOFT_DELETE
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "호출자가 커밋한 커스텀 이미지 1개"
+            f"(상태는 {self.own_status.value})와 다른 사용자가 커밋한 커스텀 이미지 1개"
+            f"(상태는 {self.other_status.value}), 호출자 개인 프로젝트에서만 이미지 권한 있음",
+            english=(
+                "one custom image the caller committed "
+                f"(status {self.own_status.value}) and one custom image another user committed "
+                f"(status {self.other_status.value}), with image permission only in the "
+                "caller's personal project"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain))
+        other = await seeding.within(SomeoneOf(domain))
+        made_caller = seeding.made(caller)
+        own_project = await seeding.personal_project_of(caller)
+        own = await seeding.creating_from_two(
+            TestSeedCommittedImage(
+                creator_id=UserID(made_caller.id), name_hint="mine", status=self.own_status
+            ),
+            registry,
+            own_project,
+        )
+        theirs = await seeding.creating_from_two(
+            TestSeedCommittedImage(
+                creator_id=UserID(seeding.made(other).id),
+                name_hint="theirs",
+                status=self.other_status,
+            ),
+            registry,
+            await seeding.personal_project_of(other),
+        )
+        await seeding.within(
+            SomeoneReachingImagesOfProject(own_project, caller, permissions=(self.granted,))
+        )
+        return ManyImagesAndACaller(
+            laid=(seeding.made(own), seeding.made(theirs)),
+            named=seeding.made(own),
+            registry=seeding.made(registry),
+            caller=made_caller,
+        )
+
+
+@dataclass(frozen=True)
 class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
     """레지스트리 2개에 나뉘어 있는 이미지들과, 한쪽 레지스트리에 권한을 받았거나 받지 않은 사용자.
 
@@ -418,10 +535,15 @@ class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
 
     @override
     def describe(self) -> str:
-        holds = "한쪽 레지스트리에 권한을 받은" if self.granted else "아무 권한도 받지 않은"
-        return (
+        holds_ko = "한쪽 레지스트리에 권한을 받은" if self.granted else "아무 권한도 받지 않은"
+        holds_en = "granted permission on one registry" if self.granted else "granted no permission"
+        return Says(
             f"레지스트리 2개, 한쪽에 이미지 {self.wanted}개와 다른 쪽에 {self.elsewhere}개, "
-            f"{holds} 사용자 1명"
+            f"{holds_ko} 사용자 1명",
+            english=(
+                f"two registries, {self.wanted} images in one and {self.elsewhere} in the other, "
+                f"one user {holds_en}"
+            ),
         )
 
     @override
@@ -454,7 +576,10 @@ class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"별칭이 등록된 이미지 1개, {self.role.value} 1명"
+        return Says(
+            f"별칭이 등록된 이미지 1개, {self.role.value} 1명",
+            english=f"one image with an alias registered, one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnAliasAndACaller:
@@ -478,8 +603,12 @@ class AnAliasAndAPlainUser(Given[Any, AnAliasAndACaller]):
 
     @override
     def describe(self) -> str:
-        holds = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
-        return f"별칭이 등록된 이미지 1개, {holds}인 사용자 1명"
+        holds_ko = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
+        holds_en = "with permission on that image" if self.granted else "with no permission"
+        return Says(
+            f"별칭이 등록된 이미지 1개, {holds_ko}인 사용자 1명",
+            english=f"one image with an alias registered and one user {holds_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnAliasAndACaller:
@@ -503,7 +632,10 @@ class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "이미지 2개, 한쪽에 별칭 2개와 다른 쪽에 1개, superadmin 1명"
+        return Says(
+            "이미지 2개, 한쪽에 별칭 2개와 다른 쪽에 1개, superadmin 1명",
+            english="two images, two aliases on one and one on the other, one superadmin",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AliasesAndACaller:
@@ -532,10 +664,14 @@ class SomeoneReachingImages(TestSeedNest[Laid[None]]):
 
     registry: Laid[ContainerRegistryData]
     someone: Laid[UserData]
+    permissions: tuple[Permission, ...] = REACHING
 
     @override
     def kind(self) -> str:
-        return "이미지를 다룰 권한을 받은 사용자 준비"
+        return Says(
+            "이미지를 다룰 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission to handle images",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -543,7 +679,7 @@ class SomeoneReachingImages(TestSeedNest[Laid[None]]):
             TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="image-keeper"),
             self.registry,
         )
-        for allowed in REACHING:
+        for allowed in self.permissions:
             seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -556,10 +692,14 @@ class SomeoneReachingImagesOfProject(TestSeedNest[Laid[None]]):
 
     project: Laid[ProjectData]
     someone: Laid[UserData]
+    permissions: tuple[Permission, ...] = REACHING
 
     @override
     def kind(self) -> str:
-        return "프로젝트의 이미지를 다룰 권한을 받은 사용자 준비"
+        return Says(
+            "프로젝트의 이미지를 다룰 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission to handle the project's images",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -567,7 +707,7 @@ class SomeoneReachingImagesOfProject(TestSeedNest[Laid[None]]):
             TestSeedRole(lambda one: ProjectID(one.id), name_hint="image-keeper"),
             self.project,
         )
-        for allowed in REACHING:
+        for allowed in self.permissions:
             seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -580,7 +720,7 @@ class Filled(Condition[Any]):
 
     @override
     def says(self) -> str:
-        return "값이 채워져 반환된다"
+        return Says("값이 채워져 반환됩니다", english="the value comes back filled")
 
     @override
     def holds(self, got: Any) -> bool:
@@ -611,13 +751,16 @@ class TheImageNode(Then[Any, ImageNode]):
 
     @override
     def says(self) -> str:
-        return "이미지 노드의 모든 필드가 예상값과 일치한다"
+        return Says(
+            "이미지 노드의 모든 필드가 예상값과 일치합니다",
+            english="every field of the image node matches the expected value",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[ImageNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Held("응답", node, Filled())]
+            return [Held("response", node, Filled())]
         identity, metadata, requirements = node.identity, node.metadata, node.requirements
         if identity is None or metadata is None or requirements is None:
             return [
@@ -657,18 +800,40 @@ class TheImageNode(Then[Any, ImageNode]):
             else Held[UserID | None](
                 "creator_id",
                 node.creator_id,
-                SameAs(image.creator_id, "이미지를 커밋한 사용자의 ID"),
+                SameAs(
+                    image.creator_id,
+                    Says(
+                        "이미지를 커밋한 사용자의 ID",
+                        english="the id of the user who committed the image",
+                    ),
+                ),
             )
         )
         return [
-            Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 ID")),
+            Held(
+                "id",
+                node.id,
+                SameAs(
+                    planted,
+                    Says(
+                        "미리 저장한 이미지의 ID",
+                        english="the id of the image created in advance",
+                    ),
+                ),
+            ),
             Same("name", node.name, name),
             Same("image", node.image, namespace),
             Same("registry", node.registry, registry),
             Held(
                 "registry_id",
                 node.registry_id,
-                SameAs(image.registry_id, "미리 만들어 둔 레지스트리의 ID"),
+                SameAs(
+                    image.registry_id,
+                    Says(
+                        "미리 저장한 레지스트리의 ID",
+                        english="the id of the registry created in advance",
+                    ),
+                ),
             ),
             Same("project", node.project, image.project),
             Same("tag", node.tag, tag),
@@ -689,7 +854,13 @@ class TheImageNode(Then[Any, ImageNode]):
             Same("customized", node.customized, image.customized),
             creator,
             Held("created_at", node.created_at, written),
-            Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
+            Skipped(
+                "last_used_at",
+                Says(
+                    "세션이 기록하는 값이라 이 실행에서는 알 수 없습니다",
+                    english="a session records it, so this run cannot know it",
+                ),
+            ),
             Same("identity.canonical_name", identity.canonical_name, name),
             Same("identity.namespace", identity.namespace, namespace),
             Same("identity.architecture", identity.architecture, architecture),
@@ -699,7 +870,10 @@ class TheImageNode(Then[Any, ImageNode]):
             Held(
                 "metadata.last_used_at",
                 metadata.last_used_at,
-                SameAs(node.last_used_at, "노드의 last_used_at 필드"),
+                SameAs(
+                    node.last_used_at,
+                    Says("노드의 last_used_at 필드", english="the node's last_used_at field"),
+                ),
             ),
             Same("metadata.tags", metadata.tags, []),
             Same(
@@ -723,19 +897,18 @@ class TheImageNode(Then[Any, ImageNode]):
 
 @dataclass(frozen=True)
 class EveryImageComesBack(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
-    """대상 이미지가 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
+    """대상 이미지가 모두 처리된 목록에 온다."""
 
     status: ImageStatus = ImageStatus.ALIVE
     tag: str | None = None
-    missing: uuid.UUID | None = None
 
     @override
     def says(self) -> str:
-        if self.missing is None:
-            return f"대상 이미지가 모두 {self.status.value} 상태로 오고, 실패한 것은 없다"
-        return (
-            f"대상 이미지가 모두 {self.status.value} 상태로 오고, "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            f"대상 이미지가 모두 {self.status.value} 상태로 오고, 실패한 것은 없습니다",
+            english=(
+                f"every target image comes back with status {self.status.value} and nothing failed"
+            ),
         )
 
     @override
@@ -746,35 +919,30 @@ class EveryImageComesBack(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNod
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [MissingResponse(answered.raised)]
         node_look = TheImageNode(status=self.status, tag=self.tag)
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
         for node, image in zip(payload.successes, laid.laid, strict=False):
             verdicts += node_look.look(
                 AnImageAndACaller(image, laid.caller), Answered(response=node)
             )
-        if self.missing is None:
-            return [*verdicts, Same("failed", payload.failed, [])]
-        verdicts.append(Same("failed count", len(payload.failed), 1))
-        for failure in payload.failed:
-            verdicts += [
-                Held[uuid.UUID](
-                    "failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")
-                ),
-                Held("failed[0].message", failure.message, Mentions("not found")),
-            ]
-        return verdicts
+        return [*verdicts, Same("failed", payload.failed, [])]
 
 
 @dataclass(frozen=True)
-class NoImageIsProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
-    """처리된 이미지 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+class OneImageIsNotProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
+    """`laid`의 첫째만 처리되고, 둘째는 같은 이유로 실패 목록에 온다."""
 
-    reason: str
+    status: ImageStatus = ImageStatus.ALIVE
+    tag: str | None = None
+    reason: str = "not found"
 
     @override
     def says(self) -> str:
-        return "처리된 이미지 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다",
+            english="only one target comes back processed and the other one in the failed list",
+        )
 
     @override
     def look(
@@ -784,17 +952,29 @@ class NoImageIsProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        verdicts: list[Verdict] = [
-            Same("successes", payload.successes, []),
-            Same("failed count", len(payload.failed), len(laid.laid)),
-        ]
-        for i, (failure, image) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            return [MissingResponse(answered.raised)]
+        processed, unprocessed = laid.laid
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), 1)]
+        if payload.successes:
+            verdicts += TheImageNode(status=self.status, tag=self.tag).look(
+                AnImageAndACaller(processed, laid.caller), Answered(response=payload.successes[0])
+            )
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        if payload.failed:
+            failure = payload.failed[0]
             verdicts += [
                 Held[uuid.UUID](
-                    f"failed[{i}].id", failure.id, SameAs(image.id, "대상 이미지의 id")
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        unprocessed.id,
+                        Says(
+                            "처리되지 않은 대상 이미지의 id",
+                            english="the id of the target image left unprocessed",
+                        ),
+                    ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                Held("failed[0].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
 
@@ -817,7 +997,7 @@ class TheLaidImage(Target):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 이미지"
+        return Says("미리 저장한 이미지", english="the image created in advance")
 
     @override
     def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
@@ -830,7 +1010,10 @@ class AnIdThatHoldsNothing(Target):
 
     @override
     def says(self) -> str:
-        return "어느 이미지도 가리키지 않는 ID"
+        return Says(
+            "어느 이미지도 가리키지 않는 ID",
+            english="an id that points at no image",
+        )
 
     @override
     def id_of(self, laid: AnImageAndACaller) -> uuid.UUID:
@@ -859,10 +1042,16 @@ class ByOffset(Paging):
     @override
     def says(self) -> str:
         if self.limit is None:
-            return "페이지 크기를 생략하고"
+            return Says("페이지 크기를 생략하고", english="with the page size omitted")
         if self.offset is not None:
-            return f"앞의 {self.offset}개를 건너뛰고 한 페이지에 {self.limit}개씩"
-        return f"한 페이지에 {self.limit}개씩"
+            return Says(
+                f"앞의 {self.offset}개를 건너뛰고 한 페이지에 {self.limit}개씩",
+                english=f"skipping the first {self.offset} and taking {self.limit} per page",
+            )
+        return Says(
+            f"한 페이지에 {self.limit}개씩",
+            english=f"taking {self.limit} per page",
+        )
 
     @override
     def asked(self) -> dict[str, Any]:
@@ -877,7 +1066,7 @@ class ByCursor(Paging):
 
     @override
     def says(self) -> str:
-        return "커서로 앞에서부터"
+        return Says("커서로 앞에서부터", english="from the front by cursor")
 
     @override
     def asked(self) -> dict[str, Any]:
@@ -890,7 +1079,7 @@ class ByABrokenCursor(Paging):
 
     @override
     def says(self) -> str:
-        return "잘못된 커서로"
+        return Says("잘못된 커서로", english="with a broken cursor")
 
     @override
     def asked(self) -> dict[str, Any]:
@@ -903,7 +1092,7 @@ class ByTwoModesAtOnce(Paging):
 
     @override
     def says(self) -> str:
-        return "크기와 커서를 함께 지정하고"
+        return Says("크기와 커서를 함께 지정하고", english="with the size and a cursor at once")
 
     @override
     def asked(self) -> dict[str, Any]:

@@ -111,6 +111,17 @@
       },
       "display_icon": "rebel"
     },
+    "rebel100.device": {
+      "slot_name": "rebel100.device",
+      "description": "Rebel100",
+      "human_readable_name": "Rebel100 Device",
+      "display_unit": "Rebel100",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
     "gaudi2.device": {
       "slot_name": "gaudi2.device",
       "description": "Gaudi 2",

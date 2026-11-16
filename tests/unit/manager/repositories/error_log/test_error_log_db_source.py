@@ -8,12 +8,12 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow

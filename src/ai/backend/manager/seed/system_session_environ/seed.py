@@ -7,11 +7,11 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
+from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
-from ai.backend.manager.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.system_session_environ.upserters import (
     SystemSessionEnvironUpserter,
@@ -29,7 +29,6 @@ class SystemSessionEnvironSeed(SeedItem):
     scope_type: SystemSessionEnvironScopeType
     # TODO(BA-8661): Make this required once the global entity ids are fixed by the seed.
     scope_id: SystemSessionEnvironScopeID | None = None
-    enabled: bool
 
     @model_validator(mode="after")
     def _validate_scope_id_for_scope_type(self) -> Self:
@@ -56,7 +55,6 @@ class SystemSessionEnvironSeed(SeedItem):
                 owner=owner,
                 value_source=self.value_source,
                 key=self.environ_key,
-                enabled=self.enabled,
             ),
             field_upserters=[],
             field_purgers=[],

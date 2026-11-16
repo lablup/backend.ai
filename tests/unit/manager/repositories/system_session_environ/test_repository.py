@@ -4,6 +4,7 @@ import enum
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 
 import pytest
 
@@ -25,7 +26,14 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
+from ai.backend.manager.models.system_session_environ.searchers import (
+    SystemSessionEnvironSearcher,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.system_session_environ.repository import (
@@ -75,7 +83,7 @@ class _RowAtOwner:
     key: str
     value_source: SystemSessionEnvironValueSource
     owner: _RowOwner
-    enabled: bool = True
+    deleted: bool = False
 
 
 @dataclass(frozen=True)
@@ -142,6 +150,14 @@ def repository(
 
 
 @pytest.fixture
+def live_row_searcher() -> SystemSessionEnvironSearcher:
+    return SystemSessionEnvironSearcher(
+        pagination=NoPagination(),
+        conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+    )
+
+
+@pytest.fixture
 def row_scope_by_owner(database: ExtendedAsyncSAEngine) -> dict[_RowOwner, _RowScope]:
     return {
         _RowOwner.PUBLIC: _RowScope(
@@ -169,7 +185,7 @@ async def case_rows(
                 key=row.key,
                 scope_type=row_scope_by_owner[row.owner].scope_type,
                 scope_id=SystemSessionEnvironScopeID(row_scope_by_owner[row.owner].scope_id),
-                enabled=row.enabled,
+                deleted_at=datetime.now(UTC) if row.deleted else None,
             )
             for row in case.rows
         ])
@@ -316,40 +332,38 @@ class TestResolve:
                 expected_environ={"K": "user@example.com"},
             ),
             _EffectiveRowsCase(
-                name="disabled_row_left_out",
+                name="deleted_row_left_out",
                 rows=[
                     _RowAtOwner(
                         "K",
                         SystemSessionEnvironValueSource.SESSION_NAME,
                         _RowOwner.PUBLIC,
-                        enabled=False,
+                        deleted=True,
                     ),
                 ],
                 expected_environ={},
             ),
             _EffectiveRowsCase(
-                name="disabled_project_row_turns_off_the_public_key",
+                name="deleted_project_row_leaves_the_public_key",
                 rows=[
-                    _RowAtOwner(
-                        "K", SystemSessionEnvironValueSource.SESSION_NAME, _RowOwner.PUBLIC
-                    ),
-                    _RowAtOwner(
-                        "K",
-                        SystemSessionEnvironValueSource.USER_NAME,
-                        _RowOwner.PROJECT,
-                        enabled=False,
-                    ),
-                ],
-                expected_environ={},
-            ),
-            _EffectiveRowsCase(
-                name="enabled_project_row_turns_on_a_disabled_public_key",
-                rows=[
+                    _RowAtOwner("K", SystemSessionEnvironValueSource.USER_NAME, _RowOwner.PUBLIC),
                     _RowAtOwner(
                         "K",
                         SystemSessionEnvironValueSource.USER_EMAIL,
+                        _RowOwner.PROJECT,
+                        deleted=True,
+                    ),
+                ],
+                expected_environ={"K": "test-user"},
+            ),
+            _EffectiveRowsCase(
+                name="live_project_row_over_a_deleted_public_key",
+                rows=[
+                    _RowAtOwner(
+                        "K",
+                        SystemSessionEnvironValueSource.USER_NAME,
                         _RowOwner.PUBLIC,
-                        enabled=False,
+                        deleted=True,
                     ),
                     _RowAtOwner("K", SystemSessionEnvironValueSource.USER_EMAIL, _RowOwner.PROJECT),
                 ],
@@ -362,24 +376,27 @@ class TestResolve:
         self,
         case: _EffectiveRowsCase,
         repository: SystemSessionEnvironRepository,
+        live_row_searcher: SystemSessionEnvironSearcher,
         starting_session: SessionDataForStart,
         case_rows: None,
     ) -> None:
-        resolved_environ_by_session = await repository.resolve([starting_session])
+        resolved_environ_by_session = await repository.resolve(
+            [starting_session], live_row_searcher
+        )
 
         assert resolved_environ_by_session[starting_session.session_id] == case.expected_environ
 
     async def test_resolves_each_session_of_one_call_on_its_own(
         self,
         repository: SystemSessionEnvironRepository,
+        live_row_searcher: SystemSessionEnvironSearcher,
         starting_session: SessionDataForStart,
         session_in_other_project: SessionDataForStart,
         rows_at_two_projects: None,
     ) -> None:
-        resolved_environ_by_session = await repository.resolve([
-            starting_session,
-            session_in_other_project,
-        ])
+        resolved_environ_by_session = await repository.resolve(
+            [starting_session, session_in_other_project], live_row_searcher
+        )
 
         assert resolved_environ_by_session[starting_session.session_id] == {"K": "test-user"}
         assert resolved_environ_by_session[session_in_other_project.session_id] == {
@@ -406,10 +423,13 @@ class TestResolve:
         self,
         case: _ValueSourceCase,
         repository: SystemSessionEnvironRepository,
+        live_row_searcher: SystemSessionEnvironSearcher,
         starting_session: SessionDataForStart,
         value_source_bound_to_key_k: None,
     ) -> None:
-        resolved_environ_by_session = await repository.resolve([starting_session])
+        resolved_environ_by_session = await repository.resolve(
+            [starting_session], live_row_searcher
+        )
 
         assert resolved_environ_by_session[starting_session.session_id] == {
             "K": case.expected_value

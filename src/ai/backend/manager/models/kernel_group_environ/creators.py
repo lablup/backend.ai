@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
-from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
 from ai.backend.manager.data.kernel_group.types import KernelGroupEnvironData
 from ai.backend.manager.errors.kernel import InvalidKernelConfig
 from ai.backend.manager.errors.repository import CheckConstraintViolationError
@@ -43,9 +42,4 @@ class KernelGroupEnvironCreator(
 
     @override
     def to_data(self, row: KernelGroupEnvironRow) -> KernelGroupEnvironData:
-        return KernelGroupEnvironData(
-            id=KernelGroupEnvironID(row.id),
-            kernel_group_id=row.kernel_group_id,
-            key=row.key,
-            value=row.value,
-        )
+        return row.to_data()

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import assert_never
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.user import (
@@ -24,7 +25,6 @@ from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import NewType, Self
+from typing import Annotated, Literal, NewType, Self, override
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import SessionId
 
 IngressID = NewType("IngressID", str)
 IngressAuthority = NewType("IngressAuthority", str)
@@ -35,6 +37,10 @@ class IngressAccessMode(StrEnum):
     PUBLIC = "public"
     USER = "user"
     TOKEN = "token"
+
+
+class IngressTargetKind(StrEnum):
+    SESSION = "session"
 
 
 class PortFrontend(BaseFieldModel):
@@ -67,11 +73,11 @@ class IngressFrontend(BaseFieldModel):
         return self
 
     def key(self) -> IngressFrontendKey:
-        """The port number or the subdomain; unique within an authority."""
+        """``{kind}-{port number or subdomain}``; unique within an authority."""
         if self.port is not None:
-            return IngressFrontendKey(str(self.port.number))
+            return IngressFrontendKey(f"{self.kind.value}-{self.port.number}")
         if self.wildcard is not None:
-            return IngressFrontendKey(self.wildcard.subdomain)
+            return IngressFrontendKey(f"{self.kind.value}-{self.wildcard.subdomain}")
         raise UnreachableError("A validated frontend sets either port or wildcard")
 
 
@@ -113,16 +119,34 @@ class IngressAccess(BaseFieldModel):
         return self
 
 
-class IngressTarget(BaseFieldModel):
-    id: IngressTargetID
+class IngressTarget(BaseFieldModel, ABC):
+    kind: IngressTargetKind
     host: str
     port: int = Field(ge=1, le=65535)
+
+    @property
+    @abstractmethod
+    def id(self) -> IngressTargetID:
+        raise NotImplementedError
+
+
+class SessionIngressTarget(IngressTarget):
+    kind: Literal[IngressTargetKind.SESSION] = IngressTargetKind.SESSION
+    session_id: SessionId
+
+    @property
+    @override
+    def id(self) -> IngressTargetID:
+        return IngressTargetID(str(self.session_id))
+
+
+AnyIngressTarget = Annotated[SessionIngressTarget, Field(discriminator="kind")]
 
 
 class IngressTargetGroup(BaseFieldModel):
     id: IngressTargetGroupID
     weight: int = Field(ge=0)
-    targets: list[IngressTarget]
+    targets: list[AnyIngressTarget]
 
 
 class IngressBackend(BaseFieldModel):

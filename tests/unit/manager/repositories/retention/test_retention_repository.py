@@ -32,6 +32,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
@@ -45,7 +46,6 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -69,10 +69,8 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -103,7 +101,6 @@ from ai.backend.manager.models.session.row import SessionDependencyRow, SessionR
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -294,7 +291,6 @@ class TestLogsRetention:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,
@@ -626,14 +622,12 @@ class TestSessionsRetention:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
                 KernelRow,
-                VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
@@ -914,7 +908,6 @@ class TestSweep:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,
@@ -1221,7 +1214,6 @@ class TestDeploymentsTerminalChildCleanup:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionRow,
                 EndpointRow,
@@ -1443,8 +1435,10 @@ class TestDeploymentsSessionGroupCleanup:
     specs orphaned. session_groups is the parent side of the NO ACTION
     replica_groups.session_group_id FK, so a group only becomes collectable once
     nothing references it -- which is what makes the spec's position in the
-    category matter. The real catalog specs are drained here (in catalog order,
-    one transaction) so a reordering breaks these tests."""
+    category matter. The boundary is deleted_at, stamped when the owning replica
+    group is drained, so an active group survives however old it is. The real
+    catalog specs are drained here (in catalog order, one transaction) so a
+    reordering breaks these tests."""
 
     # deployment_revisions / endpoint_tokens are out of this fixture's table set;
     # every other deployments spec runs as the catalog declares it.
@@ -1463,7 +1457,6 @@ class TestDeploymentsSessionGroupCleanup:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionGroupRow,
                 SessionRow,
@@ -1509,7 +1502,12 @@ class TestDeploymentsSessionGroupCleanup:
         return endpoint_id
 
     async def _add_group(
-        self, db: ExtendedAsyncSAEngine, scope: _Scope, *, created_at: datetime
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _Scope,
+        *,
+        created_at: datetime,
+        deleted_at: datetime | None = None,
     ) -> SessionGroupID:
         group_id = SessionGroupID(uuid.uuid4())
         async with db.begin_session() as sess:
@@ -1522,6 +1520,7 @@ class TestDeploymentsSessionGroupCleanup:
                     placement_direction=SessionGroupPlacementDirection.SPREAD,
                     placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
                     created_at=created_at,
+                    deleted_at=deleted_at,
                 )
             )
         return group_id
@@ -1595,7 +1594,7 @@ class TestDeploymentsSessionGroupCleanup:
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
         endpoint_id = await self._add_endpoint(db, scope)
-        group_id = await self._add_group(db, scope, created_at=_OLD)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
         await self._add_replica_group(
             db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
         )
@@ -1609,7 +1608,7 @@ class TestDeploymentsSessionGroupCleanup:
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
         endpoint_id = await self._add_endpoint(db, scope)
-        group_id = await self._add_group(db, scope, created_at=_OLD)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
         await self._add_replica_group(
             db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.STABLE, updated_at=_OLD
         )
@@ -1627,7 +1626,7 @@ class TestDeploymentsSessionGroupCleanup:
         endpoint_id = await self._add_endpoint(
             db, scope, lifecycle=EndpointLifecycle.DESTROYED, destroyed_at=_OLD
         )
-        group_id = await self._add_group(db, scope, created_at=_OLD)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
         await self._add_replica_group(
             db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.STABLE, updated_at=_NEW
         )
@@ -1638,16 +1637,27 @@ class TestDeploymentsSessionGroupCleanup:
         assert await _count(db, ReplicaGroupRow) == 0  # DB cascade
         assert await _count(db, SessionGroupRow) == 0
 
-    async def test_recently_created_unreferenced_group_preserved(
+    async def test_active_group_without_deleted_at_preserved(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
-        # Guards the create-group-then-create-replica-group window: a group whose
-        # owner row is not committed yet is inside the boundary and survives.
-        await self._add_group(db, scope, created_at=_NEW)
+        # A user group is never stamped, so an old one stays: only the owning
+        # replica group's drain fixes its retention boundary.
+        await self._add_group(db, scope, created_at=_OLD)
 
         await self._drain(db, self._deployment_specs())
 
         assert await _count(db, SessionGroupRow) == 1
+
+    async def test_unreferenced_group_past_deleted_at_purged(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # The boundary is deleted_at, not created_at: a group stamped long enough
+        # ago goes even when it was created recently.
+        await self._add_group(db, scope, created_at=_NEW, deleted_at=_OLD)
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, SessionGroupRow) == 0
 
     async def test_member_session_survives_the_purged_group(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
@@ -1656,7 +1666,7 @@ class TestDeploymentsSessionGroupCleanup:
         # its group keeps its row (the unbinding itself is covered by the model
         # test); the sweep must not hold the group back for it either.
         endpoint_id = await self._add_endpoint(db, scope)
-        group_id = await self._add_group(db, scope, created_at=_OLD)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
         await self._add_replica_group(
             db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
         )
@@ -1674,7 +1684,7 @@ class TestDeploymentsSessionGroupCleanup:
         # but a group visited before its replica group is simply not collectable
         # yet and slips to the next sweep.
         endpoint_id = await self._add_endpoint(db, scope)
-        group_id = await self._add_group(db, scope, created_at=_OLD)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
         await self._add_replica_group(
             db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
         )
@@ -1803,11 +1813,12 @@ class TestUsageBucketsRetention:
 
 
 class TestCatalogCompleteness:
-    def test_every_category_is_wired(self) -> None:
-        # The sweep iterates enabled policies of any category, so every
-        # RetentionCategory must resolve to a purger spec set.
+    def test_every_drainable_category_is_wired(self) -> None:
+        # The sweep iterates enabled policies of any category, so every category it
+        # can drain must resolve to a purger spec set. ``projects`` is drained by the
+        # leader task through the project repository instead.
         catalog = RetentionDBSource._catalog(_THRESHOLD)
-        assert set(catalog) == set(RetentionCategory)
+        assert set(catalog) == set(RetentionCategory) - {RetentionCategory.PROJECTS}
 
 
 class TestSweepCategoryIsolation:
@@ -1824,7 +1835,6 @@ class TestSweepCategoryIsolation:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,

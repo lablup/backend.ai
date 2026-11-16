@@ -75,6 +75,8 @@ import ai.backend.manager.models.kernel_group_environ
 import ai.backend.manager.models.kernel_group_environ.row
 import ai.backend.manager.models.kernel_group_resource_slot
 import ai.backend.manager.models.kernel_group_resource_slot.row
+import ai.backend.manager.models.kernel_group_vfolder_mount
+import ai.backend.manager.models.kernel_group_vfolder_mount.row
 import ai.backend.manager.models.keypair
 import ai.backend.manager.models.keypair.row
 import ai.backend.manager.models.login_client_type

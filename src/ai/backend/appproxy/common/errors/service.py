@@ -38,6 +38,36 @@ class WorkerNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class WorkerNotFound(BackendAIError, web.HTTPNotFound):
+    """Raised when service discovery holds no worker of an authority."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/worker-not-found"
+    error_title = "Worker not found."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class WorkerFrontendLabelsInvalid(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a worker registers frontend labels that do not parse."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/worker-frontend-labels-invalid"
+    error_title = "Worker registered invalid frontend labels."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class PortNotAvailable(BackendAIError, web.HTTPConflict):
     """Raised when designated port is already occupied."""
 

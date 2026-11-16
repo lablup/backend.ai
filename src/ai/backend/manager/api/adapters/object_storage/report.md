@@ -1,122 +1,395 @@
 ## object_storage
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/object_storage/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/object_storage/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/object_storage/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/object_storage/adapter.py)
 
-시나리오: 미완 8 / 10
+Scenario: complete
 
-- ops 로 구성 (8)
-  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - get_presigned_download_url — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - get_presigned_upload_url — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
+- built from ops (8)
+  - admin_search: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - create: representative success ✓ · representative rejection ✓
+  - get: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✓
+  - partial_bulk_update: representative success ✓ · representative rejection ✓
+  - purge: representative success ✓ · representative rejection ✓
+  - update: representative success ✓ · representative rejection ✓
+- direct implementation (2)
+  - get_presigned_download_url: success present 1 · rejection present 3 (single_field)
+  - get_presigned_upload_url: success present 1 · rejection present 1 (single_field)
+
+**admin_search**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin filters by name, orders by name ascending and asks for one page, only the object storage with that name comes back. This call is gated by the global role](#searching-filtering-by-name-leaves-only-the-matching-object-storage) | answered |
+| [when a user who is not the superadmin tries to search object storages, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-object-storages) | rejected |
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order without their stored secret keys](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | answered |
+| [when a user granted nothing loads several object storage ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id) | rejected |
+
+**create**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin creates an object storage, the whole created one comes back. This call is gated by the global role](#creating-the-superadmin-creates-an-object-storage) | answered |
+| [when a user who is not the superadmin tries to create an object storage, it is rejected for lack of permission. This call is gated by the global role](#creating-a-user-who-is-not-the-superadmin-may-not-create-an-object-storage) | rejected |
+
+**get**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted permission to read object storages reads one, the seeded object storage comes back without its stored secret key](#reading-a-user-granted-read-gets-an-object-storage) | answered |
+| [when a user granted nothing reads one object storage, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-get-an-object-storage) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-object-storages) | 성공 |
-| [슈퍼관리자가 object storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-object-storages-and-a-missing-id) | 성공 |
+| [when the superadmin purges two object storages and an unknown id at once, the two come back in the purged list and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging-the-superadmin-purges-several-object-storages-and-a-missing-id) | answered |
+| [when a user granted nothing tries to purge several object storages at once, nothing is purged and every one comes back in the failed list because there is no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-object-storages) | rejected |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-object-storages) | 성공 |
-| [슈퍼관리자가 object storage 여럿의 호스트를 한 번에 바꾸면, 모두 새 호스트로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-object-storages-at-once) | 성공 |
+| [when the superadmin changes the hosts of several object storages at once, they all come back with the new host and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-object-storages-at-once) | answered |
+| [when a user granted nothing tries to update several object storages at once, nothing is updated and every one comes back in the failed list because there is no permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-object-storages) | rejected |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 object storage 를 purge 하면 purge 한 것의 id 가 반환된다](#purging-the-superadmin-purges-an-object-storage) | 성공 |
-| [아무 권한도 받지 않은 사용자가 object storage 를 purge 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-an-object-storage) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다](#purging-purging-an-object-storage-id-nothing-answers-to-is-not-found) | 거부 |
+| [when the superadmin purges an object storage, the id of the purged one comes back](#purging-the-superadmin-purges-an-object-storage) | answered |
+| [when a user granted nothing purges an object storage, it is rejected for a lack of permission](#purging-a-user-granted-nothing-may-not-purge-an-object-storage) | rejected |
+| [when the superadmin purges an id nothing answers to, it is rejected because the target cannot be found](#purging-purging-an-object-storage-id-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 호스트만 바꾸면, 호스트는 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-changes-the-host-of-an-object-storage) | 성공 |
-| [아무 권한도 받지 않은 사용자가 object storage 를 수정하면 권한 부족으로 거부된다. object storage 는 global 에만 속해 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-an-object-storage) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-an-object-storage-id-nothing-answers-to-is-not-found) | 거부 |
+| [when the superadmin changes only the host, the host becomes the new value and the rest stays as it was](#editing-the-superadmin-changes-the-host-of-an-object-storage) | answered |
+| [when a user granted nothing updates an object storage, it is rejected for a lack of permission. An object storage belongs to global alone, so there is no way to receive that permission](#editing-a-user-granted-nothing-may-not-edit-an-object-storage) | rejected |
+| [when the superadmin updates an id nothing answers to, it is rejected because the target cannot be found](#editing-the-superadmin-editing-an-object-storage-id-nothing-answers-to-is-not-found) | rejected |
+
+**get_presigned_download_url**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin asks for a URL to download an object of an available revision, a URL made from the object's stored path comes back](#presigned_urls-the-superadmin-gets-a-download-url-for-an-available-revision) | answered |
+| [when a download URL is asked for a revision that is not available, it is rejected because the revision is not approved](#presigned_urls-downloading-an-unavailable-revision-is-refused) | rejected |
+| [when the reservoir in the global config is not an object storage, a download URL request is rejected because the storage is not supported](#presigned_urls-downloading-from-a-vfs-reservoir-is-refused) | rejected |
+| [when the global config has no reservoir, a download URL request is rejected because the server is misconfigured](#presigned_urls-downloading-with-no-reservoir-config-is-refused) | rejected |
+
+**get_presigned_upload_url**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin asks for a URL to upload an object to a writable artifact's revision, a URL made from the object's stored path comes back with the fields to send along](#presigned_urls-the-superadmin-gets-an-upload-url-for-a-writable-artifact) | answered |
+| [when an upload URL is asked for a readonly artifact's revision, it is rejected because the artifact cannot be written](#presigned_urls-uploading-to-a-readonly-artifact-is-refused) | rejected |
+
+### admin_search
+
+<a id="searching-filtering-by-name-leaves-only-the-matching-object-storage"></a>
+
+#### [filtering-by-name-leaves-only-the-matching-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_searching.py): pass
+
+when the superadmin filters by name, orders by name ascending and asks for one page, only the object storage with that name comes back. This call is gated by the global role
+
+Given
+
+- 2 object storages and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.admin_search: user-1 filters object storages by name, orders them by name ascending and asks for one page
+
+Then
+
+- only the object storage with the matching name comes back
+  - items: same as the object storages seeded in advance
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-who-is-not-the-superadmin-may-not-search-object-storages"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-object-storages](/tests/scenario/bai_scenario/manager/object_storage/test_searching.py): pass
+
+when a user who is not the superadmin tries to search object storages, it is rejected for lack of permission. This call is gated by the global role
+
+Given
+
+- 2 object storages and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.admin_search: user-1 filters object storages by name, orders them by name ascending and asks for one page
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order"></a>
+
+#### [a-user-granted-read-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+
+when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order without their stored secret keys
+
+Given
+
+- 2 object storages and one user granted READ on object storages
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare a user granted READ on object storages in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role storage-keeper-1: applies only within the scope it is granted in
+    - Role storage-keeper-1: READ allowed on every object_storage
+    - regular user user-1: holds Role storage-keeper-1
+
+When
+
+- ObjectStorageAdapter.batch_load_by_ids: user-1 loads two object storages seeded in advance at once
+
+Then
+
+- the object storages seeded in advance come back in the requested order with '*****' as their secret keys
+  - length = 2
+  - [0].id: same as the object storage created in advance
+  - [0].entity_id: same as the object storage created in advance
+  - [0].name = 'object-storage-1'
+  - [0].host = 'seeded.object-storage.test'
+  - [0].access_key = 'seeded-access-key'
+  - [0].secret_key = '*****'
+  - [0].endpoint = 'http://seeded.object-storage.test'
+  - [0].region = 'seeded-region'
+  - [1].id: same as the object storage created in advance
+  - [1].entity_id: same as the object storage created in advance
+  - [1].name = 'object-storage-2'
+  - [1].host = 'seeded.object-storage.test'
+  - [1].access_key = 'seeded-access-key'
+  - [1].secret_key = '*****'
+  - [1].endpoint = 'http://seeded.object-storage.test'
+  - [1].region = 'seeded-region'
+
+<a id="reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id"></a>
+
+#### [a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+
+when a user granted nothing loads several object storage ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission
+
+Given
+
+- 2 object storages and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.batch_load_by_ids: user-1 loads two object storages seeded in advance at once
+
+Then
+
+- every entry comes back holding a rejection for lack of permission
+  - length = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### create
+
+<a id="creating-the-superadmin-creates-an-object-storage"></a>
+
+#### [the-superadmin-creates-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_creating.py): pass
+
+when the superadmin creates an object storage, the whole created one comes back. This call is gated by the global role
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.create: user-1 creates an object storage
+
+Then
+
+- the whole created object storage comes back
+  - id: skipped: the database generates it
+  - entity_id: skipped: the database generates it
+  - name = 'made-object-storage'
+  - host = 'made.object-storage.test'
+  - access_key = 'made-access-key'
+  - secret_key = 'made-secret-key'
+  - endpoint = 'https://made.object-storage.test'
+  - region = 'made-region'
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-create-an-object-storage"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-create-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_creating.py): pass
+
+when a user who is not the superadmin tries to create an object storage, it is rejected for lack of permission. This call is gated by the global role
+
+Given
+
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.create: user-1 creates an object storage
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### get
+
+<a id="reading-a-user-granted-read-gets-an-object-storage"></a>
+
+#### [a-user-granted-read-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+
+when a user granted permission to read object storages reads one, the seeded object storage comes back without its stored secret key
+
+Given
+
+- one object storage and one user granted READ on object storages
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare a user granted READ on object storages in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role storage-keeper-1: applies only within the scope it is granted in
+    - Role storage-keeper-1: READ allowed on every object_storage
+    - regular user user-1: holds Role storage-keeper-1
+
+When
+
+- ObjectStorageAdapter.get: user-1 reads object-storage-1
+
+Then
+
+- the object storage created in advance comes back with '*****' as its secret key
+  - id: same as the object storage created in advance
+  - entity_id: same as the object storage created in advance
+  - name = 'object-storage-1'
+  - host = 'seeded.object-storage.test'
+  - access_key = 'seeded-access-key'
+  - secret_key = '*****'
+  - endpoint = 'http://seeded.object-storage.test'
+  - region = 'seeded-region'
+
+<a id="reading-a-user-granted-nothing-may-not-get-an-object-storage"></a>
+
+#### [a-user-granted-nothing-may-not-get-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+
+when a user granted nothing reads one object storage, it is rejected for lack of permission
+
+Given
+
+- one object storage and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get: user-1 reads object-storage-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_purge
 
-<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-object-storages"></a>
-
-#### [a-user-granted-nothing-purges-none-of-several-object-storages](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_purging.py) — pass
-
-아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
-
-Given
-
-- object storage 2개와, 일반 사용자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - object storage object-storage-2: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ObjectStorageAdapter.partial_bulk_purge — user-1이 object storage 2개를 한 번에 purge
-
-Then
-
-- 처리된 object storage 없이 대상이 모두 실패 목록에 온다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 object storage 의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 object storage 의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
 <a id="partial_bulk_purging-the-superadmin-purges-several-object-storages-and-a-missing-id"></a>
 
-#### [the-superadmin-purges-several-object-storages-and-a-missing-id](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_purging.py) — pass
+#### [the-superadmin-purges-several-object-storages-and-a-missing-id](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 object storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two object storages and an unknown id at once, the two come back in the purged list and the unknown id comes back in the failed list because no target answers to it
 
 Given
 
-- object storage 2개와, 슈퍼관리자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - object storage object-storage-2: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 object storages and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.partial_bulk_purge — user-1이 object storage 2개 와 없는 id 하나를 한 번에 purge
+- ObjectStorageAdapter.partial_bulk_purge: user-1 purges 2 object storages and one unknown id at once
 
 Then
 
-- 대상 object storage 가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target object storage comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 미리 만들어 둔 object storage와 같다
-  - successes[0].entity_id: 미리 만들어 둔 object storage와 같다
+  - successes[0].id: same as the object storage created in advance
+  - successes[0].entity_id: same as the object storage created in advance
   - successes[0].name = 'object-storage-1'
   - successes[0].host = 'seeded.object-storage.test'
   - successes[0].access_key = 'seeded-access-key'
   - successes[0].secret_key = 'seeded-secret-key'
   - successes[0].endpoint = 'http://seeded.object-storage.test'
   - successes[0].region = 'seeded-region'
-  - successes[1].id: 미리 만들어 둔 object storage와 같다
-  - successes[1].entity_id: 미리 만들어 둔 object storage와 같다
+  - successes[1].id: same as the object storage created in advance
+  - successes[1].entity_id: same as the object storage created in advance
   - successes[1].name = 'object-storage-2'
   - successes[1].host = 'seeded.object-storage.test'
   - successes[1].access_key = 'seeded-access-key'
@@ -124,79 +397,79 @@ Then
   - successes[1].endpoint = 'http://seeded.object-storage.test'
   - successes[1].region = 'seeded-region'
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-object-storages"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-object-storages](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_purging.py): pass
+
+when a user granted nothing tries to purge several object storages at once, nothing is purged and every one comes back in the failed list because there is no permission
+
+Given
+
+- 2 object storages and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.partial_bulk_purge: user-1 purges 2 object storages at once
+
+Then
+
+- no object storage is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target object storage
+  - rejected: failed[0]: Insufficient permission
+  - failed[1].id: same as the id of the target object storage
+  - rejected: failed[1]: Insufficient permission
 
 ### partial_bulk_update
 
-<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-object-storages"></a>
-
-#### [a-user-granted-nothing-edits-none-of-several-object-storages](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_editing.py) — pass
-
-아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
-
-Given
-
-- object storage 2개와, 일반 사용자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - object storage object-storage-2: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ObjectStorageAdapter.partial_bulk_update — user-1이 object storage 2개의 호스트를 한 번에 수정
-
-Then
-
-- 처리된 object storage 없이 대상이 모두 실패 목록에 온다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 object storage 의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 object storage 의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
 <a id="partial_bulk_editing-the-superadmin-edits-several-object-storages-at-once"></a>
 
-#### [the-superadmin-edits-several-object-storages-at-once](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-object-storages-at-once](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 object storage 여럿의 호스트를 한 번에 바꾸면, 모두 새 호스트로 오고 실패한 것은 없다
+when the superadmin changes the hosts of several object storages at once, they all come back with the new host and nothing failed
 
 Given
 
-- object storage 2개와, 슈퍼관리자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - object storage object-storage-2: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 object storages and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.partial_bulk_update — user-1이 object storage 2개의 호스트를 한 번에 수정
+- ObjectStorageAdapter.partial_bulk_update: user-1 updates the host of 2 object storages at once
 
 Then
 
-- 대상 object storage 가 모두 처리된 목록에 오고, 실패한 것은 없다
+- every target object storage comes back in the processed list and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만들어 둔 object storage와 같다
-  - successes[0].entity_id: 미리 만들어 둔 object storage와 같다
+  - successes[0].id: same as the object storage created in advance
+  - successes[0].entity_id: same as the object storage created in advance
   - successes[0].name = 'object-storage-1'
   - successes[0].host = 'moved.object-storage.test'
   - successes[0].access_key = 'seeded-access-key'
   - successes[0].secret_key = 'seeded-secret-key'
   - successes[0].endpoint = 'http://seeded.object-storage.test'
   - successes[0].region = 'seeded-region'
-  - successes[1].id: 미리 만들어 둔 object storage와 같다
-  - successes[1].entity_id: 미리 만들어 둔 object storage와 같다
+  - successes[1].id: same as the object storage created in advance
+  - successes[1].entity_id: same as the object storage created in advance
   - successes[1].name = 'object-storage-2'
   - successes[1].host = 'moved.object-storage.test'
   - successes[1].access_key = 'seeded-access-key'
@@ -205,114 +478,147 @@ Then
   - successes[1].region = 'seeded-region'
   - failed = []
 
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-object-storages"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-object-storages](/tests/scenario/bai_scenario/manager/object_storage/test_partial_bulk_editing.py): pass
+
+when a user granted nothing tries to update several object storages at once, nothing is updated and every one comes back in the failed list because there is no permission
+
+Given
+
+- 2 object storages and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Object storage object-storage-2: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.partial_bulk_update: user-1 updates the host of 2 object storages at once
+
+Then
+
+- no object storage is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target object storage
+  - rejected: failed[0]: Insufficient permission
+  - failed[1].id: same as the id of the target object storage
+  - rejected: failed[1]: Insufficient permission
+
 ### purge
 
 <a id="purging-the-superadmin-purges-an-object-storage"></a>
 
-#### [the-superadmin-purges-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_purging.py) — pass
+#### [the-superadmin-purges-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_purging.py): pass
 
-슈퍼관리자가 object storage 를 purge 하면 purge 한 것의 id 가 반환된다
+when the superadmin purges an object storage, the id of the purged one comes back
 
 Given
 
-- object storage 하나와, 슈퍼관리자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one object storage and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.purge — user-1이 object-storage-1 purge
+- ObjectStorageAdapter.purge: user-1 purges object-storage-1
 
 Then
 
-- purge 한 object storage 의 id 가 반환된다
-  - id: 미리 만들어 둔 object storage와 같다
+- the id of the purged object storage comes back
+  - id: same as the object storage created in advance
+  - entity_id: same as the object storage created in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-an-object-storage"></a>
 
-#### [a-user-granted-nothing-may-not-purge-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 object storage 를 purge 하면 권한 부족으로 거부된다
+when a user granted nothing purges an object storage, it is rejected for a lack of permission
 
 Given
 
-- object storage 하나와, 일반 사용자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one object storage and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.purge — user-1이 object-storage-1 purge
+- ObjectStorageAdapter.purge: user-1 purges object-storage-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="purging-purging-an-object-storage-id-nothing-answers-to-is-not-found"></a>
 
-#### [purging-an-object-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/object_storage/test_purging.py) — pass
+#### [purging-an-object-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/object_storage/test_purging.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin purges an id nothing answers to, it is rejected because the target cannot be found
 
 Given
 
-- object storage 하나와, 슈퍼관리자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one object storage and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.purge — user-1이 존재하지 않는 id purge
+- ObjectStorageAdapter.purge: user-1 purges an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### update
 
 <a id="editing-the-superadmin-changes-the-host-of-an-object-storage"></a>
 
-#### [the-superadmin-changes-the-host-of-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_editing.py) — pass
+#### [the-superadmin-changes-the-host-of-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_editing.py): pass
 
-슈퍼관리자가 호스트만 바꾸면, 호스트는 새 값이 되고 나머지는 그대로 남는다
+when the superadmin changes only the host, the host becomes the new value and the rest stays as it was
 
 Given
 
-- object storage 하나와, 슈퍼관리자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one object storage and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.update — user-1이 object-storage-1의 호스트 수정
+- ObjectStorageAdapter.update: user-1 updates the host of object-storage-1
 
 Then
 
-- 미리 만들어 둔 object storage 전체가 반환된다
-  - id: 미리 만들어 둔 object storage와 같다
-  - entity_id: 미리 만들어 둔 object storage와 같다
+- the whole object storage created in advance comes back
+  - id: same as the object storage created in advance
+  - entity_id: same as the object storage created in advance
   - name = 'object-storage-1'
   - host = 'moved.object-storage.test'
   - access_key = 'seeded-access-key'
@@ -322,53 +628,232 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-an-object-storage"></a>
 
-#### [a-user-granted-nothing-may-not-edit-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 object storage 를 수정하면 권한 부족으로 거부된다. object storage 는 global 에만 속해 그 권한을 받을 방법이 없다
+when a user granted nothing updates an object storage, it is rejected for a lack of permission. An object storage belongs to global alone, so there is no way to receive that permission
 
 Given
 
-- object storage 하나와, 일반 사용자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one object storage and one regular user
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.update — user-1이 object-storage-1의 호스트 수정
+- ObjectStorageAdapter.update: user-1 updates the host of object-storage-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-the-superadmin-editing-an-object-storage-id-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-an-object-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/object_storage/test_editing.py) — pass
+#### [the-superadmin-editing-an-object-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/object_storage/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin updates an id nothing answers to, it is rejected because the target cannot be found
 
 Given
 
-- object storage 하나와, 슈퍼관리자 한 명
-  - object storage object-storage-1: 호스트가 seeded.object-storage.test 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one object storage and one superadmin
+  - Object storage object-storage-1: host is seeded.object-storage.test
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ObjectStorageAdapter.update — user-1이 존재하지 않는 id의 호스트 수정
+- ObjectStorageAdapter.update: user-1 updates the host of an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### get_presigned_download_url
+
+<a id="presigned_urls-the-superadmin-gets-a-download-url-for-an-available-revision"></a>
+
+#### [the-superadmin-gets-a-download-url-for-an-available-revision](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when the superadmin asks for a URL to download an object of an available revision, a URL made from the object's stored path comes back
+
+Given
+
+- one writable artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_download_url: user-1 asks for a URL to download model.bin of the revision
+
+Then
+
+- a download URL made from the object's stored path comes back
+  - presigned_url = 'https://presigned.scenario.local/download/artifact-1/1.0/model.bin'
+
+<a id="presigned_urls-downloading-an-unavailable-revision-is-refused"></a>
+
+#### [downloading-an-unavailable-revision-is-refused](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when a download URL is asked for a revision that is not available, it is rejected because the revision is not approved
+
+Given
+
+- one writable artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_download_url: user-1 asks for a URL to download model.bin of the revision
+
+Then
+
+- the call is rejected
+  - rejected: ArtifactRevisionNotApproved
+
+<a id="presigned_urls-downloading-from-a-vfs-reservoir-is-refused"></a>
+
+#### [downloading-from-a-vfs-reservoir-is-refused](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when the reservoir in the global config is not an object storage, a download URL request is rejected because the storage is not supported
+
+Given
+
+- one writable artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_download_url: user-1 asks for a URL to download model.bin of the revision
+
+Then
+
+- the call is rejected
+  - rejected: ObjectStorageOperationNotSupported
+
+<a id="presigned_urls-downloading-with-no-reservoir-config-is-refused"></a>
+
+#### [downloading-with-no-reservoir-config-is-refused](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when the global config has no reservoir, a download URL request is rejected because the server is misconfigured
+
+Given
+
+- one writable artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_download_url: user-1 asks for a URL to download model.bin of the revision
+
+Then
+
+- the call is rejected
+  - rejected: ServerMisconfiguredError
+
+### get_presigned_upload_url
+
+<a id="presigned_urls-the-superadmin-gets-an-upload-url-for-a-writable-artifact"></a>
+
+#### [the-superadmin-gets-an-upload-url-for-a-writable-artifact](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when the superadmin asks for a URL to upload an object to a writable artifact's revision, a URL made from the object's stored path comes back with the fields to send along
+
+Given
+
+- one writable artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_upload_url: user-1 asks for a URL to upload model.bin to the revision
+
+Then
+
+- an upload URL made from the object's stored path comes back with the fields to send along
+  - presigned_url = 'https://presigned.scenario.local/upload/artifact-1/1.0/model.bin'
+  - fields = {'policy': 'seeded-policy'}
+
+<a id="presigned_urls-uploading-to-a-readonly-artifact-is-refused"></a>
+
+#### [uploading-to-a-readonly-artifact-is-refused](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when an upload URL is asked for a readonly artifact's revision, it is rejected because the artifact cannot be written
+
+Given
+
+- one readonly artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_upload_url: user-1 asks for a URL to upload model.bin to the revision
+
+Then
+
+- the call is rejected
+  - rejected: ArtifactReadonly
 

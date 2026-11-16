@@ -9,17 +9,16 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.errors.resource import ModelStoreProjectLeaveError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
@@ -35,6 +34,8 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
+from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -65,6 +66,7 @@ _TABLES: list[Table | type[HasTable]] = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
+    SSHKeypairRow,
     ProjectRow,
     VirtualEntityRow,
     ScopeBindingRow,
@@ -206,8 +208,9 @@ async def _create_user(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(f"AK{unique}"),
                     secret_key=SecretValue(f"SK{unique}"),
-                    ssh_public_key="ssh-rsa test",
-                    ssh_private_key="test-private-key",
+                ),
+                ssh_keypair=SSHKeypairCreator(
+                    public_key="ssh-rsa test", private_key=None, is_default=True
                 ),
                 keypair_resource_policy="default",
             )

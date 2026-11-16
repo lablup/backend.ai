@@ -30,6 +30,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -62,8 +63,15 @@ class Purging(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]):
 
     @override
     def describe(self, laid: ADefinitionAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else laid.definition.config_name
-        return f"{laid.caller.username}이 {called} 영구 삭제"
+        if self.other is not None:
+            return Says(
+                f"{laid.caller.username} 이 존재하지 않는 ID 를 영구 삭제합니다",
+                english=f"{laid.caller.username} purges a missing id",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.definition.config_name} 을 영구 삭제합니다",
+            english=f"{laid.caller.username} purges {laid.definition.config_name}",
+        )
 
     @override
     async def call(
@@ -80,7 +88,10 @@ class ThePurgedOneIsNamed(Then[ADefinitionAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "영구 삭제한 설정 정의의 ID를 응답한다"
+        return Says(
+            "영구 삭제한 설정 정의의 ID 를 응답합니다",
+            english="it answers with the id of the purged config definition",
+        )
 
     @override
     def look(self, laid: ADefinitionAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -88,7 +99,17 @@ class ThePurgedOneIsNamed(Then[ADefinitionAndACaller, Purged]):
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
-            Held("ID", payload.id, SameAs[UUID](laid.definition.id, "미리 만들어 둔 설정 정의"))
+            Held(
+                "ID",
+                payload.id,
+                SameAs[UUID](
+                    laid.definition.id,
+                    Says(
+                        "미리 저장한 설정 정의",
+                        english="the config definition made in advance",
+                    ),
+                ),
+            )
         ]
 
 
@@ -102,7 +123,13 @@ class TheSuperadminPurgesIt(
 
     @override
     def describe(self) -> str:
-        return "종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다"
+        return Says(
+            "종속 행이 없는 설정 정의를 superadmin 이 영구 삭제하면, 삭제한 ID 가 반환됩니다",
+            english=(
+                "when the superadmin purges a config definition with no dependent rows, "
+                "the purged id comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
@@ -127,7 +154,15 @@ class EntriesAndFragmentsDoNotBlockIt(
 
     @override
     def describe(self) -> str:
-        return "허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다"
+        return Says(
+            "허용 목록 항목과 설정 조각이 딸린 설정 정의를 superadmin 이 영구 삭제하면, "
+            "종속 행이 삭제를 막지 않고 정의의 ID 가 반환됩니다",
+            english=(
+                "when the superadmin purges a config definition holding an allow-list entry "
+                "and a config fragment, the dependent rows do not block the purge and the id "
+                "of the definition comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
@@ -152,7 +187,14 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다"
+        return Says(
+            "같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, "
+            "엔티티 영구 삭제 권한이 없어 거부됩니다",
+            english=(
+                "when a regular user with no permission purges the same config definition, "
+                "it is rejected because the user has no entity purge permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
@@ -177,8 +219,12 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 ID 를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin purges a missing id, it is rejected because no such "
+                "target exists"
+            ),
         )
 
     @override

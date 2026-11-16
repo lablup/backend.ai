@@ -294,6 +294,7 @@ class TestReplicaStateInfo:
     def test_creation_with_replicas(self) -> None:
         replica_ids = [uuid.uuid4(), uuid.uuid4()]
         info = ReplicaStateInfo(
+            replica_count=2,
             desired_replica_count=2,
             replica_ids=replica_ids,
         )
@@ -302,6 +303,7 @@ class TestReplicaStateInfo:
 
     def test_creation_with_zero_replicas(self) -> None:
         info = ReplicaStateInfo(
+            replica_count=0,
             desired_replica_count=0,
             replica_ids=[],
         )
@@ -311,6 +313,7 @@ class TestReplicaStateInfo:
     def test_serialization_round_trip(self) -> None:
         replica_ids = [uuid.uuid4(), uuid.uuid4()]
         info = ReplicaStateInfo(
+            replica_count=2,
             desired_replica_count=2,
             replica_ids=replica_ids,
         )

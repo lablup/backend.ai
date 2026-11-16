@@ -30,6 +30,10 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.dto.manager.v2.kernel_group.request import (
+    KernelGroupEnvironNestedFilter,
+    KernelGroupResourceSlotNestedFilter,
+)
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
@@ -183,6 +187,12 @@ class SessionFilter(BaseRequestModel):
     )
     requested_starts_at: DateTimeFilter | None = Field(
         default=None, description="Filter by the reserved start time requested at creation"
+    )
+    kernel_group_environ: KernelGroupEnvironNestedFilter | None = Field(
+        default=None, description="Filter by the environ rows of the session's kernel groups"
+    )
+    kernel_group_resource_slots: KernelGroupResourceSlotNestedFilter | None = Field(
+        default=None, description="Filter by the resource slot rows of the session's kernel groups"
     )
     AND: list[SessionFilter] | None = None
     OR: list[SessionFilter] | None = None
@@ -434,7 +444,10 @@ class EnqueueSessionInput(BaseRequestModel):
     )
     bootstrap_script: str | None = Field(
         default=None,
-        description="Shell script executed on container startup. Falls back to keypair setting.",
+        description=(
+            "Shell script executed on container startup. Falls back to the user's default"
+            " bootstrap script, then the resource group's default."
+        ),
     )
 
     # Scheduling
@@ -469,6 +482,13 @@ class EnqueueSessionInput(BaseRequestModel):
     )
     attach_network: UUID | None = Field(
         default=None, description="Persistent network UUID to attach."
+    )
+    session_group_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Session group UUID the session joins. The group must belong to the session's "
+            "owner and project."
+        ),
     )
 
     # Metadata

@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy.orm import joinedload, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
@@ -26,7 +26,6 @@ class StreamDBSource:
                         noload("*"),
                         selectinload(KernelRow.agent_row).noload("*"),
                     ),
-                    joinedload(SessionRow.user),
                 )
                 .execution_options(populate_existing=True)
             )

@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 from .permission import RolePermissionPresetFilterGQL
@@ -90,6 +91,13 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
     scope_type: StringFilter | None = gql_field(description="Filter by scope type.", default=None)
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)
+    auto_assign_to_owner: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the assign-to-owner flag.",
+        ),
+        default=None,
+    )
     deleted: bool | None = gql_field(
         description=(
             "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
@@ -112,6 +120,13 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Filter by conditions on the permission entries the preset carries.",
+        ),
+        default=None,
+    )
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
         ),
         default=None,
     )

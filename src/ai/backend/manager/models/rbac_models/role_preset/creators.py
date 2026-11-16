@@ -7,6 +7,8 @@ from typing import override
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.role_preset import RolePresetCreateConflict
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
     RolePresetSearchableFields,
@@ -29,6 +31,7 @@ class RolePresetCreator(
     name: str
     scope_type: EntityType
     auto_assign: bool = False
+    auto_assign_to_owner: bool = False
     role_name_template: str | None = None
 
     @override
@@ -37,7 +40,15 @@ class RolePresetCreator(
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                constraint_name="uq_role_presets_name",
+                error=RolePresetCreateConflict(
+                    f"A role preset named '{self.name}' already exists for {self.scope_type}"
+                ),
+            ),
+        )
 
     @override
     def build_row(self) -> RolePresetRow:
@@ -46,6 +57,7 @@ class RolePresetCreator(
             role_name_template=self.role_name_template,
             scope_type=self.scope_type,
             auto_assign=self.auto_assign,
+            auto_assign_to_owner=self.auto_assign_to_owner,
         )
 
     @override

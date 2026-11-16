@@ -1,11 +1,11 @@
 # contexts
 
-This package defines context classes used to pass values and state between different test steps in the testing framework. Contexts are used to share information such as session objects, IDs, or other resources that are created or modified during test execution, making it possible for later steps to access results from previous steps.
+This package defines context classes that pass values and state between test steps in the testing framework. A context shares values such as session objects, ids and other resources that test execution creates or changes, so a later step can read the result of an earlier step.
 
-Typical usage includes wrapping resources like client sessions or test IDs, and providing a consistent interface for test scenarios to access shared state.
+Typical usage wraps a resource such as a client session or a test id and gives test scenarios a consistent interface to the shared state.
 
 Example classes:
-- `TestSpecMetaContext`: Store test metadata like test_id.
+- `TestSpecMetaContext`: Stores test metadata, such as `test_id`.
 - `ClientSessionContext`: Stores and provides an asynchronous client session.
 
-These context classes are typically used as part of the test scenario setup and teardown process.
+These context classes are typically used as part of the setup and teardown process of a test scenario.

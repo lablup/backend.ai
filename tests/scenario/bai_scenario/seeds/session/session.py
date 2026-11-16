@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import override
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -30,10 +31,17 @@ from ai.backend.manager.data.session.spec import (
     SessionScope,
     SessionSpec,
 )
-from ai.backend.manager.data.session.types import SessionEntityData
+from ai.backend.manager.data.session.types import (
+    SessionDesignatedAgentData,
+    SessionEntityData,
+)
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.session.creators import SessionCreator
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
+from ai.backend.manager.models.session_designated_agent.creators import (
+    SessionDesignatedAgentCreator,
+)
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFromThree
 
 
 def session_spec(
@@ -101,11 +109,11 @@ class TestSeedSession(
 
     @override
     def kind(self) -> str:
-        return "세션"
+        return Says("세션", english="Session")
 
     @override
     def detail(self) -> str:
-        return "스케줄링을 기다리고 있다"
+        return Says("스케줄링을 기다립니다", english="waiting to be scheduled")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -147,7 +155,10 @@ class TestSeedSessionInGroup(TestSeedSession):
 
     @override
     def detail(self) -> str:
-        return "세션 그룹의 멤버로 스케줄링을 기다리고 있다"
+        return Says(
+            "세션 그룹의 멤버로 스케줄링을 기다립니다",
+            english="waiting to be scheduled as a member of the session group",
+        )
 
     @override
     def seed(
@@ -156,3 +167,24 @@ class TestSeedSessionInGroup(TestSeedSession):
         creator = super().seed(name, first, second, third)
         scope = creator.spec.scope.model_copy(update={"session_group_id": self.session_group_id})
         return replace(creator, spec=creator.spec.model_copy(update={"scope": scope}))
+
+
+@dataclass(frozen=True)
+class TestSeedDesignatedAgentOf(
+    TestSeedFieldCreator[SessionEntityData, SessionDesignatedAgentData]
+):
+    """An agent the session designates, the one an earlier row answered."""
+
+    agent_uuid: AgentUUID
+
+    @override
+    def kind(self) -> str:
+        return Says("지정 에이전트 하나를 갖습니다", english="has one designated agent")
+
+    @override
+    def owner_id(self, owner: SessionEntityData) -> SessionID:
+        return SessionID(owner.id)
+
+    @override
+    def seed(self) -> SessionDesignatedAgentCreator:
+        return SessionDesignatedAgentCreator(agent_uuid=self.agent_uuid)

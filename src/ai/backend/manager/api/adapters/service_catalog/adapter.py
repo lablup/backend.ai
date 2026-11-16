@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
     ServiceCatalogNode,
 )
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
     OrderDirection,
     ServiceCatalogOrderField,
     ServiceCatalogStatusFilter,
@@ -212,16 +211,4 @@ class ServiceCatalogAdapter(BaseAdapter):
             registered_at=data.registered_at,
             last_heartbeat=data.last_heartbeat,
             config_hash=data.config_hash,
-            endpoints=[
-                EndpointInfo(
-                    id=ep.id,
-                    role=ep.role,
-                    scope=ep.scope,
-                    address=ep.address,
-                    port=ep.port,
-                    protocol=ep.protocol,
-                    metadata=ep.metadata,
-                )
-                for ep in data.endpoints
-            ],
         )

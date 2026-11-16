@@ -17,7 +17,7 @@ class VFolderAutoMountEntityType(EntityType):
     @override
     @classmethod
     def description(cls) -> str:
-        return "A vfolder mounted into every session created in a project."
+        return "A vfolder mounted into every session created in a project or by a user."
 
 
 class VFolderAutoMountID(EntityIdentifier):

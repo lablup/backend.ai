@@ -25,7 +25,7 @@ from ai.backend.manager.models.specs.relation import (
     RelationPurger,
     RelationUpserter,
 )
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -65,13 +65,6 @@ class V2RelationWriteOps(V2WriteOps):
             await self._govern([scope], target, cap=Permission.READ)
             await self._widen_share(target, scope, {Permission.READ: None})
         return written
-
-    async def _validate_precondition_checks(self, checks: Sequence[PreconditionCheck]) -> None:
-        """Refuse the write where the spec named a row that must not be there. What the
-        database cannot state for itself is stated here, each with its own error."""
-        for check in checks:
-            if (await self._sess.execute(check.finder)).first() is not None:
-                raise check.error
 
     async def _insert_relation_row(self, row: Base, checks: Sequence[IntegrityErrorCheck]) -> bool:
         """Insert the relation row unless the pair already stands, answering whether it

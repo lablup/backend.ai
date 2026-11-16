@@ -25,6 +25,7 @@ from ai.backend.manager.errors.agent import (
     AgentNotFound,
     ConflictingSessionRescheduleNotSupported,
 )
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -215,6 +216,30 @@ class TestWatcher:
         ):
             yield agent_service
 
+    async def test_watcher_port_defaults_to_watcher_service_addr_port(
+        self, agent_service: AgentService, agent_id: AgentId, mock_etcd: AsyncMock
+    ) -> None:
+        mock_etcd.get.side_effect = lambda key: {
+            f"nodes/agents/{agent_id}/ip": "192.168.1.100",
+        }.get(key)
+
+        watcher_info = await agent_service._get_watcher_info(agent_id)
+
+        assert watcher_info["addr"].port == 6009
+
+    @pytest.mark.parametrize("token", [None, ""], ids=["missing", "empty"])
+    async def test_watcher_info_rejects_unconfigured_token(
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        mock_config_provider: MagicMock,
+        token: str | None,
+    ) -> None:
+        mock_config_provider.config.watcher.token = token
+
+        with pytest.raises(WatcherTokenNotConfigured):
+            await agent_service._get_watcher_info(agent_id)
+
     async def test_agent_start_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -362,7 +387,10 @@ class TestUpdateResourceGroup:
     ) -> None:
         # Given the repository rejects the change because active sessions remain
         mock_agent_repository.update_resource_group.side_effect = AgentHasConflictingSessions(
-            agent_id, 1
+            agent_id,
+            allocated_session_count=1,
+            designating_session_count=0,
+            designating_deployment_count=0,
         )
 
         # When / Then the error propagates and nothing is terminated

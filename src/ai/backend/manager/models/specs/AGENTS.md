@@ -1,14 +1,14 @@
-# Write specs (v2 lineage) — Guardrails
+# Write specs (v2 lineage): Guardrails
 
 > For the selection table and design rationale, see `KNOWLEDGE.md` in the same directory.
 
 Declarative write specs, colocated with the schema: a spec says *what* to write
 (row, membership, checks); executing it is the ops layer's job
-(`repositories/ops/v2/`). Specs must NOT touch sessions or issue SQL.
+(`repositories/ops/v2/`). Specs must not touch sessions or issue SQL.
 
 ## Every v2-consumed spec lives here
 
-Whatever spec type the v2 actions and ops consume is declared in this package — the
+Whatever spec type the v2 actions and ops consume is declared in this package: the
 write specs below, plus the read/update declarations (`querier.py`, `lookup.py`,
 `searcher.py`, `updater.py`, `pagination.py`, and the batch purge spec in
 `purger.py`). `repositories/base/` holds read-side infrastructure only; do not
@@ -22,24 +22,26 @@ declare a spec there.
   (`relation.py`), and they name the pair.
 - A relation table has no row id column. The pair of ends is its primary key; a polymorphic
   side adds its type column to the key.
+- A new relation is named by its ends, scope first and target second, in the order
+  `create_relation(creator, scope, target)` takes them: `DomainResourceGroupRelationRow`, table `domain_resource_group_relations`. The order is the permission: the scope reads the target and what the target owns, and the target reads the scope itself only.
 - Create inserts a new pair only. A pair already linked, soft-deleted or not, is left
-  as it stands and answered `False`; bringing it back is the restore updater's.
+  as it stands and the create returns `False`; bringing it back is the restore updater's.
 - Soft delete / restore (`RelationLifecycleUpdater`) writes the soft delete mixin's
   `deleted_at` alone. What each side reads of the other stays, so a soft-deleted relation
   is still listed on both sides and can be restored. Only purge removes access. Only
   relations carrying the soft delete mixin declare this updater, one class per direction,
-  each answering a constant.
+  each returning a constant.
 - A business value switched on and off, such as `idle_checker_bindings.enabled`, is not a
   soft delete. The general updater writes it.
-- Do NOT carry a relation as a field on a `DataUpdater`. A value whose change drags
-  other writes along does not belong on the general edit path — the same rule soft
+- Do not carry a relation as a field on a `DataUpdater`. A value whose change drags
+  other writes along does not belong on the general edit path: the same rule soft
   delete follows.
 - Rationale: `proposals/BEP-1075-entity-relation-operations.md`.
 
 ## What a spec splits on depends on the operation
 
 A row in the graph is an entity or a field, and which one it is comes from the table
-in `KNOWLEDGE.md`. A row outside it is a sidecar — it stands on its own like an entity
+in `KNOWLEDGE.md`. A row outside it is a sidecar: it stands on its own like an entity
 and is read through an entity's permission like a field, while belonging to neither.
 
 | Operation | Roots | Why |
@@ -48,8 +50,8 @@ and is read through an entity's permission like a field, while belonging to neit
 | purger | `GuardedEntityPurger` / `EntityBatchPurger` / `GuardedFieldPurger` / `FieldBatchPurger` | removing an entity removes what it left in the graph; the batch roots pick by subquery instead of by id |
 | updater | `GuardedDataUpdater` / `DataBatchUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by conditions |
 
-The roots are deliberately unrelated. Do NOT extract a common base across them
-or type any function against "any creator/purger" — the absence of a common supertype
+The roots are deliberately unrelated. Do not extract a common base across them
+or type any function against "any creator/purger": the absence of a common supertype
 is the enforcement. Reuse execution logic through ops-layer helpers that take plain
 values (`row_class`, `pk_value`, ...).
 
@@ -59,29 +61,31 @@ values (`row_class`, `pk_value`, ...).
   the row was inserted or already there. Running them again changes nothing.
 - A row already there is left as it stands by `*_if_absent` and updated with the update
   values by an upsert. With no update values an upsert leaves it as well.
-- Do NOT put a column that decides an edge (one `created_in` reads, a relation's pair)
+- Do not put a column that decides an edge (one `created_in` reads, a relation's pair)
   in the update values. Changing it keeps the old edge and adds the new one.
 
 ## A single-row write carries its guard on the root
 
-- `GuardedEntityCreator.precondition_checks()`, `GuardedDataUpdater.guard_checks()`,
-  `GuardedEntityPurger.guard_checks()` and `GuardedFieldPurger.guard_checks()` are
-  abstract on the root. `EntityCreator`, `DataUpdater`, `EntityPurger` and `FieldPurger`
-  answer an empty list under `@final`; a spec that refuses inherits the guarded root
-  directly.
+- `GuardedEntityCreator.precondition_checks()`, `GuardedDanglingFieldCreator.precondition_checks()`,
+  `GuardedDataUpdater.guard_checks()`, `GuardedEntityPurger.guard_checks()` and
+  `GuardedFieldPurger.guard_checks()` are abstract on the root. `EntityCreator`,
+  `DanglingFieldCreator`, `DataUpdater`, `EntityPurger` and `FieldPurger` return an empty
+  list under `@final`; a spec that rejects inherits the guarded root directly.
+- Only the single-row create runs preconditions. The batch dangling creates take
+  `DanglingFieldCreator`, so a guarded spec cannot reach them.
 - A `GuardCheck` is a condition on the row already named, paired with the error to
-  raise when it fails. It rides on the UPDATE / DELETE statement; ops tells a missing
-  row (`EntityNotFoundError`) from a refusing one (the first failing check's error)
+  raise when it fails. It rides on the UPDATE / DELETE statement; ops distinguishes a missing
+  row (`EntityNotFoundError`) from a rejecting one (the first failing check's error)
   with one read of that row after the statement touched nothing.
 - A `PreconditionCheck` names rows elsewhere whose presence turns a create away; a
   `ConflictCheck` names rows a purge must not leave behind. Neither is a guard.
-- Do NOT translate a refusal in the caller. The error a guard answers is declared on
+- Do not translate a rejection in the caller. The error a guard raises is declared on
   the spec, and the repository has no `None` to branch on for it.
 
-## An entity answers its own id
+## An entity returns its own id
 
-- A creator and an upserter answer one hook — `entity_id(row)`. It returns an
-  `EntityIdentifier`, which answers its own type, so nothing declares the type
+- A creator and an upserter implement one hook: `entity_id(row)`. It returns an
+  `EntityIdentifier`, which carries its own type, so nothing declares the type
   separately.
 - It takes the row because the id does not exist before the insert; the database
   usually fills it.
@@ -92,7 +96,7 @@ values (`row_class`, `pk_value`, ...).
 
 `GlobalEntityCreator` merely does not go under another entity; it provisions its own
 virtual entity node exactly as `EntityCreator` does. Rows are created under a global
-entity too — an image under its container registry — so it has to be namable in the
+entity too (an image under its container registry) so it has to be namable in the
 graph. What it does not have is `created_in`, and the missing hook is what says it
 is created in no scope.
 
@@ -119,8 +123,8 @@ is created in no scope.
 | share, capped | its own govern | yes (a share, the target side of a relation) |
 | share, capped | another's govern | **no** |
 
-- A share is lent to the receiving scope. It answers through that scope's own govern
-  only, not to other scopes governing that virtual entity, and only for the shared
+- A share is lent to the receiving scope. It is reachable through that scope's own govern
+  only, not through other scopes governing that virtual entity, and only for the shared
   entity itself: a shared vfolder taken as a scope does not read the invitations under
   it, and a project shared to a resource group is not read by another project governing
   that resource group.
@@ -128,21 +132,21 @@ is created in no scope.
 
 | | Every-field cap | Field paths (READ/UPDATE, descendants included) |
 |---|---|---|
-| replace (**everything** before it goes) | `replace_share(scope, entity, cap)` — 0 is a cap too | `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` |
+| replace (**everything** before it goes) | `replace_share(scope, entity, cap)`: 0 is a cap too | `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` |
 | widen | `widen_share` | `widen_share_fields` |
-| narrow | `narrow_share` — removes the bit's rows | `narrow_share_fields` — removes the path and its descendants, an emptied row too |
-| remove | `unshare(scope, entities)` — own stays | |
+| narrow | `narrow_share`: removes the bit's rows | `narrow_share_fields`: removes the path and its descendants, an emptied row too |
+| remove | `unshare(scope, entities)`: own stays | |
 
 - A share mixing every-field bits and paths is not one replace: `replace_share(cap)`
   then `widen_share_fields`.
 - Accepting an invitation is `accept_invitation(updater)`: the invitation row's update
   and `widen_share` in one transaction. An invitation is a share on offer, so it lives
   with the share writes.
-- The three pairs come in through a provider only, per `repositories/AGENTS.md`. Never
+- The three pairs come in through a provider only, per `repositories/AGENTS.md`. Do not
   use a creator to share what already exists.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and
   permission-carrying paths convert lazily.
-- Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
+- Do not keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
 
 ## Role-managed entities
 
@@ -150,15 +154,15 @@ is created in no scope.
   resource group: created in no scope) or `RoleManagedEntityCreator` (project, user:
   `created_in` a domain) and are executed through the matching ops methods, as the
   plain `GlobalEntityCreator` / `EntityCreator` pair is. The type decides the path;
-  there is NO runtime capability check (`isinstance`).
+  there is no runtime capability check (`isinstance`).
 - Neither role-managed root is a subtype of its plain counterpart. `RoleTemplateSource`
   is the only shared base; no write path accepts that type bare.
-- Entity specs declare NO roles — the spec contributes only `template_value(row)` for
+- Entity specs declare no roles: the spec contributes only `template_value(row)` for
   the presets' name templates. Restricting which types may carry presets is the
   preset-creation service's validation.
 - The plain entity paths never touch roles, even when matching presets exist.
 - Enrollment writes graph relations only. Granting a joining user the target's auto_assign
-  roles is an explicit ops primitive — never an implicit side effect keyed on the type.
+  roles is an explicit ops primitive: never an implicit side effect keyed on the type.
 
 ## A batch purge says which kind it removes, and what bounds it
 
@@ -168,7 +172,7 @@ is created in no scope.
 - The two are unrelated roots, so an entity spec cannot flow through the field path and
   leave its graph rows behind. There is no unmarked batch purge.
 - What bounds the sweep follows the same axis every other write does: an entity batch is
-  bounded by the scopes the ops call names, a field batch by the owner it is given —
+  bounded by the scopes the ops call names, a field batch by the owner it is given:
   `build_subquery(owner_id)`, like `create_field(owner_id, ...)`. No field operation is
   scoped, and this one is not either.
 - `EntityBatchPurger.entity_id(row)` takes the row: a batch names a subquery, not an id.
@@ -178,7 +182,7 @@ is created in no scope.
 - A creator may put a SQL expression on a column in `build_row()`; the value is then
   computed inside the INSERT, with no lock and no SELECT before it. A rank asking for
   "one past the last" is what this is for.
-- Concurrent inserts can land on the same value. Do NOT use it where the order has to
+- Concurrent inserts can land on the same value. Do not use it where the order has to
   be deterministic.
 - Such a column is read back once after the insert. ops works that out from the row, so
   a spec declares nothing.
@@ -192,15 +196,15 @@ is created in no scope.
   id. A query rather than conditions, so an owner reached through a join is
   expressible; it selects the pair (row id, owner id), so one spec serves a single row
   and a batch alike.
-- It takes two type parameters, so the type `field_id()` answers and the type this
-  lookup handles cannot come apart.
+- It takes two type parameters, so the type `field_id()` returns and the type this
+  lookup handles cannot diverge.
 - `FieldOwnerKeyLookup` reads the same thing from the other end: a caller-facing key to
   the owner. `FieldKeyLookup` reads the row's id and the owner's from that key in one
-  query — an operation naming the row takes its id, so the key has to become one
+  query: an operation naming the row takes its id, so the key has to become one
   somewhere.
-- Do NOT pre-read the owner to check existence. Declare the FK violation in
+- Do not pre-read the owner to check existence. Declare the FK violation in
   `integrity_error_checks()` mapped to the domain error; preconditions beyond
-  existence (e.g. lifecycle) belong to the service layer as EXISTS checks.
+  existence (for example lifecycle) belong to the service layer as EXISTS checks.
 
 ## Soft delete belongs to its own updaters
 
@@ -209,8 +213,8 @@ the shared updaters are `SoftDeleteUpdater` / `RestoreUpdater` in `models/specs/
 Rows not yet on the mixin keep the column they delete by today.
 
 - Whether a row is soft-deleted is the soft delete mixin's `deleted_at` (nullable
-  timestamp) alone; NULL means alive. Do NOT add a `deleted` boolean beside it.
-- Do NOT put a deletion value (`deleted`, `DELETED`, `delete-pending`) in a business
+  timestamp) alone; NULL means alive. Do not add a `deleted` boolean beside it.
+- Do not put a deletion value (`deleted`, `DELETED`, `delete-pending`) in a business
   `status` enum. Restore resets `deleted_at` only, and the business state stays.
 - A lifecycle that ends by a `status` transition (session `TERMINATED`, deployment
   `DESTROYED`) is a finished record, not a soft delete. It gets no `deleted_at`; retention
@@ -218,7 +222,7 @@ Rows not yet on the mixin keep the column they delete by today.
 - An entity whose purge has to clean up external resources carries a separate
   `purge_status`: a NOT NULL enum with a named default. `purging` and `purge-error` occur
   only on a row with `deleted_at` set (CHECK).
-- `deleted_at` and `purge_status` are NOT exposed on the general `DataUpdater`. With no
+- `deleted_at` and `purge_status` are not exposed on the general `DataUpdater`. With no
   field for them, the ordinary edit path cannot make the transition at all.
 - Soft delete and restore each get their own updater, and `build_values()` returns a
   constant. A transition value taken as an argument is a value that can be passed
@@ -227,12 +231,12 @@ Rows not yet on the mixin keep the column they delete by today.
   `<Entity>RestoreUpdater`, carried by a `Delete*` and a `Restore*` action base
   respectively.
 - A domain that offers soft delete offers restore.
-- ops executes both as an update — the DB operation is an UPDATE, so no delete
+- ops executes both as an update: the DB operation is an UPDATE, so no delete
   operation exists to generalize. What records the run as a delete is the action's
   `operation_type()`; see `../../actions/AGENTS.md`.
 
 ## Naming: what is written vs where a read looks
 
 `…_global_entity` / `…_entity` / `…_field_entity` methods name **what is written**;
-`…_in_global` / `…_in_scopes` name the **operation scope** (where a read looks). Never
+`…_in_global` / `…_in_scopes` name the **operation scope** (where a read looks). Do not
 conflate the two axes.

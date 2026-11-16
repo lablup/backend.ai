@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio.engine import create_async_engine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
@@ -50,12 +51,10 @@ from ai.backend.manager.config.unified import (
     DebugConfig,
     ManagerConfig,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import DomainRow, domains
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.keypair.row import keypairs
@@ -76,7 +75,13 @@ from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.server import webapp_plugin_ctx
-from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
+from ai.backend.testutils.bootstrap import (
+    ETCD_PASSWORD,
+    ETCD_USER,
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
+)
 from ai.backend.testutils.pants import get_parallel_slot
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
@@ -221,6 +226,8 @@ def bootstrap_config(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
             "addr": HostPortPairModel(host=etcd_addr.host, port=etcd_addr.port),
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         }),
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,

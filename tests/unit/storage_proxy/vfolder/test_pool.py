@@ -48,7 +48,9 @@ VOLUME_ID = VolumeID(uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
 
 async def test_get_volume_by_name(mock_volume: AsyncMock) -> None:
-    pool = VolumePool(volumes={StorageVolumeName("test_volume"): mock_volume})
+    pool = VolumePool(
+        volumes={StorageVolumeName("test_volume"): mock_volume}, volume_status_checks=[]
+    )
 
     assert pool.get_volume_by_name(StorageVolumeName("test_volume")) is mock_volume
 
@@ -61,7 +63,8 @@ async def test_get_volume_by_id(mock_volume: AsyncMock) -> None:
         volumes={
             StorageVolumeName(str(VOLUME_ID).upper()): mock_volume,
             StorageVolumeName("test_volume"): mock_volume,
-        }
+        },
+        volume_status_checks=[],
     )
 
     assert pool.get_volume(VOLUME_ID) is mock_volume
@@ -76,7 +79,8 @@ async def test_list_volumes_excludes_noop_volume(mock_volume: AsyncMock) -> None
         volumes={
             StorageVolumeName("test_volume"): mock_volume,
             StorageVolumeName(NOOP_STORAGE_VOLUME_NAME): mock_volume,
-        }
+        },
+        volume_status_checks=[],
     )
 
     assert set(pool.list_volumes()) == {StorageVolumeName("test_volume")}

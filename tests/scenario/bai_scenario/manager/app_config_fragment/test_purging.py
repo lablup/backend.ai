@@ -35,6 +35,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
@@ -75,10 +76,15 @@ class Purging(When[AFragmentAndACaller, AppConfigFragmentAdapter, Purged]):
 
     @override
     def describe(self, laid: AFragmentAndACaller) -> str:
-        called = (
-            "존재하지 않는 id" if self.other is not None else f"{laid.fragment.config_name}의 조각"
+        if self.other is not None:
+            return Says(
+                f"{laid.caller.username} 이 존재하지 않는 id 를 삭제합니다",
+                english=f"{laid.caller.username} deletes a missing id",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.fragment.config_name} 의 조각을 삭제합니다",
+            english=f"{laid.caller.username} deletes the fragment of {laid.fragment.config_name}",
         )
-        return f"{laid.caller.username}이 {called} 삭제"
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: AFragmentAndACaller) -> Purged:
@@ -97,9 +103,13 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
 
     @override
     def describe(self, laid: SomeFragmentsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 자기 조각 {len(laid.mine)}개, 다른 사용자의 조각, "
-            "존재하지 않는 id를 한 번에 삭제"
+        return Says(
+            f"{laid.caller.username} 이 자기 조각 {len(laid.mine)}개, 다른 사용자의 조각, "
+            "존재하지 않는 id 를 한 번에 삭제합니다",
+            english=(
+                f"{laid.caller.username} deletes {len(laid.mine)} own fragments, another user's "
+                "fragment and a missing id at once"
+            ),
         )
 
     @override
@@ -119,14 +129,26 @@ class ThePurgedOneIsNamed(Then[AFragmentAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "삭제한 조각의 id를 응답한다"
+        return Says(
+            "삭제한 조각의 id 를 응답합니다",
+            english="it answers with the id of the deleted fragment",
+        )
 
     @override
     def look(self, laid: AFragmentAndACaller, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Held("id", payload.id, SameAs(laid.fragment.id, "미리 만들어 둔 조각"))]
+        return [
+            Held(
+                "id",
+                payload.id,
+                SameAs(
+                    laid.fragment.id,
+                    Says("미리 저장한 조각", english="the fragment made in advance"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -135,36 +157,13 @@ class MineArePurgedTheRestFail(Then[SomeFragmentsAndACaller, BulkPurged]):
 
     @override
     def says(self) -> str:
-        return "자기 것은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 반환된다"
-
-    @override
-    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[BulkPurged]) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Held[list[UUID]](
-                "successes",
-                [node.id for node in payload.successes],
-                SameAs[list[UUID]]([one.id for one in laid.mine], "미리 만들어 둔 자기 조각들"),
+        return Says(
+            "자기 것은 삭제된 목록에, 남의 것과 없는 id 는 실패 목록에 반환됩니다",
+            english=(
+                "the user's own fragments come back in the succeeded list, and another user's "
+                "fragment and the missing id come back in the failed list"
             ),
-            Same("failed", len(payload.failed), 2),
-            Held[UUID | None](
-                "failed[0].id",
-                payload.failed[0].id if payload.failed else None,
-                SameAs[UUID | None](laid.theirs.id, "미리 만들어 둔 남의 조각"),
-            ),
-            Skipped("failed[*].message", "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"),
-        ]
-
-
-@dataclass(frozen=True)
-class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
-    """둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "있는 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
+        )
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[BulkPurged]) -> list[Verdict]:
@@ -176,11 +175,74 @@ class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
                 "successes",
                 [node.id for node in payload.successes],
                 SameAs[list[UUID]](
-                    [*(one.id for one in laid.mine), laid.theirs.id], "미리 만들어 둔 조각들"
+                    [one.id for one in laid.mine],
+                    Says(
+                        "미리 저장한 자기 조각들",
+                        english="the user's own fragments made in advance",
+                    ),
+                ),
+            ),
+            Same("failed", len(payload.failed), 2),
+            Held[UUID | None](
+                "failed[0].id",
+                payload.failed[0].id if payload.failed else None,
+                SameAs[UUID | None](
+                    laid.theirs.id,
+                    Says(
+                        "미리 저장한 남의 조각",
+                        english="another user's fragment made in advance",
+                    ),
+                ),
+            ),
+            Skipped(
+                "failed[*].message",
+                Says(
+                    "이유는 문자열로 오고, 문자열은 변경되어도 되는 값입니다",
+                    english="the reason comes as a string, and a string is a value that may change",
+                ),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
+    """둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "있는 둘은 삭제된 목록에, 없는 id 는 실패 목록에 반환됩니다",
+            english=(
+                "the two existing fragments come back in the succeeded list, and the missing "
+                "id comes back in the failed list"
+            ),
+        )
+
+    @override
+    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[BulkPurged]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [
+            Held[list[UUID]](
+                "successes",
+                [node.id for node in payload.successes],
+                SameAs[list[UUID]](
+                    [*(one.id for one in laid.mine), laid.theirs.id],
+                    Says(
+                        "미리 저장한 조각들",
+                        english="the fragments made in advance",
+                    ),
                 ),
             ),
             Same("failed", len(payload.failed), 1),
-            Skipped("failed[*].message", "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"),
+            Skipped(
+                "failed[*].message",
+                Says(
+                    "이유는 문자열로 오고, 문자열은 변경되어도 되는 값입니다",
+                    english="the reason comes as a string, and a string is a value that may change",
+                ),
+            ),
         ]
 
 
@@ -194,7 +256,14 @@ class TheGrantedUserPurgesTheirOwn(
 
     @override
     def describe(self) -> str:
-        return "자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
+        return Says(
+            "자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, "
+            "삭제한 id 를 담은 응답이 반환됩니다",
+            english=(
+                "when a user with one own fragment and delete permission on their own scope "
+                "deletes it, an answer holding the deleted id comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -219,7 +288,14 @@ class AnotherUsersFragmentIsRefused(
 
     @override
     def describe(self) -> str:
-        return "다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다"
+        return Says(
+            "다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted delete permission only on their own scope deletes another "
+                "user's fragment, it is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -244,7 +320,14 @@ class ReadingIsNotEnoughToPurge(
 
     @override
     def describe(self) -> str:
-        return "자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다"
+        return Says(
+            "자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부됩니다. "
+            "삭제는 읽기와 다른 권한을 검사합니다",
+            english=(
+                "when a user granted only read permission on their own fragment deletes it, "
+                "it is rejected for lack of permission. Delete checks a permission other than read"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -269,7 +352,13 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin deletes a missing id, it is rejected because no such "
+                "target exists"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -294,10 +383,16 @@ class MixedIdsArePurgedEach(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 "
-            "id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 "
-            "함께 반환된다"
+            "id 를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id 는 실패 목록에 "
+            "이유와 함께 반환됩니다",
+            english=(
+                "when a user granted delete permission only on their own scope deletes two own "
+                "fragments, another user's fragment and a missing id at once, the two own "
+                "fragments come back in the succeeded list and the others come back in the "
+                "failed list together with the reason"
+            ),
         )
 
     @override
@@ -323,7 +418,14 @@ class TheSuperadminPurgesBoth(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
+        return Says(
+            "superadmin 이 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, "
+            "없는 id 는 실패 목록에 반환됩니다",
+            english=(
+                "when the superadmin deletes two fragments and one missing id at once, the two "
+                "come back in the succeeded list and the missing id comes back in the failed list"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:

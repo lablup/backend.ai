@@ -342,32 +342,6 @@ def agents_for_resource_tie_breaking() -> list[AgentInfo]:
 
 
 @pytest.fixture
-def agents_specialized_vs_general() -> list[AgentInfo]:
-    """
-    Specialized agent (with unutilized GPU) vs general agent (CPU-only).
-
-    - agent-specialized: 2 CPU, 4096 mem remaining, unutilized GPU
-    - agent-general: 6 CPU, 12288 mem remaining, no accelerators
-    """
-    return [
-        _create_agent_info(
-            agent_id="agent-specialized",
-            available_slots={
-                "cpu": Decimal("8"),
-                "mem": Decimal("16384"),
-                "cuda.shares": Decimal("4"),
-            },
-            occupied_slots={"cpu": Decimal("6"), "mem": Decimal("12288")},
-        ),
-        _create_agent_info(
-            agent_id="agent-general",
-            available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-            occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-        ),
-    ]
-
-
-@pytest.fixture
 def agents_with_custom_accelerator() -> list[AgentInfo]:
     """
     Agents with a custom accelerator resource type.

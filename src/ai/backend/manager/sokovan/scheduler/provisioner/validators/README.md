@@ -4,10 +4,10 @@
 
 ## Overview
 
-Validators are plugins that validate resource constraints before sessions are scheduled. They execute in the first stage of the scheduling pipeline, and sessions that fail validation are immediately excluded from scheduling.
+Validators are plugins that validate resource constraints before sessions are scheduled. They run in the first stage of the scheduling pipeline, and sessions that fail validation are excluded from scheduling immediately.
 
 **Key Responsibilities:**
-- Per-user/group/domain resource quota validation
+- Resource quota validation per user, project and domain
 - Concurrent session count limit validation
 - Inter-session dependency validation
 - Pending session limit validation
@@ -75,17 +75,17 @@ class SchedulingValidator:
 
 #### KeypairResourceLimitValidator
 
-Validates per-user (keypair) resource usage limits.
+Validates the resource usage limits per user (keypair).
 
 **Validates:**
 - Currently used resources + requested resources ≤ allocated quota
-- Per-resource-type validation (CPU, memory, GPU, etc.)
+- Per-resource-type validation (CPU, memory, GPU and so on)
 
 **On Failure:** `KeypairResourceQuotaExceeded`
 
 #### UserResourceLimitValidator
 
-Validates per-user resource usage limits.
+Validates the resource usage limits per user.
 
 **Validates:**
 - Resource limits set in user policies
@@ -94,17 +94,17 @@ Validates per-user resource usage limits.
 
 #### GroupResourceLimitValidator
 
-Validates per-group resource usage limits.
+Validates the resource usage limits per project.
 
 **Validates:**
-- Total resource usage across all users in the group
-- Group quota exceeded check
+- Total resource usage across all users in the project
+- Project quota exceeded check
 
 **On Failure:** `GroupResourceQuotaExceeded`
 
 #### DomainResourceLimitValidator
 
-Validates per-domain resource usage limits.
+Validates the resource usage limits per domain.
 
 **Validates:**
 - Domain-wide resource usage
@@ -120,7 +120,7 @@ Validates concurrent session count limits.
 
 **Validates:**
 - Per-user concurrent session count limit
-- Per-group concurrent session count limit
+- Per-project concurrent session count limit
 - Per-domain concurrent session count limit
 
 **On Failure:** `ConcurrencyLimitExceeded`
@@ -142,7 +142,7 @@ Validates inter-session dependencies.
 
 #### PendingSessionCountLimitValidator
 
-Validates per-user pending session count limits.
+Validates the pending session count limits per user.
 
 **Validates:**
 - Current PENDING session count
@@ -152,7 +152,7 @@ Validates per-user pending session count limits.
 
 #### PendingSessionResourceLimitValidator
 
-Validates total resource limits for pending sessions.
+Validates the total resource limits for pending sessions.
 
 **Validates:**
 - Total requested resources of PENDING sessions
@@ -251,7 +251,7 @@ class CustomValidationError(SchedulingValidationError):
 
 ### 3. Register in Factory
 
-Add custom rule when creating Validator in `factory.py`:
+Add the custom rule when creating the Validator in `factory.py`:
 
 ```python
 def create_validator(self) -> SchedulingValidator:
@@ -265,14 +265,14 @@ def create_validator(self) -> SchedulingValidator:
 
 ## Configuration
 
-Validators are enabled/disabled at the system level. Individual resource limits are configured in:
+Validators are enabled or disabled at the system level. Individual resource limits are configured in the following places:
 
-- **Keypair Quotas**: Set during user creation or by administrator
-- **Group Quotas**: Set during group creation
+- **Keypair Quotas**: Set during user creation or by an administrator
+- **Project Quotas**: Set during project creation
 - **Domain Quotas**: Set during domain creation
 - **Concurrency Limits**: Set in resource policies
 
-## Related Documents
+## Related documents
 
 - [Provisioner README](../README.md)
 - [Scheduler README](../../README.md)

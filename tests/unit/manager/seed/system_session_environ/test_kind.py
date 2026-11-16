@@ -42,7 +42,6 @@ class TestSystemSessionEnvironSeed:
                     value_source=SystemSessionEnvironValueSource.SESSION_ID,
                     key="BACKENDAI_SESSION_ID",
                     scope_type=SystemSessionEnvironScopeType.PUBLIC,
-                    enabled=True,
                 ),
                 expected_key="BACKENDAI_SESSION_ID:public",
             ),
@@ -53,7 +52,6 @@ class TestSystemSessionEnvironSeed:
                     key="BACKENDAI_SESSION_ID",
                     scope_type=SystemSessionEnvironScopeType.DOMAIN,
                     scope_id=SystemSessionEnvironScopeID(UUID(_DOMAIN_ID)),
-                    enabled=True,
                 ),
                 expected_key=f"BACKENDAI_SESSION_ID:domain:{_DOMAIN_ID}",
             ),
@@ -64,7 +62,6 @@ class TestSystemSessionEnvironSeed:
                     key="BACKENDAI_SESSION_ID",
                     scope_type=SystemSessionEnvironScopeType.PROJECT,
                     scope_id=SystemSessionEnvironScopeID(UUID(_DOMAIN_ID)),
-                    enabled=True,
                 ),
                 expected_key=f"BACKENDAI_SESSION_ID:project:{_DOMAIN_ID}",
             ),
@@ -79,15 +76,11 @@ class TestSystemSessionEnvironSeed:
         [
             _InvalidSeedItemCase(
                 name="missing-value-source",
-                item={"key": "K", "scope_type": "public", "enabled": True},
+                item={"key": "K", "scope_type": "public"},
             ),
             _InvalidSeedItemCase(
                 name="missing-key",
-                item={"value_source": "session_id", "scope_type": "public", "enabled": True},
-            ),
-            _InvalidSeedItemCase(
-                name="missing-enabled",
-                item={"value_source": "session_id", "key": "K", "scope_type": "public"},
+                item={"value_source": "session_id", "scope_type": "public"},
             ),
             _InvalidSeedItemCase(
                 name="unknown-value-source",
@@ -95,7 +88,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "hostname",
                     "key": "K",
                     "scope_type": "public",
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -104,7 +96,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "session_id",
                     "key": "1BAD",
                     "scope_type": "public",
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -113,7 +104,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "session_id",
                     "key": "K" * 257,
                     "scope_type": "public",
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -122,7 +112,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "session_id",
                     "key": "K",
                     "scope_type": "user",
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -132,7 +121,6 @@ class TestSystemSessionEnvironSeed:
                     "key": "K",
                     "scope_type": "public",
                     "scope_id": _DOMAIN_ID,
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -141,7 +129,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "session_id",
                     "key": "K",
                     "scope_type": "domain",
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -150,7 +137,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "session_id",
                     "key": "K",
                     "scope_type": "project",
-                    "enabled": True,
                 },
             ),
             _InvalidSeedItemCase(
@@ -159,7 +145,6 @@ class TestSystemSessionEnvironSeed:
                     "value_source": "session_id",
                     "key": "K",
                     "scope_type": "public",
-                    "enabled": True,
                     "rank": 1,
                 },
             ),

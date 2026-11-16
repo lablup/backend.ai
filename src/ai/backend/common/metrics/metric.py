@@ -487,6 +487,7 @@ class LayerType(enum.StrEnum):
     SERVICE_CATALOG_REPOSITORY = "service_catalog_repository"
     SESSION_REPOSITORY = "session_repository"
     STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
+    STORAGE_STATUS_REPOSITORY = "storage_status_repository"
     USER_REPOSITORY = "user_repository"
     USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
     VFOLDER_ADMIN_REPOSITORY = "vfolder_admin_repository"
@@ -535,6 +536,7 @@ class LayerType(enum.StrEnum):
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
     VALKEY_TUS = "valkey_tus"
+    VALKEY_STORAGE_VOLUME = "valkey_storage_volume"
     VALKEY_LOCK = "valkey_lock"
 
     # Client layers

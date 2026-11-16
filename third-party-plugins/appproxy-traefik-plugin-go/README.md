@@ -1,9 +1,9 @@
-# AppProxy Traefik Go Plugin
+# App Proxy Traefik Go Plugin
 
 Tracks circuit and session access times and WebSocket activity through the
-AppProxy worker's Unix socket API. Authentication remains in the
+app proxy worker's Unix socket API. Authentication remains in the
 [Rust/WASM plugin](https://github.com/lablup/backend.ai-appproxy-worker-traefik).
-Both plugins are required for AppProxy's
+Both plugins are required for the app proxy's
 Traefik HTTP routing.
 
 ## Development
@@ -18,7 +18,7 @@ go test ./...
 
 ## Integration
 
-- The coordinator generates the `id`, `sessionids`, and `lastusedmarkerpath` settings.
+- The app proxy coordinator generates the `id`, `sessionids`, and `lastusedmarkerpath` settings.
 - Traefik loads the source from `plugins-local/src/backend.ai/appproxy-traefik-plugin-go/`.
 - This source import does not change CI, packaging, or deployment configuration.
 

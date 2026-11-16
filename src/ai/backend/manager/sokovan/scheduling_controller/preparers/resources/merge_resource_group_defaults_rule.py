@@ -21,6 +21,7 @@ Merge semantics (unchanged from prior split):
   * scalar draft value wins when not ``None``
   * collection draft value wins when not empty
   * RG default fills only the "draft did not set" slots
+  * ``bootstrap_script`` takes the owner's default bootstrap script before the RG default
 
 Runs before :class:`.expand_kernel_groups_rule.ExpandKernelGroupsRule`
 so downstream expansion and finalize see fully-resolved options.
@@ -93,8 +94,30 @@ class MergeResourceGroupDefaultsRule(ResourceSpecDraftRule):
             }
         )
 
+        user_script = context.user.default_bootstrap_script
+        if user_script is not None and new_options.kernel_groups is not None:
+            new_options = new_options.model_copy(
+                update={
+                    "kernel_groups": tuple(
+                        group.model_copy(
+                            update={
+                                "execution_spec": group.execution_spec.model_copy(
+                                    update={"bootstrap_script": user_script}
+                                )
+                            }
+                        )
+                        if group.execution_spec.bootstrap_script is None
+                        else group
+                        for group in new_options.kernel_groups
+                    )
+                }
+            )
+
         # Per-group execution-spec fill — only when RG carries a baseline.
-        if rg_defaults.default_kernel_execution_spec is not None and opts.kernel_groups is not None:
+        if (
+            rg_defaults.default_kernel_execution_spec is not None
+            and new_options.kernel_groups is not None
+        ):
             rg_exec = rg_defaults.default_kernel_execution_spec
             merged_groups = tuple(
                 group.model_copy(
@@ -102,7 +125,7 @@ class MergeResourceGroupDefaultsRule(ResourceSpecDraftRule):
                         "execution_spec": self._merge_execution_spec(group.execution_spec, rg_exec),
                     }
                 )
-                for group in opts.kernel_groups
+                for group in new_options.kernel_groups
             )
             new_options = new_options.model_copy(update={"kernel_groups": merged_groups})
 

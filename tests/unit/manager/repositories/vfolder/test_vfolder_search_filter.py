@@ -14,30 +14,46 @@ import sqlalchemy as sa
 from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.kernel_group import KernelGroupRole
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageModeFilter
-from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
+from ai.backend.common.types import (
+    BinarySize,
+    MountPermission,
+    ResourceSlot,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -88,6 +104,7 @@ class TestVfolderSearchFilter:
             database_connection,
             [
                 DomainRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -99,6 +116,9 @@ class TestVfolderSearchFilter:
                 VFolderRow,
                 VFolderUserMountPolicyRow,
                 ModelCardRow,
+                SessionRow,
+                KernelGroupRow,
+                KernelGroupVFolderMountRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
@@ -408,6 +428,7 @@ class TestVfolderSearchFilter:
             )
 
         yield {
+            "domain_id": domain_id,
             "project_id": project_id,
             "user_a_id": user_a_id,
             "user_b_id": user_b_id,
@@ -611,6 +632,120 @@ class TestVfolderSearchFilter:
         )
 
         result = await _search_vfolders(db_with_cleanup, querier, scope)
+
+        assert result.rows == []
+        assert result.total_count == 0
+
+    @pytest.fixture
+    async def mounting_sessions(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+    ) -> dict[str, SessionID]:
+        """A running session on ``vf_clone_1`` and user_b's unshared ``vf_noclone_b``, and a
+        terminated session on ``vf_clone_2``."""
+        resource_group_id = ResourceGroupID(uuid.uuid4())
+        running = SessionID(uuid.uuid4())
+        terminated = SessionID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ResourceGroupRow(
+                    id=resource_group_id,
+                    name="default",
+                    driver="static",
+                    scheduler="fifo",
+                    scheduler_opts=ResourceGroupOpts(),
+                )
+            )
+            await db_sess.flush()
+            for session_id, status, vfolder_ids in (
+                (
+                    running,
+                    SessionStatus.RUNNING,
+                    (cloneable_data["vf_clone_1"], cloneable_data["vf_noclone_b"]),
+                ),
+                (terminated, SessionStatus.TERMINATED, (cloneable_data["vf_clone_2"],)),
+            ):
+                db_sess.add(
+                    SessionRow(
+                        id=session_id,
+                        cluster_size=1,
+                        domain_name="test-domain",
+                        domain_id=DomainID(cloneable_data["domain_id"]),
+                        resource_group_id=resource_group_id,
+                        scaling_group_name="default",
+                        group_id=cloneable_data["project_id"],
+                        user_uuid=cloneable_data["user_a_id"],
+                        status=status,
+                        vfolder_mounts=[],
+                    )
+                )
+                await db_sess.flush()
+                group = KernelGroupRow(session_id=session_id, role=KernelGroupRole(DEFAULT_ROLE))
+                db_sess.add(group)
+                await db_sess.flush()
+                for index, vfolder_id in enumerate(vfolder_ids):
+                    db_sess.add(
+                        KernelGroupVFolderMountRow(
+                            kernel_group_id=group.id,
+                            vfolder_id=VFolderUUID(vfolder_id),
+                            vfsubpath=".",
+                            mount_destination=f"/home/work/mnt-{index}",
+                            mount_perm=MountPermission.READ_WRITE,
+                        )
+                    )
+        return {"running": running, "terminated": terminated}
+
+    async def _search_used_by_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        user_id: uuid.UUID,
+        session_id: SessionID,
+    ) -> BatchQuerierResult[Row[Any]]:
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                VFolderSearchableFields.linked.usage.sessions.used_by(session_id).condition
+            ],
+            orders=[],
+        )
+        return await _search_vfolders(db, querier, UserVFolderTarget(user_id=UserID(user_id)))
+
+    async def test_used_by_session_returns_the_mounted_vfolder_within_the_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+        mounting_sessions: dict[str, SessionID],
+    ) -> None:
+        """user_b's ``vf_noclone_b`` is mounted too, and user_a's scope leaves it out."""
+        result = await self._search_used_by_session(
+            db_with_cleanup, cloneable_data["user_a_id"], mounting_sessions["running"]
+        )
+
+        assert [row.VFolderRow.id for row in result.rows] == [cloneable_data["vf_clone_1"]]
+        assert result.total_count == 1
+
+    async def test_used_by_terminated_session_returns_the_vfolder_it_mounted(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+        mounting_sessions: dict[str, SessionID],
+    ) -> None:
+        result = await self._search_used_by_session(
+            db_with_cleanup, cloneable_data["user_a_id"], mounting_sessions["terminated"]
+        )
+
+        assert [row.VFolderRow.id for row in result.rows] == [cloneable_data["vf_clone_2"]]
+
+    async def test_used_by_another_session_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+        mounting_sessions: dict[str, SessionID],
+    ) -> None:
+        result = await self._search_used_by_session(
+            db_with_cleanup, cloneable_data["user_a_id"], SessionID(uuid.uuid4())
+        )
 
         assert result.rows == []
         assert result.total_count == 0

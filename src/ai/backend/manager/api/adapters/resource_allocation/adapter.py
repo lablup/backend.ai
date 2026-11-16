@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ResourceGroupUsageNode,
     ScopeResourceUsageNode,
     UserConcurrencyPayload,
+    UserResourceAllocationPayload,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import AccessKey, BinarySize, SlotQuantity
@@ -42,6 +43,7 @@ from ai.backend.manager.data.resource_allocation.types import (
     ResourceGroupUsageData,
     ScopeUsageData,
 )
+from ai.backend.manager.errors.auth import AuthenticationRequired
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
@@ -66,13 +68,12 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_resourc
 from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
     GetUserConcurrencyAction,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_usage import (
+    GetUserUsageAction,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
 )
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupKeypairOwnerByAccessKeyAction,
-)
-from ai.backend.manager.services.user.processors import UserProcessors
 
 
 class ResourceAllocationAdapter(BaseAdapter):
@@ -80,19 +81,16 @@ class ResourceAllocationAdapter(BaseAdapter):
 
     _session: SessionProcessors
     _domain: DomainProcessors
-    _user: UserProcessors
     _config_provider: ManagerConfigProvider | None
 
     def __init__(
         self,
         session: SessionProcessors,
         domain: DomainProcessors,
-        user: UserProcessors,
         config_provider: ManagerConfigProvider | None,
     ) -> None:
         self._session = session
         self._domain = domain
-        self._user = user
         self._config_provider = config_provider
 
     def _visibility_settings(self) -> tuple[bool, bool]:
@@ -120,23 +118,6 @@ class ResourceAllocationAdapter(BaseAdapter):
         )
         return str(result.access_key), result.resource_policy
 
-    async def my_keypair_usage_for_current_user(
-        self,
-    ) -> KeypairResourceAllocationPayload:
-        """Get keypair resource usage for the current user.
-
-        Resolves access_key and resource_policy internally from current_user().
-        Intended for GQL resolvers where request context lacks keypair info.
-        """
-        me = current_user()
-        if me is None:
-            raise PermissionError("Not authenticated")
-        access_key, resource_policy = await self._resolve_keypair_context(me.user_id)
-        return await self.my_keypair_usage(
-            access_key=access_key,
-            resource_policy=resource_policy,
-        )
-
     async def effective_allocation_for_current_user(
         self,
         input: EffectiveResourceAllocationInput,
@@ -147,7 +128,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         access_key, resource_policy = await self._resolve_keypair_context(me.user_id)
         return await self.effective_allocation(
             input=input,
@@ -180,7 +161,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         access_key, resource_policy = await self._resolve_keypair_context(me.user_id)
         return await self.check_preset_availability(
             input=input,
@@ -203,24 +184,23 @@ class ResourceAllocationAdapter(BaseAdapter):
             private_session_count=result.concurrency.private_session_count,
         )
 
-    async def _keypair_owner(self, access_key: AccessKey) -> UserID:
-        result = await self._user.lookup_keypair_owner.run(
-            LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
+    async def my_user_usage(self) -> UserResourceAllocationPayload:
+        """Get the current user's resource usage across all their keypairs."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = await self._session.resource_allocation.get_user_usage.run(
+            GetUserUsageAction(user_id=UserID(me.user_id))
         )
-        return UserID(result.entity_id())
+        return UserResourceAllocationPayload(user=_scope_usage_to_node(result.usage))
 
-    async def my_keypair_usage(
-        self,
-        access_key: str,
-        resource_policy: Mapping[str, Any],
-    ) -> KeypairResourceAllocationPayload:
-        """Get keypair resource usage for the current user."""
+    async def my_keypair_usage(self) -> KeypairResourceAllocationPayload:
+        """Get the usage of the current user's default keypair."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         result = await self._session.resource_allocation.get_keypair_usage.run(
-            GetKeypairUsageAction(
-                user_id=await self._keypair_owner(AccessKey(access_key)),
-                access_key=AccessKey(access_key),
-                resource_policy=resource_policy,
-            )
+            GetKeypairUsageAction(user_id=UserID(me.user_id))
         )
         return KeypairResourceAllocationPayload(
             keypair=_scope_usage_to_node(result.usage),
@@ -278,7 +258,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """Get effective allocation for the current user."""
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         grv, hide = self._visibility_settings()
         result = await self._session.resource_allocation.get_effective_allocation.run(
             GetEffectiveAllocationAction(
@@ -327,7 +307,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """Check which resource presets are available for session creation."""
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         grv, hide = self._visibility_settings()
         result = await self._session.resource_allocation.check_preset_availability.run(
             CheckPresetAvailabilityAction(

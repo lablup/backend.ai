@@ -5,7 +5,6 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -19,6 +18,8 @@ from aiohttp.test_utils import TestClient
 from graphene.types import inputobjecttype
 from graphql import GraphQLInputObjectType, Undefined, coerce_input_value
 
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     ResourceSlot,
@@ -34,7 +35,10 @@ from ai.backend.manager.api.gql_legacy.group import (
     GroupNode,
     ModifyGroupInput,
 )
-from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    ProjectAllowedRegistryData,
+)
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -75,7 +79,6 @@ class TestCreateGroupMutation:
             resource_policy="default",
             type=ProjectType.GENERAL,
             integration_name=None,
-            container_registry=None,
         )
 
     @pytest.fixture
@@ -210,7 +213,6 @@ class TestGroupNodeQuery:
                 "local:volume1": {VFolderHostPermission.CREATE, VFolderHostPermission.MODIFY},
             }),
             integration_name=None,
-            container_registry=None,
             resource_policy="default",
             type=ProjectType.GENERAL,
             dotfiles=b"",
@@ -291,19 +293,27 @@ class TestGroupNodeQuery:
 
 
 class TestRegistryTargetInput:
-    @pytest.mark.parametrize(
-        "configuration", [{}, {"containerRegistry": None}, {"containerRegistry": "{}"}]
-    )
-    def test_omitted_null_and_empty_clear_the_target(
+    def _props(
         self, configuration: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    ) -> ModifyGroupInput:
         monkeypatch.setattr(inputobjecttype, "_INPUT_OBJECT_TYPE_DEFAULT_VALUE", Undefined)
-
         schema = graphene.Schema(types=[ModifyGroupInput])
         input_type = schema.graphql_schema.get_type("ModifyGroupInput")
         assert isinstance(input_type, GraphQLInputObjectType)
         props = coerce_input_value(configuration, input_type)
-        target = props.to_action(uuid4()).updater.container_registry
+        assert isinstance(props, ModifyGroupInput)
+        return props
+
+    def test_omitted_keeps_the_target(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        assert self._props({}, monkeypatch).to_registry_change().is_nop()
+
+    @pytest.mark.parametrize(
+        "configuration", [{"containerRegistry": None}, {"containerRegistry": "{}"}]
+    )
+    def test_null_and_empty_clear_the_target(
+        self, configuration: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target = self._props(configuration, monkeypatch).to_registry_change()
         assert not target.is_nop()
         assert target.optional_value() is None
 
@@ -330,32 +340,34 @@ async def test_registry_field_is_lazy_and_batches_group_types() -> None:
 
     ctx = MagicMock()
     ctx.dataloader_manager = DataLoaderManager()
-    project = ProjectData(
-        id=first,
-        name="project",
-        description=None,
-        is_active=True,
-        created_at=datetime.now(UTC),
-        modified_at=datetime.now(UTC),
-        integration_name=None,
-        domain_name="default",
-        total_resource_slots=ResourceSlot(),
-        allowed_vfolder_hosts=VFolderHostPermissionMap(),
-        dotfiles=b"",
-        resource_policy="default",
-        type=ProjectType.GENERAL,
-        container_registry=ImageCommitRegistry("harbor", "images"),
-    )
-    loader = ctx.processors.project.bulk_get.run = AsyncMock(
+
+    def registry(name: str) -> ContainerRegistryData:
+        return ContainerRegistryData(
+            id=ContainerRegistryID(uuid4()),
+            url=f"https://{name}.example.com",
+            registry_name=name,
+            type=ContainerRegistryType.HARBOR2,
+            project="images",
+            username=None,
+            password=None,
+            ssl_verify=True,
+            is_global=False,
+            extra=None,
+        )
+
+    loader = ctx.processors.project.bulk_get_registries.run = AsyncMock(
         return_value=PartialBulkResult(
             items=[
-                PartialBulkEntityResult[ProjectData].succeeded(
-                    first, project, description="resolved"
+                PartialBulkEntityResult[list[ProjectAllowedRegistryData]].succeeded(
+                    first,
+                    [
+                        ProjectAllowedRegistryData(registry=registry("other"), is_default=False),
+                        ProjectAllowedRegistryData(registry=registry("harbor"), is_default=True),
+                    ],
                 ),
-                PartialBulkEntityResult[ProjectData].succeeded(
+                PartialBulkEntityResult[list[ProjectAllowedRegistryData]].succeeded(
                     second,
-                    replace(project, id=second, container_registry=None),
-                    description="resolved",
+                    [ProjectAllowedRegistryData(registry=registry("other"), is_default=False)],
                 ),
             ]
         )
@@ -376,4 +388,4 @@ async def test_registry_field_is_lazy_and_batches_group_types() -> None:
         "nodes": [{"containerRegistry": '{"registry": "harbor", "project": "images"}'}],
     }
     loader.assert_awaited_once()
-    assert list(loader.call_args.args[0].ids) == [first, second]
+    assert list(loader.call_args.args[0].project_ids) == [first, second]

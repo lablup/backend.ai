@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 
 KERNEL_ID = str(uuid.UUID("00000000-0000-0000-0000-0000000000a1"))
 SESSION_ID = str(uuid.UUID("00000000-0000-0000-0000-0000000000b2"))
+SESSION_NAME = "test-session"
 OWNER_ID = str(uuid.UUID("00000000-0000-0000-0000-0000000000c3"))
 AGENT_ADDR = "tcp://127.0.0.1:6011"
 
@@ -71,6 +72,7 @@ def test_build_kernel_creation_config_has_all_keys() -> None:
         image_config=image_config,
         kernel_id=KERNEL_ID,
         session_id=SESSION_ID,
+        session_name=SESSION_NAME,
         owner_user_id=OWNER_ID,
         agent_addr=AGENT_ADDR,
     )
@@ -80,6 +82,7 @@ def test_build_kernel_creation_config_has_all_keys() -> None:
         "image",
         "kernel_id",
         "session_id",
+        "session_name",
         "owner_user_id",
         "owner_project_id",
         "network_id",
@@ -113,6 +116,7 @@ def test_build_kernel_creation_config_has_all_keys() -> None:
     assert config["image"] is image_config
     assert config["kernel_id"] == KERNEL_ID
     assert config["session_id"] == SESSION_ID
+    assert config["session_name"] == SESSION_NAME
     assert config["owner_user_id"] == OWNER_ID
     assert config["owner_project_id"] is None
     assert config["network_id"] == SESSION_ID
@@ -136,6 +140,7 @@ def test_environ_includes_cluster_and_service_ports() -> None:
         image_config=_image_config(),
         kernel_id=KERNEL_ID,
         session_id=SESSION_ID,
+        session_name=SESSION_NAME,
         owner_user_id=OWNER_ID,
         agent_addr=AGENT_ADDR,
     )
@@ -157,6 +162,7 @@ def test_environ_omits_service_ports_when_label_absent() -> None:
         image_config=_image_config(labels={}),
         kernel_id=KERNEL_ID,
         session_id=SESSION_ID,
+        session_name=SESSION_NAME,
         owner_user_id=OWNER_ID,
         agent_addr=AGENT_ADDR,
     )

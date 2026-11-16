@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Protocol
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
@@ -27,7 +28,6 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
@@ -36,10 +36,8 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -145,7 +143,6 @@ class TestModelCardDelete:
                 UserRoleRow,
                 UserRow,
                 EntityShareRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,

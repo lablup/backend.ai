@@ -1,0 +1,57 @@
+# Manager Repositories layer: 배경
+
+> 규칙은 같은 디렉터리의 `AGENTS.md` 에 있다.
+
+## 데이터 접근 경로 선택
+
+| 상황 | 경로 |
+|---|---|
+| 외부 API 를 처리하는 동작 | v2 ops (`V2DBOpsProvider` + `models/specs/` 타입), 우선 |
+| 순수 전달 (spec 입력, 데이터 출력, 분기 없음) | ops-generic service 를 거치는 범용 `OpsRepository`, 도메인 repository 를 아예 작성하지 않는다 |
+| 복잡한 내부 동작 (다중 테이블, scheduler 내부) | db object(`db_source`) 위의 repository 메서드 |
+
+기본은 첫 번째 row 이다. 동작을 spec 으로 실제로 표현할 수 없을 때만 db object 로 내려가고, 순수 전달만 남으면 repository 를 건너뛴다.
+
+## 동작별로 spec 이 담는 것
+
+| 동작 | spec | 담는 것 |
+|---|---|---|
+| get | `DataQuerier` | row 클래스, entity id column 과 값, `to_data` |
+| | `FieldQuerier` | 위와 같고 field row 자체의 id 로 찾는다 |
+| | `OwnedFieldQuerier` | 소유자가 지정한 row 를 소유자로 찾는다 |
+| lookup | `DataLookup` | row 클래스, key 조건, `to_data` |
+| search | `Searcher` | select, options, `to_data` |
+| create | `GlobalEntityCreator` | row 만 |
+| | `EntityCreator` | scope 와 membership 도 생성한다 |
+| | `RoleManagedEntityCreator` | entity 와 preset 역할 |
+| update | `DataUpdater` | row 클래스, pk, 값, `to_data` |
+| upsert | `EntityUpserter` | conflict key, scope 는 생성된 상태로 유지한다 |
+| purge | `GlobalEntityPurger` | create 와 대칭 |
+| | `EntityPurger` | row 와 함께 scope 를 정리한다 |
+
+- create, purge, upsert 메서드는 write 가 무엇을 등록하는지에 따라 나뉜다. 그래서 scoped spec 이 등록이 없는 경로로 흐를 수 없다.
+- `delete` 는 없다. 어느 column 이 row 를 삭제로 표시하는지는 도메인 지식이므로, delete action 은 `DataUpdater` 를 가지고 update 경로를 실행한다.
+- `OpsRepository` 가 ops 위에 추가하는 것은 두 가지다. row 가 없으면 `None` 대신 `EntityNotFoundError` / `FieldNotFoundError` 를 반환한다. 에러의 domain 은 spec 이 가진 식별자에서 읽고, key 로 지정한 row 라면 lookup 에서 읽는다. 그리고 `BackendAIError` 가 아닌 에러(연결을 열지 못한 경우 등)로 실패한 호출을 재시도한다.
+
+## ops provider 로의 점진 이관
+
+`ops/v2/provider.py` 의 `V2DBOpsProvider` 가 표준 경로이다. db_source 는 ops 로 점진 이관 중이므로 새 코드와 수정하는 코드에는 ops 를 사용하고, 기존 코드는 손댈 때까지 둔다. raw session 이 호출자에게 노출되지 않도록 engine 을 격리하고, 임의의 SQL 이 계층을 넘지 못하도록 spec 타입만 받는다.
+
+## tx 를 하나의 메서드로 묶는 이유
+
+tx 경계를 명확히 하기 위해 public 메서드에서 session 을 열고 닫는다. 여러 동작을 하나의 service 호출로 묶으면 부분 commit 없이 원자성을 보장한다. 메서드를 작은 조각으로 나누면 호출자가 여러 tx 에 걸쳐 일관성을 잃는다.
+
+## spec 이 테이블 하나만 다루는 이유
+
+spec 안에 다중 테이블 write 를 숨기면 순서와 의존성이 드러나지 않는다. 소유자를 먼저 생성하고 소유자가 지정한 row 는 소유자의 확정된 id 아래에서 구성된 `FieldCreator` 이므로, parent→child 순서가 명시적이다.
+
+## scope 필터 기본값
+
+`batch_query_with_scopes` 가 RBAC scope 를 강제하기 위한 기본값이다. `batch_query_in_global` 은 필터를 우회하므로 superadmin/internal 경로로 한정하고, 빈 scope 는 `EmptyOperationScopeError` 로 차단한다.
+
+## session group 보존 경계
+
+- `session_groups.deleted_at` 이 deployments 범주가 수거하는 경계이다. NULL 행은 선택되지 않으므로, 남겨야 하는 그룹은 NULL 로 둔다. live replica group 이 아직 쥐고 있는 그룹과 사용자가 만든 그룹이 그렇다.
+- 값을 쓰는 경로는 두 개이고, 둘 다 `deleted_at` 이 아직 NULL 인 행만 쓴다. replica group 이 terminal lifecycle(`ReplicaGroupLifecycle.terminal_statuses()`)에 도달할 때의 lifecycle reconcile 과, drain 이 terminal lifecycle 에 도달하기 전에 replica group 이 purge 되는 경우를 덮는 endpoint destroy retire 경로이다.
+- migration 은 terminal replica group 이 아직 참조하는 그룹만 backfill 한다. replica group 이 한 번도 참조하지 않은 그룹은 사용자 소유이고, migration 이전에 replica group 행이 purge 된 그룹은 흔적이 없다. 둘 다 NULL 로 남아 deployments 범주에서 수거되지 않는다.
+

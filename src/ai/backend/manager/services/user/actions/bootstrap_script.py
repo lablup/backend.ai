@@ -40,7 +40,8 @@ class GetDefaultBootstrapScriptActionResult:
 
 @dataclass(frozen=True)
 class UpdateDefaultBootstrapScriptAction(BaseSingleEntityAction):
-    """Append a revision to the user's default bootstrap script."""
+    """Append a revision to the user's default bootstrap script. A user with no default
+    gets a new script, set as the default."""
 
     user_id: UserID
     script: BootstrapScript

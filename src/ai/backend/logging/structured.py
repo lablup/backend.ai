@@ -60,6 +60,8 @@ class LogFieldNormalizer:
                 return str(value)
             case datetime():
                 return value.isoformat()
+            case str():
+                return str(value)
             case _:
                 return value
 

@@ -58,6 +58,7 @@ class VFolderOwnershipTypeGQL(StrEnum):
 )
 class VFolderOperationStatusGQL(StrEnum):
     READY = "ready"
+    CREATING = "creating"
     CLONING = "cloning"
     DELETE_PENDING = "delete-pending"
     DELETE_ONGOING = "delete-ongoing"

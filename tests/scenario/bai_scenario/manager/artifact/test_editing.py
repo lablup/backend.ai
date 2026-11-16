@@ -16,7 +16,7 @@ from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.artifact import (
     AnArtifactAndACaller,
     AnArtifactAndSomeone,
@@ -28,7 +28,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "고친 설명"
+EDITED = Says("수정한 설명", english="the edited description")
 
 type ArtifactStep = Scenario[
     TestSeedingSession, AnArtifactAndACaller, ArtifactAdapter, ArtifactNode
@@ -47,8 +47,16 @@ class Editing(When[AnArtifactAndACaller, ArtifactAdapter, ArtifactNode]):
 
     @override
     def describe(self, laid: AnArtifactAndACaller) -> str:
-        first = "soft delete 한 뒤 " if self.deleted_first else ""
-        return f"{laid.caller.username}이 {laid.artifact.name}을 {first}설명을 고침"
+        who = laid.caller.username
+        if self.deleted_first:
+            return Says(
+                f"{who}이 {laid.artifact.name}을 soft delete 한 뒤 설명을 수정합니다",
+                english=f"{who} soft deletes {laid.artifact.name} and then changes its description",
+            )
+        return Says(
+            f"{who}이 {laid.artifact.name}의 설명을 수정합니다",
+            english=f"{who} changes the description of {laid.artifact.name}",
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: AnArtifactAndACaller) -> ArtifactNode:
@@ -73,7 +81,13 @@ class TheSuperadminEditsAnArtifact(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아티팩트의 설명을 바꾸면, 새 설명을 실은 아티팩트가 온다"
+        return Says(
+            "superadmin 이 아티팩트의 설명을 변경하면, 새 설명을 담은 아티팩트가 응답으로 옵니다",
+            english=(
+                "when the superadmin changes the description of an artifact, the artifact "
+                "comes back holding the new description"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactAndACaller]:
@@ -98,7 +112,10 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 아티팩트를 고칠 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 아티팩트를 수정할 수 없습니다",
+            english="a user granted nothing cannot edit an artifact",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactAndACaller]:
@@ -123,8 +140,13 @@ class ASoftDeletedArtifactIsNotEdited(
 
     @override
     def describe(self) -> str:
-        return (
-            "soft delete 된 아티팩트는 슈퍼관리자라도 고칠 수 없고, 대상이 없다는 것으로 거부된다"
+        return Says(
+            "soft delete 된 아티팩트는 superadmin 이라도 수정할 수 없고, 대상이 없다는 것으로 "
+            "거부됩니다",
+            english=(
+                "a soft-deleted artifact cannot be edited even by the superadmin, and it is "
+                "rejected as having no target"
+            ),
         )
 
     @override

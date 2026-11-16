@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -90,7 +92,7 @@ class InvalidURLError(BackendAIError):
         )
 
 
-class InvalidSessionParameterError(BackendAIError):
+class InvalidSessionParameterError(BackendAIError, web.HTTPBadRequest):
     """Raised when session parameter is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-session-parameter"
@@ -207,4 +209,19 @@ class MissingHealthCheckInfoError(BackendAIError):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UnsupportedServiceDiscoveryTypeError(BackendAIError):
+    """Raised when the configured service discovery type is not supported by the coordinator."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/unsupported-service-discovery-type"
+    error_title = "Service discovery type is not supported."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

@@ -67,6 +67,14 @@ docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "386": "386",
 }
 
+# Environment variables the kernel runner entrypoint reads to set the container user and groups.
+# Only the agent sets them; a user-supplied value must never reach the container.
+RUNNER_RESERVED_ENVIRON_KEYS: Final[frozenset[str]] = frozenset({
+    "LOCAL_USER_ID",
+    "LOCAL_GROUP_ID",
+    "ADDITIONAL_GIDS",
+})
+
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 default_registry = "index.docker.io"

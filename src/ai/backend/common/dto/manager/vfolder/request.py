@@ -11,7 +11,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.field import VFolderPermissionField
-from ai.backend.common.typed_validators import VFolderName
+from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 
 __all__ = (
@@ -251,7 +251,7 @@ class CreateDownloadSessionReq(BaseRequestModel):
 class CreateUploadSessionReq(BaseRequestModel):
     """Request to create a file upload session."""
 
-    path: str = Field(description="File path to upload to")
+    path: VFolderRelativePath = Field(description="File path to upload to")
     size: int = Field(description="File size in bytes")
 
 

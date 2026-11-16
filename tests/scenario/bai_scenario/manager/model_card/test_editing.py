@@ -17,6 +17,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -32,7 +33,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "고쳐 쓴 제목"
+EDITED = Says("수정한 제목", english="the edited title")
 
 type CardStep = Scenario[TestSeedingSession, ModelCardsAndACaller, ModelCardAdapter, ModelCardNode]
 
@@ -47,7 +48,10 @@ class EditingTheTitle(When[ModelCardsAndACaller, ModelCardAdapter, ModelCardNode
 
     @override
     def describe(self, laid: ModelCardsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.cards[0].name}의 제목을 고침"
+        return Says(
+            f"{laid.caller.username}이 {laid.cards[0].name}의 제목을 수정합니다",
+            english=f"{laid.caller.username} edits the title of {laid.cards[0].name}",
+        )
 
     @override
     async def call(self, adapter: ModelCardAdapter, laid: ModelCardsAndACaller) -> ModelCardNode:
@@ -64,7 +68,13 @@ class TheEditedCard(Then[ModelCardsAndACaller, ModelCardNode]):
 
     @override
     def says(self) -> str:
-        return "제목은 새 값이 되고 나머지는 그대로인 카드 전체"
+        return Says(
+            "제목은 새 값이 되고 나머지는 그대로인 카드 전체가 응답으로 옵니다",
+            english=(
+                "the whole card comes back with the title taking the new value "
+                "and the rest unchanged"
+            ),
+        )
 
     @override
     def look(self, laid: ModelCardsAndACaller, answered: Answered[ModelCardNode]) -> list[Verdict]:
@@ -87,9 +97,14 @@ class AUserGrantedUpdateEditsTheTitle(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, "
-            "제목은 새 값이 되고 나머지는 그대로 남는다"
+        return Says(
+            "프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 변경하면 "
+            "제목은 새 값이 되고 나머지는 그대로 남습니다",
+            english=(
+                "when a user granted read and update permission on model cards in the project "
+                "changes the title of a card, the title takes the new value and the rest "
+                "stays unchanged"
+            ),
         )
 
     @override
@@ -115,7 +130,13 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to update a model card, "
+                "the call is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ModelCardsAndACaller]:

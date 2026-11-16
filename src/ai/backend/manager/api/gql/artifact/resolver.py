@@ -40,6 +40,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import ArtifactAvailability
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
@@ -757,7 +758,7 @@ async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
 ) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator
 
 
@@ -775,5 +776,5 @@ async def artifact_import_progress_updated(
     artifact_revision_id: ID,
 ) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

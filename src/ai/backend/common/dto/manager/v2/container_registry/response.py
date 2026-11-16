@@ -19,6 +19,7 @@ __all__ = (
     "DeleteContainerRegistryPayload",
     "PurgeContainerRegistryPayload",
     "AdminSearchContainerRegistriesPayload",
+    "ScopedSearchContainerRegistriesPayload",
     "UpdateContainerRegistryPayload",
 )
 
@@ -78,6 +79,15 @@ class PurgeContainerRegistryPayload(BaseResponseModel):
 
 class AdminSearchContainerRegistriesPayload(BaseResponseModel):
     """Payload for listing container registries with pagination info."""
+
+    items: list[ContainerRegistryNode] = Field(description="List of container registries.")
+    total_count: int = Field(description="Total number of matching registries.")
+    has_next_page: bool = Field(description="Whether more items exist after this page.")
+    has_previous_page: bool = Field(description="Whether items exist before this page.")
+
+
+class ScopedSearchContainerRegistriesPayload(BaseResponseModel):
+    """Payload for the container registries the named scopes reach, with pagination info."""
 
     items: list[ContainerRegistryNode] = Field(description="List of container registries.")
     total_count: int = Field(description="Total number of matching registries.")

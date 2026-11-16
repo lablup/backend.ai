@@ -21,6 +21,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -41,7 +42,10 @@ class TheTerminatorIsRegistered(Given[TestSeedingSession, None]):
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 세션 종료 처리기가 등록되어 있다"
+        return Says(
+            "코디네이터가 세션 종료 처리기를 등록했습니다",
+            english="the coordinator has registered a session terminator handler",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> None:
@@ -54,7 +58,10 @@ class NothingIsRegistered(Given[TestSeedingSession, None]):
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 없다"
+        return Says(
+            "코디네이터가 등록한 처리기가 없습니다",
+            english="the coordinator has registered no handler",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> None:
@@ -69,7 +76,10 @@ class Listing(When[None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHa
 
     @override
     def describe(self, laid: None) -> str:
-        return "세션 처리기 목록을 조회"
+        return Says(
+            "세션 처리기 목록을 조회합니다",
+            english="lists the session handlers",
+        )
 
     @override
     async def call(
@@ -83,7 +93,10 @@ class Listing(When[None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHa
 class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
     @override
     def says(self) -> str:
-        return "세션 종료 처리기 하나가 그 이름과 설명으로 반환된다"
+        return Says(
+            "세션 종료 처리기 하나가 그 이름과 설명으로 반환됩니다",
+            english="one session terminator handler comes back with its name and description",
+        )
 
     @override
     def look(
@@ -109,7 +122,7 @@ class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
 class NothingIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
     @override
     def says(self) -> str:
-        return "빈 목록이 반환된다"
+        return Says("빈 목록이 반환됩니다", english="an empty list comes back")
 
     @override
     def look(
@@ -132,7 +145,12 @@ class TheRegisteredHandlerIsListed(
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 그 이름과 설명으로 반환된다"
+        return Says(
+            "코디네이터가 등록한 처리기가 그 이름과 설명으로 반환됩니다",
+            english=(
+                "the handler the coordinator registered comes back with its name and description"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, None]:
@@ -161,7 +179,10 @@ class NoRegisteredHandlerListsNothing(
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 없으면 빈 목록이 반환된다"
+        return Says(
+            "코디네이터가 등록한 처리기가 없으면 빈 목록이 반환됩니다",
+            english="when the coordinator has registered no handler, an empty list comes back",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, None]:

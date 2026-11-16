@@ -84,6 +84,9 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 )
 from ai.backend.common.dto.manager.v2.service_catalog.request import ServiceCatalogFilter
 from ai.backend.common.dto.manager.v2.session.request import SessionFilter
+from ai.backend.common.dto.manager.v2.system_session_environ.request import (
+    SystemSessionEnvironFilter,
+)
 from ai.backend.common.dto.manager.v2.user.request import UserFilter
 from ai.backend.common.dto.manager.v2.vfolder.request import VFolderFilter
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
@@ -130,6 +133,9 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.api.adapters.system_session_environ.adapter import (
+    SystemSessionEnvironAdapter,
+)
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.models.clauses import QueryCondition
@@ -475,6 +481,13 @@ CASES = [
         "field_id",
         "kernels.id",
         deprecated_field="id",
+    ),
+    NodeIdFilterCase(
+        SystemSessionEnvironAdapter,
+        "_convert_filter",
+        SystemSessionEnvironFilter,
+        "entity_id",
+        "system_session_environ.id",
     ),
     NodeIdFilterCase(
         UserAdapter,

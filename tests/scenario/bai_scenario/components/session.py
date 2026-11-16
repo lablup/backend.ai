@@ -15,7 +15,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Given
+from ai.backend.testutils.scenario_steps import Given, Says
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
 from bai_scenario.components.resource_allocation import lay_a_place
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -36,7 +36,10 @@ class SomeoneMakingSessions(TestSeedNest[GrantedUser]):
 
     @override
     def kind(self) -> str:
-        return "그 프로젝트에서 세션을 만들 수 있는 사용자 준비"
+        return Says(
+            "그 프로젝트에서 세션을 생성할 수 있는 사용자 준비",
+            english="Prepare a user who can create sessions in the project",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> GrantedUser:
@@ -63,7 +66,12 @@ class SomeoneTerminatingSessionsIn(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return "프로젝트 범위의 세션 soft delete 권한을 받은 사용자 준비"
+        return Says(
+            "프로젝트 범위의 세션 soft delete 권한을 받은 사용자 준비",
+            english=(
+                "Prepare a user granted the session soft delete permission in the project scope"
+            ),
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -105,14 +113,24 @@ class APendingSessionAndSomeone(Given[Any, APendingSessionAndACaller]):
     def describe(self) -> str:
         match self.who:
             case Terminator.SUPERADMIN:
-                return "대기 세션 하나와 슈퍼관리자 한 명"
+                return Says(
+                    "대기 세션 하나와 superadmin 한 명",
+                    english="one pending session and one superadmin",
+                )
             case Terminator.PROJECT_GRANTEE:
-                return (
+                return Says(
                     "대기 세션 하나와 그 프로젝트 범위에서 세션 soft delete 권한을 받은 "
-                    "일반 사용자 한 명"
+                    "일반 사용자 한 명",
+                    english=(
+                        "one pending session and one regular user granted the session "
+                        "soft delete permission in the project scope"
+                    ),
                 )
             case Terminator.NOBODY_GRANTED:
-                return "대기 세션 하나와 아무 권한도 받지 않은 일반 사용자 한 명"
+                return Says(
+                    "대기 세션 하나와 아무 권한도 받지 않은 일반 사용자 한 명",
+                    english="one pending session and one regular user holding no permission",
+                )
 
     @override
     async def lay(self, seeding: Any) -> APendingSessionAndACaller:

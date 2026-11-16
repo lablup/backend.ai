@@ -122,6 +122,7 @@ _cuda_attributes_iv = t.Dict({
 
 class MockPlugin(AbstractComputePlugin):
     config_watch_enabled = False
+    require_explicit_allow = True
 
     key: DeviceName
     slot_types: list[tuple[SlotName, SlotTypes]] = []

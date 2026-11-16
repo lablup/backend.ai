@@ -2,15 +2,15 @@
 
 ## Service Overview
 
-The Metric Service provides container utilization metrics collection and management for Backend.AI. It interfaces with Prometheus to query time-series data for various resource metrics including CPU, memory, network, and disk usage. The service is designed to support flexible querying, aggregation, and filtering of metrics data.
+The Metric Service collects and manages container utilization metrics for Backend.AI. It calls Prometheus to query time-series data for resource metrics such as CPU, memory, network and disk usage. The service supports flexible querying, aggregation and filtering of metric data.
 
 ## Key Features and Capabilities
 
-- **Metric Metadata Query**: Retrieve available metric names from the system
-- **Time-Series Data Query**: Fetch historical metric data with customizable time ranges and intervals
-- **Flexible Filtering**: Support for label-based filtering (kernel_id, agent_id, user_id, project_id, etc.)
+- **Metric Metadata Query**: Get the available metric names from the system
+- **Time-Series Data Query**: Get historical metric data with customizable time ranges and intervals
+- **Flexible Filtering**: Support for label-based filtering (kernel_id, agent_id, user_id, project_id and others)
 - **Metric Type Detection**: Automatic detection and handling of different metric types (GAUGE, RATE, DIFF)
-- **Aggregation Support**: Sum metrics by various dimensions for project/user level analysis
+- **Aggregation Support**: Sum metrics by various dimensions for project-level and user-level analysis
 - **Prometheus Integration**: Direct integration with Prometheus for reliable metric storage and querying
 
 ## Operation Scenarios

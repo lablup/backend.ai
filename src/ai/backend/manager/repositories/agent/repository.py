@@ -8,7 +8,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.agent import AgentUUID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -30,6 +30,7 @@ from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
@@ -171,6 +172,16 @@ class AgentRepository:
             return await r.lookup_entity_id(AgentNameLookup(agent_id=agent_id))
 
     @agent_repository_resilience.apply()
+    async def search_agents_in_resource_group(
+        self, resource_group_name: ResourceGroupName, searcher: AgentSearcher
+    ) -> list[AgentData]:
+        """The agents of the named resource group matching ``searcher``.
+
+        Raises ``ResourceGroupNotFound`` if no resource group has the name.
+        """
+        return await self._db_source.search_agents_in_resource_group(resource_group_name, searcher)
+
+    @agent_repository_resilience.apply()
     async def cleanup_agent_caches(self, agent_id: AgentId) -> None:
         """Drop what an exiting agent left in the caches, which are keyed by its name."""
         with suppress_with_log(
@@ -202,12 +213,9 @@ class AgentRepository:
         *,
         force: bool,
     ) -> list[KernelInfo]:
-        """Change the agent's resource group, returning the kernels still on it.
-
-        Raises AgentHasConflictingSessions if the agent has active kernels and
-        ``force`` is not set, ScalingGroupNotFound if the target group does not
-        exist, and AgentNotFound if the agent does not exist; otherwise updates
-        the group and returns those kernels.
+        """Change the agent's resource group, returning the active kernels on it.
+        Without ``force``, raises AgentHasConflictingSessions when active kernels or unterminated
+        designations by other resource groups exist.
         """
         return await self._db_source.update_resource_group(agent_id, resource_group_id, force=force)
 

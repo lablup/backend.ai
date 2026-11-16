@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import LoginCli
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege, LoginClientTypeConflict
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -31,7 +31,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "webui"
-DESCRIBED = "새로 지정한 설명"
+DESCRIBED = Says("새로 지정한 설명", english="the description just set")
 
 type CreatingStep = Scenario[TestSeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
 
@@ -49,7 +49,10 @@ class Creating(When[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        return f"{laid.caller.username}이 {self.named} 종류를 생성"
+        return Says(
+            f"{laid.caller.username} 이 {self.named} 로그인 클라이언트 유형을 생성합니다",
+            english=(f"{laid.caller.username} creates the login client type {self.named}"),
+        )
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ACaller) -> LoginClientTypeNode:
@@ -70,7 +73,16 @@ class CreatingWithTheLaidName(When[ATypeAndACaller, LoginClientTypeAdapter, Logi
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 이름 {laid.client_type.name}(으)로 다시 생성"
+        return Says(
+            (
+                f"{laid.caller.username} 이 이미 있는 이름 {laid.client_type.name} (으)로 "
+                "로그인 클라이언트 유형을 다시 생성합니다"
+            ),
+            english=(
+                f"{laid.caller.username} creates the login client type again with the existing "
+                f"name {laid.client_type.name}"
+            ),
+        )
 
     @override
     async def call(
@@ -95,7 +107,14 @@ class TheSuperadminMakesOneWithANameAlone(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다"
+        return Says(
+            "superadmin 이 이름만 지정해 로그인 클라이언트 유형을 생성하면 설명이 비어 있는 노드가 "
+            "반환됩니다",
+            english=(
+                "when the superadmin creates a login client type with only a name, the node comes "
+                "back with an empty description"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -122,7 +141,14 @@ class ADescriptionComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다"
+        return Says(
+            "superadmin 이 이름과 설명을 함께 지정해 로그인 클라이언트 유형을 생성하면 지정한 값이 "
+            "그대로 담긴 노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a login client type with a name and a description, "
+                "the node comes back carrying the given values"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -147,7 +173,14 @@ class ANameAlreadyTakenIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
+        return Says(
+            "같은 이름의 로그인 클라이언트 유형이 이미 있을 때 그 이름으로 다시 생성하면 이름 중복으로 "
+            "거부됩니다",
+            english=(
+                "when a login client type with the same name already exists, creating another with "
+                "that name is rejected as a duplicate name"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
@@ -172,7 +205,13 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 로그인 클라이언트 유형을 생성하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin creates a login client type, it is rejected "
+                "because the role is insufficient"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -197,7 +236,13 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 종류를 생성하지 못한다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 로그인 클라이언트 유형을 생성하지 못합니다",
+            english=(
+                "turning permission enforcement off still does not let a user who is not the "
+                "superadmin create a login client type"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

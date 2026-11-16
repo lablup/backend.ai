@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -27,8 +28,6 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -101,7 +100,6 @@ class TestBulkUpsertDomainFairShare:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ResourceSlotTypeRow,
@@ -410,7 +408,6 @@ class TestBulkUpsertProjectFairShare:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ResourceSlotTypeRow,
@@ -665,7 +662,6 @@ class TestBulkUpsertUserFairShare:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ResourceSlotTypeRow,

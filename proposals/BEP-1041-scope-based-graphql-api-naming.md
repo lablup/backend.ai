@@ -273,7 +273,7 @@ async def my_sessions(
 - Sessions: `domain_sessions`, `project_sessions`, `my_sessions`
 - VFolders: `domain_vfolders`, `project_vfolders`, `my_vfolders`
 
-### 4. GraphQL Schema 예시
+### 4. GraphQL Schema Example
 
 **Key Principles:**
 1. **Admin API**: No scope parameter (filtering via filter)

@@ -12,6 +12,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -34,10 +35,7 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -96,7 +94,6 @@ class TestFairShareRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ResourceGroupForProjectRow,
                 AssocGroupUserRow,
@@ -104,7 +101,6 @@ class TestFairShareRepository:
                 ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
-                KernelRow,
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
                 AgentResourceRow,

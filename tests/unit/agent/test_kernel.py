@@ -1,6 +1,8 @@
 import asyncio
 import time
+import uuid
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any, cast, override
 
 import pytest
@@ -8,7 +10,10 @@ import pytest
 from ai.backend.agent import kernel as kernel_mod
 from ai.backend.agent.docker.kernel import DockerKernel
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
-from ai.backend.agent.errors.kernel import KernelRunnerReplyTimeoutError
+from ai.backend.agent.errors.kernel import (
+    KernelRunnerInvalidReplyError,
+    KernelRunnerReplyTimeoutError,
+)
 from ai.backend.agent.kernel import AbstractCodeRunner, match_distro_data
 from ai.backend.common import msgpack
 
@@ -232,6 +237,29 @@ class TestEveryWaitOnTheKernelIsBounded:
         monkeypatch.setattr(kernel_mod, "KERNEL_REPLY_TIMEOUT_SEC", 0.05)
         runner = _runner_that_is_never_answered()
         runner.kernel_id = cast(Any, "k")
+        assert await runner.ping() is None
+
+
+class TestStatusReplyExtensionTypes:
+    @pytest.mark.parametrize(
+        "reply",
+        [
+            {"started_at": Decimal("1.5")},
+            {"started_at": uuid.UUID(int=1)},
+            {"nested": [{"started_at": Decimal("1.5")}]},
+        ],
+        ids=["decimal", "uuid", "nested"],
+    )
+    async def test_a_status_with_an_extension_type_is_rejected(self, reply: object) -> None:
+        runner = _runner_that_is_never_answered()
+        await runner.status_queue.put(msgpack.packb(reply))
+        with pytest.raises(KernelRunnerInvalidReplyError):
+            await runner.feed_and_get_status()
+
+    async def test_ping_reports_a_rejected_status_as_no_reply(self) -> None:
+        runner = _runner_that_is_never_answered()
+        runner.kernel_id = cast(Any, "k")
+        await runner.status_queue.put(msgpack.packb({"started_at": Decimal("1.5")}))
         assert await runner.ping() is None
 
 

@@ -248,7 +248,7 @@ class TestRecord:
 
         records = await silent_reads_harness.audit(UpsertEntityLabelAction.action_name())
         assert [((r.entity_type, r.entity_id), r.status, r.description) for r in records] == [
-            (entity_key(_owner(project)), OperationStatus.ERROR, str(raised.value))
+            (entity_key(_owner(project)), OperationStatus.ERROR, type(raised.value).__name__)
         ]
 
     async def test_a_failing_permission_read_is_an_error_not_a_denial(

@@ -10,14 +10,13 @@ from uuid import UUID
 from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.types import (
     MAXIMUM_DOTFILE_PATH_LENGTH,
     MAXIMUM_DOTFILE_SIZE,
     NO_NUL_PATTERN,
-    RESERVED_DOTFILES,
     DotfilePermission,
 )
-from ai.backend.common.exception import InvalidAPIParameters
 
 __all__ = (
     # User config
@@ -65,8 +64,7 @@ class CreateUserDotfileRequest(BaseRequestModel):
     @field_validator("path")
     @classmethod
     def validate_path(cls, value: str) -> str:
-        if value in RESERVED_DOTFILES:
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        DotfilePath(value)
         return value
 
 

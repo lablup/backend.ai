@@ -4,10 +4,13 @@ import sys
 from pathlib import Path
 
 
-def build_revision_map():
+DEFAULT_VERSIONS_DIR = "src/ai/backend/manager/models/alembic/versions"
+
+
+def build_revision_map(versions_dir):
     rev_map = {}
     current_rev = None
-    for p in Path("src/ai/backend/manager/models/alembic/versions").glob("*.py"):
+    for p in Path(versions_dir).glob("*.py"):
         src = p.read_text()
         tree = ast.parse(src, filename=p)
         for node in ast.walk(tree):
@@ -42,9 +45,10 @@ def find_heads(rev_map):
 
 
 def main():
-    rev_map = build_revision_map()
+    versions_dir = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_VERSIONS_DIR
+    rev_map = build_revision_map(versions_dir)
     heads = find_heads(rev_map)
-    print(f"Detected head revisions: {', '.join(heads)}")
+    print(f"Detected head revisions: {', '.join(sorted(heads))}")
     if len(heads) > 1:
         sys.exit(1)
 

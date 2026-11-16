@@ -5,11 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
-from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.model_card.request import PartialBulkPurgeModelCardsInput
 from ai.backend.common.dto.manager.v2.model_card.response import ModelCardNode
@@ -19,9 +17,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Held,
     Same,
-    SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -30,10 +27,9 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.model_card import (
     CardsInAProjectAndSomeone,
-    Mentions,
     ModelCardLook,
     ModelCardsAndACaller,
-    NoCardIsProcessed,
+    TheOutsideCardIsRefused,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -45,9 +41,7 @@ type CardStep = Scenario[TestSeedingSession, ModelCardsAndACaller, ModelCardAdap
 
 @dataclass(frozen=True)
 class PurgingEveryCard(When[ModelCardsAndACaller, ModelCardAdapter, Purged]):
-    """미리 만든 카드들을 한 번에 purge 한다. `missing`이 있으면 그 id 도 함께 넣는다."""
-
-    missing: UUID | None = None
+    """미리 만든 카드들을 다른 프로젝트의 카드까지 함께 한 번에 purge 한다."""
 
     @override
     def operation(self) -> str:
@@ -55,31 +49,30 @@ class PurgingEveryCard(When[ModelCardsAndACaller, ModelCardAdapter, Purged]):
 
     @override
     def describe(self, laid: ModelCardsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 카드 {len(laid.cards)}개{besides}를 한 번에 purge 함"
+        count = len(laid.cards) + len(laid.outside)
+        return Says(
+            f"{laid.caller.username}이 카드 {count}개를 한 번에 purge 합니다",
+            english=f"{laid.caller.username} purges {count} cards at once",
+        )
 
     @override
     async def call(self, adapter: ModelCardAdapter, laid: ModelCardsAndACaller) -> Purged:
-        ids: list[UUID] = [card.id for card in laid.cards]
-        if self.missing is not None:
-            ids.append(self.missing)
+        ids = [card.id for card in (*laid.cards, *laid.outside)]
         with ActingAs(laid.caller):
             return await adapter.partial_bulk_purge(PartialBulkPurgeModelCardsInput(ids=ids))
 
 
 @dataclass(frozen=True)
 class EveryCardIsPurged(Then[ModelCardsAndACaller, Purged]):
-    """대상이 모두 purge 전 모습으로 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
+    """대상이 모두 purge 전 모습으로 처리된 목록에 오고, 실패한 것은 없다."""
 
     started: datetime
-    missing: UUID | None = None
 
     @override
     def says(self) -> str:
-        if self.missing is None:
-            return "대상 카드가 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
-            "대상 카드가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "대상 카드가 모두 처리된 목록에 오고 실패한 것은 없습니다",
+            english="every target card comes back in the processed list and nothing failed",
         )
 
     @override
@@ -91,15 +84,7 @@ class EveryCardIsPurged(Then[ModelCardsAndACaller, Purged]):
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.cards))]
         for i, (node, card) in enumerate(zip(payload.successes, laid.cards, strict=False)):
             verdicts += look.verdicts(f"successes[{i}].", node, card)
-        if self.missing is None:
-            return [*verdicts, Same("failed", payload.failed, [])]
-        verdicts.append(Same("failed count", len(payload.failed), 1))
-        for failure in payload.failed:
-            verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
-                Held("failed[0].message", failure.message, Mentions("No such model card")),
-            ]
-        return verdicts
+        return [*verdicts, Same("failed", payload.failed, [])]
 
 
 @dataclass(frozen=True)
@@ -114,9 +99,13 @@ class AUserGrantedPurgePurgesSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, "
-            "둘 다 처리된 목록에 오고 실패한 것은 없다"
+        return Says(
+            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면 "
+            "둘 다 처리된 목록에 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted purge permission on model cards in the project purges "
+                "two cards at once, both come back in the processed list and nothing failed"
+            ),
         )
 
     @override
@@ -133,55 +122,32 @@ class AUserGrantedPurgePurgesSeveral(
 
 
 @dataclass(frozen=True)
-class PurgingAnswersForTheMissingOne(
+class ACardOutsideTheGrantedProjectIsNotPurged(
     Scenario[TestSeedingSession, ModelCardsAndACaller, ModelCardAdapter, Purged]
 ):
     started: datetime
-    missing: UUID = UUID(int=1)
 
     @override
     def summary(self) -> str:
-        return "purging-several-answers-for-the-missing-one"
+        return "a-card-outside-the-granted-project-is-not-purged"
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 "
-            "통과시키므로 없는 id 가 purge 까지 간다"
+        return Says(
+            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 그 프로젝트의 카드와 권한을 받지 "
+            "않은 다른 프로젝트의 카드를 한 번에 purge 하면, 그 프로젝트의 카드만 처리된 목록에 "
+            "오고 다른 프로젝트의 카드는 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted purge permission on model cards in the project purges a "
+                "card of that project and a card of another project at once, only the card of "
+                "that project comes back in the processed list and the other one comes back in "
+                "the failed list for lack of permission"
+            ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ModelCardsAndACaller]:
-        return CardsInAProjectAndSomeone(count=2, role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ModelCardsAndACaller, ModelCardAdapter, Purged]:
-        return PurgingEveryCard(missing=self.missing)
-
-    @override
-    def then(self) -> Then[ModelCardsAndACaller, Purged]:
-        return EveryCardIsPurged(started=self.started, missing=self.missing)
-
-
-@dataclass(frozen=True)
-class AUserGrantedNothingPurgesNone(
-    Scenario[TestSeedingSession, ModelCardsAndACaller, ModelCardAdapter, Purged]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-nothing-purges-none-of-several-model-cards"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, "
-            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ModelCardsAndACaller]:
-        return CardsInAProjectAndSomeone(count=2)
+        return CardsInAProjectAndSomeone(count=1, granted=(Permission.HARD_DELETE,), outside=1)
 
     @override
     def when(self) -> When[ModelCardsAndACaller, ModelCardAdapter, Purged]:
@@ -189,13 +155,12 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def then(self) -> Then[ModelCardsAndACaller, Purged]:
-        return NoCardIsProcessed(reason="Insufficient permission")
+        return TheOutsideCardIsRefused(started=self.started)
 
 
 SCENARIOS: list[CardStep] = [
     AUserGrantedPurgePurgesSeveral(started=datetime.now(UTC)),
-    PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
-    AUserGrantedNothingPurgesNone(),
+    ACardOutsideTheGrantedProjectIsNotPurged(started=datetime.now(UTC)),
 ]
 
 

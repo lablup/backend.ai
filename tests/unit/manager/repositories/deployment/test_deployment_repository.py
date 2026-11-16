@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -53,7 +54,6 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentOptions,
@@ -92,7 +92,6 @@ from ai.backend.manager.models.endpoint.creators import (
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -157,17 +156,19 @@ def attach_primary_replica_group(
     *,
     current_revision_id: uuid.UUID | None = None,
     target_revision_id: uuid.UUID | None = None,
+    session_group_id: SessionGroupID | None = None,
 ) -> ReplicaGroupRow:
     """Create the primary replica group for a hand-built endpoint and wire its
     revision pointers, mirroring what ``create_endpoint`` does at runtime.
 
     Revision pointers now live on the replica group, so tests that construct
     ``EndpointRow`` directly must attach a group for the revision-resolution
-    paths to see ``current``/``deploying`` revisions.
+    paths to see ``current``/``deploying`` revisions. ``session_group_id`` names an
+    existing group when the fixture creates ``session_groups``.
     """
     group_id = uuid.uuid4()
     group = ReplicaGroupRow(
-        session_group_id=SessionGroupID(uuid.uuid4()),
+        session_group_id=session_group_id or SessionGroupID(uuid.uuid4()),
         id=ReplicaGroupID(group_id),
         deployment_id=endpoint.id,
         current_revision_id=current_revision_id,
@@ -1436,6 +1437,7 @@ class TestDeploymentRevisionOperations:
         async with with_tables(
             database_connection,
             [
+                VirtualEntityRow,
                 DomainRow,
                 ResourceGroupRow,
                 ResourcePresetRow,  # ResourceGroupRow relationship dependency
@@ -1447,6 +1449,7 @@ class TestDeploymentRevisionOperations:
                 UserRow,
                 KeyPairRow,  # keypairs.user foreign key target
                 ProjectRow,
+                SessionGroupRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -1682,7 +1685,17 @@ class TestDeploymentRevisionOperations:
                 lifecycle_stage=EndpointLifecycle.CREATED,
             )
             db_sess.add(endpoint)
-            attach_primary_replica_group(db_sess, endpoint)
+            await db_sess.flush()
+            session_group = SessionGroupRow(
+                domain_id=test_domain.domain_id,
+                project_id=test_group_id,
+                owner_user_id=test_user_uuid,
+                placement_direction=SessionGroupPlacementDirection.SPREAD,
+                placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+            )
+            db_sess.add(session_group)
+            await db_sess.flush()
+            attach_primary_replica_group(db_sess, endpoint, session_group_id=session_group.id)
             await db_sess.commit()
 
         return endpoint_id
@@ -2107,7 +2120,8 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: DeploymentID,
     ) -> None:
         """Drains live groups to DRAINING with zeroed desired counts and clears the endpoint's
-        deploy pointer, leaving already-DRAINED groups untouched."""
+        deploy pointer, leaving already-DRAINED groups' lifecycle untouched. The owning
+        session groups take the destroy moment as their retention boundary."""
         drained_group_id = ReplicaGroupID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             # The endpoint's primary group is live and still requesting replicas.
@@ -2121,10 +2135,20 @@ class TestDeploymentRevisionOperations:
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
                 )
             )
-            # A second group that has already finished draining.
+            # The live group's session group, which the destroy retires.
+            live_session_group_id = (
+                await db_sess.execute(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id == test_endpoint_id
+                    )
+                )
+            ).scalar_one()
+            # A second group that has already finished draining. It shares the live
+            # group's session group only to satisfy the FK; the test cares about the
+            # live one.
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=live_session_group_id,
                     id=drained_group_id,
                     deployment_id=test_endpoint_id,
                     lifecycle=ReplicaGroupLifecycle.DRAINED,
@@ -2165,6 +2189,13 @@ class TestDeploymentRevisionOperations:
             assert live.scaling_status is ReplicaGroupScalingStatus.SCALING
             # The already-DRAINED group is left as-is.
             assert by_id[drained_group_id].lifecycle is ReplicaGroupLifecycle.DRAINED
+            # The retired group's session group starts aging now.
+            session_group_deleted_at = await db_sess.scalar(
+                sa.select(SessionGroupRow.deleted_at).where(
+                    SessionGroupRow.id == live_session_group_id
+                )
+            )
+            assert session_group_deleted_at is not None
             # The endpoint's deploy pointer/sub-step is cleared.
             endpoint = (
                 await db_sess.execute(

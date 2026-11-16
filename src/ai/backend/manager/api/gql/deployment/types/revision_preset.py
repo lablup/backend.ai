@@ -150,6 +150,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     PreStartActionGQL,
     PreStartActionInputGQL,
 )
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -556,6 +557,13 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),

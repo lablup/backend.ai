@@ -65,6 +65,43 @@ class ScratchUtils:
         return scratch_root / str(kernel_id) / "config"
 
 
+class RestartStateStore:
+    """
+    Keeps the files needed to restart a kernel under its scratch directory, outside the
+    container mounts. Reads fall back to the config directory used by earlier versions.
+    """
+
+    _state_dir: Path
+    _legacy_dir: Path
+
+    def __init__(self, scratch_root: Path, kernel_id: KernelId) -> None:
+        scratch_dir = (scratch_root / str(kernel_id)).resolve()
+        self._state_dir = scratch_dir / "restart-state"
+        self._legacy_dir = scratch_dir / "config"
+
+    def _read(self, name: str) -> bytes:
+        try:
+            return (self._state_dir / name).read_bytes()
+        except FileNotFoundError:
+            return (self._legacy_dir / name).read_bytes()
+
+    def _write(self, name: str, data: bytes) -> None:
+        self._state_dir.mkdir(mode=0o700, exist_ok=True)
+        self._state_dir.chmod(0o700)
+        tmp_path = self._state_dir / f"{name}.tmp"
+        fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as file:
+            file.write(data)
+        tmp_path.replace(self._state_dir / name)
+        (self._legacy_dir / name).unlink(missing_ok=True)
+
+    async def load(self, name: str) -> bytes:
+        return await run_in_executor_with_context(None, self._read, name)
+
+    async def store(self, name: str, data: bytes) -> None:
+        await run_in_executor_with_context(None, self._write, name, data)
+
+
 class ScratchConfig:
     def __init__(self, config_path: Path) -> None:
         self._config_path = config_path

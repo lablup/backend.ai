@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGroupRole
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
@@ -67,3 +68,16 @@ class KernelGroupRow(CreatedAtMixin, Base):
     batch_timeout_sec: Mapped[int | None] = mapped_column(
         "batch_timeout_sec", sa.Integer, nullable=True
     )
+
+    def to_data(self) -> KernelGroupData:
+        return KernelGroupData(
+            id=KernelGroupID(self.id),
+            session_id=self.session_id,
+            role=KernelGroupRole(self.role),
+            image_id=self.image_id,
+            shmem=self.shmem,
+            startup_command=self.startup_command,
+            preopen_ports=list(self.preopen_ports),
+            requested_starts_at=self.requested_starts_at,
+            batch_timeout_sec=self.batch_timeout_sec,
+        )

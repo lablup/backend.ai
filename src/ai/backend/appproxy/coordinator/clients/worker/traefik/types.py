@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from typing import NotRequired, TypedDict
+from dataclasses import dataclass
+from typing import NotRequired, TypedDict, override
+
+from pydantic import ConfigDict
+
+from ai.backend.appproxy.coordinator.errors.ingress import TraefikAppliedIngressRevisionInvalidError
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo
 
 
 class HttpRouterConfig(TypedDict):
@@ -82,9 +89,25 @@ class AuthPluginMiddlewareConfig(TypedDict):
     plugin: AuthPluginOptionsByName
 
 
-type HttpMiddlewareConfig = (
-    CorsHeadersMiddlewareConfig | IpAllowListMiddlewareConfig | AuthPluginMiddlewareConfig
-)
-type RoutingConfig = (
-    HttpRouterConfig | TcpRouterConfig | HttpServiceConfig | TcpServiceConfig | HttpMiddlewareConfig
-)
+@dataclass(frozen=True)
+class IngressRoutingConfigs:
+    http_router: HttpRouterConfig | None = None
+    http_service: HttpServiceConfig | None = None
+    cors_headers_middleware: CorsHeadersMiddlewareConfig | None = None
+    ip_allowlist_middleware: IpAllowListMiddlewareConfig | None = None
+    auth_plugin_middleware: AuthPluginMiddlewareConfig | None = None
+    tcp_router: TcpRouterConfig | None = None
+    tcp_service: TcpServiceConfig | None = None
+
+
+class AppliedIngressRevision(BackendAISchema):
+    model_config = ConfigDict(frozen=True)
+
+    revision: int
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return TraefikAppliedIngressRevisionInvalidError(
+            extra_msg=info.summary, extra_data={"errors": info.errors}
+        )

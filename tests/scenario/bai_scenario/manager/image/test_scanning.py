@@ -23,13 +23,16 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
@@ -68,10 +71,23 @@ class ARegistryServingATag(Given[Any, ARegistryAndACaller]):
     @override
     def describe(self) -> str:
         arches = ", ".join(SERVED.architectures)
-        registered = ", 그 태그로 이미 등록된 x86_64 이미지 1개" if self.already_registered else ""
-        return (
-            f"{SERVED.repository}:{SERVED.tag} 태그를 {arches}로 내놓는 레지스트리 1개"
-            f"{registered}, {self.role.value} 1명"
+        if self.already_registered:
+            return Says(
+                f"{SERVED.repository}:{SERVED.tag} 태그를 {arches}로 제공하는 레지스트리 1개, "
+                f"그 태그로 이미 등록된 x86_64 이미지 1개, {self.role.value} 1명",
+                english=(
+                    f"one registry serving the tag {SERVED.repository}:{SERVED.tag} for "
+                    f"{arches}, one x86_64 image already registered with that tag, "
+                    f"one {self.role.value}"
+                ),
+            )
+        return Says(
+            f"{SERVED.repository}:{SERVED.tag} 태그를 {arches}로 제공하는 레지스트리 1개, "
+            f"{self.role.value} 1명",
+            english=(
+                f"one registry serving the tag {SERVED.repository}:{SERVED.tag} for {arches}, "
+                f"one {self.role.value}"
+            ),
         )
 
     @override
@@ -103,8 +119,14 @@ class Canonical:
 
     def says(self) -> str:
         if self._tag is None:
-            return "이미지 없이 레지스트리 이름만"
-        return f"{SERVED.repository}:{self._tag} 태그를"
+            return Says(
+                "이미지 없이 레지스트리 이름만",
+                english="the registry name alone without an image",
+            )
+        return Says(
+            f"{SERVED.repository}:{self._tag} 태그를",
+            english=f"the tag {SERVED.repository}:{self._tag}",
+        )
 
 
 THE_SERVED_TAG = Canonical(SERVED.tag)
@@ -125,8 +147,14 @@ class Scanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {self.canonical.says()} {self.architecture} 아키텍처로 스캔"
+        canonical = self.canonical.says()
+        return Says(
+            f"{laid.caller.username}이 {in_language(canonical, Language.KOREAN)} "
+            f"{self.architecture} 아키텍처로 스캔합니다",
+            english=(
+                f"{laid.caller.username} scans {in_language(canonical, Language.ENGLISH)} "
+                f"for the {self.architecture} architecture"
+            ),
         )
 
     @override
@@ -145,13 +173,16 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
 
     @override
     def says(self) -> str:
-        return "요청한 아키텍처로 등록된 이미지 노드가 반환된다"
+        return Says(
+            "요청한 아키텍처로 등록된 이미지 노드가 응답으로 옵니다",
+            english="the image node registered for the requested architecture comes back",
+        )
 
     @override
     def look(self, laid: ARegistryAndACaller, answered: Answered[ImageNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Held("응답", node, Filled())]
+            return [Held("response", node, Filled())]
         identity, metadata, requirements = node.identity, node.metadata, node.requirements
         if identity is None or metadata is None or requirements is None:
             return [
@@ -163,16 +194,38 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
         name = f"{registry.registry_name}/{SERVED.repository}:{SERVED.tag}"
         written = WrittenByThisRun(datetime.now(UTC))
         return [
-            Skipped("id", "스캔이 새로 만든 행이라 데이터베이스가 정한다")
+            Skipped(
+                "id",
+                Says(
+                    "스캔이 새로 만든 행이라 데이터베이스가 정합니다",
+                    english="the scan created the row, so the database decides it",
+                ),
+            )
             if laid.registered is None
-            else Held("id", node.id, SameAs[UUID](laid.registered.id, "이미 등록된 이미지의 ID")),
+            else Held(
+                "id",
+                node.id,
+                SameAs[UUID](
+                    laid.registered.id,
+                    Says(
+                        "이미 등록된 이미지의 id",
+                        english="the id of the already registered image",
+                    ),
+                ),
+            ),
             Same("name", node.name, name),
             Same("image", node.image, SERVED.repository),
             Same("registry", node.registry, registry.registry_name),
             Held(
                 "registry_id",
                 node.registry_id,
-                SameAs[UUID](registry.id, "미리 만들어 둔 레지스트리의 ID"),
+                SameAs[UUID](
+                    registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry created in advance",
+                    ),
+                ),
             ),
             Same("project", node.project, PROJECT),
             Same("tag", node.tag, SERVED.tag),
@@ -191,7 +244,13 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
             Same("config_digest", node.config_digest, "sha256:config-amd64"),
             Same("is_local", node.is_local, False),
             Held("created_at", node.created_at, written),
-            Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
+            Skipped(
+                "last_used_at",
+                Says(
+                    "세션이 기록하는 값이라 이 실행에서는 알 수 없습니다",
+                    english="a session records it, so this run cannot know it",
+                ),
+            ),
             Same("identity.canonical_name", identity.canonical_name, name),
             Same("identity.namespace", identity.namespace, SERVED.repository),
             Same("identity.architecture", identity.architecture, "x86_64"),
@@ -201,7 +260,13 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
             Held(
                 "metadata.last_used_at",
                 metadata.last_used_at,
-                SameAs(node.last_used_at, "노드의 last_used_at 필드"),
+                SameAs(
+                    node.last_used_at,
+                    Says(
+                        "노드의 last_used_at 필드",
+                        english="the node's last_used_at field",
+                    ),
+                ),
             ),
             Same("metadata.tags", metadata.tags, []),
             Same("metadata.labels", metadata.labels, []),
@@ -229,9 +294,13 @@ class ScanningAnUnregisteredImage(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. "
-            "scan은 슈퍼관리자 역할이 있어야만 실행된다"
+        return Says(
+            "superadmin 이 미등록된 이미지를 scan 하면 요청한 아키텍처의 이미지 하나가 응답으로 "
+            "옵니다. scan 은 superadmin 역할이 있어야만 실행됩니다",
+            english=(
+                "when the superadmin scans an unregistered image, one image of the requested "
+                "architecture comes back. A scan runs only with the superadmin role"
+            ),
         )
 
     @override
@@ -257,9 +326,14 @@ class ScanningARegisteredImage(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 "
-            "등록된 이미지를 레지스트리 값으로 갱신해 반환한다"
+        return Says(
+            "superadmin 이 이미 등록된 이미지를 scan 하면 새 이미지를 만들지 않고 등록된 "
+            "이미지를 레지스트리 값으로 갱신해 응답으로 옵니다",
+            english=(
+                "when the superadmin scans an already registered image, it refreshes the "
+                "registered image with the registry values and brings it back without "
+                "creating a new one"
+            ),
         )
 
     @override
@@ -285,7 +359,13 @@ class APlainUserMayNotScan(
 
     @override
     def describe(self) -> str:
-        return "일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다"
+        return Says(
+            "일반 사용자는 scan 을 실행할 수 없어 superadmin 권한 부족으로 거부됩니다",
+            english=(
+                "a plain user may not run a scan, so the call is rejected for lack of "
+                "superadmin privilege"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
@@ -310,9 +390,13 @@ class NoRegistryMatchesTheImage(
 
     @override
     def describe(self) -> str:
-        return (
-            "이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. "
-            "레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다"
+        return Says(
+            "이미지에 맞는 registry 가 없으면 scan 하지 않고 거부합니다. 레지스트리 이름만 "
+            "주어도 레지스트리 전체를 스캔하지 않습니다",
+            english=(
+                "a name no registry holds as an image is rejected without a scan. Giving only "
+                "the registry name does not scan the whole registry"
+            ),
         )
 
     @override
@@ -338,7 +422,10 @@ class AMissingTagIsNotASuccess(
 
     @override
     def describe(self) -> str:
-        return "레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다"
+        return Says(
+            "레지스트리에 없는 태그를 scan 하면 대상이 없어 거부됩니다",
+            english="scanning a tag the registry does not hold is rejected as not found",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:

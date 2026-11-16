@@ -137,10 +137,14 @@ def build_v2_routes(
     from .storage_host.registry import register_v2_storage_host_routes
     from .storage_namespace.handler import V2StorageNamespaceHandler
     from .storage_namespace.registry import register_v2_storage_namespace_routes
+    from .system_session_environ.handler import V2SystemSessionEnvironHandler
+    from .system_session_environ.registry import register_v2_system_session_environ_routes
     from .user.handler import V2UserHandler
     from .user.registry import register_v2_user_routes
     from .vfolder.handler import V2VFolderHandler
     from .vfolder.registry import register_v2_vfolder_routes
+    from .vfolder_auto_mount.handler import V2VFolderAutoMountHandler
+    from .vfolder_auto_mount.registry import register_v2_vfolder_auto_mount_routes
     from .vfs_storage.handler import V2VFSStorageHandler
     from .vfs_storage.registry import register_v2_vfs_storage_routes
 
@@ -215,8 +219,12 @@ def build_v2_routes(
     )
     storage_host_handler = V2StorageHostHandler(adapter=adapters.storage_host)
     storage_namespace_handler = V2StorageNamespaceHandler(adapter=adapters.storage_namespace)
+    system_session_environ_handler = V2SystemSessionEnvironHandler(
+        adapter=adapters.system_session_environ
+    )
     user_handler = V2UserHandler(adapter=adapters.user)
     vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)
+    vfolder_auto_mount_handler = V2VFolderAutoMountHandler(adapter=adapters.vfolder_auto_mount)
     vfs_storage_handler = V2VFSStorageHandler(adapter=adapters.vfs_storage)
 
     # Build the v2 parent registry
@@ -322,8 +330,14 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_storage_namespace_routes(storage_namespace_handler, route_deps)
     )
+    v2_reg.add_subregistry(
+        register_v2_system_session_environ_routes(system_session_environ_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_user_routes(user_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfolder_routes(vfolder_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_vfolder_auto_mount_routes(vfolder_auto_mount_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_vfs_storage_routes(vfs_storage_handler, route_deps))
 
     # Export (reuses v1 handler directly, no adapter)

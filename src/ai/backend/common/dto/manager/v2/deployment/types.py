@@ -153,6 +153,7 @@ class NetworkConfigInfo(BaseResponseModel):
 class ReplicaStateInfo(BaseResponseModel):
     """Current replica state of a deployment."""
 
+    replica_count: int
     desired_replica_count: int
     replica_ids: list[UUID]
 

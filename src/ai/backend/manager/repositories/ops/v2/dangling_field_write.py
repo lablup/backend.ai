@@ -11,7 +11,11 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import DanglingFieldCreator, NestedFieldCreator
+from ai.backend.manager.models.specs.creator import (
+    DanglingFieldCreator,
+    GuardedDanglingFieldCreator,
+    NestedFieldCreator,
+)
 from ai.backend.manager.models.specs.upserter import DanglingFieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -20,9 +24,10 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
     """Sidecar writes, bound to a single session."""
 
     async def create_dangling_field[TRow: Base, TData: FieldData](
-        self, creator: DanglingFieldCreator[TRow, TData]
+        self, creator: GuardedDanglingFieldCreator[TRow, TData]
     ) -> TData:
-        """Insert one row that names a kind and no owner."""
+        """Insert one row that names a kind and no owner, after what the spec refuses."""
+        await self._validate_precondition_checks(creator.precondition_checks())
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)

@@ -7,6 +7,7 @@
             "role_name_template": null,
             "scope_type": "domain",
             "auto_assign": false,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -17,6 +18,7 @@
             "role_name_template": null,
             "scope_type": "domain",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -27,6 +29,7 @@
             "role_name_template": null,
             "scope_type": "project",
             "auto_assign": false,
+            "auto_assign_to_owner": true,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -37,6 +40,7 @@
             "role_name_template": null,
             "scope_type": "project",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -47,6 +51,7 @@
             "role_name_template": null,
             "scope_type": "global",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -57,6 +62,7 @@
             "role_name_template": null,
             "scope_type": "user",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -862,13 +868,6 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
-            "id": "01993d56-bb39-770f-9701-e312457d52ad",
-            "role_preset_id": "76616aa7-6597-5b11-8629-adff5d5640c2",
-            "entity_type": "system_session_environ",
-            "permission": 1,
-            "created_at": "2025-09-12 09:51:58.265582+00"
-        },
-        {
             "id": "01993d56-bb39-768a-9929-c68ed1aec06c",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "agent",
@@ -1583,13 +1582,6 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
-            "id": "01993d56-bb39-7f67-9d8b-2426bdce8850",
-            "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
-            "entity_type": "system_session_environ",
-            "permission": 1,
-            "created_at": "2025-09-12 09:51:58.265582+00"
-        },
-        {
             "id": "01993d56-bb39-7d41-8964-1180c35b36b7",
             "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
             "entity_type": "user",
@@ -2195,6 +2187,41 @@
             "id": "01993d56-bb39-7651-a9ca-e09fbb1ce7df",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "vfolder",
+            "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-71da-b8ab-3ef81c507c89",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-758d-8b38-017b992fda14",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 2,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7aa0-8fc3-8ce43d9d8a0f",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 4,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7d8a-9948-fb96efd2e446",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 8,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7f83-9d2e-f48845987aea",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
             "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         }

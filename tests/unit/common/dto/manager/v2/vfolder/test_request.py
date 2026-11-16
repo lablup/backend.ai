@@ -190,12 +190,21 @@ class TestFileOperationInputs:
         assert req.archive is False
 
     def test_upload_session_size_ge_zero(self) -> None:
-        req = CreateUploadSessionInput(path="/upload.bin", size=0)
+        req = CreateUploadSessionInput(path="upload.bin", size=0)
         assert req.size == 0
 
     def test_upload_session_negative_size_raises(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            CreateUploadSessionInput(path="/upload.bin", size=-1)
+            CreateUploadSessionInput(path="upload.bin", size=-1)
+
+    @pytest.mark.parametrize("path", ["file.bin", "a/b/file.bin", "a/../file.bin", "a..b/c..d"])
+    def test_upload_session_path_inside_vfolder(self, path: str) -> None:
+        assert CreateUploadSessionInput(path=path, size=1).path == path
+
+    @pytest.mark.parametrize("path", ["", ".", "a/..", "..", "../x", "a/../../x", "/x", "/a/../x"])
+    def test_upload_session_path_outside_vfolder_raises(self, path: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateUploadSessionInput(path=path, size=1)
 
     def test_rename_file_min_length(self) -> None:
         req = RenameFileInput(target_path="/old.txt", new_name="new.txt")

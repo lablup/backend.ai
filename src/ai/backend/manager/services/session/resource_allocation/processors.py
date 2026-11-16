@@ -38,6 +38,10 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_user_co
     GetUserConcurrencyAction,
     GetUserConcurrencyActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_usage import (
+    GetUserUsageAction,
+    GetUserUsageActionResult,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
@@ -57,6 +61,7 @@ class ResourceAllocationProcessors:
     get_keypair_usage: SingleEntityActionProcessor[
         GetKeypairUsageAction, GetKeypairUsageActionResult
     ]
+    get_user_usage: SingleEntityActionProcessor[GetUserUsageAction, GetUserUsageActionResult]
     get_project_usage: SingleEntityActionProcessor[
         GetProjectUsageAction, GetProjectUsageActionResult
     ]
@@ -90,6 +95,7 @@ class ResourceAllocationProcessors:
         self.get_keypair_usage = user.single_entity(
             GetKeypairUsageAction, service.get_keypair_usage
         )
+        self.get_user_usage = user.single_entity(GetUserUsageAction, service.get_user_usage)
         self.get_project_usage = project.single_entity(
             GetProjectUsageAction, service.get_project_usage
         )

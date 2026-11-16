@@ -9,13 +9,15 @@ generated:
   at: 2026-08-10
 status: stable
 ---
-# REST v2 API layer — Knowledge
+# REST v2 API layer: Knowledge
 
 > For rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Adapter dependency and operation surface
 
-Handlers hold no behavior — every handler calls the shared per-entity adapter
+Handlers hold no behavior: every handler calls the shared per-entity adapter
 (`api/adapters/`). Registration mirrors the gates: `admin_*` handlers register with
 `superadmin_required`, bare global reads register with `auth_required` only (public
 reads), and scoped searches take the scopes from the request body.
@@ -40,7 +42,7 @@ class V2DomainHandler:
   scopes in the body (e.g. `POST .../kernels/scoped/search`,
   `POST .../replica-groups/scoped/search` under `scheduling_history/`).
 - Outgoing pattern: parent-fixed paths (`POST /v2/sessions/projects/{project_id}/search`,
-  `POST /v2/users/domains/{domain_name}/search`, ...). Do not add new ones — a scope is
+  `POST /v2/users/domains/{domain_name}/search`, ...). Do not add new ones: a scope is
   request data, not a URL segment.
 
 ## Pagination mode behavior
@@ -50,5 +52,5 @@ search endpoints accept both cursor and offset pagination arguments.
 - **Default (no args):** falls back to offset (`limit=10, offset=0`).
 - **Offset (`limit`/`offset`):** applies the user-specified `order`, or the entity's default ordering if absent. Use when custom ordering is needed.
 - **Cursor (`first`/`after` or `last`/`before`):** ordering is fixed to the entity's cursor key (usually `created_at` or the PK).
-  The user-specified `order` is ignored — a fixed ordering is required for cursor consistency. Suited to infinite scroll / "load more" UX.
+  The user-specified `order` is ignored: a fixed ordering is required for cursor consistency. Suited to infinite scroll / "load more" UX.
 - Only one mode per request. Mixing `first`+`limit` is an error.

@@ -15,6 +15,8 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
+from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_log.row import ErrorLogRow
@@ -34,6 +36,7 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
 
 @dataclass
@@ -136,6 +139,32 @@ class UserSessionGroupPurger(EntityBatchPurger[SessionGroupRow, SessionGroupID])
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupID:
+        return row.id
+
+
+@dataclass
+class UserVFolderAutoMountPurger(EntityBatchPurger[VFolderAutoMountRow, VFolderAutoMountID]):
+    """Clears the vfolder auto-mounts set on a user, each with the RBAC graph it left."""
+
+    user_id: UserID
+
+    @override
+    def entity_id(self, row: VFolderAutoMountRow) -> EntityIdentifier:
+        return row.id
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[VFolderAutoMountRow]]:
+        return sa.select(VFolderAutoMountRow).where(
+            VFolderAutoMountRow.scope_type == VFolderAutoMountScopeType.USER,
+            VFolderAutoMountRow.scope_id == self.user_id,
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountID:
         return row.id
 
 

@@ -13,6 +13,8 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import SlotTypes
 from ai.backend.manager.data.resource_slot.types import AgentResourceData, ResourceSlotTypeData
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
+from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.searchable_fields import (
     AgentResourceSearchableFields,
@@ -47,7 +49,17 @@ class AgentResourceUpserter(FieldUpserter[AgentUUID, AgentResourceRow, AgentReso
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_agent_resources_slot_name_resource_slot_types",
+                error=ResourceSlotTypeNotFound(
+                    f"Resource slot type '{self.slot_name}' reported by agent '{self.agent_id}'"
+                    " is not registered. Register it with"
+                    " `./bai resource-slot slot-type create`."
+                ),
+            ),
+        )
 
     @override
     def build_insert_values(self, owner_id: AgentUUID) -> dict[str, Any]:

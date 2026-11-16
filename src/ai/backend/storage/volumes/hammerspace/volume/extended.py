@@ -18,6 +18,8 @@ from ai.backend.common.clients.storage_backends.hammerspace.client import (
 from ai.backend.common.clients.storage_backends.hammerspace.exceptions import (
     AuthenticationError,
 )
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
     StorageBackendCapability,
     StorageBackendType,
@@ -181,6 +183,8 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
@@ -189,6 +193,8 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.watcher = watcher
+        self._volume_name = volume_name
+        self._status_check_config = status_check_config
         self._client = None
 
         address = self.config.get("address")

@@ -41,13 +41,13 @@ def main() -> int:
         "--verify",
         type=pathlib.Path,
         metavar="DIR",
-        help="check DIR/<component>/report.md against this run; write nothing",
+        help="check the reports under DIR against this run; write nothing",
     )
     parser.add_argument(
         "--split",
         type=pathlib.Path,
         metavar="DIR",
-        help="write DIR/<component>/report.md for every component this run covered",
+        help="write report.md and report.ko.md under DIR for every component this run covered",
     )
     args = parser.parse_args()
     missing = [p for p in args.logs if not p.exists()]
@@ -82,23 +82,27 @@ def main() -> int:
     report = Report.of(records_of(lines), AdapterWiring(src / "ai" / "backend" / "manager"))
     if args.verify is not None:
         drifted = 0
+        checked = 0
+        variants = chosen.variants()
         for component in report.components:
-            written = args.verify / component.component / f"report.{chosen.suffix()}"
-            wanted = chosen.render_one(component) + "\n"
-            if not written.exists():
-                print(f"{written}: not written yet", file=sys.stderr)
-                drifted += 1
-            elif (had := written.read_text(encoding="utf8")) != wanted:
-                print(f"{written}: no longer matches the run", file=sys.stderr)
-                sys.stderr.writelines(
-                    difflib.unified_diff(
-                        had.splitlines(keepends=True),
-                        wanted.splitlines(keepends=True),
-                        fromfile=f"{written} (committed)",
-                        tofile=f"{written} (this run)",
+            for name, one in variants.items():
+                written = args.verify / component.component / name
+                wanted = one.render_one(component) + "\n"
+                checked += 1
+                if not written.exists():
+                    print(f"{written}: not written yet", file=sys.stderr)
+                    drifted += 1
+                elif (had := written.read_text(encoding="utf8")) != wanted:
+                    print(f"{written}: no longer matches the run", file=sys.stderr)
+                    sys.stderr.writelines(
+                        difflib.unified_diff(
+                            had.splitlines(keepends=True),
+                            wanted.splitlines(keepends=True),
+                            fromfile=f"{written} (committed)",
+                            tofile=f"{written} (this run)",
+                        )
                     )
-                )
-                drifted += 1
+                    drifted += 1
         if drifted:
             print(
                 f"{drifted} report(s) behind the run. Read what changed, then bring "
@@ -106,15 +110,17 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        print(f"{len(report.components)} report(s) level with the run")
+        print(f"{checked} report(s) level with the run")
         return 0
 
     if args.split is not None:
+        variants = chosen.variants()
         for component in report.components:
-            written = args.split / component.component / f"report.{chosen.suffix()}"
-            written.parent.mkdir(parents=True, exist_ok=True)
-            written.write_text(chosen.render_one(component) + "\n", encoding="utf8")
-            print(written)
+            for name, one in variants.items():
+                written = args.split / component.component / name
+                written.parent.mkdir(parents=True, exist_ok=True)
+                written.write_text(one.render_one(component) + "\n", encoding="utf8")
+                print(written)
         return 0
 
     text = chosen.render(report)

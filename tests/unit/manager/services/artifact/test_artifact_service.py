@@ -32,6 +32,7 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
     ReservoirConnectionError,
@@ -1120,7 +1121,7 @@ class TestRetrieveModelAction:
 
         model = ModelTarget(model_id="some-model")
         action = RetrieveModelAction(registry_id=registry_id, model=model)
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(InvalidAPIParameters):
             await artifact_service.retrieve_single_model(action)
 
     async def test_no_storage_config_raises_misconfigured(

@@ -38,7 +38,7 @@ def resource_allocation() -> None:
 
 @resource_allocation.command(name="keypair-usage")
 def keypair_usage() -> None:
-    """Show my keypair resource usage."""
+    """Show my keypair resource usage. Deprecated: use `user-usage`."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -84,6 +84,21 @@ def concurrency() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_allocation.my_concurrency()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)
+
+
+@resource_allocation.command(name="user-usage")
+def user_usage() -> None:
+    """Show my resource usage across all my keypairs."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_allocation.my_user_usage()
             print_result(result)
         finally:
             await registry.close()

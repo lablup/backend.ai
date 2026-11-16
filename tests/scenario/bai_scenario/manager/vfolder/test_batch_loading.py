@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -54,7 +55,10 @@ class LoadingTheFolderById(When[AFolderAndItsReader, VFolderAdapter, Answer]):
 
     @override
     def describe(self, laid: AFolderAndItsReader) -> str:
-        return f"{laid.caller.username}이 {laid.folder.name} 폴더 id로 일괄 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.folder.name} vfolder 를 id 로 일괄 조회합니다",
+            english=f"{laid.caller.username} loads the {laid.folder.name} vfolder by id in one call",
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderAndItsReader) -> Answer:
@@ -72,9 +76,13 @@ class LoadingReadableUnreadableAndMissing(When[AReaderAndTwoFolders, VFolderAdap
 
     @override
     def describe(self, laid: AReaderAndTwoFolders) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 {laid.readable.name}, {laid.unreadable.name}, "
-            "없는 id 순으로 일괄 읽음"
+            "없는 id 순으로 일괄 조회합니다",
+            english=(
+                f"{laid.caller.username} loads a readable vfolder, an unreadable vfolder and "
+                "a missing id in that order in one call"
+            ),
         )
 
     @override
@@ -97,7 +105,13 @@ class LoadingTheFolderAndMissing(When[AFolderAndItsReader, VFolderAdapter, Answe
 
     @override
     def describe(self, laid: AFolderAndItsReader) -> str:
-        return f"{laid.caller.username}이 {laid.folder.name} 폴더와 없는 id를 일괄 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.folder.name} vfolder 와 없는 id 를 일괄 조회합니다",
+            english=(
+                f"{laid.caller.username} loads the {laid.folder.name} vfolder and a missing id "
+                "in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderAndItsReader) -> Answer:
@@ -118,7 +132,10 @@ class LoadingNothing(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
 
     @override
     def describe(self, laid: AFolderMakerAndTheirDomain) -> str:
-        return f"{laid.caller.username}이 빈 목록으로 일괄 읽음"
+        return Says(
+            f"{laid.caller.username}이 빈 목록으로 일괄 조회합니다",
+            english=f"{laid.caller.username} loads with an empty list",
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderMakerAndTheirDomain) -> Answer:
@@ -134,7 +151,10 @@ class TheFolderAlone(Then[AFolderAndItsReader, Answer]):
 
     @override
     def says(self) -> str:
-        return "심은 폴더 하나가 통째로 온다"
+        return Says(
+            "미리 저장한 vfolder 하나가 전체가 응답으로 옵니다",
+            english="the whole vfolder seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -156,7 +176,10 @@ class ARefusalAlone(Then[AFolderAndItsReader, Answer]):
 
     @override
     def says(self) -> str:
-        return "그 자리는 권한 부족으로 거부된다"
+        return Says(
+            "그 항목은 권한 부족으로 거부됩니다",
+            english="that entry is rejected for lack of permission",
+        )
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -178,7 +201,10 @@ class EachElementInOrder(Then[AReaderAndTwoFolders, Answer]):
 
     @override
     def says(self) -> str:
-        return "입력 순서대로 자리마다 폴더 또는 거부가 온다"
+        return Says(
+            "입력 순서대로 각 항목에 vfolder 또는 거부가 옵니다",
+            english="a vfolder or a rejection comes back for each id in input order",
+        )
 
     @override
     def look(self, laid: AReaderAndTwoFolders, answered: Answered[Answer]) -> list[Verdict]:
@@ -206,7 +232,13 @@ class TheFolderThenNothing(Then[AFolderAndItsReader, Answer]):
 
     @override
     def says(self) -> str:
-        return "있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다"
+        return Says(
+            "있는 vfolder 는 노드로, 없는 id 항목은 빈 값으로 옵니다",
+            english=(
+                "the existing vfolder comes back as a node and the missing id entry as an "
+                "empty value"
+            ),
+        )
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -231,7 +263,7 @@ class AnEmptyList(Then[AFolderMakerAndTheirDomain, Answer]):
 
     @override
     def says(self) -> str:
-        return "빈 목록이 온다"
+        return Says("빈 목록이 옵니다", english="an empty list comes back")
 
     @override
     def look(self, laid: AFolderMakerAndTheirDomain, answered: Answered[Answer]) -> list[Verdict]:
@@ -253,9 +285,13 @@ class AUserLoadsTheirOwnFolderById(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, "
-            "그 폴더가 온다"
+        return Says(
+            "자기 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기 vfolder 를 id 로 "
+            "일괄 조회하면, 그 vfolder 가 응답으로 옵니다",
+            english=(
+                "when a user granted vfolder read in their personal project loads their own "
+                "vfolder by id, that vfolder comes back"
+            ),
         )
 
     @override
@@ -277,13 +313,17 @@ class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder"
+        return "a-user-granted-nothing-gets-a-rejection-in-place-of-their-own-folder"
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, "
-            "호출은 성공하되 그 자리는 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 자기 vfolder 를 id 로 일괄 조회하면, 호출은 "
+            "성공하되 그 항목은 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing loads their own vfolder by id, the call succeeds "
+                "but that entry is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -307,13 +347,18 @@ class ABatchLoadAnswersEachElementInOrder(
 
     @override
     def summary(self) -> str:
-        return "a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"
+        return "a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order"
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 "
-            "한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다"
+        return Says(
+            "자기 vfolder 만 읽을 수 있는 사용자가 자기 vfolder, 공유받지 않은 다른 사용자의 "
+            "vfolder, 없는 id 를 한 번에 요청하면, 입력 순서대로 그 vfolder, 거부, 거부가 옵니다",
+            english=(
+                "when a user who can read only their own vfolder asks for their vfolder, "
+                "someone else's unshared vfolder and a missing id in one call, their vfolder, "
+                "a rejection and a rejection come back in input order"
+            ),
         )
 
     @override
@@ -341,9 +386,13 @@ class AnAcceptedShareLoadsSomeoneElsesFolderById(
 
     @override
     def describe(self) -> str:
-        return (
-            "남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, "
-            "그 폴더가 온다"
+        return Says(
+            "다른 사용자의 vfolder 를 읽기로 공유받아 받아들인 사용자가 그 vfolder 를 id 로 "
+            "일괄 조회하면, 그 vfolder 가 응답으로 옵니다",
+            english=(
+                "when a user who accepted a read share of someone else's vfolder loads it by "
+                "id, that vfolder comes back"
+            ),
         )
 
     @override
@@ -365,13 +414,17 @@ class AnUnansweredOfferGetsARefusalForTheFolder(
 ):
     @override
     def summary(self) -> str:
-        return "an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder"
+        return "an-unanswered-offer-gets-a-rejection-in-place-of-someone-elses-folder"
 
     @override
     def describe(self) -> str:
-        return (
-            "남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, "
-            "호출은 성공하되 그 자리는 권한 부족으로 거부된다"
+        return Says(
+            "다른 사용자의 vfolder 를 공유 제안만 받고 받아들이지 않은 사용자가 그 vfolder 를 "
+            "id 로 일괄 조회하면, 호출은 성공하되 그 항목은 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who was offered someone else's vfolder but did not accept loads "
+                "it by id, the call succeeds but that entry is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -399,9 +452,14 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, "
-            "그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다"
+        return Says(
+            "superadmin 이 다른 사용자의 vfolder 와 없는 id 를 함께 요청하면, 그 vfolder 는 "
+            "노드로, 없는 id 항목은 빈 값으로 옵니다",
+            english=(
+                "when the superadmin asks for someone else's vfolder and a missing id "
+                "together, the vfolder comes back as a node and the missing id entry as an "
+                "empty value"
+            ),
         )
 
     @override
@@ -427,7 +485,13 @@ class ABatchLoadOfNothingAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 옵니다",
+            english=(
+                "when a user granted nothing gives an empty id list, an empty list comes back "
+                "without a permission check"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:

@@ -396,11 +396,14 @@ class TestDeleteFilesAction:
         mock_vfolder_data: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         mock_vfolder_repository.get_by_id = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = DeleteFilesAction(
             user_uuid=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["file.txt"],
             recursive=False,
@@ -419,11 +422,14 @@ class TestDeleteFilesAction:
         mock_vfolder_data: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         mock_vfolder_repository.get_by_id = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = DeleteFilesAction(
             user_uuid=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["dir1/", "dir2/", "file.txt"],
             recursive=True,
@@ -445,11 +451,14 @@ class TestDeleteFilesAsyncAction:
         mock_vfolder_data: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         mock_vfolder_repository.get_by_id = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["large_dir/"],
             recursive=True,
@@ -465,11 +474,13 @@ class TestDeleteFilesAsyncAction:
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         mock_vfolder_repository.get_by_id = AsyncMock(side_effect=VFolderNotFound())
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             files=["file.txt"],
             recursive=False,
@@ -486,11 +497,14 @@ class TestMkdirAction:
         mock_vfolder_data: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         mock_vfolder_repository.get_by_id = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = MkdirAction(
             user_id=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="newdir",
             parents=False,
@@ -510,11 +524,14 @@ class TestMkdirAction:
         mock_vfolder_data: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         mock_vfolder_repository.get_by_id = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = MkdirAction(
             user_id=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             path="a/b/c",
             parents=True,
@@ -531,10 +548,12 @@ class TestMkdirAction:
         file_service: VFolderFileService,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        keypair_resource_policy: dict[str, str],
     ) -> None:
         dirs = [f"dir{i}" for i in range(51)]
         action = MkdirAction(
             user_id=user_uuid,
+            keypair_resource_policy=keypair_resource_policy,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             path=dirs,
             parents=False,

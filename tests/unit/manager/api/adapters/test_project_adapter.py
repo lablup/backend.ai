@@ -35,7 +35,6 @@ def readable() -> ProjectData:
         dotfiles=b"",
         resource_policy="default",
         type=ProjectType.GENERAL,
-        container_registry=None,
     )
 
 

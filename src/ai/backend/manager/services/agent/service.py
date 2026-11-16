@@ -28,6 +28,7 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.errors.agent import AgentNotFound, ConflictingSessionRescheduleNotSupported
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -111,16 +112,16 @@ class AgentService:
         """
         Get watcher information.
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
-        :return token: agent watcher token ("insecure" if not set in config server)
+        :return token: agent watcher token
         """
         token = self._config_provider.config.watcher.token
-        if token is None:
-            token = "insecure"
+        if not token:
+            raise WatcherTokenNotConfigured()
         agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
         raw_watcher_port = await self._etcd.get(
             f"nodes/agents/{agent_id}/watcher_port",
         )
-        watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
+        watcher_port = 6009 if raw_watcher_port is None else int(raw_watcher_port)
         # TODO: watcher scheme is assumed to be http
         addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
         return {
@@ -141,13 +142,9 @@ class AgentService:
         self, action: UpdateAgentResourceGroupAction
     ) -> UpdateAgentResourceGroupActionResult:
         """
-        Change an agent's resource group, handling the sessions running on it.
-
-        The repository atomically gates on the agent's active sessions (raising
-        AgentHasConflictingSessions when they exist and ``force`` is unset),
-        commits the group change, and returns those sessions. The returned
-        sessions are then transitioned per ``policy``; their cleanup proceeds
-        asynchronously. ``RESCHEDULE`` is not implemented yet.
+        Change an agent's resource group and transition the sessions running on it per ``policy``.
+        Without ``force``, the repository raises AgentHasConflictingSessions on any conflict.
+        ``RESCHEDULE`` is not implemented yet.
         """
         agent_id = action.agent_id
         if action.policy is ConflictingSessionCleanupPolicy.RESCHEDULE:

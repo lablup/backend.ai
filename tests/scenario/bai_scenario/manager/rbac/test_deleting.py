@@ -8,6 +8,8 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeleteRolePayload,
@@ -23,13 +25,14 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
 )
 from bai_scenario.components.domain import TheCallIsRefused
-from bai_scenario.components.rbac import RolesAndACaller, RolesAndSomeone
+from bai_scenario.components.rbac import Granted, RolesAndACaller, RolesAndSomeone
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -48,7 +51,10 @@ class SoftDeleting(When[RolesAndACaller, RBACAdapter, Deleted]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.role.name}을 soft delete 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.role.name} 을 soft delete 합니다",
+            english=f"{laid.caller.username} soft deletes {laid.role.name}",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Deleted:
@@ -66,7 +72,10 @@ class SoftDeletingThenRestoring(When[RolesAndACaller, RBACAdapter, Deleted]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.role.name}을 soft delete 했다가 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.role.name} 을 soft delete 했다가 restore 합니다",
+            english=f"{laid.caller.username} soft deletes {laid.role.name} and then restores it",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Deleted:
@@ -85,7 +94,10 @@ class Restoring(When[RolesAndACaller, RBACAdapter, Deleted]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.role.name}을 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.role.name} 을 restore 합니다",
+            english=f"{laid.caller.username} restores {laid.role.name}",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Deleted:
@@ -103,7 +115,10 @@ class Purging(When[RolesAndACaller, RBACAdapter, Deleted]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.role.name}을 purge 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.role.name} 을 purge 합니다",
+            english=f"{laid.caller.username} purges {laid.role.name}",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Deleted:
@@ -117,14 +132,23 @@ class TheRoleIdComesBack(Then[RolesAndACaller, Deleted]):
 
     @override
     def says(self) -> str:
-        return "그 역할의 id 가 온다"
+        return Says("그 역할의 id 가 옵니다", english="the id of that role comes back")
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs(laid.role.id, "대상 역할의 id"))]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs(
+                    laid.role.id,
+                    Says("대상 역할의 id", english="the id of the target role"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -137,7 +161,10 @@ class TheSuperadminSoftDeletesARole(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 역할을 soft delete 하면, 그 역할의 id 가 온다"
+        return Says(
+            "superadmin 이 역할을 soft delete 하면, 그 역할의 id 가 옵니다",
+            english="when the superadmin soft deletes a role, the id of that role comes back",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -162,7 +189,10 @@ class AUserGrantedNothingMayNotSoftDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 역할을 soft delete 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 역할을 soft delete 할 수 없습니다",
+            english="a user granted nothing cannot soft delete a role",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -187,7 +217,10 @@ class RestoringASoftDeletedRole(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 역할을 restore 하면, 그 역할의 id 가 온다"
+        return Says(
+            "soft delete 된 역할을 restore 하면, 그 역할의 id 가 옵니다",
+            english="when a soft-deleted role is restored, the id of that role comes back",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -212,7 +245,10 @@ class AUserGrantedNothingMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 역할을 restore 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 역할을 restore 할 수 없습니다",
+            english="a user granted nothing cannot restore a role",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -235,7 +271,10 @@ class TheSuperadminPurgesARole(Scenario[TestSeedingSession, RolesAndACaller, RBA
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 역할을 purge 하면, 그 역할의 id 가 온다"
+        return Says(
+            "superadmin 이 역할을 purge 하면, 그 역할의 id 가 옵니다",
+            english="when the superadmin purges a role, the id of that role comes back",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -260,11 +299,74 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 역할을 purge 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 역할을 purge 할 수 없습니다",
+            english="a user granted nothing cannot purge a role",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
         return RolesAndSomeone()
+
+    @override
+    def when(self) -> When[RolesAndACaller, RBACAdapter, Deleted]:
+        return Purging()
+
+    @override
+    def then(self) -> Then[RolesAndACaller, Deleted]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AUserGrantedUpdateOnlyMayNotSoftDelete(
+    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-update-only-may-not-soft-delete-a-role"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대상 도메인에서 역할 수정 권한만 받은 사용자는 역할을 soft delete 할 수 없습니다",
+            english=(
+                "a user granted only role update permission in a domain cannot soft delete a role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
+        return RolesAndSomeone(grant=(Granted(RoleEntityType(), Permission.UPDATE),))
+
+    @override
+    def when(self) -> When[RolesAndACaller, RBACAdapter, Deleted]:
+        return SoftDeleting()
+
+    @override
+    def then(self) -> Then[RolesAndACaller, Deleted]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AUserGrantedSoftDeleteOnlyMayNotPurge(
+    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-soft-delete-only-may-not-purge-a-role"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대상 도메인에서 역할 soft delete 권한만 받은 사용자는 역할을 purge 할 수 없습니다",
+            english=(
+                "a user granted only role soft delete permission in a domain cannot purge a role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
+        return RolesAndSomeone(grant=(Granted(RoleEntityType(), Permission.SOFT_DELETE),))
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, Deleted]:
@@ -282,6 +384,8 @@ SCENARIOS: list[RoleStep] = [
     AUserGrantedNothingMayNotRestore(),
     TheSuperadminPurgesARole(),
     AUserGrantedNothingMayNotPurge(),
+    AUserGrantedUpdateOnlyMayNotSoftDelete(),
+    AUserGrantedSoftDeleteOnlyMayNotPurge(),
 ]
 
 

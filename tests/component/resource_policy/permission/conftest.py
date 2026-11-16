@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_policy import (
@@ -63,9 +64,7 @@ from ai.backend.manager.api.rest.v2.resource_policy.registry import (
     register_v2_resource_policy_routes,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
@@ -74,6 +73,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -373,8 +373,9 @@ async def seeded_caller(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(access_key),
                     secret_key=SecretValue(secret_key),
-                    ssh_public_key="ssh-rsa test",
-                    ssh_private_key="test-private-key",
+                ),
+                ssh_keypair=SSHKeypairCreator(
+                    public_key="ssh-rsa test", private_key=None, is_default=True
                 ),
                 keypair_resource_policy=resource_policy_fixture,
             )

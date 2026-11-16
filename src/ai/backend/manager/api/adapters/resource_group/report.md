@@ -1,344 +1,317 @@
 ## resource_group
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-시나리오: 미완 4 / 25
+Scenario: incomplete 2 / 25
 
-- ops 로 구성 (10)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_names — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - get_allowed_resource_groups_for_domain — 대표 성공 ✓ · 대표 실패 ✓
-  - get_allowed_resource_groups_for_project — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✓
-- ops + 직접 구현 (1)
-  - get_fair_share_spec — 성공 있음 2 · 실패 있음 2 (partial_bulk_get_ops, single_entity)
-- 직접 구현 (14)
-  - admin_replace_default_deployment_options — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - admin_replace_default_session_options — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - create — 성공 있음 2 · 실패 있음 3 (global_scope)
-  - get_allowed_domains_for_resource_group — 성공 있음 2 · 실패 있음 1 (single_entity)
-  - get_allowed_projects_for_resource_group — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - get_resource_info — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - update — 성공 있음 5 · 실패 있음 3 (single_entity)
-  - update_allowed_domains_for_resource_group — 성공 있음 1 · 실패 있음 3 (relation, single_entity)
-  - update_allowed_projects_for_resource_group — 성공 있음 1 · 실패 있음 1 (relation, single_entity)
-  - update_allowed_resource_groups_for_domain — 성공 있음 3 · 실패 있음 2 (global_scope, relation, single_entity)
-  - update_allowed_resource_groups_for_project — 성공 있음 1 · 실패 있음 1 (global_scope, relation, single_entity)
-  - update_config — 성공 있음 2 · 실패 있음 1 (single_entity)
-  - update_fair_share_spec — 성공 있음 2 · 실패 있음 2 (single_entity)
+- built from ops (10)
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_by_names: representative success ✓ · representative rejection ✓
+  - get: representative success ✓ · representative rejection ✓
+  - get_allowed_resource_groups_for_domain: representative success ✓ · representative rejection ✓
+  - get_allowed_resource_groups_for_project: representative success ✓ · representative rejection ✓
+  - lookup_name: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search: representative success ✓ · representative rejection ✓
+  - search: representative success ✓ · representative rejection ✓
+- ops + direct implementation (1)
+  - get_fair_share_spec: success present 2 · rejection present 2 (partial_bulk_get_ops, single_entity)
+- direct implementation (14)
+  - admin_replace_default_deployment_options: success present 2 · rejection present 2 (single_entity)
+  - admin_replace_default_session_options: success present 1 · rejection present 2 (single_entity)
+  - create: success present 2 · rejection present 3 (global_scope)
+  - get_allowed_domains_for_resource_group: success present 2 · rejection present 1 (single_entity)
+  - get_allowed_projects_for_resource_group: success present 1 · rejection present 1 (single_entity)
+  - get_resource_info: success present 2 · rejection present 2 (single_entity)
+  - purge: success present 2 · rejection present 2 (single_entity)
+  - update: success present 5 · rejection present 3 (single_entity)
+  - update_allowed_domains_for_resource_group: success present 1 · rejection present 3 (relation, single_entity)
+  - update_allowed_projects_for_resource_group: success present 1 · rejection present 1 (relation, single_entity)
+  - update_allowed_resource_groups_for_domain: success present 3 · rejection present 2 (global_scope, relation, single_entity)
+  - update_allowed_resource_groups_for_project: success present 1 · rejection present 1 (global_scope, relation, single_entity)
+  - update_config: success present 2 · rejection present 1 (single_entity)
+  - update_fair_share_spec: success present 3 · rejection present 3 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty) | 성공 |
+| [batch loading an empty id list answers an empty response without calling the lower layer](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
+| [when the superadmin batch loads two seeded groups and one unknown id, the items come back in the order requested and the item for the unknown id is empty](#reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty) | answered |
+| [a user granted nothing batch loading two groups by id is not rejected as a call, and every item carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | rejected |
 
 **batch_load_by_names**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading-a-batch-load-of-no-names-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있다](#reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty) | 성공 |
+| [batch loading an empty name list answers an empty response without calling the lower layer](#reading-a-batch-load-of-no-names-answers-an-empty-list) | answered |
+| [when the superadmin batch loads two seeded groups and one unknown name, the items come back in the order requested and the item for the unknown name is empty](#reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty) | answered |
+| [a user granted nothing batch loading two groups by name is not rejected as a call, and every item carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | rejected |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. 그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다](#reading-a-user-granted-read-on-the-group-reads-it-by-name) | 성공 |
-| [리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다](#reading-the-superadmin-reads-a-resource-group-by-name) | 성공 |
-| [아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-resource-group) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다](#reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted read through the role granted on the resource group reading it by name gets the whole group. the resource group is its own scope, so the role granted on it applies](#reading-a-user-granted-read-on-the-group-reads-it-by-name) | answered |
+| [one resource group exists and the superadmin reads it by name, so the whole group comes back](#reading-the-superadmin-reads-a-resource-group-by-name) | answered |
+| [a user granted nothing reading by name is rejected for not enough permission](#reading-a-user-granted-nothing-may-not-read-a-resource-group) | rejected |
+| [a user granted nothing reading a name nothing answers to is rejected because no target answers to it, not for not enough permission. the step that looks up the id by name checks authentication alone and the permission check follows the lookup](#reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too) | rejected |
+| [when the superadmin reads a name nothing answers to, the call is rejected because no target answers to it](#reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **get_allowed_resource_groups_for_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it) | 성공 |
-| [도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-domain) | 성공 |
-| [아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain) | 거부 |
-| [존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted the resource group read role in the domain scope reading the allow list of that domain gets only the linked group name](#allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it) | answered |
+| [when one resource group is linked to a domain and one is not, reading the allow list of that domain as the superadmin answers only the linked group name](#allowing-the-superadmin-reads-the-groups-allowed-for-a-domain) | answered |
+| [a user granted nothing trying to read the allow list of their own domain is rejected for not enough permission](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain) | rejected |
+| [reading the allow list of a domain name nothing answers to is rejected because no target answers to it](#allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found) | rejected |
 
 **get_allowed_resource_groups_for_project**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-project) | 성공 |
-| [아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project) | 거부 |
+| [when a resource group is linked to a project, reading the allow list of that project as the superadmin answers the linked group name](#allowing-the-superadmin-reads-the-groups-allowed-for-a-project) | answered |
+| [a user granted nothing trying to read the allow list of a project is rejected for not enough permission. reading has to be allowed in all three scopes, the caller's domain, the project and the caller themself](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project) | rejected |
 
 **lookup_name**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name) | 성공 |
-| [슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다](#looking_up-the-superadmin-looks-up-a-resource-group-by-name) | 성공 |
-| [아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted nothing can still look up a resource group by name. this call checks authentication alone, and the call receiving that id checks the permission](#looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name) | answered |
+| [when the superadmin looks up a resource group by name, the id of that resource group comes back](#looking_up-the-superadmin-looks-up-a-resource-group-by-name) | answered |
+| [looking up the id of a name no resource group holds is rejected as no such target](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | 성공 |
-| [슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one) | 성공 |
+| [a user granted nothing trying to purge several resource groups at once gets none purged and every one in the failed list for not enough permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | answered |
+| [when the superadmin purges two resource groups and one unknown id at once, the two come back as deleted and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups) | 성공 |
-| [슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once) | 성공 |
+| [a user granted nothing trying to edit several resource groups at once gets none edited and every one in the failed list for not enough permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups) | answered |
+| [when the superadmin changes the description of several resource groups at once, they all come back with the new description and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once) | answered |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, 도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다](#searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it) | 성공 |
-| [슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다](#searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it) | 성공 |
-| [아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-domain-scope) | 거부 |
+| [a user granted the resource group read role in the domain scope searching that domain scope gets only the resource group linked to the domain, and the unlinked resource group does not come back](#searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it) | answered |
+| [the superadmin searching a domain scope gets only the one resource group linked to that domain](#searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it) | answered |
+| [a user granted nothing searching their own domain scope is rejected for not enough permission](#searching-a-user-granted-nothing-may-not-search-a-domain-scope) | rejected |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다](#searching-a-name-filter-narrows-the-answer-to-that-resource-group) | 성공 |
-| [활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching-an-active-filter-leaves-only-the-active-resource-groups) | 성공 |
-| [리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page) | 성공 |
-| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching-the-monitor-searches-resource-groups-like-the-superadmin) | 성공 |
-| [리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching-the-superadmin-counts-every-resource-group-laid) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group) | 거부 |
+| [searching with the name of one of two resource groups as the filter answers only that group](#searching-a-name-filter-narrows-the-answer-to-that-resource-group) | answered |
+| [when active and inactive groups are mixed, searching with the active filter answers only the active ones](#searching-an-active-filter-leaves-only-the-active-resource-groups) | answered |
+| [when two resource groups exist and only the first item is asked for, one item comes back and the response says there is a next page](#searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page) | answered |
+| [the monitor searching without a filter gets the same response as the superadmin](#searching-the-monitor-searches-resource-groups-like-the-superadmin) | answered |
+| [when two resource groups exist and the superadmin searches without a filter, both come back](#searching-the-superadmin-counts-every-resource-group-laid) | answered |
+| [when a user who is not the superadmin searches every resource group without a filter, the call is rejected for lacking the role](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group) | rejected |
 
 **get_fair_share_spec**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec) | 성공 |
-| [에이전트가 없는 그룹의 fair share 설정을 슈퍼관리자가 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-the-superadmin-reads-the-default-fair-share-spec) | 성공 |
-| [아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted read through the role granted on the resource group reading the fair share config of a resource group with no agent gets the defaults set in the code and an empty weight list](#fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec) | answered |
+| [when the superadmin reads the fair share config of a resource group with no agent, the defaults set in the code come back and the weight list is empty](#fair_share-the-superadmin-reads-the-default-fair-share-spec) | answered |
+| [a user granted nothing trying to read the fair share config is rejected for not enough permission](#fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec) | rejected |
+| [when the superadmin reads the fair share config of a name nothing answers to, the call is rejected because no target answers to it](#fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **admin_replace_default_deployment_options**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options) | 성공 |
-| [슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-the-superadmin-replaces-the-default-deployment-options-whole) | 성공 |
-| [아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-deployment-options) | 거부 |
-| [등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-deployment-handler-is-refused) | 거부 |
+| [a user granted update through the role granted on the resource group replacing the default deployment options gets the options given whole](#options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options) | answered |
+| [when the superadmin replaces the default deployment options with the settings of one registered handler, the options given come back whole](#options-the-superadmin-replaces-the-default-deployment-options-whole) | answered |
+| [a user granted nothing trying to replace the default deployment options is rejected for not enough permission](#options-a-user-granted-nothing-may-not-replace-the-default-deployment-options) | rejected |
+| [replacing the options with the name of an unregistered deployment handler is rejected as invalid input](#options-naming-an-unregistered-deployment-handler-is-refused) | rejected |
 
 **admin_replace_default_session_options**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다](#options-the-superadmin-replaces-the-default-session-options-whole) | 성공 |
-| [아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-session-options) | 거부 |
-| [등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-session-handler-is-refused) | 거부 |
+| [when the superadmin replaces the default session options with a priority and the settings of one registered handler, the options given come back whole and the entries left out take the defaults in the code](#options-the-superadmin-replaces-the-default-session-options-whole) | answered |
+| [a user granted nothing trying to replace the default session options is rejected for not enough permission](#options-a-user-granted-nothing-may-not-replace-the-default-session-options) | rejected |
+| [replacing the options with the name of an unregistered session handler is rejected as invalid input](#options-naming-an-unregistered-session-handler-is-refused) | rejected |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다](#creating-a-resource-group-made-as-the-default-answers-default) | 성공 |
-| [슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다](#creating-the-superadmin-makes-a-resource-group) | 성공 |
-| [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | 거부 |
-| [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | 거부 |
+| [when no default group exists and the superadmin creates one designated as the default, the group comes back as the default](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
+| [when the superadmin creates a resource group with only a name, the whole group comes back active, public and not the default, filled from the defaults in the code](#creating-the-superadmin-makes-a-resource-group) | answered |
+| [creating with a name another resource group already holds is rejected as a duplicate name](#creating-a-name-another-resource-group-already-holds-is-refused) | rejected |
+| [when a user who is not the superadmin tries to create a resource group, the call is rejected for lacking the role](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | rejected |
+| [when the monitor tries to create a resource group, the call is rejected for lacking the role. the monitor passes reads only](#creating-the-monitor-may-not-make-a-resource-group) | rejected |
 
 **get_allowed_domains_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다](#allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it) | 성공 |
-| [도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다](#allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group) | 거부 |
+| [a user granted read through the role granted on the resource group reading the allowed domains of the group gets an empty list because no domain is linked](#allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it) | answered |
+| [when the superadmin reads the allowed domains of a resource group linked to a domain, that domain name comes back](#allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group) | answered |
+| [a user granted nothing trying to read the allowed domains of a resource group is rejected for not enough permission](#allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group) | rejected |
 
 **get_allowed_projects_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다](#allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group) | 거부 |
+| [when the superadmin reads the allowed projects of a resource group linked to a project, that project id comes back](#allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group) | answered |
+| [a user granted nothing trying to read the allowed projects of a resource group is rejected for not enough permission](#allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group) | rejected |
 
 **get_resource_info**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다](#reading-a-user-granted-read-on-the-group-reads-its-resource-info) | 성공 |
-| [에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다](#reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents) | 성공 |
-| [아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-the-resource-info) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted read through the role granted on the resource group reading the resource info gets the same response as the superadmin](#reading-a-user-granted-read-on-the-group-reads-its-resource-info) | answered |
+| [when the superadmin reads the resource info of a group without agents, capacity, used and free are all empty](#reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents) | answered |
+| [a user granted nothing reading the resource info is rejected for not enough permission](#reading-a-user-granted-nothing-may-not-read-the-resource-info) | rejected |
+| [when the superadmin reads the resource info of a name nothing answers to, the call is rejected because no target answers to it](#reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-a-user-granted-hard-delete-on-the-group-purges-it) | 성공 |
-| [리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-the-superadmin-purges-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-resource-group) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted hard delete through the role granted on the resource group purging it gets the whole deleted group](#retiring-a-user-granted-hard-delete-on-the-group-purges-it) | answered |
+| [one resource group exists and the superadmin purges it, so the whole deleted group comes back](#retiring-the-superadmin-purges-a-resource-group) | answered |
+| [a user granted nothing trying to purge is rejected for not enough permission](#retiring-a-user-granted-nothing-may-not-purge-a-resource-group) | rejected |
+| [when the superadmin purges a name nothing answers to, the call is rejected because no target answers to it](#retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다](#editing-a-user-granted-update-on-the-group-changes-its-description) | 성공 |
-| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다](#editing-an-edit-naming-no-field-changes-nothing) | 성공 |
-| [활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다](#editing-deactivating-a-resource-group-answers-it-inactive) | 성공 |
-| [기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다](#editing-making-a-resource-group-the-default-answers-it-default) | 성공 |
-| [슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-changing-the-description-leaves-the-rest) | 성공 |
-| [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | 거부 |
-| [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [a user granted update through the role granted on the resource group changing the description gets the group with the new description](#editing-a-user-granted-update-on-the-group-changes-its-description) | answered |
+| [an edit naming no field answers the group with nothing changed](#editing-an-edit-naming-no-field-changes-nothing) | answered |
+| [deactivating an active group answers the group as inactive](#editing-deactivating-a-resource-group-answers-it-inactive) | answered |
+| [when no default group exists, making a group the default answers it as the default](#editing-making-a-resource-group-the-default-answers-it-default) | answered |
+| [when the superadmin changes only the description, the whole group comes back with the new description and the rest unchanged](#editing-the-superadmin-changing-the-description-leaves-the-rest) | answered |
+| [a user granted nothing trying to change the description is rejected for not enough permission](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | rejected |
+| [when another default group exists, making a different group the default is rejected because a default group already exists](#editing-making-a-second-resource-group-the-default-is-refused) | rejected |
+| [when the superadmin edits a name nothing answers to, the call is rejected because no target answers to it](#editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **update_allowed_domains_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-domain-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | 거부 |
-| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | 거부 |
-| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | 거부 |
+| [when the superadmin adds a domain to the allowed domains of a resource group, the list holding that domain name comes back](#allowing-the-superadmin-allows-a-domain-for-a-resource-group) | answered |
+| [a user granted nothing trying to add a domain to the allowed domains of a resource group is rejected for not enough permission. the step that writes the relation checks the permission of both scopes](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | rejected |
+| [adding a domain name nothing answers to to the allowed domains of a resource group is rejected because no target answers to it](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | rejected |
+| [removing a domain name nothing answers to from the allowed domains of a resource group is rejected because no target answers to it instead of being skipped. removing an unknown resource group name on the domain side is skipped](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | rejected |
 
 **update_allowed_projects_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-project-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group) | 거부 |
+| [when the superadmin adds a project to the allowed projects of a resource group, the list holding that project id comes back](#allowing-the-superadmin-allows-a-project-for-a-resource-group) | answered |
+| [a user granted nothing trying to add a project to the allowed projects of a resource group is rejected for not enough permission](#allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group) | rejected |
 
 **update_allowed_resource_groups_for_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다](#allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped) | 성공 |
-| [슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-domain) | 성공 |
-| [도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다](#allowing-the-superadmin-disallows-a-resource-group-for-a-domain) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain) | 거부 |
-| [존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found) | 거부 |
+| [removing a resource group name nothing answers to from the allow list of a domain skips that name and an empty list comes back](#allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped) | answered |
+| [when the superadmin adds a resource group to the allow list of a domain, the list holding that group name comes back](#allowing-the-superadmin-allows-a-resource-group-for-a-domain) | answered |
+| [when the superadmin removes the resource group linked to a domain from the allow list, an empty list comes back](#allowing-the-superadmin-disallows-a-resource-group-for-a-domain) | answered |
+| [when a user who is not the superadmin tries to add a resource group to the allow list of a domain, the call is rejected for lacking the role. the step that turns the resource group name into an id goes through the superadmin check](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain) | rejected |
+| [adding a resource group name nothing answers to to the allow list of a domain is rejected because no target answers to it](#allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found) | rejected |
 
 **update_allowed_resource_groups_for_project**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-project) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project) | 거부 |
+| [when the superadmin adds a resource group to the allow list of a project, the list holding that group name comes back](#allowing-the-superadmin-allows-a-resource-group-for-a-project) | answered |
+| [when a user who is not the superadmin tries to add a resource group to the allow list of a project, the call is rejected for lacking the role](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project) | rejected |
 
 **update_config**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-preemption-config) | 성공 |
-| [슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | 성공 |
-| [아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-the-config) | 거부 |
+| [when the superadmin changes the preemption config, the whole group comes back with the new preemption values](#editing-the-superadmin-changes-the-preemption-config) | answered |
+| [when the superadmin changes the config to a last-in-first-out scheduler, private visibility, host network and a given proxy address, the whole group comes back with those values](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | answered |
+| [a user granted nothing trying to change the config is rejected for not enough permission](#editing-a-user-granted-nothing-may-not-edit-the-config) | rejected |
 
 **update_fair_share_spec**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환된다](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | 성공 |
-| [슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다](#fair_share-the-superadmin-changes-the-fair-share-half-life) | 성공 |
-| [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [when a user granted update in the group scope assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config](#fair_share-a-user-granted-update-assigns-a-resource-weight) | answered |
+| [a user granted update through the role granted on the resource group changing the half-life gets the whole group](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | answered |
+| [when the superadmin changes the half-life, the whole group comes back. the returned node does not carry this config](#fair_share-the-superadmin-changes-the-fair-share-half-life) | answered |
+| [a user granted nothing trying to change the half-life is rejected for not enough permission](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | rejected |
+| [assigning a weight to a resource type no agent reports is rejected as an invalid input](#fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected) | rejected |
+| [when the superadmin changes the half-life of a name nothing answers to, the call is rejected because no target answers to it](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 ### batch_load_by_ids
 
 <a id="reading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
 
-#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다
+batch loading an empty id list answers an empty response without calling the lower layer
 
 Given
 
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
+- ResourceGroupAdapter.batch_load_by_ids: user-1 batch loads an empty id list
 
 Then
 
-- 빈 응답이 반환된다
+- an empty response comes back
   - items = []
-
-<a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
-
-아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다
-
-Given
-
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceGroupAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 2개를 id로 한 번에 조회
-
-Then
-
-- 항목마다 권한 부족 거부가 담긴다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
 
 <a id="reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty"></a>
 
-#### [the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
+when the superadmin batch loads two seeded groups and one unknown id, the items come back in the order requested and the item for the unknown id is empty
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
+- ResourceGroupAdapter.batch_load_by_ids: user-1 batch loads 2 seeded resource groups and one unknown id
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있다
+- the items come back in the order requested and the item for a missing one is empty
   - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: skipped: the database generates it
   - items[0].name = 'wanted-1'
   - items[0].status.is_active = True
   - items[0].status.is_public = True
   - items[0].status.is_default = False
   - items[0].metadata.description = None
-  - items[0].metadata.created_at: 이 실행이 쓴 시각
+  - items[0].metadata.created_at: the time this run wrote
   - items[0].network.wsproxy_addr = None
   - items[0].network.use_host_network = False
   - items[0].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -348,15 +321,15 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].id: 무시함 — 데이터베이스가 만든다
+  - items[0].default_deployment_options: skipped: the default the installation sets
+  - items[0].default_session_options: skipped: the default the installation sets
+  - items[1].id: skipped: the database generates it
   - items[1].name = 'other-1'
   - items[1].status.is_active = True
   - items[1].status.is_public = True
   - items[1].status.is_default = False
   - items[1].metadata.description = None
-  - items[1].metadata.created_at: 이 실행이 쓴 시각
+  - items[1].metadata.created_at: the time this run wrote
   - items[1].network.wsproxy_addr = None
   - items[1].network.use_host_network = False
   - items[1].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -366,101 +339,101 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - items[1].default_deployment_options: skipped: the default the installation sets
+  - items[1].default_session_options: skipped: the default the installation sets
   - items[2] = None
+
+<a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
+
+a user granted nothing batch loading two groups by id is not rejected as a call, and every item carries a denial for not enough permission
+
+Given
+
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.batch_load_by_ids: user-1 batch loads the 2 seeded resource groups by id
+
+Then
+
+- every item carries a denial for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### batch_load_by_names
 
 <a id="reading-a-batch-load-of-no-names-answers-an-empty-list"></a>
 
-#### [a-batch-load-of-no-names-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-batch-load-of-no-names-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다
+batch loading an empty name list answers an empty response without calling the lower layer
 
 Given
 
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.batch_load_by_names — user-1이 빈 이름 목록으로 조회
+- ResourceGroupAdapter.batch_load_by_names: user-1 batch loads an empty name list
 
 Then
 
-- 빈 응답이 반환된다
+- an empty response comes back
   - items = []
-
-<a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
-
-아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다
-
-Given
-
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceGroupAdapter.batch_load_by_names — user-1이 미리 만들어 둔 2개를 이름으로 한 번에 조회
-
-Then
-
-- 항목마다 권한 부족 거부가 담긴다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
 
 <a id="reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty"></a>
 
-#### [the-superadmin-batch-load-by-names-leaves-a-missing-name-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-batch-load-by-names-leaves-a-missing-name-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있다
+when the superadmin batch loads two seeded groups and one unknown name, the items come back in the order requested and the item for the unknown name is empty
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.batch_load_by_names — user-1이 미리 만들어 둔 2개와 없는 이름 하나를 한 번에 조회
+- ResourceGroupAdapter.batch_load_by_names: user-1 batch loads 2 seeded resource groups and one unknown name
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있다
+- the items come back in the order requested and the item for a missing one is empty
   - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: skipped: the database generates it
   - items[0].name = 'wanted-1'
   - items[0].status.is_active = True
   - items[0].status.is_public = True
   - items[0].status.is_default = False
   - items[0].metadata.description = None
-  - items[0].metadata.created_at: 이 실행이 쓴 시각
+  - items[0].metadata.created_at: the time this run wrote
   - items[0].network.wsproxy_addr = None
   - items[0].network.use_host_network = False
   - items[0].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -470,15 +443,15 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].id: 무시함 — 데이터베이스가 만든다
+  - items[0].default_deployment_options: skipped: the default the installation sets
+  - items[0].default_session_options: skipped: the default the installation sets
+  - items[1].id: skipped: the database generates it
   - items[1].name = 'other-1'
   - items[1].status.is_active = True
   - items[1].status.is_public = True
   - items[1].status.is_default = False
   - items[1].metadata.description = None
-  - items[1].metadata.created_at: 이 실행이 쓴 시각
+  - items[1].metadata.created_at: the time this run wrote
   - items[1].network.wsproxy_addr = None
   - items[1].network.use_host_network = False
   - items[1].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -488,47 +461,76 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - items[1].default_deployment_options: skipped: the default the installation sets
+  - items[1].default_session_options: skipped: the default the installation sets
   - items[2] = None
+
+<a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
+
+a user granted nothing batch loading two groups by name is not rejected as a call, and every item carries a denial for not enough permission
+
+Given
+
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.batch_load_by_names: user-1 batch loads the 2 seeded resource groups by name
+
+Then
+
+- every item carries a denial for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### get
 
 <a id="reading-a-user-granted-read-on-the-group-reads-it-by-name"></a>
 
-#### [a-user-granted-read-on-the-group-reads-it-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-read-on-the-group-reads-it-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. 그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다
+a user granted read through the role granted on the resource group reading it by name gets the whole group. the resource group is its own scope, so the role granted on it applies
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 READ 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 READ 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the READ role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the READ role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: READ allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.get — user-1이 resource-group-1으로 조회
+- ResourceGroupAdapter.get: user-1 reads resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -538,40 +540,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="reading-the-superadmin-reads-a-resource-group-by-name"></a>
 
-#### [the-superadmin-reads-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-reads-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다
+one resource group exists and the superadmin reads it by name, so the whole group comes back
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get — user-1이 resource-group-1으로 조회
+- ResourceGroupAdapter.get: user-1 reads resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -581,410 +583,410 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다
+a user granted nothing reading by name is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get — user-1이 resource-group-1으로 조회
+- ResourceGroupAdapter.get: user-1 reads resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too"></a>
 
-#### [a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다
+a user granted nothing reading a name nothing answers to is rejected because no target answers to it, not for not enough permission. the step that looks up the id by name checks authentication alone and the permission check follows the lookup
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get — user-1이 존재하지 않는 이름으로 조회
+- ResourceGroupAdapter.get: user-1 reads a name that does not exist
 
 Then
 
-- 거부된다
-  - 거부: ResourceGroupNotFound
+- the call is rejected
+  - rejected: ResourceGroupNotFound
 
 <a id="reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin reads a name nothing answers to, the call is rejected because no target answers to it
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get — user-1이 존재하지 않는 이름으로 조회
+- ResourceGroupAdapter.get: user-1 reads a name that does not exist
 
 Then
 
-- 거부된다
-  - 거부: ResourceGroupNotFound
+- the call is rejected
+  - rejected: ResourceGroupNotFound
 
 ### get_allowed_resource_groups_for_domain
 
 <a id="allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it"></a>
 
-#### [a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다
+a user granted the resource group read role in the domain scope reading the allow list of that domain gets only the linked group name
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 그 도메인 범위의 리소스 그룹 읽기 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인 범위의 리소스 그룹 읽기 역할을 받은 사용자 준비
-    - 역할 group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-reader-1: resource_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 group-reader-1 보유
+- one domain, one resource group linked to the domain and one not linked, and one regular user granted the resource group read role in the domain scope
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the resource group read role in the domain scope
+    - Role group-reader-1: applies only within the scope it is granted in
+    - Role group-reader-1: READ allowed on every resource_group
+    - regular user user-1: holds Role group-reader-1
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1 reads the allow list of domain home-1
 
 Then
 
-- 허용 목록에 건 리소스 그룹 이름만 담긴다
+- the allow list holds only the name of the linked resource group
   - items = ['linked-1']
 
 <a id="allowing-the-superadmin-reads-the-groups-allowed-for-a-domain"></a>
 
-#### [the-superadmin-reads-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다
+when one resource group is linked to a domain and one is not, reading the allow list of that domain as the superadmin answers only the linked group name
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1 reads the allow list of domain home-1
 
 Then
 
-- 허용 목록에 건 리소스 그룹 이름만 담긴다
+- the allow list holds only the name of the linked resource group
   - items = ['linked-1']
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다
+a user granted nothing trying to read the allow list of their own domain is rejected for not enough permission
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one regular user
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1 reads the allow list of domain home-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found"></a>
 
-#### [reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다
+reading the allow list of a domain name nothing answers to is rejected because no target answers to it
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 존재하지 않는 도메인의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1 reads the allow list of a domain that does not exist
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### get_allowed_resource_groups_for_project
 
 <a id="allowing-the-superadmin-reads-the-groups-allowed-for-a-project"></a>
 
-#### [the-superadmin-reads-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다
+when a resource group is linked to a project, reading the allow list of that project as the superadmin answers the linked group name
 
 Given
 
-- 프로젝트 하나와 프로젝트에 건 리소스 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 프로젝트 team-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group linked to the project and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project team-1 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_project: user-1 reads the allow list of project team-1
 
 Then
 
-- 허용 목록에 건 리소스 그룹 이름만 담긴다
+- the allow list holds only the name of the linked resource group
   - items = ['resource-group-1']
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다
+a user granted nothing trying to read the allow list of a project is rejected for not enough permission. reading has to be allowed in all three scopes, the caller's domain, the project and the caller themself
 
 Given
 
-- 프로젝트 하나와 프로젝트에 건 리소스 그룹 하나, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 프로젝트 team-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group linked to the project and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project team-1 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_project: user-1 reads the allow list of project team-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### lookup_name
 
 <a id="looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name"></a>
 
-#### [a-user-granted-nothing-still-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+#### [a-user-granted-nothing-still-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py): pass
 
-아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다
+a user granted nothing can still look up a resource group by name. this call checks authentication alone, and the call receiving that id checks the permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.lookup_name — user-1이 resource-group-1의 id를 찾음
+- ResourceGroupAdapter.lookup_name: user-1 looks up the id of resource-group-1
 
 Then
 
-- 그 리소스 그룹의 id가 온다
-  - id: 미리 만든 리소스 그룹의 id와 같다
+- the id of that resource group comes back
+  - id: same as the id of the resource group seeded in advance
 
 <a id="looking_up-the-superadmin-looks-up-a-resource-group-by-name"></a>
 
-#### [the-superadmin-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+#### [the-superadmin-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py): pass
 
-슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다
+when the superadmin looks up a resource group by name, the id of that resource group comes back
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.lookup_name — user-1이 resource-group-1의 id를 찾음
+- ResourceGroupAdapter.lookup_name: user-1 looks up the id of resource-group-1
 
 Then
 
-- 그 리소스 그룹의 id가 온다
-  - id: 미리 만든 리소스 그룹의 id와 같다
+- the id of that resource group comes back
+  - id: same as the id of the resource group seeded in advance
 
 <a id="looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found"></a>
 
-#### [looking-up-a-resource-group-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+#### [looking-up-a-resource-group-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py): pass
 
-아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다
+looking up the id of a name no resource group holds is rejected as no such target
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.lookup_name — user-1이 no-such-group의 id를 찾음
+- ResourceGroupAdapter.lookup_name: user-1 looks up the id of no-such-group
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+a user granted nothing trying to purge several resource groups at once gets none purged and every one in the failed list for not enough permission
 
 Given
 
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.partial_bulk_purge — user-1이 그룹 2개를 한 번에 완전 삭제함
+- ResourceGroupAdapter.partial_bulk_purge: user-1 purges 2 resource groups at once
 
 Then
 
-- 처리된 그룹 없이 그룹이 모두 실패 목록에 온다
+- no group is processed and every group comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 그룹의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 그룹의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the group
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the group
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one"></a>
 
-#### [purging-several-resource-groups-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py) — pass
+#### [purging-several-resource-groups-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two resource groups and one unknown id at once, the two come back as deleted and the unknown id comes back in the failed list because no target answers to it
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.partial_bulk_purge — user-1이 그룹 2개 와 없는 id 하나를 한 번에 완전 삭제함
+- ResourceGroupAdapter.partial_bulk_purge: user-1 purges 2 resource groups and one unknown id at once
 
 Then
 
-- 그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every group comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: skipped: the database generates it
   - successes[0].name = 'wanted-1'
   - successes[0].status.is_active = True
   - successes[0].status.is_public = True
   - successes[0].status.is_default = False
   - successes[0].metadata.description = None
-  - successes[0].metadata.created_at: 이 실행이 쓴 시각
+  - successes[0].metadata.created_at: the time this run wrote
   - successes[0].network.wsproxy_addr = None
   - successes[0].network.use_host_network = False
   - successes[0].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -994,15 +996,15 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].default_deployment_options: skipped: the default the installation sets
+  - successes[0].default_session_options: skipped: the default the installation sets
+  - successes[1].id: skipped: the database generates it
   - successes[1].name = 'other-1'
   - successes[1].status.is_active = True
   - successes[1].status.is_public = True
   - successes[1].status.is_default = False
   - successes[1].metadata.description = None
-  - successes[1].metadata.created_at: 이 실행이 쓴 시각
+  - successes[1].metadata.created_at: the time this run wrote
   - successes[1].network.wsproxy_addr = None
   - successes[1].network.use_host_network = False
   - successes[1].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -1012,79 +1014,79 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].default_deployment_options: skipped: the default the installation sets
+  - successes[1].default_session_options: skipped: the default the installation sets
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_update
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+a user granted nothing trying to edit several resource groups at once gets none edited and every one in the failed list for not enough permission
 
 Given
 
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.partial_bulk_update — user-1이 그룹 2개의 설명을 한 번에 고침
+- ResourceGroupAdapter.partial_bulk_update: user-1 edits the description of 2 resource groups at once
 
 Then
 
-- 처리된 그룹 없이 그룹이 모두 실패 목록에 온다
+- no group is processed and every group comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 그룹의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 그룹의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the group
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the group
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once"></a>
 
-#### [the-superadmin-edits-several-resource-groups-at-once](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-resource-groups-at-once](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+when the superadmin changes the description of several resource groups at once, they all come back with the new description and nothing failed
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.partial_bulk_update — user-1이 그룹 2개의 설명을 한 번에 고침
+- ResourceGroupAdapter.partial_bulk_update: user-1 edits the description of 2 resource groups at once
 
 Then
 
-- 그룹이 모두 처리된 목록에 오고, 실패한 것은 없다
+- every group comes back in the processed list and nothing failed
   - successes count = 2
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: skipped: the database generates it
   - successes[0].name = 'wanted-1'
   - successes[0].status.is_active = True
   - successes[0].status.is_public = True
   - successes[0].status.is_default = False
-  - successes[0].metadata.description = '한 번에 고친 설명'
-  - successes[0].metadata.created_at: 이 실행이 쓴 시각
+  - successes[0].metadata.description = 'the description edited at once'
+  - successes[0].metadata.created_at: the time this run wrote
   - successes[0].network.wsproxy_addr = None
   - successes[0].network.use_host_network = False
   - successes[0].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -1094,15 +1096,15 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].default_deployment_options: skipped: the default the installation sets
+  - successes[0].default_session_options: skipped: the default the installation sets
+  - successes[1].id: skipped: the database generates it
   - successes[1].name = 'other-1'
   - successes[1].status.is_active = True
   - successes[1].status.is_public = True
   - successes[1].status.is_default = False
-  - successes[1].metadata.description = '한 번에 고친 설명'
-  - successes[1].metadata.created_at: 이 실행이 쓴 시각
+  - successes[1].metadata.description = 'the description edited at once'
+  - successes[1].metadata.created_at: the time this run wrote
   - successes[1].network.wsproxy_addr = None
   - successes[1].network.use_host_network = False
   - successes[1].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -1112,42 +1114,42 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].default_deployment_options: skipped: the default the installation sets
+  - successes[1].default_session_options: skipped: the default the installation sets
   - failed = []
 
 ### scoped_search
 
 <a id="searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it"></a>
 
-#### [a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, 도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다
+a user granted the resource group read role in the domain scope searching that domain scope gets only the resource group linked to the domain, and the unlinked resource group does not come back
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 그 도메인 범위의 리소스 그룹 읽기 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인 범위의 리소스 그룹 읽기 역할을 받은 사용자 준비
-    - 역할 group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-reader-1: resource_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 group-reader-1 보유
+- one domain, one resource group linked to the domain and one not linked, and one regular user granted the resource group read role in the domain scope
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the resource group read role in the domain scope
+    - Role group-reader-1: applies only within the scope it is granted in
+    - Role group-reader-1: READ allowed on every resource_group
+    - regular user user-1: holds Role group-reader-1
 
 When
 
-- ResourceGroupAdapter.scoped_search — user-1이 도메인 home-1 스코프로 조회
+- ResourceGroupAdapter.scoped_search: user-1 searches the domain home-1 scope
 
 Then
 
-- 도메인에 건 리소스 그룹 하나만 반환된다
+- only the one resource group linked to the domain comes back
   - items = ['linked-1']
   - total_count = 1
   - has_next_page = False
@@ -1155,30 +1157,30 @@ Then
 
 <a id="searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it"></a>
 
-#### [the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다
+the superadmin searching a domain scope gets only the one resource group linked to that domain
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.scoped_search — user-1이 도메인 home-1 스코프로 조회
+- ResourceGroupAdapter.scoped_search: user-1 searches the domain home-1 scope
 
 Then
 
-- 도메인에 건 리소스 그룹 하나만 반환된다
+- only the one resource group linked to the domain comes back
   - items = ['linked-1']
   - total_count = 1
   - has_next_page = False
@@ -1186,59 +1188,59 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-a-domain-scope"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-domain-scope](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-domain-scope](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다
+a user granted nothing searching their own domain scope is rejected for not enough permission
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one regular user
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.scoped_search — user-1이 도메인 home-1 스코프로 조회
+- ResourceGroupAdapter.scoped_search: user-1 searches the domain home-1 scope
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### search
 
 <a id="searching-a-name-filter-narrows-the-answer-to-that-resource-group"></a>
 
-#### [a-name-filter-narrows-the-answer-to-that-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-name-filter-narrows-the-answer-to-that-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다
+searching with the name of one of two resource groups as the filter answers only that group
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.search — user-1이 이름 wanted-1 필터로 조회
+- ResourceGroupAdapter.search: user-1 searches with the name wanted-1 filter
 
 Then
 
-- 필터에 맞는 리소스 그룹 하나만 반환된다
+- only the one resource group the filter names comes back
   - items = ['wanted-1']
   - total_count = 1
   - has_next_page = False
@@ -1246,29 +1248,29 @@ Then
 
 <a id="searching-an-active-filter-leaves-only-the-active-resource-groups"></a>
 
-#### [an-active-filter-leaves-only-the-active-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [an-active-filter-leaves-only-the-active-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다
+when active and inactive groups are mixed, searching with the active filter answers only the active ones
 
 Given
 
-- 활성 리소스 그룹 하나와 비활성 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 active-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 inactive-1: fifo 스케줄러를 쓴다, 비활성
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one active resource group, one inactive group and one superadmin
+  - Domain home-1
+  - Resource group active-1: uses the fifo scheduler
+  - Resource group inactive-1: uses the fifo scheduler, inactive
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.search — user-1이 활성 필터로 조회
+- ResourceGroupAdapter.search: user-1 searches with the active filter
 
 Then
 
-- 응답에 나와야 하는 리소스 그룹만 반환된다
+- only the resource groups that must appear in the response come back
   - items = ['active-1']
   - total_count = 1
   - has_next_page = False
@@ -1276,29 +1278,29 @@ Then
 
 <a id="searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page"></a>
 
-#### [asking-for-the-first-resource-group-only-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [asking-for-the-first-resource-group-only-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다
+when two resource groups exist and only the first item is asked for, one item comes back and the response says there is a next page
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.search — user-1이 앞에서 한 건만 조회
+- ResourceGroupAdapter.search: user-1 asks for one item from the front
 
 Then
 
-- 한 건짜리 첫 페이지가 반환된다
+- the first page holding one item comes back
   - len(items) = 1
   - total_count = 2
   - has_next_page = True
@@ -1306,29 +1308,29 @@ Then
 
 <a id="searching-the-monitor-searches-resource-groups-like-the-superadmin"></a>
 
-#### [the-monitor-searches-resource-groups-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [the-monitor-searches-resource-groups-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다
+the monitor searching without a filter gets the same response as the superadmin
 
 Given
 
-- 리소스 그룹 둘과, 모니터 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one monitor
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.search — user-1이 필터 없이 전체 조회
+- ResourceGroupAdapter.search: user-1 searches every resource group without a filter
 
 Then
 
-- 응답에 나와야 하는 리소스 그룹만 반환된다
+- only the resource groups that must appear in the response come back
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -1336,29 +1338,29 @@ Then
 
 <a id="searching-the-superadmin-counts-every-resource-group-laid"></a>
 
-#### [the-superadmin-counts-every-resource-group-laid](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [the-superadmin-counts-every-resource-group-laid](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다
+when two resource groups exist and the superadmin searches without a filter, both come back
 
 Given
 
-- 리소스 그룹 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one superadmin
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.search — user-1이 필터 없이 전체 조회
+- ResourceGroupAdapter.search: user-1 searches every resource group without a filter
 
 Then
 
-- 응답에 나와야 하는 리소스 그룹만 반환된다
+- only the resource groups that must appear in the response come back
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -1366,61 +1368,61 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
-슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다
+when a user who is not the superadmin searches every resource group without a filter, the call is rejected for lacking the role
 
 Given
 
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.search — user-1이 필터 없이 전체 조회
+- ResourceGroupAdapter.search: user-1 searches every resource group without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### get_fair_share_spec
 
 <a id="fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec"></a>
 
-#### [a-user-granted-read-on-the-group-reads-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-read-on-the-group-reads-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다
+a user granted read through the role granted on the resource group reading the fair share config of a resource group with no agent gets the defaults set in the code and an empty weight list
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 READ 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 READ 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the READ role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the READ role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: READ allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1 reads the fair share config of resource-group-1
 
 Then
 
-- 기본 fair share 설정이 반환되고 가중치 목록은 비어 있다
+- the default fair share settings come back and the weight list is empty
   - half_life_days = 7
   - lookback_days = 28
   - decay_unit_days = 1
@@ -1429,28 +1431,28 @@ Then
 
 <a id="fair_share-the-superadmin-reads-the-default-fair-share-spec"></a>
 
-#### [the-superadmin-reads-the-default-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [the-superadmin-reads-the-default-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-에이전트가 없는 그룹의 fair share 설정을 슈퍼관리자가 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다
+when the superadmin reads the fair share config of a resource group with no agent, the defaults set in the code come back and the weight list is empty
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1 reads the fair share config of resource-group-1
 
 Then
 
-- 기본 fair share 설정이 반환되고 가중치 목록은 비어 있다
+- the default fair share settings come back and the weight list is empty
   - half_life_days = 7
   - lookback_days = 28
   - decay_unit_days = 1
@@ -1459,198 +1461,200 @@ Then
 
 <a id="fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다
+a user granted nothing trying to read the fair share config is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1 reads the fair share config of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin reads the fair share config of a name nothing answers to, the call is rejected because no target answers to it
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 존재하지 않는 이름의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1 reads the fair share config of a name that does not exist
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### admin_replace_default_deployment_options
 
 <a id="options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options"></a>
 
-#### [a-user-granted-update-on-the-group-replaces-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [a-user-granted-update-on-the-group-replaces-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다
+a user granted update through the role granted on the resource group replacing the default deployment options gets the options given whole
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the UPDATE role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1 replaces the default deployment options of resource-group-1 with the selection policy STRICT and the settings of handler check-replica-deployments
 
 Then
 
-- 갈아끼운 배포 옵션만 반환된다
+- only the replaced deployment options come back
   - resource_group_name = 'resource-group-1'
   - default_deployment_options.handler_options.default.timeout_sec = 600
   - default_deployment_options.handler_options.default.max_retry_count = 3
   - default_deployment_options.handler_options.by_handler = [('check-replica-deployments', 60, None)]
+  - default_deployment_options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-the-superadmin-replaces-the-default-deployment-options-whole"></a>
 
-#### [the-superadmin-replaces-the-default-deployment-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [the-superadmin-replaces-the-default-deployment-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다
+when the superadmin replaces the default deployment options with the settings of one registered handler, the options given come back whole
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1 replaces the default deployment options of resource-group-1 with the selection policy STRICT and the settings of handler check-replica-deployments
 
 Then
 
-- 갈아끼운 배포 옵션만 반환된다
+- only the replaced deployment options come back
   - resource_group_name = 'resource-group-1'
   - default_deployment_options.handler_options.default.timeout_sec = 600
   - default_deployment_options.handler_options.default.max_retry_count = 3
   - default_deployment_options.handler_options.by_handler = [('check-replica-deployments', 60, None)]
+  - default_deployment_options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-a-user-granted-nothing-may-not-replace-the-default-deployment-options"></a>
 
-#### [a-user-granted-nothing-may-not-replace-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [a-user-granted-nothing-may-not-replace-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다
+a user granted nothing trying to replace the default deployment options is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1 replaces the default deployment options of resource-group-1 with the selection policy STRICT and the settings of handler check-replica-deployments
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="options-naming-an-unregistered-deployment-handler-is-refused"></a>
 
-#### [naming-an-unregistered-deployment-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [naming-an-unregistered-deployment-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다
+replacing the options with the name of an unregistered deployment handler is rejected as invalid input
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 no-such-handler의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1 replaces the default deployment options of resource-group-1 with the selection policy STRICT and the settings of handler no-such-handler
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 ### admin_replace_default_session_options
 
 <a id="options-the-superadmin-replaces-the-default-session-options-whole"></a>
 
-#### [the-superadmin-replaces-the-default-session-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [the-superadmin-replaces-the-default-session-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다
+when the superadmin replaces the default session options with a priority and the settings of one registered handler, the options given come back whole and the entries left out take the defaults in the code
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_session_options — user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 terminate-sessions의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_session_options: user-1 replaces the default session options of resource-group-1 with a priority and the settings of handler terminate-sessions
 
 Then
 
-- 갈아끼운 세션 옵션만 반환된다
+- only the replaced session options come back
   - resource_group_name = 'resource-group-1'
   - default_session_options.priority = 20
   - default_session_options.is_preemptible = True
@@ -1664,88 +1668,88 @@ Then
 
 <a id="options-a-user-granted-nothing-may-not-replace-the-default-session-options"></a>
 
-#### [a-user-granted-nothing-may-not-replace-the-default-session-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [a-user-granted-nothing-may-not-replace-the-default-session-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다
+a user granted nothing trying to replace the default session options is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_session_options — user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 terminate-sessions의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_session_options: user-1 replaces the default session options of resource-group-1 with a priority and the settings of handler terminate-sessions
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="options-naming-an-unregistered-session-handler-is-refused"></a>
 
-#### [naming-an-unregistered-session-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [naming-an-unregistered-session-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
-등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다
+replacing the options with the name of an unregistered session handler is rejected as invalid input
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_session_options — user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 no-such-handler의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_session_options: user-1 replaces the default session options of resource-group-1 with a priority and the settings of handler no-such-handler
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 ### create
 
 <a id="creating-a-resource-group-made-as-the-default-answers-default"></a>
 
-#### [a-resource-group-made-as-the-default-answers-default](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [a-resource-group-made-as-the-default-answers-default](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다
+when no default group exists and the superadmin creates one designated as the default, the group comes back as the default
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.create — user-1이 primary을 기본 그룹으로 생성
+- ResourceGroupAdapter.create: user-1 creates primary as the default group
 
 Then
 
-- 만든 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group just created comes back
+  - id: skipped: the database generates it
   - name = 'primary'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = True
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -1755,39 +1759,39 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="creating-the-superadmin-makes-a-resource-group"></a>
 
-#### [the-superadmin-makes-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [the-superadmin-makes-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다
+when the superadmin creates a resource group with only a name, the whole group comes back active, public and not the default, filled from the defaults in the code
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.create — user-1이 compute을 생성
+- ResourceGroupAdapter.create: user-1 creates compute
 
 Then
 
-- 만든 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group just created comes back
+  - id: skipped: the database generates it
   - name = 'compute'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -1797,380 +1801,380 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="creating-a-name-another-resource-group-already-holds-is-refused"></a>
 
-#### [a-name-another-resource-group-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [a-name-another-resource-group-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다
+creating with a name another resource group already holds is rejected as a duplicate name
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.create — user-1이 resource-group-1을 생성
+- ResourceGroupAdapter.create: user-1 creates resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: ResourceGroupConflict
+- the call is rejected
+  - rejected: ResourceGroupConflict
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다
+when a user who is not the superadmin tries to create a resource group, the call is rejected for lacking the role
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.create — user-1이 by-a-user을 생성
+- ResourceGroupAdapter.create: user-1 creates by-a-user
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="creating-the-monitor-may-not-make-a-resource-group"></a>
 
-#### [the-monitor-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [the-monitor-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다
+when the monitor tries to create a resource group, the call is rejected for lacking the role. the monitor passes reads only
 
 Given
 
-- 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.create — user-1이 by-the-monitor을 생성
+- ResourceGroupAdapter.create: user-1 creates by-the-monitor
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### get_allowed_domains_for_resource_group
 
 <a id="allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it"></a>
 
-#### [a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다
+a user granted read through the role granted on the resource group reading the allowed domains of the group gets an empty list because no domain is linked
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 READ 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 READ 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the READ role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the READ role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: READ allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.get_allowed_domains_for_resource_group — user-1이 resource-group-1의 허용 도메인 조회
+- ResourceGroupAdapter.get_allowed_domains_for_resource_group: user-1 reads the allowed domains of resource-group-1
 
 Then
 
-- 허용 목록이 비어 있다
+- the allow list is empty
   - items = []
 
 <a id="allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group"></a>
 
-#### [the-superadmin-reads-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다
+when the superadmin reads the allowed domains of a resource group linked to a domain, that domain name comes back
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_domains_for_resource_group — user-1이 linked-1의 허용 도메인 조회
+- ResourceGroupAdapter.get_allowed_domains_for_resource_group: user-1 reads the allowed domains of linked-1
 
 Then
 
-- 허용 도메인에 건 도메인 이름만 담긴다
+- the allowed domains hold only the name of the linked domain
   - items = ['home-1']
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다
+a user granted nothing trying to read the allowed domains of a resource group is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_domains_for_resource_group — user-1이 resource-group-1의 허용 도메인 조회
+- ResourceGroupAdapter.get_allowed_domains_for_resource_group: user-1 reads the allowed domains of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### get_allowed_projects_for_resource_group
 
 <a id="allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group"></a>
 
-#### [the-superadmin-reads-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다
+when the superadmin reads the allowed projects of a resource group linked to a project, that project id comes back
 
 Given
 
-- 프로젝트 하나와 프로젝트에 건 리소스 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 프로젝트 team-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group linked to the project and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project team-1 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트 조회
+- ResourceGroupAdapter.get_allowed_projects_for_resource_group: user-1 reads the allowed projects of resource-group-1
 
 Then
 
-- 허용 프로젝트에 건 프로젝트 id만 담긴다
-  - items: 건 프로젝트와 같다
+- the allowed projects hold only the id of the linked project
+  - items: same as the linked project
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다
+a user granted nothing trying to read the allowed projects of a resource group is rejected for not enough permission
 
 Given
 
-- 프로젝트 하나와 프로젝트에 건 리소스 그룹 하나, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 프로젝트 team-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group linked to the project and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project team-1 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트 조회
+- ResourceGroupAdapter.get_allowed_projects_for_resource_group: user-1 reads the allowed projects of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### get_resource_info
 
 <a id="reading-a-user-granted-read-on-the-group-reads-its-resource-info"></a>
 
-#### [a-user-granted-read-on-the-group-reads-its-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-read-on-the-group-reads-its-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다
+a user granted read through the role granted on the resource group reading the resource info gets the same response as the superadmin
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 READ 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 READ 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the READ role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the READ role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: READ allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 resource-group-1의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1 reads the resource info of resource-group-1
 
 Then
 
-- 용량·사용량·여유가 모두 비어 있다
+- capacity, used and free are all empty
   - capacity.entries = []
   - used.entries = []
   - free.entries = []
 
 <a id="reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents"></a>
 
-#### [the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다
+when the superadmin reads the resource info of a group without agents, capacity, used and free are all empty
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 resource-group-1의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1 reads the resource info of resource-group-1
 
 Then
 
-- 용량·사용량·여유가 모두 비어 있다
+- capacity, used and free are all empty
   - capacity.entries = []
   - used.entries = []
   - free.entries = []
 
 <a id="reading-a-user-granted-nothing-may-not-read-the-resource-info"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다
+a user granted nothing reading the resource info is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 resource-group-1의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1 reads the resource info of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-resource-info-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-resource-info-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
-슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin reads the resource info of a name nothing answers to, the call is rejected because no target answers to it
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 존재하지 않는 이름의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1 reads the resource info of a name that does not exist
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### purge
 
 <a id="retiring-a-user-granted-hard-delete-on-the-group-purges-it"></a>
 
-#### [a-user-granted-hard-delete-on-the-group-purges-it](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [a-user-granted-hard-delete-on-the-group-purges-it](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
-그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다
+a user granted hard delete through the role granted on the resource group purging it gets the whole deleted group
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 HARD_DELETE 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 HARD_DELETE 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the HARD_DELETE role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the HARD_DELETE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: HARD_DELETE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 resource-group-1 완전 삭제
+- ResourceGroupAdapter.purge: user-1 purges resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2180,40 +2184,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="retiring-the-superadmin-purges-a-resource-group"></a>
 
-#### [the-superadmin-purges-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [the-superadmin-purges-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
-리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다
+one resource group exists and the superadmin purges it, so the whole deleted group comes back
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 resource-group-1 완전 삭제
+- ResourceGroupAdapter.purge: user-1 purges resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2223,98 +2227,98 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
-아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다
+a user granted nothing trying to purge is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 resource-group-1 완전 삭제
+- ResourceGroupAdapter.purge: user-1 purges resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [the-superadmin-purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
-슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin purges a name nothing answers to, the call is rejected because no target answers to it
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 존재하지 않는 이름 완전 삭제
+- ResourceGroupAdapter.purge: user-1 purges a name that does not exist
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### update
 
 <a id="editing-a-user-granted-update-on-the-group-changes-its-description"></a>
 
-#### [a-user-granted-update-on-the-group-changes-its-description](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [a-user-granted-update-on-the-group-changes-its-description](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다
+a user granted update through the role granted on the resource group changing the description gets the group with the new description
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the UPDATE role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1, changing the description to a new value
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = 'moved to the second rack'
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2324,40 +2328,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-an-edit-naming-no-field-changes-nothing"></a>
 
-#### [an-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [an-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다
+an edit naming no field answers the group with nothing changed
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 아무것도 지정하지 않고 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1 naming no field
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2367,40 +2371,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-deactivating-a-resource-group-answers-it-inactive"></a>
 
-#### [deactivating-a-resource-group-answers-it-inactive](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [deactivating-a-resource-group-answers-it-inactive](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다
+deactivating an active group answers the group as inactive
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 활성을 False로 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1, setting active to False
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = False
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2410,40 +2414,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-making-a-resource-group-the-default-answers-it-default"></a>
 
-#### [making-a-resource-group-the-default-answers-it-default](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [making-a-resource-group-the-default-answers-it-default](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다
+when no default group exists, making a group the default answers it as the default
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 기본을 True로 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1, setting default to True
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = True
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2453,40 +2457,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-the-superadmin-changing-the-description-leaves-the-rest"></a>
 
-#### [the-superadmin-changing-the-description-leaves-the-rest](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-changing-the-description-leaves-the-rest](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다
+when the superadmin changes only the description, the whole group comes back with the new description and the rest unchanged
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1, changing the description to a new value
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = 'moved to the second rack'
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2496,481 +2500,481 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다
+a user granted nothing trying to change the description is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1, changing the description to a new value
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-making-a-second-resource-group-the-default-is-refused"></a>
 
-#### [making-a-second-resource-group-the-default-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [making-a-second-resource-group-the-default-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다
+when another default group exists, making a different group the default is rejected because a default group already exists
 
 Given
 
-- 기본 리소스 그룹 하나와 기본이 아닌 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 default-group-1: fifo 스케줄러를 쓴다, 기본 그룹
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one default resource group, one non-default group and one superadmin
+  - Domain home-1
+  - Resource group default-group-1: uses the fifo scheduler, default group
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 기본을 True로 수정
+- ResourceGroupAdapter.update: user-1 updates resource-group-1, setting default to True
 
 Then
 
-- 거부된다
-  - 거부: DefaultResourceGroupAlreadyExists
+- the call is rejected
+  - rejected: DefaultResourceGroupAlreadyExists
 
 <a id="editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin edits a name nothing answers to, the call is rejected because no target answers to it
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update — user-1이 존재하지 않는 이름을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1 updates a name that does not exist, changing the description to a new value
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### update_allowed_domains_for_resource_group
 
 <a id="allowing-the-superadmin-allows-a-domain-for-a-resource-group"></a>
 
-#### [the-superadmin-allows-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다
+when the superadmin adds a domain to the allowed domains of a resource group, the list holding that domain name comes back
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 home-1 추가
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1 adds home-1 in the allowed domains of other-1
 
 Then
 
-- 허용 도메인에 건 도메인 이름만 담긴다
+- the allowed domains hold only the name of the linked domain
   - items = ['home-1']
 
 <a id="allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다
+a user granted nothing trying to add a domain to the allowed domains of a resource group is rejected for not enough permission. the step that writes the relation checks the permission of both scopes
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one regular user
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 home-1 추가
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1 adds home-1 in the allowed domains of other-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found"></a>
 
-#### [allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다
+adding a domain name nothing answers to to the allowed domains of a resource group is rejected because no target answers to it
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 없는 도메인 이름 추가
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1 adds an unknown domain name in the allowed domains of other-1
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 <a id="allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found"></a>
 
-#### [disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다
+removing a domain name nothing answers to from the allowed domains of a resource group is rejected because no target answers to it instead of being skipped. removing an unknown resource group name on the domain side is skipped
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 없는 도메인 이름 제거
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1 removes an unknown domain name in the allowed domains of other-1
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### update_allowed_projects_for_resource_group
 
 <a id="allowing-the-superadmin-allows-a-project-for-a-resource-group"></a>
 
-#### [the-superadmin-allows-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다
+when the superadmin adds a project to the allowed projects of a resource group, the list holding that project id comes back
 
 Given
 
-- 프로젝트 하나와 리소스 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트에 team-1 추가
+- ResourceGroupAdapter.update_allowed_projects_for_resource_group: user-1 adds team-1 to the allowed projects of resource-group-1
 
 Then
 
-- 허용 프로젝트에 건 프로젝트 id만 담긴다
-  - items: 건 프로젝트와 같다
+- the allowed projects hold only the id of the linked project
+  - items: same as the linked project
 
 <a id="allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다
+a user granted nothing trying to add a project to the allowed projects of a resource group is rejected for not enough permission
 
 Given
 
-- 프로젝트 하나와 리소스 그룹 하나, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트에 team-1 추가
+- ResourceGroupAdapter.update_allowed_projects_for_resource_group: user-1 adds team-1 to the allowed projects of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### update_allowed_resource_groups_for_domain
 
 <a id="allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped"></a>
 
-#### [disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다
+removing a resource group name nothing answers to from the allow list of a domain skips that name and an empty list comes back
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 없는 그룹 이름 제거
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1 removes an unknown resource group name in the allow list of domain home-1
 
 Then
 
-- 허용 목록이 비어 있다
+- the allow list is empty
   - items = []
 
 <a id="allowing-the-superadmin-allows-a-resource-group-for-a-domain"></a>
 
-#### [the-superadmin-allows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다
+when the superadmin adds a resource group to the allow list of a domain, the list holding that group name comes back
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 other-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1 adds other-1 in the allow list of domain home-1
 
 Then
 
-- 허용 목록에 방금 건 리소스 그룹 이름만 담긴다
+- the allow list holds only the name of the resource group just linked
   - items = ['other-1']
 
 <a id="allowing-the-superadmin-disallows-a-resource-group-for-a-domain"></a>
 
-#### [the-superadmin-disallows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-disallows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다
+when the superadmin removes the resource group linked to a domain from the allow list, an empty list comes back
 
 Given
 
-- 도메인 하나, 도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인 home-1 의 세션이 쓸 수 있는 리소스 그룹 linked-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, one resource group linked to the domain and one not linked, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Domain home-1 whose sessions can use Resource group linked-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 linked-1 제거
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1 removes linked-1 in the allow list of domain home-1
 
 Then
 
-- 허용 목록이 비어 있다
+- the allow list is empty
   - items = []
 
 <a id="allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다
+when a user who is not the superadmin tries to add a resource group to the allow list of a domain, the call is rejected for lacking the role. the step that turns the resource group name into an id goes through the superadmin check
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one regular user
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 other-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1 adds other-1 in the allow list of domain home-1
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found"></a>
 
-#### [allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다
+adding a resource group name nothing answers to to the allow list of a domain is rejected because no target answers to it
 
 Given
 
-- 도메인 하나, 어느 것도 도메인에 걸지 않은 리소스 그룹 둘, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 linked-1: fifo 스케줄러를 쓴다
-  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, two resource groups neither of which is linked to the domain, and one superadmin
+  - Domain home-1
+  - Resource group linked-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 없는 그룹 이름 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1 adds an unknown resource group name in the allow list of domain home-1
 
 Then
 
-- 거부된다
-  - 거부: ResourceGroupNotFound
+- the call is rejected
+  - rejected: ResourceGroupNotFound
 
 ### update_allowed_resource_groups_for_project
 
 <a id="allowing-the-superadmin-allows-a-resource-group-for-a-project"></a>
 
-#### [the-superadmin-allows-a-resource-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-resource-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다
+when the superadmin adds a resource group to the allow list of a project, the list holding that group name comes back
 
 Given
 
-- 프로젝트 하나와 리소스 그룹 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록에 resource-group-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_project: user-1 adds resource-group-1 to the allow list of project team-1
 
 Then
 
-- 허용 목록에 건 리소스 그룹 이름만 담긴다
+- the allow list holds only the name of the linked resource group
   - items = ['resource-group-1']
 
 <a id="allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다
+when a user who is not the superadmin tries to add a resource group to the allow list of a project, the call is rejected for lacking the role
 
 Given
 
-- 프로젝트 하나와 리소스 그룹 하나, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one project, one resource group and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록에 resource-group-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_project: user-1 adds resource-group-1 to the allow list of project team-1
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### update_config
 
 <a id="editing-the-superadmin-changes-the-preemption-config"></a>
 
-#### [the-superadmin-changes-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-changes-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다
+when the superadmin changes the preemption config, the whole group comes back with the new preemption values
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_config — user-1이 resource-group-1의 선점 설정을 수정
+- ResourceGroupAdapter.update_config: user-1 updates the preemption config of resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -2980,40 +2984,40 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
   - scheduler.preemption.preemption_min_runtime = 60.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-the-superadmin-changes-the-scheduler-visibility-and-network-config"></a>
 
-#### [the-superadmin-changes-the-scheduler-visibility-and-network-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-changes-the-scheduler-visibility-and-network-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다
+when the superadmin changes the config to a last-in-first-out scheduler, private visibility, host network and a given proxy address, the whole group comes back with those values
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_config — user-1이 resource-group-1의 스케줄러·공개·네트워크 설정을 수정
+- ResourceGroupAdapter.update_config: user-1 updates the scheduler, visibility and network config of resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = False
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = 'https://proxy.example.test'
   - network.use_host_network = True
   - scheduler.type = <SchedulerTypeDTO.LIFO: 'lifo'>
@@ -3023,72 +3027,75 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="editing-a-user-granted-nothing-may-not-edit-the-config"></a>
 
-#### [a-user-granted-nothing-may-not-edit-the-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-the-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다
+a user granted nothing trying to change the config is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_config — user-1이 resource-group-1의 스케줄러·공개·네트워크 설정을 수정
+- ResourceGroupAdapter.update_config: user-1 updates the scheduler, visibility and network config of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### update_fair_share_spec
 
-<a id="fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec"></a>
+<a id="fair_share-a-user-granted-update-assigns-a-resource-weight"></a>
 
-#### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-update-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환된다
+when a user granted update in the group scope assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config
 
 Given
 
-- 리소스 그룹 하나와, 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and one regular user granted the UPDATE role in the group scope. the group's agent reports one resource slot type with its capacity
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Resource slot type slot-1: count type
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-1: slot-1 slot capacity 10 reported, 0 in use
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1 assigns a weight to slot-1 on resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -3098,40 +3105,87 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
+<a id="fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec"></a>
+
+#### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+a user granted update through the role granted on the resource group changing the half-life gets the whole group
+
+Given
+
+- one resource group and one regular user granted the UPDATE role in the group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1 changes the half-life in the fair share config of resource-group-1
+
+Then
+
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="fair_share-the-superadmin-changes-the-fair-share-half-life"></a>
 
-#### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다
+when the superadmin changes the half-life, the whole group comes back. the returned node does not carry this config
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1 changes the half-life in the fair share config of resource-group-1
 
 Then
 
-- 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
   - status.is_default = False
   - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
@@ -3141,58 +3195,91 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
 
 <a id="fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec"></a>
 
-#### [a-user-granted-nothing-may-not-change-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-nothing-may-not-change-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다
+a user granted nothing trying to change the half-life is rejected for not enough permission
 
 Given
 
-- 리소스 그룹 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1 changes the half-life in the fair share config of resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected"></a>
+
+#### [a-weight-on-a-resource-no-agent-reports-is-rejected](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+assigning a weight to a resource type no agent reports is rejected as an invalid input
+
+Given
+
+- one resource group and one regular user granted the UPDATE role in the group scope. the group's agent reports one resource slot type with its capacity
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Resource slot type slot-1: count type
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-1: slot-1 slot capacity 10 reported, 0 in use
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1 assigns a weight to no-such-slot on resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: InvalidResourceWeightError
 
 <a id="fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
-슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin changes the half-life of a name nothing answers to, the call is rejected because no target answers to it
 
 Given
 
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 존재하지 않는 이름의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1 changes the half-life in the fair share config of a name that does not exist
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 

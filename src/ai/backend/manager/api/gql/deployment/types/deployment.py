@@ -249,6 +249,15 @@ class DeploymentStrategyGQL:
 )
 class ReplicaState:
     desired_replica_count: int
+    replica_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The replica count the user set. Autoscaling changes only desiredReplicaCount,"
+                " so the two differ when an autoscaling rule set the count."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -897,7 +906,10 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     desired_replicas: IntFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.9.0",
-            description="Filter by the requested replica count.",
+            description=(
+                "Filter by the desired replica count."
+                " Falls back to the user-set replica count until autoscaling sets one."
+            ),
         ),
         default=None,
     )
@@ -979,6 +991,16 @@ class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInp
     resource_group_name: str
     name: str | None = None
     tags: list[str] | None = None
+    designated_agent_ids: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUIDs of the agents the route sessions are placed on. Each must belong to"
+                " the resource group."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -1031,6 +1053,16 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET
+    designated_agent_ids: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Replaces the designated agent UUIDs; an empty list clears them. Each must"
+                " belong to the deployment's resource group. Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_input(
@@ -1107,10 +1139,11 @@ class AdminRefreshDeploymentRevisionsPayload:
 # Replace deployment options types
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
-            " semantics — the supplied payload is the complete new value."
+            " semantics — the supplied payload is the complete new value,"
+            " except an omitted agent selection policy, which keeps the stored one."
         ),
     ),
     name="ReplaceDeploymentOptionsInput",
@@ -1122,12 +1155,10 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Payload returned after replacing a deployment's options. Only"
-            " the refreshed options surface is returned; the server path uses"
-            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
-            " deployment node."
+            " the refreshed options surface is returned."
         ),
     ),
     model=ReplaceDeploymentOptionsPayloadDTO,

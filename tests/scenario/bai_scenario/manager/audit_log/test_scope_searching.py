@@ -29,7 +29,7 @@ from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ARecordWithoutScopes,
@@ -60,11 +60,14 @@ class SearchingTheScopes(When[ScopesToSearch, AuditLogAdapter, ScopesSearched]):
     @override
     def describe(self, laid: ScopesToSearch) -> str:
         how = {
-            "all": "",
-            "project": " 프로젝트 종류만 지정해",
-            "user": " 범위 하나의 식별자를 지정해",
+            "all": ("", ""),
+            "project": (" 프로젝트 종류만 지정해", ", naming only the project type"),
+            "user": (" 범위 하나의 식별자를 지정해", ", naming the identifier of one scope"),
         }[self.narrow]
-        return f"{laid.caller.username}이 기록 하나의 범위를{how} 검색"
+        return Says(
+            f"{laid.caller.username}이 기록 하나의 범위를{how[0]} 검색합니다",
+            english=f"{laid.caller.username} searches the scopes of one record{how[1]}",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: ScopesToSearch) -> ScopesSearched:
@@ -103,7 +106,12 @@ class TheSuperadminSearchesTheScopes(
 
     @override
     def describe(self) -> str:
-        return "범위 둘을 남긴 기록을 슈퍼관리자가 검색하면, 범위 둘이 반환된다"
+        return Says(
+            "범위 둘을 남긴 기록을 superadmin 이 검색하면, 범위 둘이 반환됩니다",
+            english=(
+                "when the superadmin searches a record that left two scopes, both scopes come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
@@ -128,9 +136,13 @@ class AReaderOfOneScopeReadsEveryScope(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "기록이 남긴 범위 하나에만 읽기 권한을 받은 사용자가 검색하면, 그 기록이 남긴 범위가 "
-            "모두 반환된다"
+            "모두 반환됩니다",
+            english=(
+                "when a user granted read on only one scope a record left searches, every "
+                "scope that record left comes back"
+            ),
         )
 
     @override
@@ -156,8 +168,12 @@ class AReaderOfTheTargetReadsTheScopes(
 
     @override
     def describe(self) -> str:
-        return (
-            "기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다"
+        return Says(
+            "기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환됩니다",
+            english=(
+                "when a user granted read only on the entity a record is about searches, the "
+                "scopes of that record come back"
+            ),
         )
 
     @override
@@ -183,8 +199,13 @@ class AReaderOfTheTriggerReadsTheScopes(
 
     @override
     def describe(self) -> str:
-        return (
-            "기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다"
+        return Says(
+            "기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 "
+            "반환됩니다",
+            english=(
+                "when a user granted read only on the user who triggered a record searches, "
+                "the scopes of that record come back"
+            ),
         )
 
     @override
@@ -210,7 +231,14 @@ class ARecordWithoutScopesAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 반환된다"
+        return Says(
+            "범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 "
+            "반환됩니다",
+            english=(
+                "when a user granted read on the target of a record that left no scope "
+                "searches, an empty page comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
@@ -235,7 +263,13 @@ class AScopeTypeFilterNarrowsTheScopes(
 
     @override
     def describe(self) -> str:
-        return "범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환된다"
+        return Says(
+            "범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환됩니다",
+            english=(
+                "when a record that left two scopes is searched naming only the project type, "
+                "only the project scope comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
@@ -260,7 +294,13 @@ class AScopeIdFilterNarrowsTheScopes(
 
     @override
     def describe(self) -> str:
-        return "범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환된다"
+        return Says(
+            "범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환됩니다",
+            english=(
+                "when a record that left two scopes is searched naming the identifier of one "
+                "scope, only that scope comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
@@ -285,7 +325,13 @@ class AUserReachingNoOwnerIsRefused(
 
     @override
     def describe(self) -> str:
-        return "기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부된다"
+        return Says(
+            "기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who can read none of the owners of a record searches, it is "
+                "rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
@@ -310,9 +356,13 @@ class TheMonitorRoleWithoutAGrantIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 "
-            "검색은 권한 그래프로 보호된다"
+        return Says(
+            "아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부됩니다. 이 "
+            "검색은 권한 그래프로 보호됩니다",
+            english=(
+                "when a monitor-role user granted nothing searches, it is rejected for lack "
+                "of permission. This search is protected by the permission graph"
+            ),
         )
 
     @override
@@ -338,7 +388,13 @@ class AnAbsentRecordIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "어느 기록에도 해당하지 않는 id로 슈퍼관리자가 검색하면, 찾을 수 없음으로 거부된다"
+        return Says(
+            "어느 기록에도 해당하지 않는 id 로 superadmin 이 검색하면, 찾을 수 없음으로 거부됩니다",
+            english=(
+                "when the superadmin searches with an id that matches no record, it is "
+                "rejected as not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
@@ -363,7 +419,13 @@ class TurningEnforcementOffReadsWithoutAGrant(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing search "
+                "the scopes of a record"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

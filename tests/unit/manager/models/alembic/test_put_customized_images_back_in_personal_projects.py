@@ -17,6 +17,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
@@ -30,7 +31,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.alembic.versions import (
@@ -38,7 +38,6 @@ from ai.backend.manager.models.alembic.versions import (
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy.row import (

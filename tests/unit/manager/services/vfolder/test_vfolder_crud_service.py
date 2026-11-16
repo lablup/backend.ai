@@ -203,7 +203,6 @@ class TestCreateVFolderAction:
         project_info: ProjectResourceInfo,
     ) -> None:
         repository.get_group_resource_info = AsyncMock(return_value=project_info)
-        repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
         repository.ensure_host_permission_allowed = AsyncMock()
         repository.create_vfolder_with_permission = AsyncMock()
 

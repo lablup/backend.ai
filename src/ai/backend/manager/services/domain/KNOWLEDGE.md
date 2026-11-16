@@ -25,6 +25,8 @@ A domain is the top scope everything else is created under. No parent entity sit
 above it, so creation is global-shaped, and an operation naming an existing domain is
 single-entity.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## The processor composition
 
 `backend.ai mgr ops list --concern organization --entity domain` prints the wired list.

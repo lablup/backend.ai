@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import secrets
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from contextlib import contextmanager as ctxmgr
@@ -95,7 +96,7 @@ from ai.backend.storage.errors import (
     VFolderNotFoundError,
 )
 from ai.backend.storage.types import QuotaConfig, VFolderID
-from ai.backend.storage.utils import check_params, log_manager_api_entry
+from ai.backend.storage.utils import check_params, log_manager_api_entry, resolve_upload_target
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .v1.registries.huggingface import create_app as create_huggingface_registries_app
@@ -130,7 +131,7 @@ async def token_auth_middleware(
                 content_type="application/problem+json",
             )
         ctx: RootContext = request.app["ctx"]
-        if token != ctx.local_config.api.manager.secret:
+        if not secrets.compare_digest(token.encode(), ctx.local_config.api.manager.secret.encode()):
             raise web.HTTPForbidden(
                 text=dump_json_str(
                     {
@@ -155,7 +156,6 @@ def _build_storage_health_response(connectivity: ConnectivityCheckResponse) -> w
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="storage-proxy",
         connectivity=connectivity,
     )
@@ -167,7 +167,6 @@ def _build_storage_probe_response(connectivity: ConnectivityCheckResponse) -> we
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="storage-proxy",
         connectivity=connectivity,
     )
@@ -1219,6 +1218,12 @@ async def create_upload_session(request: web.Request) -> web.Response:
             await log_manager_api_entry(log, "create_upload_session", params)
             ctx: RootContext = request.app["ctx"]
             volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(params["volume"]))
+            await asyncio.to_thread(
+                resolve_upload_target,
+                params["vfid"],
+                volume.mangle_vfpath(params["vfid"]),
+                params["relpath"],
+            )
             session_id = await volume.prepare_upload(params["vfid"])
             await ctx.valkey_tus_client.initialize_offset(TusSessionId(session_id))
             token_data = {

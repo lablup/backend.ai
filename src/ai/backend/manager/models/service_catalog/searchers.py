@@ -6,18 +6,10 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.service_catalog.types import (
-    ServiceCatalogData,
-    ServiceCatalogEndpointData,
-)
-from ai.backend.manager.models.service_catalog.row import (
-    ServiceCatalogEndpointRow,
-    ServiceCatalogRow,
-)
+from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.service_catalog.searchable_fields import (
-    ServiceCatalogEndpointSearchableFields,
     ServiceCatalogSearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -25,31 +17,12 @@ from ai.backend.manager.models.specs.searcher import Searcher
 
 @dataclass
 class ServiceCatalogSearcher(Searcher[ServiceCatalogRow, ServiceCatalogData]):
-    """Reads registered services with their endpoints eagerly loaded.
-
-    The endpoints are a to-many of the same entity rather than a second one, so the
-    select stays single-entity and the conversion assembles the nested value.
-    """
+    """Reads registered services."""
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
-        return sa.select(ServiceCatalogRow).options(selectinload(ServiceCatalogRow.endpoints))
+        return sa.select(ServiceCatalogRow)
 
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
         return ServiceCatalogSearchableFields.own.to_data(row)
-
-
-@dataclass
-class ServiceCatalogEndpointSearcher(
-    Searcher[ServiceCatalogEndpointRow, ServiceCatalogEndpointData]
-):
-    """Reads endpoint rows; which services' endpoints is the caller's condition to say."""
-
-    @override
-    def build_select(self) -> sa.sql.Select[Any]:
-        return sa.select(ServiceCatalogEndpointRow)
-
-    @override
-    def to_data(self, row: ServiceCatalogEndpointRow) -> ServiceCatalogEndpointData:
-        return ServiceCatalogEndpointSearchableFields.own.to_data(row)

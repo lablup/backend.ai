@@ -27,20 +27,13 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         """Create and provide Traefik etcd connection if enabled."""
         if setup_input.proxy_coordinator.enable_traefik:
             traefik_config = setup_input.proxy_coordinator.traefik
-            if not traefik_config:
+            if traefik_config is None or traefik_config.etcd is None:
                 raise MissingTraefikConfigError(
                     "Traefik is enabled but traefik configuration is missing."
                 )
 
-            creds: dict[str, str] | None = None
-            if traefik_config.etcd.password:
-                creds = {"password": traefik_config.etcd.password}
-
-            async with TraefikEtcd(
-                [addr.to_legacy() for addr in traefik_config.etcd.addrs],
-                traefik_config.etcd.namespace,
-                {ConfigScopes.GLOBAL: ""},
-                credentials=creds,
+            async with TraefikEtcd.create_from_config(
+                traefik_config.etcd.to_dataclass(), {ConfigScopes.GLOBAL: ""}
             ) as traefik_etcd:
                 yield traefik_etcd
         else:

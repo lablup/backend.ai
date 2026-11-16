@@ -138,7 +138,7 @@ class V2KeypairHandler:
         self,
         body: BodyParam[AdminRegisterSSHKeypairInput],
     ) -> APIResponse:
-        """Register (overwrite) a user's SSH keypair (admin only)."""
+        """Register (overwrite) a user's SSH public key (admin only)."""
         result = await self._adapter.admin_register_ssh_keypair(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

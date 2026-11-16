@@ -8,6 +8,7 @@ from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.dependencies.bootstrap.etcd import EtcdDependency
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 class TestEtcdDependency:
@@ -26,8 +27,8 @@ class TestEtcdDependency:
         etcd_config = EtcdConfig.model_validate({
             "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
             "namespace": test_ns,
-            "user": None,
-            "password": None,
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         })
 
         # Create a minimal BootstrapConfig with just etcd settings

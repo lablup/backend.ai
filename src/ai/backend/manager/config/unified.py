@@ -198,6 +198,7 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.etcd import EtcdConfig
@@ -206,6 +207,7 @@ from ai.backend.common.configs.otel import OTELConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -228,7 +230,6 @@ from ai.backend.common.typed_validators import (
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import (
     KeyProviderType,
     SecretKeyId,
@@ -3721,7 +3722,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),
+        Field(),
         BackendAIConfigMeta(
             description=(
                 "Etcd distributed key-value store configuration. Etcd is used for cluster "
@@ -3792,6 +3793,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "production deployments."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the manager starts. Read only from the "
+                "config file: etcd values are ignored. Wheels provided here run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

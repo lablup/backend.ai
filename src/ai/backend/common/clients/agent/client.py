@@ -13,6 +13,7 @@ from ai.backend.common.dto.agent.response import (
     GatherHwinfoResp,
     HealthResp,
 )
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
@@ -21,7 +22,6 @@ from ai.backend.common.types import (
     BackendAISchema,
     ClusterInfo,
     ImageConfig,
-    KernelCreationConfig,
     KernelId,
     SessionId,
 )

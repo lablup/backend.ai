@@ -26,6 +26,7 @@ __all__ = (
     "ResourceGroupUsageNode",
     "ScopeResourceUsageNode",
     "UserConcurrencyPayload",
+    "UserResourceAllocationPayload",
 )
 
 
@@ -104,6 +105,14 @@ class KeypairResourceAllocationPayload(BaseResponseModel):
     """Payload for keypair resource allocation query."""
 
     keypair: ScopeResourceUsageNode = Field(description="Keypair resource usage.")
+
+
+class UserResourceAllocationPayload(BaseResponseModel):
+    """Payload for user resource allocation query."""
+
+    user: ScopeResourceUsageNode = Field(
+        description="User resource usage summed across all of the user's keypairs."
+    )
 
 
 class ProjectResourceAllocationPayload(BaseResponseModel):

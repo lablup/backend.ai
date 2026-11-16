@@ -23,6 +23,7 @@ python_distribution(
             "atom": "ai.backend.accelerator.rebellions.atom.plugin:ATOMPlugin",
             "atom_plus": "ai.backend.accelerator.rebellions.atom_plus.plugin:ATOMPlusPlugin",
             "atom_max": "ai.backend.accelerator.rebellions.atom_max.plugin:ATOMMaxPlugin",
+            "rebel100": "ai.backend.accelerator.rebellions.rebel100.plugin:Rebel100Plugin",
         }
     },
     generate_setup=True,

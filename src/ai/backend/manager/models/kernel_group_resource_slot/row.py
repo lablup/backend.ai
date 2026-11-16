@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.manager.data.kernel_group.types import KernelGroupResourceSlotData
 from ai.backend.manager.models.base import GUID, Base
 
 __all__ = ("KernelGroupResourceSlotRow",)
@@ -46,3 +47,11 @@ class KernelGroupResourceSlotRow(Base):
     quantity: Mapped[Decimal] = mapped_column(
         "quantity", sa.Numeric(precision=24, scale=6), nullable=False
     )
+
+    def to_data(self) -> KernelGroupResourceSlotData:
+        return KernelGroupResourceSlotData(
+            id=KernelGroupResourceSlotID(self.id),
+            kernel_group_id=self.kernel_group_id,
+            slot_name=ResourceSlotName(self.slot_name),
+            quantity=self.quantity,
+        )

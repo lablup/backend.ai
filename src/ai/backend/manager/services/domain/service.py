@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.dotfile.types import DotfileEntries, verify_dotfile_name
+from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
@@ -19,9 +19,21 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
     DeleteDomainDotfileActionResult,
 )
+from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
+    GlobalSearchDomainContainerRegistryRelationsAction,
+    GlobalSearchDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
+)
+from ai.backend.manager.services.domain.actions.scoped_search_container_registry_relations import (
+    ScopedSearchDomainContainerRegistryRelationsAction,
+    ScopedSearchDomainContainerRegistryRelationsActionResult,
+)
+from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
+    UpdateDomainContainerRegistryRelationsAction,
+    UpdateDomainContainerRegistryRelationsActionResult,
 )
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
@@ -44,6 +56,38 @@ class DomainService:
             data=await self._repository.create_domain(action.to_creator())
         )
 
+    async def update_container_registry_relations(
+        self, action: UpdateDomainContainerRegistryRelationsAction
+    ) -> UpdateDomainContainerRegistryRelationsActionResult:
+        change = await self._repository.update_container_registry_relations(
+            action.domain_id, action.registry_ids
+        )
+        return UpdateDomainContainerRegistryRelationsActionResult(
+            linked=change.linked, unlinked=change.unlinked
+        )
+
+    async def scoped_search_container_registry_relations(
+        self, action: ScopedSearchDomainContainerRegistryRelationsAction
+    ) -> ScopedSearchDomainContainerRegistryRelationsActionResult:
+        result = await self._repository.scoped_search_container_registry_relations(action.searcher)
+        return ScopedSearchDomainContainerRegistryRelationsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def global_search_container_registry_relations(
+        self, action: GlobalSearchDomainContainerRegistryRelationsAction
+    ) -> GlobalSearchDomainContainerRegistryRelationsActionResult:
+        result = await self._repository.global_search_container_registry_relations(action.searcher)
+        return GlobalSearchDomainContainerRegistryRelationsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def purge(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         domain_data = await self._repository.purge_domain(action.domain_id, action.name)
         return PurgeDomainActionResult(domain_data=domain_data)
@@ -51,8 +95,7 @@ class DomainService:
     async def create_dotfile(
         self, action: CreateDomainDotfileAction
     ) -> CreateDomainDotfileActionResult:
-        if not verify_dotfile_name(action.entry.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        DotfilePath(action.entry.path)
         domain_id, current = await self._read_dotfiles(action.name)
         entries = current.added(action.entry)
         await self._write_dotfiles(domain_id, entries)
@@ -61,6 +104,7 @@ class DomainService:
     async def update_dotfile(
         self, action: UpdateDomainDotfileAction
     ) -> UpdateDomainDotfileActionResult:
+        DotfilePath(action.entry.path)
         domain_id, current = await self._read_dotfiles(action.name)
         entries = current.replaced(action.entry)
         await self._write_dotfiles(domain_id, entries)

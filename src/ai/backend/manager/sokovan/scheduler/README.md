@@ -4,13 +4,13 @@
 
 ## Overview
 
-Scheduler is the core module responsible for session scheduling in Backend.AI, allocating pending sessions to appropriate agents and managing the entire lifecycle of sessions.
+The scheduler is the core module for session scheduling in Backend.AI. It places pending sessions on appropriate agents and manages the full lifecycle of sessions.
 
 **Key Responsibilities:**
-- **Session Scheduling**: Allocates waiting sessions to available agents
-- **Resource Constraint Validation**: Verifies that requested resources satisfy system constraints
-- **Lifecycle Management**: Handles session start, termination, and timeout detection
-- **State Transition Management**: Tracks kernel state transitions (SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED)
+- **Session Scheduling**: places waiting sessions on available agents
+- **Resource Constraint Validation**: verifies that the requested resources satisfy the system constraints
+- **Lifecycle Management**: handles session start, termination and timeout detection
+- **State Transition Management**: tracks kernel state transitions (SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED)
 
 ## Architecture
 
@@ -74,26 +74,26 @@ scheduler/
 
 ## Dependencies
 
-Scheduler depends on the following infrastructure components:
+The scheduler depends on these infrastructure components:
 
-**PostgreSQL**: Persists session, kernel, agent, and scaling group states
+**PostgreSQL**: persists session, kernel, agent and resource group states
 
-**Redis (Valkey)**: Caches agent states, event streams
+**Valkey**: caches agent states and event streams
 
-**etcd**: Shares global configuration
+**etcd**: shares global configuration
 
 ## Major Components
 
 ### ScheduleCoordinator
 
-ScheduleCoordinator acts as the top-level orchestrator for session scheduling and serves as the central hub of the Scheduler layer. It periodically executes scheduling tasks and invokes appropriate processing handlers based on the current state of sessions. It receives and processes kernel-related events from agents (image pulling start/complete/fail, kernel creation/running/termination, etc.) and orchestrates image pulling operations across multiple agents.
+ScheduleCoordinator is the top-level orchestrator for session scheduling and the central hub of the scheduler layer. It runs the scheduling tasks periodically and calls the handler for the current session state. It receives and processes the kernel events from agents (image pull start, complete and failure, kernel creation, running and termination, and so on) and coordinates image pulling across multiple agents.
 
 **Key Dependencies:**
-- **Scheduler**: Executes actual scheduling logic
-- **SchedulingController**: Pre-validation and preparation before session creation
-- **KernelStateEngine**: Manages kernel state transitions
-- **SchedulerRepository**: Database access
-- **State-specific Handlers**: Handles various session states (PENDING, SCHEDULED, PREPARING, RUNNING, TERMINATING, etc.)
+- **Scheduler**: runs the actual scheduling logic
+- **SchedulingController**: pre-validation and preparation before session creation
+- **KernelStateEngine**: manages kernel state transitions
+- **SchedulerRepository**: database access
+- **State-specific Handlers**: handle the session states (PENDING, SCHEDULED, PREPARING, RUNNING, TERMINATING and so on)
 
 **Key Methods:**
 
@@ -108,12 +108,12 @@ async def process_schedule(self) -> None:
 ```
 
 **Processing Flow:**
-1. Execute ScheduleSessionsHandler
-2. Call Scheduler's schedule_all_scaling_groups()
-3. Process scheduling results
+1. Run ScheduleSessionsHandler
+2. Call the scheduler's schedule_all_scaling_groups()
+3. Process the scheduling results
 
 #### `handle_kernel_pulling()`
-Processes image pulling-related events.
+Processes image pulling events.
 
 ```python
 async def handle_kernel_pulling(
@@ -128,30 +128,30 @@ async def handle_kernel_pulling(
 ```
 
 **Processing Cases:**
-- `image_pull_started`: Image pulling started
-- `image_pulled`: Image pulling succeeded
-- `image_pull_failed`: Image pulling failed
+- `image_pull_started`: image pulling started
+- `image_pulled`: image pulling succeeded
+- `image_pull_failed`: image pulling failed
 
 #### `handle_kernel_creating()`, `handle_kernel_running()`, `handle_kernel_terminated()`
 Process kernel lifecycle events.
 
 ### Scheduler
 
-Scheduler is the engine that executes actual scheduling algorithms, responsible for querying pending sessions and allocating them to available agents. It provides an extensible scheduling mechanism through a plugin system, designed to flexibly change scheduling policies or algorithms. It performs session start and termination processing, confirms progress during image pulling or kernel creation, and handles timeout detection via Coordinator's failure classification.
+The scheduler is the engine that runs the scheduling algorithms. It queries pending sessions and places them on available agents. It provides an extensible scheduling mechanism through a plugin system so that scheduling policies and algorithms can change. It starts and terminates sessions, checks progress during image pulling and kernel creation, and detects timeouts through the coordinator's failure classification.
 
 **Key Plugins and Dependencies:**
-- **SessionValidator**: Validates whether resources satisfy system constraints (user/group/domain quotas, concurrent execution limits, etc.)
-- **SessionSequencer**: Determines scheduling priority for pending sessions (FIFO, LIFO, DRF, etc., applicable per scaling group)
-- **AgentSelector**: Selects the optimal agent for session execution (configurable per scaling group)
-- **SessionAllocator**: Allocates resources to selected agents and reflects in database
-- **SchedulerRepository**: Database access
+- **SessionValidator**: validates whether the resources satisfy the system constraints (user, project and domain quotas, concurrent execution limits and so on)
+- **SessionSequencer**: determines the scheduling priority of pending sessions (FIFO, LIFO, DRF and so on, applicable per resource group)
+- **AgentSelector**: selects the optimal agent for the session (configurable per resource group)
+- **SessionAllocator**: allocates resources on the selected agents and writes them to the database
+- **SchedulerRepository**: database access
 - **AgentRPCPool**: RPC communication with agents
-- **HookRegistry**: Executes status-based transition hooks
+- **HookRegistry**: runs the status-based transition hooks
 
 **Core Methods:**
 
 #### `schedule_all_scaling_groups()`
-Schedules pending sessions for all scaling groups.
+Schedules pending sessions for all resource groups.
 
 ```python
 async def schedule_all_scaling_groups(self) -> None:
@@ -174,7 +174,7 @@ async def terminate_sessions(
 ```
 
 #### `start_sessions()`
-Starts scheduled sessions.
+Starts the scheduled sessions.
 
 ```python
 async def start_sessions(self) -> None:
@@ -253,17 +253,17 @@ sequenceDiagram
     Sched-->>Coord: Scheduling complete
 ```
 
-**Step-by-Step Explanation:**
+**Step-by-step Explanation:**
 
-The complete scheduling process consists of five major stages. In the first stage, pending sessions and available agents are queried by scaling group. Sessions in PENDING state are retrieved from the scaling group, and agents in ALIVE state belonging to the same scaling group are queried. If there are no pending sessions or available agents, scheduling for that scaling group is skipped.
+The complete scheduling process has five stages. In the first stage, the scheduler queries pending sessions and available agents by resource group. It retrieves the sessions in PENDING state from the resource group and the agents in ALIVE state that belong to the same resource group. If there is no pending session or no available agent, it skips scheduling for that resource group.
 
-In the second stage, data needed for scheduling is constructed. Current resource usage and available resources for each agent are queried, and resource requirements requested by each pending session are analyzed. Scaling group configuration (scheduling policy, resource limits, etc.) is retrieved, and all this information is synthesized to construct an in-memory snapshot representing the current state of the entire system.
+In the second stage, it builds the data needed for scheduling. It queries the current resource usage and the available resources of each agent and analyzes the resource requirements of each pending session. It reads the resource group configuration (scheduling policy, resource limits and so on) and combines this information into an in-memory snapshot of the current state of the entire system.
 
-In the third stage, Validator plugins validate each session. They check resource quotas configured per user, group, and domain, verify concurrent session count limits, and confirm that inter-session dependencies are satisfied. Sessions that fail validation are immediately marked as failed and excluded from subsequent stages.
+In the third stage, the Validator plugins validate each session. They check the resource quotas configured per user, project and domain, the concurrent session count limits, and confirm that the inter-session dependencies are satisfied. A session that fails validation is marked as failed immediately and excluded from the later stages.
 
-In the fourth stage, the Sequencer plugin determines priority for sessions that passed validation. It sorts sessions according to the policy configured in the scaling group (FIFO, LIFO, DRF, etc.) to decide which session to process first.
+In the fourth stage, the Sequencer plugin determines the priority of the sessions that passed validation. It sorts the sessions by the policy configured in the resource group (FIFO, LIFO, DRF and so on) and decides which session to process first.
 
-In the fifth stage, each session is processed according to sorted priority. The Selector plugin selects the optimal agent considering the session's resource requirements and agents' available resources. If an agent is selected, the Allocator plugin actually allocates resources on that agent, changes session state to SCHEDULED, and creates kernel records in PREPARING state. Whenever allocation succeeds, the in-memory system snapshot is updated to reflect the latest resource state for subsequent session scheduling.
+In the fifth stage, the scheduler processes each session in the sorted order. The Selector plugin selects the optimal agent based on the resource requirements of the session and the available resources of the agents. When an agent is selected, the Allocator plugin allocates the resources on that agent, changes the session state to SCHEDULED and creates the kernel rows in PREPARING state. After each successful allocation, it updates the in-memory system snapshot with the latest resource state for the next session.
 
 ### Session Start Flow
 
@@ -352,23 +352,23 @@ sequenceDiagram
     Sched-->>Coord: Start complete
 ```
 
-**Step-by-Step Explanation:**
+**Step-by-step Explanation:**
 
-The session start flow proceeds through three major phases: Precondition Check, Pulling Progress Check, and Session Start.
+The session start flow has three phases: precondition check, pulling progress check and session start.
 
 **Phase 1: Precondition Check (SCHEDULED → PREPARING)**
 
-In the first phase, check_preconditions() queries sessions in SCHEDULED state and their kernels. For each session, it transitions the session state to PREPARING and triggers image check/pull operations on the selected agents. The agent checks if the required container image exists locally, and if not, initiates image pulling. This phase ensures all required images are available before actual kernel creation.
+In the first phase, check_preconditions() queries the sessions in SCHEDULED state and their kernels. For each session, it transitions the session state to PREPARING and triggers the image check and pull on the selected agents. The agent checks whether the required container image exists locally and starts pulling it if it does not. This phase ensures that all required images are available before kernel creation.
 
 **Phase 2: Pulling Progress Check (PREPARING → PREPARED)**
 
-In the second phase, check_pulling_progress() periodically queries sessions in PREPARING or PULLING state. For each session, it checks whether all kernels have their images ready. Once all images for a session are confirmed to be pulled and ready, the session state is transitioned to PREPARED. This phase monitors image pulling progress and moves sessions forward when ready.
+In the second phase, check_pulling_progress() periodically queries the sessions in PREPARING or PULLING state. For each session, it checks whether the images of all kernels are ready. When all images of a session are pulled and ready, it transitions the session state to PREPARED. This phase monitors the image pulling progress and advances a session when it is ready.
 
 **Phase 3: Session Start (PREPARED → CREATING)**
 
-In the third phase, start_sessions() queries sessions in PREPARED state—sessions that have passed precondition checks and have all images ready. For cluster sessions, SSH key pairs are generated for inter-node communication, and cluster-dedicated networks are configured. All information needed for kernel creation is constructed, including image references, resource slots, environment variables, volume mounts, and network settings.
+In the third phase, start_sessions() queries the sessions in PREPARED state, which passed the precondition check and have all images ready. For a multi-kernel session, it generates SSH key pairs for inter-node communication and configures cluster-dedicated networks. It builds all information needed for kernel creation: image references, resource slots, environment variables, volume mounts and network settings.
 
-The agent's create_kernel RPC method is called for each kernel with the prepared configuration. Since images are already pulled in the PREPARING phase, the agent can immediately create and start containers without additional image pulling. Multiple kernels can be created concurrently. If RPC calls succeed, kernels transition to CREATING state, and when all kernels in a session successfully start, the session transitions to RUNNING state.
+It calls the agent's create_kernel RPC for each kernel with the prepared configuration. Because the images were pulled in the PREPARING phase, the agent can create and start the containers immediately without another image pull. It can create multiple kernels concurrently. When the RPC calls succeed, the kernels transition to CREATING, and when all kernels of a session start successfully, the session transitions to RUNNING.
 
 ### Session Termination Flow
 
@@ -427,27 +427,27 @@ sequenceDiagram
     end
 ```
 
-**Step-by-Step Explanation:**
+**Step-by-step Explanation:**
 
-The session termination flow consists of five stages and proceeds asynchronously. In the first stage, sessions requested for termination and all kernels belonging to those sessions are queried from the database, and the current state of each session and kernel is checked.
+The session termination flow has five stages and runs asynchronously. In the first stage, it queries the sessions requested for termination and all kernels of those sessions from the database and checks the current state of each session and kernel.
 
-In the second stage, states are marked to indicate termination is in progress. The session's state is changed to TERMINATING, and the state of each kernel belonging to the session is also changed to TERMINATING. These state changes are immediately reflected in the database so other components can know that the session and kernels are terminating.
+In the second stage, it marks the states to show that termination is in progress. It changes the session state to TERMINATING and the state of each kernel of the session to TERMINATING. It writes these state changes to the database immediately so that other components can see that the session and its kernels are terminating.
 
-In the third stage, the destroy_kernel RPC method of the agent where each kernel is running is called. Forced or normal termination mode can be selected according to the forced flag value. Even if RPC call fails, the error is logged and processing continues with the next kernel, ensuring failure of some kernels doesn't block the entire termination process.
+In the third stage, it calls the destroy_kernel RPC of the agent that runs each kernel. The forced flag selects forced or normal termination. If an RPC fails, it logs the error and continues with the next kernel, so a failure of some kernels does not block the whole termination.
 
-The fourth stage is performed on the agent side. The agent sends a SIGTERM signal to the container to attempt normal termination and waits for the configured timeout. If the container doesn't terminate within the timeout period, a SIGKILL signal is sent to force termination. After the container terminates, mounted volumes are unmounted and allocated network resources are released.
+The fourth stage runs on the agent. The agent sends SIGTERM to the container for a normal termination and waits for the configured timeout. If the container does not terminate within the timeout, the agent sends SIGKILL to force termination. After the container terminates, the agent unmounts the mounted volumes and releases the allocated network resources.
 
-In the fifth stage, termination completion is handled. When kernel cleanup is completed, the agent publishes a kernel_terminated event, and ScheduleCoordinator receives this event to update the kernel's state to TERMINATED. When all kernels belonging to a session are in TERMINATED state, the session's state is also changed to TERMINATED and the agent's occupied_slots is decreased to release allocated resources.
+In the fifth stage, it handles termination completion. When kernel cleanup completes, the agent publishes a kernel_terminated event, and ScheduleCoordinator updates the kernel state to TERMINATED. When all kernels of a session are in TERMINATED state, it changes the session state to TERMINATED and decreases the agent's occupied_slots to release the allocated resources.
 
 ## Provisioner Plugin System
 
-Scheduler provides an extensible plugin architecture through the `provisioner/` package that allows flexible modification or extension of scheduling policies and algorithms. Each plugin type defines a clear interface, and system administrators can implement and use custom plugins as needed.
+The scheduler provides an extensible plugin architecture through the `provisioner/` package, so that administrators can change or extend scheduling policies and algorithms. Each plugin type defines an interface, and an administrator can implement and use a custom plugin.
 
-> **Note:** All provisioning plugins are located in `scheduler/provisioner/`. For detailed documentation on each plugin type, see the [Provisioner README](./provisioner/README.md).
+> **Note:** All provisioning plugins are in `scheduler/provisioner/`. For the documentation of each plugin type, see the [Provisioner README](./provisioner/README.md).
 
 ### Validators
 
-Validator is a plugin that validates whether resources requested by sessions satisfy system constraints.
+A Validator plugin validates whether the resources a session requests satisfy the system constraints.
 
 **Basic Interface:**
 ```python
@@ -468,27 +468,27 @@ class SessionValidator(abc.ABC):
 
 #### KeypairResourceLimitValidator
 
-KeypairResourceLimitValidator validates resource usage limits per user (keypair). This validator queries the resources currently used by the user, and checks whether configured quotas would be exceeded when considering additional resources from the new session request. If quotas are exceeded, it stops scheduling by raising a SessionSchedulingError exception.
+KeypairResourceLimitValidator validates the resource usage limit per keypair. It queries the resources the user currently uses and checks whether the configured quota would be exceeded by the additional resources of the new session request. If the quota is exceeded, it stops scheduling by raising a SessionSchedulingError.
 
 #### GroupResourceLimitValidator
 
-GroupResourceLimitValidator validates resource usage limits per group. It checks whether the sum of resource usage by all users belonging to a group is within group quotas.
+GroupResourceLimitValidator validates the resource usage limit per project. It checks whether the sum of the resource usage of all users in a project is within the project quota.
 
 #### DomainResourceLimitValidator
 
-DomainResourceLimitValidator validates resource usage limits per domain. It verifies that domain-wide resource usage doesn't exceed domain quotas.
+DomainResourceLimitValidator validates the resource usage limit per domain. It verifies that the domain-wide resource usage does not exceed the domain quota.
 
 #### ConcurrencyValidator
 
-ConcurrencyValidator validates concurrent session count limits. It checks the concurrent session count configured per user, group, or domain, compares it with currently running session count to determine whether new session start is possible.
+ConcurrencyValidator validates the concurrent session count limits. It checks the concurrent session count configured per user, project or domain and compares it with the running session count to decide whether a new session can start.
 
 #### DependenciesValidator
 
-DependenciesValidator validates inter-session dependencies. When a session depends on another session (e.g., main container depends on sidecar container), it checks whether the dependency target session exists and verifies that the session is in RUNNING state. If dependencies are not satisfied, session start is deferred.
+DependenciesValidator validates the inter-session dependencies. When one session depends on another (for example, the main container depends on a sidecar container), it checks whether the dependency target session exists and is in RUNNING state. If the dependency is not satisfied, it defers the session start.
 
 ### Sequencers
 
-Sequencer is a plugin that determines the scheduling order for pending sessions that passed validation. Different Sequencers can be configured per scaling group to apply priority policies suited to each group's characteristics.
+A Sequencer plugin determines the scheduling order of the pending sessions that passed validation. A resource group can configure a different Sequencer to apply the priority policy that fits its characteristics.
 
 **Basic Interface:**
 ```python
@@ -508,19 +508,19 @@ class WorkloadSequencer(abc.ABC):
 
 #### FIFOSequencer (First In First Out)
 
-FIFOSequencer sorts in order of session creation time. The earliest created session has the highest priority, performing ascending sort based on `created_at` timestamp.
+FIFOSequencer sorts by session creation time. The earliest created session has the highest priority; it sorts ascending by the `created_at` timestamp.
 
 #### LIFOSequencer (Last In First Out)
 
-LIFOSequencer sorts in reverse order of session creation time. The most recently created session has the highest priority, which can be useful in some special use cases.
+LIFOSequencer sorts in reverse creation order. The most recently created session has the highest priority, which is useful in some special cases.
 
 #### DRFSequencer (Dominant Resource Fairness)
 
-DRFSequencer calculates priority based on resource fairness. It first calculates each user's dominant resource (the resource type used most), and assigns higher priority to sessions of users with lower dominant resource utilization. This enables fair distribution of system resources among multiple users. Among sessions of the same user, FIFO policy is applied.
+DRFSequencer calculates priority from resource fairness. It first calculates each user's dominant resource (the resource type the user uses most) and gives higher priority to the sessions of users with lower dominant resource utilization. This distributes system resources fairly among users. It applies FIFO to the sessions of the same user.
 
 ### Selectors
 
-Selector is a plugin that selects the optimal agent to execute a session. Different selection strategies can be applied according to scaling group characteristics or operational goals.
+A Selector plugin selects the optimal agent to run a session. A resource group can apply a different selection strategy according to its characteristics or operating goal.
 
 **Basic Interface:**
 ```python
@@ -542,19 +542,19 @@ class AgentSelector(abc.ABC):
 
 #### ConcentratedSelector (Concentrated Placement)
 
-ConcentratedSelector uses a strategy that concentrates resource usage to maximize efficiency. It first filters agents with sufficient available resources to provide what the session requests. Among them, it preferentially selects agents with high current resource utilization, and if utilization is equal, selects agents with smaller total resource capacity. This strategy is advantageous for maximizing resource utilization and minimizing the number of idle agents.
+ConcentratedSelector concentrates resource usage to maximize efficiency. It first filters the agents with enough available resources for the session request. Among them, it prefers the agents with high current resource utilization, and when utilization is equal, the agents with the smaller total resource capacity. This strategy maximizes resource utilization and minimizes the number of idle agents.
 
 #### DispersedSelector (Dispersed Placement)
 
-DispersedSelector uses a strategy that distributes resources across multiple agents to ensure high availability. Among agents with sufficient available resources, it preferentially selects agents with low current resource utilization, and if utilization is equal, selects agents with larger total resource capacity. This strategy is advantageous for minimizing impact when one agent fails and evenly distributing load across multiple agents.
+DispersedSelector distributes resources across multiple agents for high availability. Among the agents with enough available resources, it prefers the agents with low current resource utilization, and when utilization is equal, the agents with the larger total resource capacity. This strategy minimizes the impact of one agent failure and distributes load evenly across agents.
 
 #### RoundRobinSelector (Round Robin)
 
-RoundRobinSelector uses a simple strategy that selects agents sequentially. After filtering agents with sufficient available resources, it uses an internal counter to cycle through agents for selection. This strategy provides simple implementation and predictable distribution effects.
+RoundRobinSelector selects agents in sequence. After filtering the agents with enough available resources, it cycles through them with an internal counter. This strategy is simple and its distribution is predictable.
 
 ### Allocators
 
-Allocator is a plugin that actually allocates session resources on the agent selected by Selector. It ensures atomicity and consistency of resource allocation through database transactions.
+An Allocator plugin allocates the session resources on the agent selected by the Selector. It keeps allocation atomic and consistent through database transactions.
 
 **Basic Interface:**
 ```python
@@ -575,15 +575,15 @@ class SchedulingAllocator(abc.ABC):
 
 #### RepositoryAllocator
 
-RepositoryAllocator performs resource allocation through the database. It first starts a database transaction and uses SELECT FOR UPDATE query to query the agent's current resource state while simultaneously acquiring row locks. This prevents other scheduling processes from simultaneously allocating resources on the same agent.
+RepositoryAllocator allocates resources through the database. It starts a transaction and queries the agent's current resource state with a SELECT FOR UPDATE query, which also takes the row lock. This prevents another scheduling process from allocating resources on the same agent at the same time.
 
-After reconfirming resources are still sufficient, it changes the session's state to SCHEDULED and creates records for each kernel in PREPARING state. It increases the agent's occupied_slots by the resources requested by the session to reflect resource usage. If all operations succeed, the transaction is committed, and if an error occurs midway, it is automatically rolled back to maintain data consistency.
+After it confirms that the resources are still sufficient, it changes the session state to SCHEDULED and creates a row for each kernel in PREPARING state. It increases the agent's occupied_slots by the resources the session requests. If all operations succeed, it commits the transaction; if an error occurs midway, it rolls back automatically to keep the data consistent.
 
-RepositoryAllocator controls concurrency through row locks via SELECT FOR UPDATE and transaction isolation level guarantees, and protects system consistency through automatic rollback on allocation failure.
+RepositoryAllocator controls concurrency with the row lock of SELECT FOR UPDATE and the transaction isolation level, and protects consistency with the automatic rollback on allocation failure.
 
 ### Hooks
 
-Hooks are status-based extension points that execute custom logic when sessions transition to specific states. The hook system is organized by target status, with session-type specific logic handled internally within each hook.
+Hooks are status-based extension points that run custom logic when a session transitions to a specific state. The hook system is organized by target status, and each hook handles the logic of its session type internally.
 
 **Architecture:**
 ```
@@ -618,78 +618,78 @@ class StatusTransitionHook(ABC):
 
 #### RunningTransitionHook
 
-RunningTransitionHook executes when sessions transition to RUNNING state. It performs three operations:
-1. **occupied_slots update**: Updates the agent's occupied resource slots
-2. **Batch execution**: For BATCH sessions, triggers the startup command execution
-3. **Inference route creation**: For INFERENCE sessions, creates routing entries in the deployment system
+RunningTransitionHook runs when a session transitions to RUNNING. It performs three operations:
+1. **occupied_slots update**: updates the agent's occupied resource slots
+2. **Batch execution**: for BATCH sessions, triggers the startup command
+3. **Inference route creation**: for INFERENCE sessions, creates the routing entries in the deployment system
 
 #### TerminatedTransitionHook
 
-TerminatedTransitionHook executes when sessions transition to TERMINATED state. It handles cleanup operations:
-1. **Inference route deletion**: For INFERENCE sessions, removes routing entries from the deployment system
+TerminatedTransitionHook runs when a session transitions to TERMINATED. It handles the cleanup operations:
+1. **Inference route deletion**: for INFERENCE sessions, removes the routing entries from the deployment system
 
 **HookRegistry:**
 
-HookRegistry provides hooks by SessionStatus. The Coordinator calls `get_hook(status)` to retrieve the appropriate hook for a transition, then executes it if present. All hooks are blocking—failures will prevent the status transition.
+HookRegistry provides a hook by SessionStatus. The coordinator calls `get_hook(status)` for a transition and runs the hook when it exists. Every hook blocks: a failure prevents the status transition.
 
 ## State-Specific Handlers
 
-ScheduleCoordinator uses multiple handlers to process various session states. Each handler performs necessary tasks for specific states or situations. Handlers are organized into four categories under `handlers/`:
+ScheduleCoordinator uses several handlers for the session states. Each handler performs the work needed for its target state or situation. The handlers are in four categories under `handlers/`:
 
 ### Lifecycle Handlers (`handlers/lifecycle/`)
 
-Handlers for core session lifecycle operations.
+Handlers for the core session lifecycle operations.
 
 #### ScheduleSessionsHandler
-Schedules pending sessions by calling Scheduler's schedule_all_scaling_groups() method to process PENDING sessions for all scaling groups.
+Schedules pending sessions by calling the scheduler's schedule_all_scaling_groups() method for all resource groups.
 
 #### StartSessionsHandler
-Starts scheduled sessions by calling Scheduler's start_sessions() method to begin actual kernel creation for sessions in SCHEDULED state.
+Starts the scheduled sessions by calling the scheduler's start_sessions() method, which begins kernel creation for the sessions in SCHEDULED state.
 
 #### TerminateSessionsHandler
-Terminates sessions by querying sessions with termination requests from the database, then calling Scheduler's terminate_sessions() method to send termination RPC to agents.
+Terminates sessions. It queries the sessions with termination requests from the database and calls the scheduler's terminate_sessions() method to send the termination RPC to the agents.
 
 ### Promotion Handlers (`handlers/promotion/`)
 
-Handlers for promoting sessions to the next status based on progress checks.
+Handlers that promote a session to the next status based on progress checks.
 
 #### PromoteToPreparedPromotionHandler
-Promotes sessions from PULLING to PREPARED status when all images have been pulled and are ready.
+Promotes a session from PULLING to PREPARED when all images are pulled and ready.
 
 #### PromoteToRunningPromotionHandler
-Promotes sessions from CREATING to RUNNING status when all kernels have started successfully.
+Promotes a session from CREATING to RUNNING when all kernels started successfully.
 
 #### PromoteToTerminatedPromotionHandler
-Promotes sessions from TERMINATING to TERMINATED status when all kernels have been cleaned up.
+Promotes a session from TERMINATING to TERMINATED when all kernels are cleaned up.
 
 #### DetectTerminationPromotionHandler
-Detects running sessions that need to be terminated and promotes them to TERMINATING status.
+Detects a running session that needs termination and promotes it to TERMINATING.
 
 ### Maintenance Handlers (`handlers/maintenance/`)
 
 Handlers for cleanup and maintenance operations.
 
 #### SweepSessionsHandler
-Cleans up old sessions. Queries long-waiting sessions and cancels or cleans sessions according to configured policy. This removes sessions that occupy resources but aren't actually being used.
+Cleans up old sessions. It queries the sessions that have waited for a long time and cancels or cleans them by the configured policy. This removes the sessions that hold resources but are not in use.
 
 ### Kernel Handlers (`handlers/kernel/`)
 
-Handlers for kernel-level operations that operate independently of session lifecycle.
+Handlers for kernel-level operations that run independently of the session lifecycle.
 
 #### SweepStaleKernelsKernelHandler
-Sweeps stale kernels that are in RUNNING state but no longer have presence on their agents. Checks kernel presence via agent RPC and terminates kernels that are no longer running on their assigned agents.
+Sweeps the stale kernels that are in RUNNING state but no longer exist on their agents. It checks kernel presence via agent RPC and terminates a kernel that no longer runs on its assigned agent.
 
 ## Kernel State Engine
 
 ### KernelStateEngine
 
-KernelStateEngine is the component that manages kernel state transitions. It updates kernel state, validates whether state transitions are valid, and synchronizes related session state according to kernel state changes.
+KernelStateEngine manages kernel state transitions. It updates the kernel state, validates a transition and keeps the related session state in sync with the kernel state changes.
 
 **Key Methods:**
 
 #### `mark_kernel_pulling()`
 
-The mark_kernel_pulling() method transitions the kernel to PULLING state. It's called when the agent starts container image pulling, and receives kernel ID and state transition reason as parameters.
+mark_kernel_pulling() transitions the kernel to PULLING. The scheduler calls it when the agent starts the container image pull, with the kernel ID and the transition reason.
 
 ```python
 async def mark_kernel_pulling(
@@ -701,7 +701,7 @@ async def mark_kernel_pulling(
 
 #### `mark_kernel_running()`
 
-The mark_kernel_running() method transitions the kernel to RUNNING state. It's called when the container successfully starts on the agent, and receives kernel ID, state transition reason, and created kernel information (container ID, network information, etc.) as parameters.
+mark_kernel_running() transitions the kernel to RUNNING. It is called when the container starts successfully on the agent, with the kernel ID, the transition reason and the created kernel information (container ID, network information and so on).
 
 ```python
 async def mark_kernel_running(
@@ -714,7 +714,7 @@ async def mark_kernel_running(
 
 #### `mark_kernel_cancelled()`
 
-The mark_kernel_cancelled() method transitions the kernel to CANCELLED state. It's called when a cancellation request comes before kernel start, and receives kernel ID, session ID, and cancellation reason as parameters. It performs special handling to transition the session itself to CANCELLED state when all kernels in the session are in CANCELLED state.
+mark_kernel_cancelled() transitions the kernel to CANCELLED. It is called when a cancellation request arrives before the kernel start, with the kernel ID, the session ID and the cancellation reason. It has special handling that transitions the session itself to CANCELLED when all kernels of the session are in CANCELLED state.
 
 ```python
 async def mark_kernel_cancelled(
@@ -727,7 +727,7 @@ async def mark_kernel_cancelled(
 
 #### `mark_kernel_terminated()`
 
-The mark_kernel_terminated() method transitions the kernel to TERMINATED state. It's called when the container terminates on the agent, and receives kernel ID, termination reason, and optionally the container's exit code as parameters.
+mark_kernel_terminated() transitions the kernel to TERMINATED. It is called when the container terminates on the agent, with the kernel ID, the termination reason and optionally the container exit code.
 
 ```python
 async def mark_kernel_terminated(
@@ -742,7 +742,7 @@ async def mark_kernel_terminated(
 
 ### Session State Transitions
 
-Sessions follow these state transition paths:
+Sessions follow these transition paths:
 
 ```
 PENDING → SCHEDULED → PREPARING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED
@@ -754,24 +754,24 @@ CANCELLED
 
 | Current State | Next State | Transition Trigger | Responsible Component | Failure Handling |
 |----------|----------|------------|--------------|------------|
-| PENDING | SCHEDULED | Scheduling success, agent allocation complete | Scheduler | CANCELLED (validation failure) |
-| PENDING | CANCELLED | User cancellation request, timeout | ScheduleCoordinator | - |
-| SCHEDULED | PREPARING | Precondition check started, image pull triggered | Scheduler | ERROR (RPC failure) |
-| PREPARING | PREPARED | All images pulled and ready | Scheduler | CANCELLED (pulling failure) |
-| PREPARED | CREATING | Kernel creation RPC started | Scheduler | ERROR (RPC failure) |
-| CREATING | RUNNING | All kernels in RUNNING state | KernelStateEngine | TERMINATING (partial failure) |
-| RUNNING | TERMINATING | Termination request received | Scheduler | - |
-| TERMINATING | TERMINATED | All kernels TERMINATED | KernelStateEngine | - |
+| PENDING | SCHEDULED | scheduling success, agent allocation complete | Scheduler | CANCELLED (validation failure) |
+| PENDING | CANCELLED | user cancellation request, timeout | ScheduleCoordinator | - |
+| SCHEDULED | PREPARING | precondition check started, image pull triggered | Scheduler | ERROR (RPC failure) |
+| PREPARING | PREPARED | all images pulled and ready | Scheduler | CANCELLED (pulling failure) |
+| PREPARED | CREATING | kernel creation RPC started | Scheduler | ERROR (RPC failure) |
+| CREATING | RUNNING | all kernels in RUNNING state | KernelStateEngine | TERMINATING (partial failure) |
+| RUNNING | TERMINATING | termination request received | Scheduler | - |
+| TERMINATING | TERMINATED | all kernels TERMINATED | KernelStateEngine | - |
 
 **Key Rules:**
-- Can only directly transition to CANCELLED from PENDING state
-- After SCHEDULED must transition to TERMINATED via TERMINATING
-- Image pulling occurs in PREPARING phase before kernel creation
-- Failure in PREPARING or CREATING treats entire session as TERMINATING
+- Only PENDING can transition directly to CANCELLED.
+- After SCHEDULED, the session must reach TERMINATED through TERMINATING.
+- Image pulling happens in the PREPARING phase before kernel creation.
+- A failure in PREPARING or CREATING treats the whole session as TERMINATING.
 
 ### Kernel State Transitions
 
-Kernels follow these state transition paths:
+Kernels follow these transition paths:
 
 ```
 SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED
@@ -783,121 +783,121 @@ CANCELLED
 
 | Current State | Next State | Transition Trigger | Responsible Component | Failure Handling |
 |----------|----------|------------|--------------|------------|
-| SCHEDULED | PREPARING | Session scheduled, kernel allocated | Scheduler | - |
-| PREPARING | PULLING | Image pull RPC triggered | Scheduler | TERMINATING on timeout |
-| PULLING | PREPARED | Image pulling complete | Agent → Event | TERMINATING on timeout |
-| PREPARED | CREATING | Kernel creation RPC started | Scheduler | TERMINATING on timeout |
-| CREATING | RUNNING | Container created and started | Agent → Event | TERMINATING on timeout |
-| SCHEDULED | CANCELLED | Cancellation request before image pull | KernelStateEngine | - |
-| PREPARING | CANCELLED | Cancellation request during image pull trigger | KernelStateEngine | - |
-| PULLING | CANCELLED | Cancellation request during image pulling | KernelStateEngine | - |
-| PREPARED | CANCELLED | Cancellation request before kernel creation | KernelStateEngine | - |
-| CREATING | CANCELLED | Cancellation request during kernel creation | KernelStateEngine | - |
-| RUNNING | TERMINATING | Termination RPC called | Scheduler | - |
-| TERMINATING | TERMINATED | Container cleanup complete | Agent → Event | Force terminate |
+| SCHEDULED | PREPARING | session scheduled, kernel allocated | Scheduler | - |
+| PREPARING | PULLING | image pull RPC triggered | Scheduler | TERMINATING on timeout |
+| PULLING | PREPARED | image pulling complete | Agent → Event | TERMINATING on timeout |
+| PREPARED | CREATING | kernel creation RPC started | Scheduler | TERMINATING on timeout |
+| CREATING | RUNNING | container created and started | Agent → Event | TERMINATING on timeout |
+| SCHEDULED | CANCELLED | cancellation request before image pull | KernelStateEngine | - |
+| PREPARING | CANCELLED | cancellation request during image pull trigger | KernelStateEngine | - |
+| PULLING | CANCELLED | cancellation request during image pulling | KernelStateEngine | - |
+| PREPARED | CANCELLED | cancellation request before kernel creation | KernelStateEngine | - |
+| CREATING | CANCELLED | cancellation request during kernel creation | KernelStateEngine | - |
+| RUNNING | TERMINATING | termination RPC called | Scheduler | - |
+| TERMINATING | TERMINATED | container cleanup complete | Agent → Event | force terminate |
 
 **Timeout Policies:**
 
-Coordinator's `_classify_failures` detects stuck sessions based on timeout thresholds:
+The coordinator's `_classify_failures` detects a stuck session by the timeout threshold:
 
 | Status | Timeout | Action on Timeout |
 |--------|---------|-------------------|
-| PREPARING | 15 minutes | Transition to TERMINATING |
-| PULLING | 15 minutes | Transition to TERMINATING |
-| CREATING | 10 minutes | Transition to TERMINATING |
+| PREPARING | 15 minutes | transition to TERMINATING |
+| PULLING | 15 minutes | transition to TERMINATING |
+| CREATING | 10 minutes | transition to TERMINATING |
 
 **PENDING scheduling failure** (max retries exceeded):
-- Sessions exceeding max scheduling retries (SERVICE_MAX_RETRIES) are deprioritized
-- Priority is lowered and session returns to PENDING for re-scheduling with lower priority
+- A session that exceeds the maximum scheduling retries (SERVICE_MAX_RETRIES) is deprioritized.
+- Its priority is lowered and it returns to PENDING for re-scheduling with the lower priority.
 
 **Termination failure** (TERMINATING stage):
-- Force terminate (SIGKILL) after timeout
+- Force termination (SIGKILL) after the timeout
 
 ## Troubleshooting
 
 ### 1. Session Stuck in PENDING State
 
 **Symptoms**:
-- Session remains in PENDING state for extended time
+- the session stays in PENDING state for a long time
 
 **Causes**:
-- Insufficient available agents in scaling group
-- Agent resource shortage
-- Resource quota exceeded
+- insufficient available agents in the resource group
+- agent resource shortage
+- resource quota exceeded
 
 **Diagnosis**:
-- **Check Session History**: Review Session History on session detail page to identify cause of persistent PENDING state
-- **Scaling Group Status**: Check agent count and state in scaling group
-- **Resource Availability**: Check available resources per agent
+- **Check session history**: review the session history on the session detail page to identify the cause of the persistent PENDING state
+- **Resource group status**: check the agent count and state in the resource group
+- **Resource availability**: check the available resources per agent
 
 **Resolution**:
-1. Add agents to scaling group
-2. Check and recover agent state
-3. Adjust resource quotas
+1. Add agents to the resource group.
+2. Check and recover the agent state.
+3. Adjust the resource quotas.
 
 ### 2. Kernel Stuck in PULLING State
 
 **Symptoms**:
-- Kernel remains in PULLING state for extended time
+- the kernel stays in PULLING state for a long time
 
 **Causes**:
-- Image registry access failure
-- Agent disk space shortage
-- Network connection issues
+- image registry access failure
+- agent disk space shortage
+- network connection issues
 
 **Diagnosis**:
-- **Check Session History**: Review image pulling-related events and error messages
-- **Agent State**: Check agent disk usage and network state
+- **Check session history**: review the image pulling events and the error messages
+- **Agent state**: check the agent disk usage and network state
 
 **Resolution**:
-1. Verify image registry connection
-2. Free agent disk space
-3. Session will be terminated after timeout (15 minutes) - user can retry
+1. Verify the image registry connection.
+2. Free agent disk space.
+3. The session is terminated after the timeout (15 minutes); the user can retry.
 
 ### 3. Kernel Fails in PREPARING/CREATING
 
 **Symptoms**:
-- Kernel creation fails
-- Session transitions to TERMINATING after timeout
+- kernel creation fails
+- the session transitions to TERMINATING after the timeout
 
 **Causes**:
-- Container image errors
-- Agent resource shortage
-- Session configuration errors
+- container image errors
+- agent resource shortage
+- session configuration errors
 
 **Diagnosis**:
-- **Check Session History**: Review kernel creation failure reasons and error messages
-- **Image Validity**: Verify the image being used is correct
-- **Agent State**: Check agent resource state
+- **Check session history**: review the kernel creation failure reasons and the error messages
+- **Image validity**: verify that the image in use is correct
+- **Agent state**: check the agent resource state
 
 **Resolution**:
-1. Validate and fix image
-2. Review session configuration (environ, mounts, etc.)
-3. Secure agent resources
-4. Retry session creation after fixing issues
+1. Validate and fix the image.
+2. Review the session configuration (environ, mounts and so on).
+3. Secure agent resources.
+4. Retry session creation after fixing the issues.
 
 ### 4. Session Termination Not Completing
 
 **Symptoms**:
-- Stuck in TERMINATING state
-- Resources not released
+- stuck in TERMINATING state
+- resources not released
 
 **Causes**:
-- No agent RPC response
-- Container force termination failure
+- no agent RPC response
+- container force termination failure
 
 **Diagnosis**:
-- **Check Session History**: Review termination progress and failure reasons
-- **Agent Connection State**: Check agent connection state and responsiveness
+- **Check session history**: review the termination progress and the failure reasons
+- **Agent connection state**: check the agent connection state and responsiveness
 
 **Resolution**:
-1. Wait for automatic force termination after timeout
-2. Check and recover agent connection state
-3. Manually clean up session if necessary
+1. Wait for the automatic force termination after the timeout.
+2. Check and recover the agent connection state.
+3. Clean up the session manually if necessary.
 
 ## Parent Document
 - [Sokovan Overall Architecture](../README.md)
 
-## Related Documents
+## Related documents
 - [Deployment Architecture](../deployment/README.md)
 - [SchedulingController Architecture](../scheduling_controller/README.md)

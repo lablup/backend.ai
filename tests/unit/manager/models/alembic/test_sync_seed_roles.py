@@ -17,11 +17,11 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.alembic.versions.dc61fa027fc1_assign_every_user_their_user_owner_role import (
@@ -41,7 +41,6 @@ from ai.backend.manager.models.alembic.versions.f4a1c9d20b73_sync_seed_roles_wit
     downgrade,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,

@@ -13,6 +13,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
 )
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
@@ -31,7 +32,7 @@ class TestSeedAccessTokenOf(TestSeedFieldCreator[DeploymentInfo, ModelDeployment
 
     @override
     def kind(self) -> str:
-        return "접근 토큰 하나를 갖는다"
+        return Says("배포 토큰 하나를 갖는다", english="has one deployment token")
 
     @override
     def owner_id(self, owner: DeploymentInfo) -> DeploymentID:

@@ -23,6 +23,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
@@ -46,14 +48,12 @@ from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.api.rest.v2.user.handler import V2UserHandler
 from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -140,7 +140,11 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()
@@ -204,7 +208,12 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
+    return DomainProcessors(
+        processor_registry.group(GroupMeta(DomainEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
+        service,
+    )
 
 
 @pytest.fixture()
@@ -392,60 +401,6 @@ async def target_project_fixture(
                 id=project_id,
                 name=f"target-project-{secrets.token_hex(6)}",
                 description="Primary test project for membership scenarios",
-                is_active=True,
-                domain_name=domain_fixture.domain_name,
-                resource_policy=resource_policy_fixture,
-            )
-        )
-        virtual_entity_id = uuid.uuid4()
-        await conn.execute(
-            sa.insert(VirtualEntityRow.__table__).values(
-                id=virtual_entity_id,
-                entity_type=ProjectEntityType(),
-                entity_id=project_id,
-            )
-        )
-        await conn.execute(
-            sa.insert(EntityMembershipRow.__table__).values(
-                virtual_entity_id=virtual_entity_id,
-                member_entity_id=virtual_entity_id,
-                capped=False,
-            )
-        )
-        await conn.execute(
-            sa.insert(ScopeBindingRow.__table__).values(
-                virtual_entity_id=virtual_entity_id,
-                scope_entity_id=virtual_entity_id,
-                permission_cap=None,
-            )
-        )
-    yield project_id
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
-                VirtualEntityRow.__table__.c.entity_id == project_id,
-            )
-        )
-        await conn.execute(
-            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
-        )
-
-
-@pytest.fixture()
-async def other_project_fixture(
-    db_engine: SAEngine,
-    domain_fixture: DomainFixtureData,
-    resource_policy_fixture: str,
-) -> AsyncIterator[uuid.UUID]:
-    """Insert another project for cross-project isolation tests."""
-    project_id = uuid.uuid4()
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(ProjectRow.__table__).values(
-                id=project_id,
-                name=f"other-project-{secrets.token_hex(6)}",
-                description="Secondary test project",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,

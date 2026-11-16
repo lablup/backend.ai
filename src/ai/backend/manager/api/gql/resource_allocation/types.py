@@ -46,6 +46,9 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     UserConcurrencyPayload as UserConcurrencyPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.resource_allocation.response import (
+    UserResourceAllocationPayload as UserResourceAllocationPayloadDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
@@ -76,6 +79,7 @@ __all__ = (
     "ResourceGroupUsageGQL",
     "ScopeResourceUsageGQL",
     "UserConcurrencyPayloadGQL",
+    "UserResourceAllocationPayloadGQL",
 )
 
 
@@ -219,6 +223,22 @@ class KeypairResourceAllocationPayloadGQL(
 ):
     keypair: ScopeResourceUsageGQL = gql_field(
         description="Keypair resource usage.",
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for user resource allocation query.",
+    ),
+    model=UserResourceAllocationPayloadDTO,
+    name="UserResourceAllocationV2",
+)
+class UserResourceAllocationPayloadGQL(
+    PydanticOutputMixin[UserResourceAllocationPayloadDTO],
+):
+    user: ScopeResourceUsageGQL = gql_field(
+        description="User resource usage summed across all of the user's keypairs.",
     )
 
 

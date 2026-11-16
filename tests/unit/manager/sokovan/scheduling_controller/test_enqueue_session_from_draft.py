@@ -232,6 +232,7 @@ def _spec_context(
             policy=_user_policy(),
             container_user=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={"main": (_vfolder_mount(),)},

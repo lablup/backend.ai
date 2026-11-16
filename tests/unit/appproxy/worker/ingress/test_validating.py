@@ -37,7 +37,7 @@ def _ingress(port: int, revision: int, authority: str = AUTHORITY) -> Ingress:
 
 @pytest.fixture
 def held() -> dict[IngressFrontendKey, Ingress]:
-    return {IngressFrontendKey("10205"): _ingress(10205, revision=5)}
+    return {IngressFrontendKey("port-10205"): _ingress(10205, revision=5)}
 
 
 @pytest.fixture
@@ -109,7 +109,7 @@ class TestValidatingIngressWriter:
     async def test_remove_is_delegated(
         self, writer: ValidatingIngressWriter, state: AsyncMock
     ) -> None:
-        keys = [IngressKey(authority=AUTHORITY, frontend_key=IngressFrontendKey("10205"))]
+        keys = [IngressKey(authority=AUTHORITY, frontend_key=IngressFrontendKey("port-10205"))]
         await writer.remove(keys)
         state.remove.assert_awaited_once_with(keys)
 
@@ -119,7 +119,8 @@ class TestValidatingIngressWriter:
         with pytest.raises(IngressAuthorityMismatchError):
             await writer.remove([
                 IngressKey(
-                    authority=IngressAuthority("worker-2"), frontend_key=IngressFrontendKey("10205")
+                    authority=IngressAuthority("worker-2"),
+                    frontend_key=IngressFrontendKey("port-10205"),
                 )
             ])
         state.remove.assert_not_awaited()

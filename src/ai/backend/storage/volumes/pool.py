@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Self
 
@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.types import VolumeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
@@ -33,14 +34,20 @@ def _parse_volume_id(volume_name: StorageVolumeName) -> VolumeID | None:
 class VolumePool:
     _volumes: Mapping[StorageVolumeName, AbstractVolume]
     _volumes_by_id: Mapping[VolumeID, AbstractVolume]
+    _volume_status_checks: Sequence[AbstractVolumeStatusCheck]
 
-    def __init__(self, volumes: Mapping[StorageVolumeName, AbstractVolume]) -> None:
+    def __init__(
+        self,
+        volumes: Mapping[StorageVolumeName, AbstractVolume],
+        volume_status_checks: Sequence[AbstractVolumeStatusCheck],
+    ) -> None:
         self._volumes = volumes
         self._volumes_by_id = {
             volume_id: volume
             for name, volume in volumes.items()
             if (volume_id := _parse_volume_id(name)) is not None
         }
+        self._volume_status_checks = volume_status_checks
 
     @classmethod
     async def create(
@@ -55,6 +62,7 @@ class VolumePool:
         volumes: dict[StorageVolumeName, AbstractVolume] = {}
         for volume_name, config in local_config.volume.items():
             volumes[volume_name] = await cls._init_volume(
+                volume_name,
                 config,
                 backends[config.backend],
                 local_config,
@@ -66,11 +74,17 @@ class VolumePool:
         volumes[StorageVolumeName(NOOP_STORAGE_VOLUME_NAME)] = init_noop_volume(
             etcd, event_dispatcher, event_producer
         )
-        return cls(volumes=volumes)
+        volume_status_checks = [
+            check
+            for volume in volumes.values()
+            if (check := await volume.volume_status_checker()) is not None
+        ]
+        return cls(volumes=volumes, volume_status_checks=volume_status_checks)
 
     @classmethod
     async def _init_volume(
         cls,
+        volume_name: StorageVolumeName,
         volume_config: VolumeInfoConfig,
         volume_type: type[AbstractVolume],
         local_config: StorageProxyUnifiedConfig,
@@ -87,6 +101,8 @@ class VolumePool:
             event_producer=event_producer,
             watcher=watcher,
             options=volume_config.options or {},
+            volume_name=volume_name,
+            status_check_config=volume_config.volume_status_check,
         )
         await volume_obj.init()
         return volume_obj
@@ -94,6 +110,9 @@ class VolumePool:
     async def shutdown(self) -> None:
         for volume in self._volumes.values():
             await volume.shutdown()
+
+    def volume_status_checks(self) -> Sequence[AbstractVolumeStatusCheck]:
+        return self._volume_status_checks
 
     def list_volumes(self) -> Mapping[StorageVolumeName, VolumeInfo]:
         return {

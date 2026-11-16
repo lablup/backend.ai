@@ -1,228 +1,141 @@
 ## project
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/project/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-시나리오: 미완 15 / 17
+Scenario: incomplete 15 / 17
 
-- ops 로 구성 (11)
-  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_image_commit_registries — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_by_domain_name — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_by_user — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- ops + 직접 구현 (4)
-  - assign_users — 성공 있음 1 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 3 · 실패 없음 (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops) — SCENARIO-GAP
-  - unassign_users — 성공 없음 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-  - update — 성공 있음 2 · 실패 없음 (single_delete_ops, single_entity, single_restore_ops) — SCENARIO-GAP
-- 직접 구현 (2)
-  - admin_create — 성공 있음 1 · 실패 있음 1 (scope)
-  - admin_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-
-**batch_load_image_commit_registries**
-
-| 시나리오 | 판정 |
-|---|---|
-| [읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다](#image_commit_registry-read-targets-in-request-order) | 성공 |
-| [읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다](#image_commit_registry-read-unconfigured-targets) | 성공 |
-| [읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다](#image_commit_registry-target-read-requires-permission) | 거부 |
+- built from ops (10)
+  - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - delete: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - restore: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_by_domain_name: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_by_user: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+- ops + direct implementation (4)
+  - assign_users: success present 1 · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - partial_bulk_update: success present 3 · rejection absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
+  - unassign_users: success absent · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - update: success present 2 · rejection absent (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
+- direct implementation (3)
+  - admin_create: success present 1 · rejection present 1 (scope)
+  - admin_purge: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - batch_load_registries: success present 3 · rejection present 1 (partial_bulk)
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-projects) | 성공 |
-| [활성 프로젝트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [when a user granted nothing tries to soft delete several projects in one call, none is soft deleted and all come back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-projects) | answered |
+| [when two active projects and a missing id are soft deleted in one call, the two come back inactive and the missing id comes back in the failed list because no target answers to it](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+| [when several soft-deleted projects are restored in one call, all come back active](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **assign_users**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 명부에 오른다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | 성공 |
+| [when a project and a role in its scope are in place and a user is assigned, the user is put on the roster](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects) | 성공 |
-| [활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects) | 성공 |
-| [슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-projects-at-once) | 성공 |
+| [when a user granted nothing tries to edit several projects in one call, none is edited and all come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects) | answered |
+| [when several projects are edited in one call with a mix of active flags and descriptions, the one whose flag is cleared is soft deleted and the one whose flag is raised is restored, both come back with the new description, and the missing id comes back in the failed list because no target answers to it](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects) | answered |
+| [when the superadmin changes the description of several projects in one call, all come back with the new description and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-projects-at-once) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-project) | 성공 |
-| [soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-project) | 성공 |
+| [an edit that clears the active flag soft deletes the project and the response carries the inactive state](#editing-clearing-the-active-flag-soft-deletes-a-project) | answered |
+| [an edit that raises the active flag of a soft-deleted project restores the project and the response carries the active state](#editing-raising-the-active-flag-restores-a-soft-deleted-project) | answered |
 
 **admin_create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, 그 이름의 프로젝트가 그 도메인 아래에 생긴다](#project-the-superadmin-makes-a-project-in-a-domain) | 성공 |
-| [프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다](#project-a-user-granted-nothing-may-not-make-a-project) | 거부 |
+| [when a domain and a project policy are in place and the superadmin creates a project, a project with that name appears under the domain](#project-the-superadmin-makes-a-project-in-a-domain) | answered |
+| [project creation is guarded by permission in the domain scope rather than by a role, so a user granted nothing is rejected for lack of permission](#project-a-user-granted-nothing-may-not-make-a-project) | rejected |
 
-### batch_load_image_commit_registries
+**batch_load_registries**
 
-<a id="image_commit_registry-read-targets-in-request-order"></a>
-
-#### [read-targets-in-request-order](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
-
-읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다
-
-Given
-
-- image commit을 위한 Container Registry가 설정되어 있다. 일반 사용자는 프로젝트 읽기 권한이 있다.
-  - 도메인 domain-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
-  - 역할 role-1: project 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 role-1 보유
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
-
-Then
-
-- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
-  - targets = [ImageCommitRegistry(registry_name='registry.example.com', project_name='images'), ImageCommitRegistry(registry_name='registry.example.com', project_name='images')]
-
-<a id="image_commit_registry-read-unconfigured-targets"></a>
-
-#### [read-unconfigured-targets](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
-
-읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다
-
-Given
-
-- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 있다.
-  - 도메인 domain-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
-  - 역할 role-1: project 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 role-1 보유
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
-
-Then
-
-- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
-  - targets = [None, None]
-
-<a id="image_commit_registry-target-read-requires-permission"></a>
-
-#### [target-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
-
-읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다
-
-Given
-
-- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 없다.
-  - 도메인 domain-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
-
-Then
-
-- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
-  - count = 2
-  - 거부: NotEnoughPermission
-  - 거부: NotEnoughPermission
+| scenario | verdict |
+|---|---|
+| [with read permission, answers a container registry allowed but not as the default with a flag saying it is not the default](#registries-read-allowed-registry) | answered |
+| [with read permission, answers the container registry allowed as the default with a flag saying it is the default](#registries-read-default-registry) | answered |
+| [with read permission and no allowed container registry, answers an empty list](#registries-read-no-registry) | answered |
+| [without read permission, rejects the read of allowed container registries](#registries-registries-read-requires-permission) | rejected |
 
 ### partial_bulk_delete
 
 <a id="partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-projects"></a>
 
-#### [a-user-granted-nothing-soft-deletes-none-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_deleting.py) — pass
+#### [a-user-granted-nothing-soft-deletes-none-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to soft delete several projects in one call, none is soft deleted and all come back in the failed list for lack of permission
 
 Given
 
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 projects under one domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.partial_bulk_delete — user-1이 프로젝트 2개를 한 번에 soft delete 함
+- ProjectAdapter.partial_bulk_delete: user-1 soft deletes 2 projects in one call
 
 Then
 
-- 처리된 프로젝트 없이 대상이 모두 실패 목록에 온다
+- no project is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 프로젝트의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프로젝트의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target project
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target project
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
 
-#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_deleting.py) — pass
+#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_deleting.py): pass
 
-활성 프로젝트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when two active projects and a missing id are soft deleted in one call, the two come back inactive and the missing id comes back in the failed list because no target answers to it
 
 Given
 
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 projects under one domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.partial_bulk_delete — user-1이 프로젝트 2개 와 없는 id 하나를 한 번에 soft delete 함
+- ProjectAdapter.partial_bulk_delete: user-1 soft deletes 2 projects and a missing id in one call
 
 Then
 
-- 대상 프로젝트가 모두 비활성으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target project comes back inactive and the missing id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].name = 'team-1'
   - successes[0].description = 'team-1 was already here'
@@ -231,11 +144,11 @@ Then
   - successes[0].resource_policy = 'default'
   - successes[0].allowed_vfolder_hosts = []
   - successes[0].is_active = False
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
-  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].type: skipped: the type already fixes the value
+  - successes[0].entity_id: same as the id of the project seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'team-2'
   - successes[1].description = 'team-2 was already here'
   - successes[1].integration_name = None
@@ -243,43 +156,43 @@ Then
   - successes[1].resource_policy = 'default'
   - successes[1].allowed_vfolder_hosts = []
   - successes[1].is_active = False
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
-  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].type: skipped: the type already fixes the value
+  - successes[1].entity_id: same as the id of the project seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id given in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_restore
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
-#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_deleting.py) — pass
+#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_deleting.py): pass
 
-soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 온다
+when several soft-deleted projects are restored in one call, all come back active
 
 Given
 
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 projects under one domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.partial_bulk_restore — user-1이 프로젝트 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+- ProjectAdapter.partial_bulk_restore: user-1 soft deletes 2 projects in one call and then restores them in one call
 
 Then
 
-- 대상 프로젝트가 모두 활성으로 오고, 실패한 것은 없다
+- every target project comes back active and nothing failed
   - successes count = 2
   - successes[0].name = 'team-1'
   - successes[0].description = 'team-1 was already here'
@@ -288,11 +201,11 @@ Then
   - successes[0].resource_policy = 'default'
   - successes[0].allowed_vfolder_hosts = []
   - successes[0].is_active = True
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
-  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].type: skipped: the type already fixes the value
+  - successes[0].entity_id: same as the id of the project seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'team-2'
   - successes[1].description = 'team-2 was already here'
   - successes[1].integration_name = None
@@ -300,215 +213,215 @@ Then
   - successes[1].resource_policy = 'default'
   - successes[1].allowed_vfolder_hosts = []
   - successes[1].is_active = True
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
-  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].type: skipped: the type already fixes the value
+  - successes[1].entity_id: same as the id of the project seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
   - failed = []
 
 ### assign_users
 
 <a id="project-assigning-a-user-to-a-project-puts-them-on-its-roster"></a>
 
-#### [assigning-a-user-to-a-project-puts-them-on-its-roster](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass
+#### [assigning-a-user-to-a-project-puts-them-on-its-roster](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 명부에 오른다
+when a project and a role in its scope are in place and a user is assigned, the user is put on the roster
 
 Given
 
-- 프로젝트 하나와 그 프로젝트 스코프의 역할, 올릴 사용자, 그리고 슈퍼관리자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 research-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 역할 project-member-1: 이 역할이 앉은 스코프 안에서만 통한다
+- one project, the role in its scope, the user to assign, and the superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project research-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Role project-member-1: applies only within the scope it is granted in
 
 When
 
-- ProjectAdapter.assign_users — user-2이 user-1을 research-1에 배정
+- ProjectAdapter.assign_users: user-2 assigns user-1 to research-1
 
 Then
 
-- 명부에 배정한 사람만 올라 있다
-  - items: 배정한 사람 하나와 같다
+- the roster holds the user assigned, and no one else
+  - items: same as the one user assigned
 
 ### partial_bulk_update
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to edit several projects in one call, none is edited and all come back in the failed list for lack of permission
 
 Given
 
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 projects under one domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.partial_bulk_update — user-1이 프로젝트 2개의 설명을 한 번에 고침
+- ProjectAdapter.partial_bulk_update: user-1 edits the description of 2 projects in one call
 
 Then
 
-- 처리된 프로젝트 없이 대상이 모두 실패 목록에 온다
+- no project is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 프로젝트의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프로젝트의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target project
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target project
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects"></a>
 
-#### [the-active-flag-soft-deletes-or-restores-each-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
+#### [the-active-flag-soft-deletes-or-restores-each-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py): pass
 
-활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when several projects are edited in one call with a mix of active flags and descriptions, the one whose flag is cleared is soft deleted and the one whose flag is raised is restored, both come back with the new description, and the missing id comes back in the failed list because no target answers to it
 
 Given
 
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 projects under one domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.partial_bulk_update — user-1이 둘째 프로젝트를 soft delete 한 뒤, 첫째는 활성 플래그를 내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림
+- ProjectAdapter.partial_bulk_update: user-1 soft deletes the second project and then, in one call, clears the active flag of the first, raises it for the second, changes both descriptions, and clears the active flag of a missing id
 
 Then
 
-- 둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- both come back with the new description, the first inactive and the second active, and the missing id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].name = 'team-1'
-  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].description = 'the description edited in one call'
   - successes[0].integration_name = None
   - successes[0].domain_name = 'target-1'
   - successes[0].resource_policy = 'default'
   - successes[0].allowed_vfolder_hosts = []
   - successes[0].is_active = False
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
-  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].type: skipped: the type already fixes the value
+  - successes[0].entity_id: same as the id of the project seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'team-2'
-  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].description = 'the description edited in one call'
   - successes[1].integration_name = None
   - successes[1].domain_name = 'target-1'
   - successes[1].resource_policy = 'default'
   - successes[1].allowed_vfolder_hosts = []
   - successes[1].is_active = True
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
-  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].type: skipped: the type already fixes the value
+  - successes[1].entity_id: same as the id of the project seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id given in the request
+  - failed[0].message: a reason containing 'not found'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-projects-at-once"></a>
 
-#### [the-superadmin-edits-several-projects-at-once](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-projects-at-once](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+when the superadmin changes the description of several projects in one call, all come back with the new description and nothing failed
 
 Given
 
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 projects under one domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.partial_bulk_update — user-1이 프로젝트 2개의 설명을 한 번에 고침
+- ProjectAdapter.partial_bulk_update: user-1 edits the description of 2 projects in one call
 
 Then
 
-- 대상 프로젝트가 모두 새 설명으로 오고, 실패한 것은 없다
+- every target project comes back with the new description and nothing failed
   - successes count = 2
   - failed = []
   - successes[0].name = 'team-1'
-  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].description = 'the description edited in one call'
   - successes[0].integration_name = None
   - successes[0].domain_name = 'target-1'
   - successes[0].resource_policy = 'default'
   - successes[0].allowed_vfolder_hosts = []
   - successes[0].is_active = True
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
-  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].type: skipped: the type already fixes the value
+  - successes[0].entity_id: same as the id of the project seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'team-2'
-  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].description = 'the description edited in one call'
   - successes[1].integration_name = None
   - successes[1].domain_name = 'target-1'
   - successes[1].resource_policy = 'default'
   - successes[1].allowed_vfolder_hosts = []
   - successes[1].is_active = True
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
-  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].type: skipped: the type already fixes the value
+  - successes[1].entity_id: same as the id of the project seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
 
 ### update
 
 <a id="editing-clearing-the-active-flag-soft-deletes-a-project"></a>
 
-#### [clearing-the-active-flag-soft-deletes-a-project](/tests/scenario/bai_scenario/manager/project/test_editing.py) — pass
+#### [clearing-the-active-flag-soft-deletes-a-project](/tests/scenario/bai_scenario/manager/project/test_editing.py): pass
 
-활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다
+an edit that clears the active flag soft deletes the project and the response carries the inactive state
 
 Given
 
-- 한 도메인 아래의 프로젝트 1개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 1 projects under one domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.update — user-1이 team-1을 활성 플래그을 고침
+- ProjectAdapter.update: user-1 edits the active flag of team-1
 
 Then
 
-- 미리 만든 프로젝트 전체가 온다
+- the whole project seeded in advance comes back
   - name = 'team-1'
   - description = 'team-1 was already here'
   - integration_name = None
@@ -516,37 +429,37 @@ Then
   - resource_policy = 'default'
   - allowed_vfolder_hosts = []
   - is_active = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - type: 무시함 — 타입이 이미 값을 못박는다
-  - entity_id: 미리 만든 프로젝트의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - type: skipped: the type already fixes the value
+  - entity_id: same as the id of the project seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="editing-raising-the-active-flag-restores-a-soft-deleted-project"></a>
 
-#### [raising-the-active-flag-restores-a-soft-deleted-project](/tests/scenario/bai_scenario/manager/project/test_editing.py) — pass
+#### [raising-the-active-flag-restores-a-soft-deleted-project](/tests/scenario/bai_scenario/manager/project/test_editing.py): pass
 
-soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, 답이 활성 상태를 실어 온다
+an edit that raises the active flag of a soft-deleted project restores the project and the response carries the active state
 
 Given
 
-- 한 도메인 아래의 프로젝트 1개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 1 projects under one domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.update — user-1이 team-1을 soft delete 한 뒤 활성 플래그을 고침
+- ProjectAdapter.update: user-1 soft deletes team-1 and then edits the active flag
 
 Then
 
-- 미리 만든 프로젝트 전체가 온다
+- the whole project seeded in advance comes back
   - name = 'team-1'
   - description = 'team-1 was already here'
   - integration_name = None
@@ -554,37 +467,37 @@ Then
   - resource_policy = 'default'
   - allowed_vfolder_hosts = []
   - is_active = True
-  - id: 무시함 — 데이터베이스가 만든다
-  - type: 무시함 — 타입이 이미 값을 못박는다
-  - entity_id: 미리 만든 프로젝트의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - type: skipped: the type already fixes the value
+  - entity_id: same as the id of the project seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 ### admin_create
 
 <a id="project-the-superadmin-makes-a-project-in-a-domain"></a>
 
-#### [the-superadmin-makes-a-project-in-a-domain](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass
+#### [the-superadmin-makes-a-project-in-a-domain](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, 그 이름의 프로젝트가 그 도메인 아래에 생긴다
+when a domain and a project policy are in place and the superadmin creates a project, a project with that name appears under the domain
 
 Given
 
-- 도메인 하나와 프로젝트 정책, 그리고 superadmin 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, the project policy, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.admin_create — user-1이 home-1 아래에 research을 만듦
+- ProjectAdapter.admin_create: user-1 creates research under home-1
 
 Then
 
-- 만든 프로젝트 전체가 온다
+- the whole project just created comes back
   - basic_info.name = 'research'
   - basic_info.description = None
   - basic_info.integration_name = None
@@ -592,33 +505,170 @@ Then
   - organization.resource_policy = 'default'
   - storage.allowed_vfolder_hosts = []
   - lifecycle.is_active = True
-  - id: 무시함 — 데이터베이스가 만든다
-  - basic_info.type: 무시함 — 타입이 이미 값을 못박는다
-  - lifecycle.created_at: 이 실행이 쓴 시각
-  - lifecycle.modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - basic_info.type: skipped: the type already fixes the value
+  - lifecycle.created_at: the time this run wrote
+  - lifecycle.modified_at: the time this run wrote
 
 <a id="project-a-user-granted-nothing-may-not-make-a-project"></a>
 
-#### [a-user-granted-nothing-may-not-make-a-project](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass
+#### [a-user-granted-nothing-may-not-make-a-project](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다
+project creation is guarded by permission in the domain scope rather than by a role, so a user granted nothing is rejected for lack of permission
 
 Given
 
-- 도메인 하나와 프로젝트 정책, 그리고 user 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain, the project policy, and one user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ProjectAdapter.admin_create — user-1이 home-1 아래에 refused을 만듦
+- ProjectAdapter.admin_create: user-1 creates refused under home-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### batch_load_registries
+
+<a id="registries-read-allowed-registry"></a>
+
+#### [read-allowed-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+with read permission, answers a container registry allowed but not as the default with a flag saying it is not the default
+
+Given
+
+- the project is allowed on the registry but not as the default. A regular user has read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Project project-1 allows Container registry registry-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every project
+  - regular user user-1: holds Role role-1
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - [0] count = 1
+  - [0][0].registry: same as the registry seeded in advance
+  - [0][0].is_default = False
+  - [1] count = 1
+  - [1][0].registry: same as the registry seeded in advance
+  - [1][0].is_default = False
+
+<a id="registries-read-default-registry"></a>
+
+#### [read-default-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+with read permission, answers the container registry allowed as the default with a flag saying it is the default
+
+Given
+
+- the project is allowed on the registry as the default. A regular user has read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Project project-1 defaults to Container registry registry-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every project
+  - regular user user-1: holds Role role-1
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - [0] count = 1
+  - [0][0].registry: same as the registry seeded in advance
+  - [0][0].is_default = True
+  - [1] count = 1
+  - [1][0].registry: same as the registry seeded in advance
+  - [1][0].is_default = True
+
+<a id="registries-read-no-registry"></a>
+
+#### [read-no-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+with read permission and no allowed container registry, answers an empty list
+
+Given
+
+- the project has no allowed registry. A regular user has read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every project
+  - regular user user-1: holds Role role-1
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - [0] count = 0
+  - [1] count = 0
+
+<a id="registries-registries-read-requires-permission"></a>
+
+#### [registries-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+without read permission, rejects the read of allowed container registries
+
+Given
+
+- the project has no allowed registry. A regular user has no read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 

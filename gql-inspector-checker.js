@@ -5,10 +5,15 @@
 // Every `usedBy` element the `usage` rename took out shares one reason.
 const USAGE_RENAME =
   "The `usedBy` search input became `usage`, which splits the relation into `usedBy` and `uses` so a condition says which side uses which. It was added in this same unreleased cycle and went out in no release tag.";
+// Both service catalog endpoint elements share one reason.
+const SERVICE_CATALOG_ENDPOINTS =
+  "A service catalog node carries only the values of the `service_catalog` table. The endpoints will return in a follow-up as a connection on the node, searched within that service catalog. The web UI does not read them.";
 
 const ACCEPTED_REMOVALS = {
   "AccessTokenFilter.token":
     "The token value is the credential itself, so no search condition may take it: a partial match narrows the value one character at a time even when the response never carries it.",
+  "AdminRegisterSSHKeypairInput.sshPrivateKey":
+    "The server keeps no SSH private key a client sends: registering takes only the public key and leaves the stored private key as it is.",
   "DeploymentUsedBy": USAGE_RENAME,
   "ModelCardUsedBy": USAGE_RENAME,
   "RoleUsedBy": USAGE_RENAME,
@@ -35,6 +40,10 @@ const ACCEPTED_REMOVALS = {
   "Query.myVfolders.usedBy": USAGE_RENAME,
   "SessionUsedBy.agent": USAGE_RENAME,
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
+  "ServiceCatalogEndpoint": SERVICE_CATALOG_ENDPOINTS,
+  "ServiceCatalog.endpoints": SERVICE_CATALOG_ENDPOINTS,
+  "ScalingGroupNode.wsproxy_api_token":
+    "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
 };
 
 // Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.

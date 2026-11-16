@@ -36,6 +36,7 @@ from joserfc import jwt as jose_jwt
 from joserfc.jwk import RSAKey
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -50,12 +51,10 @@ from ai.backend.logging import LogLevel
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.config.unified import DatabaseConfig
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import DomainRow, domains
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, association_groups_users, groups
 from ai.backend.manager.models.resource_policy.row import (

@@ -8,13 +8,12 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.user.creators import UserCreator

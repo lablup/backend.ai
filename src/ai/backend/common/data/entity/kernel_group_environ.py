@@ -7,7 +7,10 @@ from ai.backend.common.data.entity.types import (
     FieldType,
 )
 
-__all__ = ("KernelGroupEnvironID",)
+__all__ = (
+    "KernelGroupEnvironFieldType",
+    "KernelGroupEnvironID",
+)
 
 
 class KernelGroupEnvironFieldType(FieldType):

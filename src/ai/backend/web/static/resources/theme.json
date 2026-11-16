@@ -13,7 +13,8 @@
           "success": ["#00BD9B", "#03A487"],
           "warning": ["#FAAD14", "#FAAD14"]
         },
-        "headerBg": ["#FF9729", "#E88A28"]
+        "headerBg": ["#FF9729", "#E88A28"],
+        "headerBgAdmin": ["#35A4F5", "#33AFE4"]
       },
       "stained": {
         "seeds": {

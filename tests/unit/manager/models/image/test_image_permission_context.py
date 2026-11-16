@@ -34,7 +34,6 @@ from ai.backend.manager.models.image.row import (
     ImagePermissionContextBuilder,
     ImageRow,
 )
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
@@ -134,7 +133,6 @@ class TestImagePermissionContextNonGlobalRegistry:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                KeyPairRow,
                 UserRow,
                 ProjectRow,
                 ContainerRegistryRow,

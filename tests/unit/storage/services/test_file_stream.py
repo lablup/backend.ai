@@ -257,6 +257,41 @@ class TestZipArchiveStreamReader:
             assert zf.read("mydir/top.txt") == b"top"
             assert zf.read("mydir/sub/deep.txt") == b"deep"
 
+    async def test_read_directory_excludes_symlinks_inside(self, tmp_path: Path) -> None:
+        """
+        Test that symlinks inside a directory are not archived.
+
+        Scenario:
+        1. Create mydir with a regular file and symlinks to an outside file, an outside
+           directory and a missing path
+        2. Add a subdirectory holding only a symlink
+        3. Verify ZIP has the regular file and the subdirectory, without symlink target content
+        """
+        base = tmp_path / "base"
+        base.mkdir()
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        outside_file = outside_dir / "target.txt"
+        outside_file.write_text("outside content")
+        mydir = base / "mydir"
+        mydir.mkdir()
+        (mydir / "regular.txt").write_text("regular")
+        (mydir / "file_link.txt").symlink_to(outside_file)
+        (mydir / "dir_link").symlink_to(outside_dir)
+        (mydir / "dangling_link.txt").symlink_to(outside_dir / "missing.txt")
+        link_only = mydir / "link_only"
+        link_only.mkdir()
+        (link_only / "file_link.txt").symlink_to(outside_file)
+
+        reader = ZipArchiveStreamReader(base)
+        reader.add_entries([mydir])
+
+        data = await self._collect_and_save(reader)
+
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            assert sorted(zf.namelist()) == ["mydir/link_only/", "mydir/regular.txt"]
+            assert zf.read("mydir/regular.txt") == b"regular"
+
     async def test_read_mixed_files_and_directories(self, tmp_path: Path) -> None:
         """
         Test that read() handles a mix of individual files and directories.

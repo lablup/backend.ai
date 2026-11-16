@@ -41,6 +41,8 @@ from ai.backend.common.dto.manager.session.response import (
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     GroupMeta,
 )
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
@@ -90,7 +92,9 @@ def server_module_registries(
         register_session_routes(
             SessionHandler(
                 project=ProjectProcessors(
-                    processor_registry.group(GroupMeta(ProjectEntityType())), AsyncMock()
+                    processor_registry.group(GroupMeta(ProjectEntityType())),
+                    processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+                    AsyncMock(),
                 ),
                 user=UserProcessors(
                     processor_registry.group(GroupMeta(UserEntityType())),

@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType
@@ -92,6 +93,7 @@ async def adapter(
     )
     project = ProjectProcessors(
         registry.group(GroupMeta(ProjectEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         ProjectService(
             unwired(StorageSessionManager, "only folder work reaches it"),
             config,
@@ -110,6 +112,8 @@ async def adapter(
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     user = UserProcessors(

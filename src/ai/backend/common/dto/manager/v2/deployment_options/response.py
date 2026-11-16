@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 
 
 class HandlerOptionsInfo(BaseResponseModel):
@@ -45,4 +46,7 @@ class DeploymentOptionsInfo(BaseResponseModel):
 
     handler_options: DeploymentHandlerOptionsInfo = Field(
         description="Handler-keyed scheduler policy (timeout + retry).",
+    )
+    agent_selection_policy: AgentSelectionPolicyEnum = Field(
+        description="How the designated agents are enforced.",
     )

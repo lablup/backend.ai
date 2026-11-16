@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import pytest
 
@@ -80,7 +81,7 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
         key="BACKENDAI_USER_NAME",
         scope_type=SystemSessionEnvironScopeType.PROJECT,
         scope_id=SystemSessionEnvironScopeID(_PROJECT_ID),
-        enabled=False,
+        deleted_at=datetime.now(UTC),
     )
     async with database.begin_session() as db_sess:
         db_sess.add_all([
@@ -160,7 +161,7 @@ class TestSessionSystemSessionEnvironScope:
             seeded_rows.project_row: _PROJECT_ID,
         }
 
-    async def test_returns_the_disabled_rows_with_their_flag(
+    async def test_returns_the_deleted_rows_with_their_deletion(
         self,
         repository: OpsRepository[SystemSessionEnvironData],
         searcher: SystemSessionEnvironSearcher,
@@ -171,8 +172,8 @@ class TestSessionSystemSessionEnvironScope:
             searcher,
         )
 
-        assert {row.id: row.enabled for row in result.items} == {
-            seeded_rows.public_row: True,
-            seeded_rows.domain_row: True,
-            seeded_rows.project_row: False,
+        assert {row.id: row.deleted_at is not None for row in result.items} == {
+            seeded_rows.public_row: False,
+            seeded_rows.domain_row: False,
+            seeded_rows.project_row: True,
         }

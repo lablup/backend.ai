@@ -7,6 +7,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.minilang import ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.utils import agg_to_array
@@ -119,7 +120,7 @@ async def test_select_queries(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     assert test_ret == actual_ret
 
     # invalid syntax
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_ordering(
             sa.select(grid.c.id).select_from(grid),
             "xxx",
@@ -143,7 +144,7 @@ async def test_column_map(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     assert test_ret == actual_ret
 
     # non-existent column in the column map
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_ordering(
             sa.select(grid.c.id).select_from(grid),
             "-data1,+data2",
@@ -198,3 +199,18 @@ async def test_orm_field_ordering(virtual_grid_db: tuple[Any, Any, Any]) -> None
     actual_ret = list(await conn.execute(sa_query))
     test_ret = [(1,), (2,)]
     assert test_ret == actual_ret
+
+
+@pytest.mark.parametrize(
+    "order_expr",
+    [
+        pytest.param("+", id="syntax-error"),
+        pytest.param("+xyz", id="unknown-field"),
+    ],
+)
+def test_order_parse_failure_is_an_invalid_request(order_expr: str) -> None:
+    table = sa.Table("grid", sa.MetaData(), sa.Column("id", sa.Integer))
+    parser = QueryOrderParser({"id": ("id", None)})
+
+    with pytest.raises(InvalidAPIParameters, match="Query ordering parsing error"):
+        parser.parse_order(table, order_expr)

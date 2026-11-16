@@ -25,6 +25,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -61,7 +62,10 @@ class SearchingEverything(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체 조회합니다",
+            english=f"{laid.caller.username} searches everything without a filter",
+        )
 
     @override
     async def call(
@@ -81,7 +85,10 @@ class SearchingByName(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, 
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회합니다",
+            english=f"{laid.caller.username} searches with the name filter {laid.named.name}",
+        )
 
     @override
     async def call(
@@ -105,7 +112,10 @@ class SearchingByCategory(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 카테고리 필터로 조회"
+        return Says(
+            f"{laid.caller.username}이 카테고리 필터로 조회합니다",
+            english=f"{laid.caller.username} searches with a category filter",
+        )
 
     @override
     async def call(
@@ -133,7 +143,10 @@ class SearchingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, Searche
 
     @override
     def describe(self, laid: APresetAlone) -> str:
-        return "사용자 컨텍스트 없이 전체 조회"
+        return Says(
+            "사용자 컨텍스트 없이 전체 조회합니다",
+            english="searches everything without a user context",
+        )
 
     @override
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: APresetAlone) -> Searched:
@@ -146,7 +159,10 @@ class OnlyTheNamedOneIsFound(Then[ManyPresetsAndACaller, Searched]):
 
     @override
     def says(self) -> str:
-        return "이름 필터에 맞는 하나만 집계된다"
+        return Says(
+            "이름 필터에 맞는 하나만 집계됩니다",
+            english="only the one matching the name filter is counted",
+        )
 
     @override
     def look(self, laid: ManyPresetsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -171,7 +187,13 @@ class AnyoneCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
+        return Says(
+            "프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계됩니다",
+            english=(
+                "when two presets exist and a user granted nothing searches without a "
+                "filter, both are counted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -196,7 +218,13 @@ class FilteringByNameKeepsThatOne(
 
     @override
     def describe(self) -> str:
-        return "이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다"
+        return Says(
+            "이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환됩니다",
+            english=(
+                "when three presets have different names and a name filter is used, only the "
+                "preset of that name comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -221,7 +249,14 @@ class FilteringByCategoryKeepsItsOwn(
 
     @override
     def describe(self) -> str:
-        return "두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다"
+        return Says(
+            "두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 "
+            "프리셋만 반환됩니다",
+            english=(
+                "when presets are split across two categories and one category filter is "
+                "used, only the presets of that category come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -246,7 +281,14 @@ class OmittingThePageSizeAnswersTen(
 
     @override
     def describe(self) -> str:
-        return "프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 "
+            "응답합니다",
+            english=(
+                "when there are 11 presets and a search gives no page size, ten items come "
+                "back and it answers that there is a next page"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -271,7 +313,13 @@ class NobodyMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다"
+        return Says(
+            "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다",
+            english=(
+                "when a preset exists and it is searched without a user context, it is "
+                "rejected because the caller cannot be known"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAlone]:

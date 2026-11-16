@@ -11,6 +11,7 @@ from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.common.clients.valkey_client.sentinel_monitor.dependency import (
     SentinelMonitorDependency,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.types import RedisProfileTarget
 
@@ -25,6 +26,7 @@ class InfrastructureResources:
 
     db: ExtendedAsyncSAEngine
     valkey: CoordinatorValkeyClients
+    sentinel_monitors: SentinelMonitorSet
     traefik_etcd: TraefikEtcd | None
 
 
@@ -66,5 +68,6 @@ class InfrastructureComposer(DependencyComposer[ServerConfig, InfrastructureReso
         yield InfrastructureResources(
             db=db,
             valkey=valkey,
+            sentinel_monitors=sentinel_monitors,
             traefik_etcd=traefik_etcd,
         )

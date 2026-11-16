@@ -119,6 +119,7 @@ from ai.backend.manager.api.gql.deployment.resolver.deployment import (
     deployment_status_changed,
     my_deployments,
     project_deployments,
+    replace_deployment_options,
     scoped_deployments,
     sync_replicas,
     update_model_deployment,
@@ -466,6 +467,7 @@ from ai.backend.manager.api.gql.resource_allocation.resolver import (
     effective_resource_allocation_v2,
     my_concurrency,
     my_keypair_resource_allocation_v2,
+    my_user_resource_allocation_v2,
     project_resource_allocation_v2,
     resource_group_resource_allocation_v2,
 )
@@ -661,6 +663,16 @@ from ai.backend.manager.api.gql.storage_volume.resolver import (
 from ai.backend.manager.api.gql.storage_volume_service_attachment.resolver import (
     admin_storage_volume_service_attachments,
 )
+from ai.backend.manager.api.gql.system_session_environ.resolver import (
+    admin_system_session_environs,
+    create_system_session_environ,
+    delete_system_session_environ,
+    purge_system_session_environ,
+    restore_system_session_environ,
+    scoped_system_session_environs,
+    system_session_environ_value_sources,
+    update_system_session_environ,
+)
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
     admin_bulk_create_users_with_keypair_v2,
@@ -683,6 +695,12 @@ from ai.backend.manager.api.gql.user.resolver.query import (
     my_user_v2,
     project_users_v2,
     scoped_users_v2,
+)
+from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    create_vfolder_auto_mount,
+    delete_vfolder_auto_mount,
+    scoped_vfolder_auto_mounts,
+    update_vfolder_auto_mount,
 )
 from ai.backend.manager.api.gql.vfolder_v2.resolver.mutation import (
     bulk_delete_vfolders_v2,
@@ -855,6 +873,9 @@ class Query:
     scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    admin_system_session_environs = admin_system_session_environs
+    system_session_environ_value_sources = system_session_environ_value_sources
+    scoped_system_session_environs = scoped_system_session_environs
     admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
@@ -905,6 +926,7 @@ class Query:
     session_group = session_group
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
+    scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments
@@ -1060,6 +1082,7 @@ class Query:
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
+    my_user_resource_allocation_v2 = my_user_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
     admin_domain_resource_allocation_v2 = admin_domain_resource_allocation_v2
     resource_group_resource_allocation_v2 = resource_group_resource_allocation_v2
@@ -1139,6 +1162,7 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    replace_deployment_options = replace_deployment_options
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
     admin_refresh_deployment_revisions = admin_refresh_deployment_revisions
@@ -1439,6 +1463,11 @@ class Mutation:
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
     update_runtime_variant = update_runtime_variant
+    create_system_session_environ = create_system_session_environ
+    update_system_session_environ = update_system_session_environ
+    delete_system_session_environ = delete_system_session_environ
+    restore_system_session_environ = restore_system_session_environ
+    purge_system_session_environ = purge_system_session_environ
     purge_runtime_variant = purge_runtime_variant
     partial_bulk_update_runtime_variants = partial_bulk_update_runtime_variants
     partial_bulk_purge_runtime_variants = partial_bulk_purge_runtime_variants
@@ -1524,6 +1553,10 @@ class Mutation:
     update_session_group = update_session_group
     create_session_group = create_session_group
     purge_session_group = purge_session_group
+    # VFolder Auto-Mount mutations
+    create_vfolder_auto_mount = create_vfolder_auto_mount
+    update_vfolder_auto_mount = update_vfolder_auto_mount
+    delete_vfolder_auto_mount = delete_vfolder_auto_mount
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
     partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels

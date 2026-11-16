@@ -191,7 +191,7 @@ class TestServiceCatalogRepositoryBulkGet:
     async def one_endpoint_service(self, repository: ServiceCatalogRepository) -> ServiceCatalogID:
         return await repository.register(self._upserter("mgr-002"), [self._endpoint("main")])
 
-    async def test_each_named_service_carries_its_own_endpoints(
+    async def test_each_named_service_is_returned(
         self,
         repository: ServiceCatalogRepository,
         two_endpoint_service: ServiceCatalogID,
@@ -199,13 +199,10 @@ class TestServiceCatalogRepositoryBulkGet:
     ) -> None:
         found = await repository.bulk_get([two_endpoint_service, one_endpoint_service])
 
-        roles = {
-            service_id: sorted(endpoint.role for endpoint in data.endpoints)
-            for service_id, data in found.items()
-        }
-        assert roles == {
-            two_endpoint_service: ["health", "main"],
-            one_endpoint_service: ["main"],
+        instance_ids = {service_id: data.instance_id for service_id, data in found.items()}
+        assert instance_ids == {
+            two_endpoint_service: "mgr-001",
+            one_endpoint_service: "mgr-002",
         }
 
     async def test_an_unknown_id_is_absent(

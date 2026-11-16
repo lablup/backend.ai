@@ -33,6 +33,7 @@ class RolePresetUpserter(
     name: str
     scope_type: EntityType
     auto_assign: bool
+    auto_assign_to_owner: bool
 
     @override
     def entity_id(self, row: RolePresetRow) -> RolePresetID:
@@ -65,6 +66,7 @@ class RolePresetUpserter(
             "name": self.name,
             "scope_type": self.scope_type,
             "auto_assign": self.auto_assign,
+            "auto_assign_to_owner": self.auto_assign_to_owner,
         }
 
     @override

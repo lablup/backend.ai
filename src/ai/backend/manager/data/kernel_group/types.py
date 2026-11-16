@@ -8,14 +8,18 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGroupRole
 from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
 from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
+from ai.backend.common.data.entity.kernel_group_vfolder_mount import KernelGroupVFolderMountID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import FieldData
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.types import MountPermission
 
 __all__ = (
     "KernelGroupData",
     "KernelGroupEnvironData",
     "KernelGroupResourceSlotData",
+    "KernelGroupVFolderMountData",
 )
 
 
@@ -46,3 +50,13 @@ class KernelGroupEnvironData(FieldData):
     kernel_group_id: KernelGroupID
     key: str
     value: str
+
+
+@dataclass(frozen=True)
+class KernelGroupVFolderMountData(FieldData):
+    id: KernelGroupVFolderMountID
+    kernel_group_id: KernelGroupID
+    vfolder_id: VFolderUUID
+    vfsubpath: str
+    mount_destination: str
+    mount_perm: MountPermission

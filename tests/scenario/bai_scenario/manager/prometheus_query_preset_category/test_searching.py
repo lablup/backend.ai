@@ -25,6 +25,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -59,7 +60,10 @@ class SearchingEverything(When[ManyCategoriesAndACaller, Adapter, Searched]):
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} searches every category without a filter",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Searched:
@@ -77,7 +81,12 @@ class SearchingByName(When[ManyCategoriesAndACaller, Adapter, Searched]):
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회합니다",
+            english=(
+                f"{laid.caller.username} searches with a filter on the name {laid.named.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Searched:
@@ -99,7 +108,10 @@ class SearchingAsNobody(When[ACategoryAlone, Adapter, Searched]):
 
     @override
     def describe(self, laid: ACategoryAlone) -> str:
-        return "사용자 컨텍스트 없이 전체 조회"
+        return Says(
+            "사용자 컨텍스트 없이 전체를 조회합니다",
+            english="searches every category with no user context",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAlone) -> Searched:
@@ -112,7 +124,10 @@ class OnlyTheNamedOneIsFound(Then[ManyCategoriesAndACaller, Searched]):
 
     @override
     def says(self) -> str:
-        return "이름 필터에 맞는 하나만 집계된다"
+        return Says(
+            "이름 필터에 맞는 하나만 집계됩니다",
+            english="only the one matching the name filter is counted",
+        )
 
     @override
     def look(self, laid: ManyCategoriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -137,7 +152,13 @@ class AnyoneCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
+        return Says(
+            "카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계됩니다",
+            english=(
+                "with two categories laid, when a user granted nothing searches without a "
+                "filter, both are counted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyCategoriesAndACaller]:
@@ -162,8 +183,13 @@ class FilteringByNameKeepsThatOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, 그 이름의 카테고리만 반환된다"
+        return Says(
+            "이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, "
+            "그 이름의 카테고리만 반환됩니다",
+            english=(
+                "with three categories of different names, when they are searched with a "
+                "filter on one name, only the category of that name comes back"
+            ),
         )
 
     @override
@@ -189,7 +215,14 @@ class OmittingThePageSizeAnswersTen(
 
     @override
     def describe(self) -> str:
-        return "카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 "
+            "있다고 응답합니다",
+            english=(
+                "with 11 categories laid, when they are searched without a page size, "
+                "ten come back and the answer says there is a next page"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyCategoriesAndACaller]:
@@ -212,7 +245,13 @@ class NobodyMayNotSearch(Scenario[TestSeedingSession, ACategoryAlone, Adapter, S
 
     @override
     def describe(self) -> str:
-        return "카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다"
+        return Says(
+            "카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부됩니다",
+            english=(
+                "with one category laid, when it is searched with no user context, "
+                "the call is rejected for an authentication failure"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACategoryAlone]:

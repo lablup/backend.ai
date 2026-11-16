@@ -428,10 +428,6 @@ def emit(repository: Path | None, check: bool, seed_dir: Path) -> None:
         print(f"wrote {target}")
 
 
-# The preset whose role a project's creator holds while still on its roster.
-_CREATOR_PRESET: Final[str] = "project_admin"
-
-
 @cli.command(name="provision")
 @click.option(
     "--seeds",
@@ -462,7 +458,7 @@ def provision(cli_ctx: CLIContext, seed_dir: Path) -> None:
     from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 
     seeds = _load(seed_dir)
-    creator_preset_ids = [seed.id for seed in seeds if seed.name == _CREATOR_PRESET]
+    creator_preset_ids = [seed.id for seed in seeds if seed.auto_assign_to_owner]
 
     async def _provision() -> None:
         bootstrap_config = await cli_ctx.get_bootstrap_config()

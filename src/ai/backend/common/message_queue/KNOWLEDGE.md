@@ -13,9 +13,11 @@ generated:
 status: stable
 ---
 
-# Message Queue — Knowledge
+# Message Queue: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this package exists
 
@@ -28,15 +30,15 @@ consumers may assume.
 - All components share a single anycast stream key (`"events"`) and a single broadcast channel (`"events_all"`), distinguished only by consumer group (`"manager"`, `"agent"`, `"storage-proxy"`, ...).
 - Adding a stream/channel is a topology decision, not a local one.
 
-## Anycast is at-least-once — only within a shallow buffer
+## Anycast is at-least-once: only within a shallow buffer
 
-- A consumer group reads, an auto-claim loop (every 60 seconds) re-claims messages idle for 5 minutes, and after 3 retries a message is **acked and discarded — there is no DLQ**.
-- Retry is implemented as ack-the-old plus re-add — a redelivered message gets a new id at the tail of the stream, so it loses ordering, and the message id is not a dedup key.
-- Every add trims the stream to about 128 entries — if producers outrun consumers, even un-acked entries can disappear. This is not durable delivery.
+- A consumer group reads, an auto-claim loop (every 60 seconds) re-claims messages idle for 5 minutes, and after 3 retries a message is **acked and discarded: there is no DLQ**.
+- Retry is implemented as ack-the-old plus re-add: a redelivered message gets a new id at the tail of the stream, so it loses ordering, and the message id is not a dedup key.
+- Every add trims the stream to about 128 entries: if producers outrun consumers, even un-acked entries can disappear. This is not durable delivery.
 - Connection failures do not stop the loop (unbounded backoff capped at 30 seconds), and a vanished consumer group is recreated automatically.
 
 ## Broadcast is a loss-tolerant compromise
 
-- Pure pub/sub — there is no ack path, so a subscriber that is down or mid-restart/reconnect misses messages permanently.
+- Pure pub/sub: there is no ack path, so a subscriber that is down or mid-restart/reconnect misses messages permanently.
 - This is a compromise, not a design goal: the premise is the applicability rule that broadcast is used **only for events whose loss is acceptable**.
-- If "eventually observed" is required, compensate with the events layer's cache plus polling ([../events/KNOWLEDGE.md](../events/KNOWLEDGE.md)) — do not assume redelivery here.
+- If "eventually observed" is required, compensate with the events layer's cache plus polling ([../events/KNOWLEDGE.md](../events/KNOWLEDGE.md)): do not assume redelivery here.

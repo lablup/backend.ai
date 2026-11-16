@@ -281,6 +281,7 @@ def _create_kernel_info(
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 
@@ -335,18 +336,5 @@ def valkey_one_stale_response(
             mock_status.presence = HealthCheckStatus.STALE
         else:
             mock_status.presence = HealthCheckStatus.HEALTHY
-        response[KernelId(kernel.id)] = mock_status
-    return response
-
-
-@pytest.fixture
-def valkey_all_stale_response(
-    running_kernels_multiple: list[KernelInfo],
-) -> dict[KernelId, MagicMock]:
-    """Valkey response showing all kernels as stale."""
-    response = {}
-    for kernel in running_kernels_multiple:
-        mock_status = MagicMock()
-        mock_status.presence = HealthCheckStatus.STALE
         response[KernelId(kernel.id)] = mock_status
     return response

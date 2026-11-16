@@ -35,9 +35,9 @@ class TestIngressUpsertRequest:
 class TestIngressRemoveRequest:
     def test_keys_are_accepted(self) -> None:
         request = IngressRemoveRequest.model_validate({
-            "keys": [{"authority": "worker-1", "frontend_key": "10205"}]
+            "keys": [{"authority": "worker-1", "frontend_key": "port-10205"}]
         })
-        assert request.keys[0].frontend_key == "10205"
+        assert request.keys[0].frontend_key == "port-10205"
 
     def test_empty_keys_are_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):

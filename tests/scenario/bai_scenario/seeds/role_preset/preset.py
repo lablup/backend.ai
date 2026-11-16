@@ -18,6 +18,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.creators impor
     RolePermissionPresetCreator,
 )
 from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRow
 
 
@@ -26,14 +27,36 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
     """A role preset in the global catalog, carrying no permission entry."""
 
     name_hint: str = "preset"
+    scope_type: EntityType = ProjectEntityType()
+    auto_assign: bool = False
+    auto_assign_to_owner: bool = False
+    role_name_template: str | None = None
 
     @override
     def kind(self) -> str:
-        return "역할 프리셋"
+        return Says("역할 프리셋", english="Role preset")
 
     @override
     def detail(self) -> str:
-        return "프로젝트 스코프용이고 자동 부여는 꺼져 있다"
+        if self.scope_type == ProjectEntityType():
+            scope_ko, scope_en = "프로젝트 스코프용", "for the project scope"
+        else:
+            scope_ko = f"{self.scope_type} 스코프용"
+            scope_en = f"for the {self.scope_type} scope"
+        notes_ko = ["자동 부여를 켬" if self.auto_assign else "자동 부여는 비활성"]
+        notes_en = [
+            "with automatic grant enabled" if self.auto_assign else "with automatic grant disabled"
+        ]
+        if self.auto_assign_to_owner:
+            notes_ko.append("소유자 부여를 켬")
+            notes_en.append("with owner assignment enabled")
+        if self.role_name_template is not None:
+            notes_ko.append("역할 이름 템플릿을 가짐")
+            notes_en.append("carrying a role name template")
+        return Says(
+            f"{scope_ko}이고 {', '.join(notes_ko)}입니다",
+            english=f"{scope_en}, {', '.join(notes_en)}",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -41,7 +64,13 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def seed(self, name: str) -> RolePresetCreator:
-        return RolePresetCreator(name=name, scope_type=ProjectEntityType())
+        return RolePresetCreator(
+            name=name,
+            scope_type=self.scope_type,
+            auto_assign=self.auto_assign,
+            auto_assign_to_owner=self.auto_assign_to_owner,
+            role_name_template=self.role_name_template,
+        )
 
 
 @dataclass(frozen=True)
@@ -53,7 +82,11 @@ class TestSeedRolePresetPermission(TestSeedFieldCreator[RolePresetData, RolePerm
 
     @override
     def kind(self) -> str:
-        return f"{self.entity_type} 전체에 {self.permission.name or int(self.permission)} 허용 항목"
+        permission = self.permission.name or int(self.permission)
+        return Says(
+            f"{self.entity_type} 전체에 {permission} 허용",
+            english=f"{permission} allowed on every {self.entity_type}",
+        )
 
     @override
     def owner_id(self, owner: RolePresetData) -> RolePresetID:

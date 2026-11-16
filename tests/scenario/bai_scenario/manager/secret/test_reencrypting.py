@@ -18,7 +18,7 @@ from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.secret import (
     CONFIG_KEYS,
@@ -46,7 +46,10 @@ class Reencrypting(When[AKeyringAndACaller, SecretAdapter, Reencrypted]):
 
     @override
     def describe(self, laid: AKeyringAndACaller) -> str:
-        return f"{laid.caller.username}이 비밀 키 전부를 재암호화"
+        return Says(
+            f"{laid.caller.username} 이 비밀 키 전부를 재암호화합니다",
+            english=f"{laid.caller.username} re-encrypts every secret key",
+        )
 
     @override
     async def call(self, adapter: SecretAdapter, laid: AKeyringAndACaller) -> Reencrypted:
@@ -64,9 +67,14 @@ class PlaintextSecretsMoveOntoTheConfigKey(
 
     @override
     def describe(self) -> str:
-        return (
-            "설정 키가 쓰기 제공자일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 "
-            "응답과 함께 둘 다 그 키로 암호화되고 평문은 없는 상태가 반환된다"
+        return Says(
+            "설정 키가 쓰기 provider 일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 "
+            "응답과 함께 둘 다 그 키로 암호화되고 평문은 없는 상태가 반환됩니다",
+            english=(
+                "when the config key is the write provider and two plaintext secret keys are "
+                "re-encrypted, the response says both were scanned and rewritten, and the "
+                "status shows both on that key with no plaintext left"
+            ),
         )
 
     @override
@@ -96,9 +104,14 @@ class SecretsAlreadyOnTheKeyAreRewrittenAgain(
 
     @override
     def describe(self) -> str:
-        return (
-            "설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 "
-            "스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘이다"
+        return Says(
+            "설정 키가 쓰기 provider 이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 "
+            "스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘입니다",
+            english=(
+                "when the config key is the write provider and two secret keys are already on "
+                "that key, re-encrypting scans and rewrites both, and the status still shows "
+                "the two on that key"
+            ),
         )
 
     @override
@@ -133,9 +146,16 @@ class APlainWriterRewritesPlaintextAsPlaintext(
 
     @override
     def describe(self) -> str:
-        return (
-            "쓰기 제공자가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 "
-            "반환되고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다"
+        return Says(
+            "쓰기 provider 가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 "
+            "응답이 반환되고 상태는 그대로 평문 둘입니다. 다시 쓴 수는 값이 바뀌었는지가 아니라 "
+            "행을 다시 썼는지를 셉니다",
+            english=(
+                "when the write provider is plaintext and two plaintext secret keys are "
+                "re-encrypted, the response says both were scanned and rewritten, and the "
+                "status still shows two plaintext entries. The rewritten count counts "
+                "rewritten rows, not changed values"
+            ),
         )
 
     @override
@@ -161,9 +181,14 @@ class APlainWriterTurnsEncryptedSecretsBackToPlaintext(
 
     @override
     def describe(self) -> str:
-        return (
-            "쓰기 제공자가 평문이고 설정 키 제공자는 읽기 전용일 때 그 키로 암호화된 비밀 키를 "
-            "재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐이다"
+        return Says(
+            "쓰기 provider 가 평문이고 설정 키 provider 는 읽기 전용일 때 그 키로 암호화된 비밀 키를 "
+            "재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐입니다",
+            english=(
+                "when the write provider is plaintext and the config key provider is read-only, "
+                "re-encrypting the secret key encrypted with that key scans and rewrites one, "
+                "and the status holds only plaintext"
+            ),
         )
 
     @override
@@ -195,7 +220,14 @@ class TheMonitorMayNotReencrypt(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다"
+        return Says(
+            "모니터 역할이 재암호화를 실행하면 역할 부족으로 거부됩니다. 상태는 조회할 수 있지만 "
+            "재암호화는 쓰기 연산이라 통과하지 못합니다",
+            english=(
+                "when the monitor role runs a re-encryption, it is rejected for lack of the role: "
+                "it can read the status, but re-encryption is a write and does not pass"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:
@@ -220,7 +252,11 @@ class AUserWhoIsNotTheSuperadminMayNotReencrypt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부됩니다",
+            english="when a user who is not the superadmin runs a re-encryption, it is rejected "
+            "for lack of the role",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:

@@ -1,8 +1,7 @@
 """The rbac adapter, assembled for one row.
 
-Role writes are the operations these rows exercise. They answer from the ops path, so
-the permission controller service behind them is wired with what a role write never
-reaches left unwired.
+Role writes and the permission reads these rows exercise run through the permission
+controller, so every piece behind them is wired.
 """
 
 from __future__ import annotations
@@ -23,7 +22,9 @@ from ai.backend.manager.actions.registry.types import (
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
@@ -45,12 +46,12 @@ from ai.backend.manager.services.rbac.service import (
     RbacRoleService,
     RbacRosterService,
 )
-from bai_scenario.runner.unwired import unwired
 
 
 @pytest.fixture
 async def adapter(
     engine: Any,
+    config: ManagerConfigProvider,
     validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> RBACAdapter:
@@ -76,7 +77,7 @@ async def adapter(
         rbac_groups.group(GroupMeta(UserEntityType())),
         PermissionControllerService(
             permission_controller_repository,
-            unwired(RbacPermissionCheckRepository, "only held-permission reads reach it"),
+            RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
             registry,
         ),
     )

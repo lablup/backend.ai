@@ -9,7 +9,9 @@ This test suite covers:
 
 from __future__ import annotations
 
+import io
 import urllib.parse
+import zipfile
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -27,7 +29,7 @@ from ai.backend.common.dto.storage.request import (
     TokenOperationType,
 )
 from ai.backend.common.types import VFolderID
-from ai.backend.storage.api.client import DownloadHandler
+from ai.backend.storage.api.client import DownloadHandler, download_directory_as_archive
 from ai.backend.storage.errors import InvalidAPIParameters
 from ai.backend.storage.services.file_stream.zip import ZipArchiveStreamReader
 from ai.backend.storage.storages.vfs_storage import VFSFileDownloadServerStreamReader
@@ -420,3 +422,37 @@ class TestVFSFileDownloadStreaming:
 
         assert resp.status == 200
         assert await resp.read() == content
+
+
+class TestDownloadDirectoryAsArchive:
+    async def test_excludes_symlinks_inside_directory(
+        self,
+        tmp_path: Path,
+        aiohttp_client: Any,
+    ) -> None:
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        outside_file = outside_dir / "target.txt"
+        outside_file.write_text("outside content")
+        mydir = tmp_path / "mydir"
+        mydir.mkdir()
+        (mydir / "regular.txt").write_text("regular")
+        (mydir / "file_link.txt").symlink_to(outside_file)
+        (mydir / "dir_link").symlink_to(outside_dir)
+        (mydir / "dangling_link.txt").symlink_to(outside_dir / "missing.txt")
+        link_only = mydir / "link_only"
+        link_only.mkdir()
+        (link_only / "file_link.txt").symlink_to(outside_file)
+
+        async def handle(request: web.Request) -> web.StreamResponse:
+            return await download_directory_as_archive(request, mydir)
+
+        app = web.Application()
+        app.router.add_get("/download", handle)
+        client = await aiohttp_client(app)
+        resp = await client.get("/download")
+
+        assert resp.status == 200
+        with zipfile.ZipFile(io.BytesIO(await resp.read())) as zf:
+            assert sorted(zf.namelist()) == ["link_only/", "regular.txt"]
+            assert zf.read("regular.txt") == b"regular"

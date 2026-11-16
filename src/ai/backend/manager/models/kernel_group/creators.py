@@ -48,14 +48,4 @@ class KernelGroupCreator(FieldCreator[SessionID, KernelGroupRow, KernelGroupData
 
     @override
     def to_data(self, row: KernelGroupRow) -> KernelGroupData:
-        return KernelGroupData(
-            id=KernelGroupID(row.id),
-            session_id=row.session_id,
-            role=KernelGroupRole(row.role),
-            image_id=row.image_id,
-            shmem=row.shmem,
-            startup_command=row.startup_command,
-            preopen_ports=list(row.preopen_ports),
-            requested_starts_at=row.requested_starts_at,
-            batch_timeout_sec=row.batch_timeout_sec,
-        )
+        return row.to_data()

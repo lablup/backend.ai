@@ -4,13 +4,17 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.models.user.row import UserRole
 
 from .base import TemplateScopeActionResult, TemplateUserScopeAction
 
 
 @dataclass
 class ListTaskTemplatesAction(TemplateUserScopeAction):
-    """Action to list all active task templates."""
+    """Action to list the task templates the requester may see."""
+
+    user_role: UserRole
+    domain_name: str
 
     @override
     @classmethod

@@ -16,13 +16,16 @@ from ai.backend.common.dto.manager.v2.image.request import (
 )
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.image import (
+    CustomImagesOfTwoMakers,
     EveryImageComesBack,
     ManyImagesAndACaller,
     ManyImagesAndSomeone,
-    NoImageIsProcessed,
+    OneImageIsNotProcessed,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -44,7 +47,10 @@ class EditingEveryTarget(When[ManyImagesAndACaller, ImageAdapter, Edited]):
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return f"{laid.caller.username}이 이미지 {len(laid.laid)}개의 태그를 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 이미지 {len(laid.laid)}개의 태그를 한 번에 수정합니다",
+            english=f"{laid.caller.username} changes the tags of {len(laid.laid)} images at once",
+        )
 
     @override
     async def call(self, adapter: ImageAdapter, laid: ManyImagesAndACaller) -> Edited:
@@ -62,22 +68,27 @@ class EditingEveryTarget(When[ManyImagesAndACaller, ImageAdapter, Edited]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminEditsSeveralImages(
+class AUserGrantedUpdateEditsEveryTarget(
     Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, Edited]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-edits-several-images-at-once"
+        return "a-user-granted-update-edits-several-images-at-once"
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다"
+        return Says(
+            "이미지 수정 권한을 받은 사용자가 이미지 여럿의 태그를 한 번에 변경하면 모두 새 태그로 "
+            "오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted update on images changes the tags of several images at "
+                "once, they all come back with the new tag and nothing failed"
+            ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
-        return ManyImagesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyImagesAndSomeone(role=UserRole.USER, granted=(Permission.UPDATE,))
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, Edited]:
@@ -89,23 +100,30 @@ class TheSuperadminEditsSeveralImages(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingEditsNone(
+class AUserWithoutUpdateOnAnothersImageEditsOnlyTheirOwn(
     Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, Edited]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-edits-none-of-several-images"
+        return "a-user-granted-update-is-denied-on-another-users-image"
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "자기 개인 프로젝트에서 이미지 수정 권한을 받은 사용자가 자기 이미지와 다른 사용자의 "
+            "이미지를 한 번에 수정하면, 자기 이미지만 새 태그로 오고 다른 사용자의 이미지는 "
+            "권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted update in their own personal project changes the tags of "
+                "their own image and another user's image at once, only their own comes back "
+                "with the new tag and the other comes back in the failed list for lack of "
+                "permission"
+            ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
-        return ManyImagesAndSomeone(role=UserRole.USER)
+        return CustomImagesOfTwoMakers(granted=Permission.UPDATE)
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, Edited]:
@@ -113,12 +131,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, Edited]:
-        return NoImageIsProcessed(reason="Insufficient permission")
+        return OneImageIsNotProcessed(
+            status=ImageStatus.ALIVE, tag=EDITED_TAG, reason="Insufficient permission"
+        )
 
 
 SCENARIOS: list[ImageStep] = [
-    TheSuperadminEditsSeveralImages(),
-    AUserGrantedNothingEditsNone(),
+    AUserGrantedUpdateEditsEveryTarget(),
+    AUserWithoutUpdateOnAnothersImageEditsOnlyTheirOwn(),
 ]
 
 

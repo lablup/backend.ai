@@ -11,12 +11,10 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
     ResourceSlot,
-    SessionTypes,
     SlotName,
     SlotQuantity,
     SlotTypes,
@@ -29,14 +27,13 @@ from ai.backend.manager.data.resource_allocation.types import (
     KeypairContextData,
     ResourceGroupUsageData,
     ScopeUsageData,
-    UserConcurrencyData,
 )
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
     ResourceGroupNotFound,
 )
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -49,7 +46,6 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     AccessKeyFilter,
@@ -99,33 +95,13 @@ class ResourceAllocationDBSource:
             result = await session.execute(query)
             row = result.first()
             if row is None:
-                raise PermissionError(f"No default keypair found for user (id: {user_id})")
+                raise KeyPairNotFound(f"No default keypair found for user (id: {user_id})")
             return KeypairContextData(
                 access_key=AccessKey(row.access_key),
                 resource_policy={
                     "total_resource_slots": row.total_resource_slots,
                     "default_for_unspecified": row.default_for_unspecified,
                 },
-            )
-
-    async def get_user_concurrency(self, user_id: UserID) -> UserConcurrencyData:
-        """Count the user's active sessions with the scheduler's concurrency-check conditions."""
-        is_private = SessionRow.session_type.in_(SessionTypes.private_types())
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            row = (
-                await db_sess.execute(
-                    sa.select(
-                        sa.func.count().filter(~is_private).label("session_count"),
-                        sa.func.count().filter(is_private).label("private_session_count"),
-                    ).where(
-                        SessionRow.user_uuid == user_id,
-                        SessionRow.status.in_(SessionStatus.resource_occupied_statuses()),
-                    )
-                )
-            ).one()
-            return UserConcurrencyData(
-                session_count=row.session_count,
-                private_session_count=row.private_session_count,
             )
 
     async def get_keypair_usage(

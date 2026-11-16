@@ -24,7 +24,8 @@ from ai.backend.manager.models.audit_log.creators import (
     SingleEntityAuditLogCreator,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldCreator
-from bai_scenario.seeds.seeder import TestSeedFieldCreator, TestSeedFieldWithNestedRows
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import TestSeedFieldCreator, TestSeedFieldWithNestedRows, joined
 
 
 @dataclass(frozen=True)
@@ -45,14 +46,19 @@ class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
 
     @override
     def kind(self) -> str:
-        parts = [f"'{self.operation}' 기록"]
+        parts = [Says(f"'{self.operation}' 기록", english=f"'{self.operation}' record")]
         if self.status is not OperationStatus.SUCCESS:
-            parts.append(f"{self.status.value} 상태")
+            parts.append(Says(f"{self.status.value} 상태", english=f"status {self.status.value}"))
         if self.triggered_by is not None:
-            parts.append("실행한 사용자가 정해져 있음")
+            parts.append(Says("실행한 사용자를 지정함", english="the user who ran it is specified"))
         if self.action_id is not None:
-            parts.append("다른 기록과 같은 실행에서 남음")
-        return ", ".join(parts)
+            parts.append(
+                Says(
+                    "다른 기록과 같은 실행에서 남음",
+                    english="recorded in the same run as another record",
+                )
+            )
+        return joined(parts)
 
     @override
     def owner_id(self, owner: Owner) -> EntityIdentifier:
@@ -91,7 +97,10 @@ class TestSeedScopedAuditRecord[Owner](TestSeedFieldWithNestedRows[Owner, AuditL
 
     @override
     def kind(self) -> str:
-        return f"'{self.operation}' 기록, 스코프 {len(self.scopes)}개 달림"
+        return joined([
+            Says(f"'{self.operation}' 기록", english=f"'{self.operation}' record"),
+            Says(f"스코프 {len(self.scopes)}개 추가됨", english=f"{len(self.scopes)} scopes added"),
+        ])
 
     @override
     def owner_id(self, owner: Owner) -> EntityIdentifier:
