@@ -297,6 +297,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         description="Added in 24.09.0.",
     )
 
+<<<<<<< HEAD
     @classmethod
     async def get_node(
         cls,
@@ -307,6 +308,12 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         _, raw_session_id = AsyncNode.resolve_global_id(info, id)
         session_id = parse_uuid(raw_session_id)
         user = graphene_ctx.user
+=======
+    @staticmethod
+    def _visible_to(user: Mapping[str, Any]) -> sa.ColumnElement[bool]:
+        """The sessions the requester may read: all for a superadmin, the domain's for an
+        admin, their own for a user, none for any other role."""
+>>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
         visible: sa.ColumnElement[bool]
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -317,6 +324,17 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 visible = SessionRow.user_uuid == user["uuid"]
             case _:
                 visible = sa.false()
+        return visible
+
+    @classmethod
+    async def get_node(
+        cls,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> Self | None:
+        graphene_ctx: GraphQueryContext = info.context
+        session_id = resolve_entity_id(id, SessionID)
+        visible = cls._visible_to(graphene_ctx.user)
         async with graphene_ctx.db.begin_readonly_session_read_committed() as db_session:
             stmt = (
                 sa.select(SessionRow)
@@ -658,10 +676,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             for dependee_id, dependent_id in dep_rows:
                 dep_map.setdefault(dependent_id, []).append(dependee_id)
 
-            # Step 2: Fetch dependent SessionRows with eager loading
+            # Step 2: Fetch the dependent SessionRows the requester may read
             sess_query = (
                 sa.select(SessionRow)
-                .where(SessionRow.id.in_(dependent_ids))
+                .where(cls._visible_to(ctx.user) & SessionRow.id.in_(dependent_ids))
                 .options(
                     selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
                     joinedload(SessionRow.user),
@@ -703,10 +721,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             for dependent_id, dependee_id in dep_rows:
                 dep_map.setdefault(dependee_id, []).append(dependent_id)
 
-            # Step 2: Fetch dependee SessionRows with eager loading
+            # Step 2: Fetch the dependee SessionRows the requester may read
             sess_query = (
                 sa.select(SessionRow)
-                .where(SessionRow.id.in_(dependee_ids))
+                .where(cls._visible_to(ctx.user) & SessionRow.id.in_(dependee_ids))
                 .options(
                     selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
                     joinedload(SessionRow.user),

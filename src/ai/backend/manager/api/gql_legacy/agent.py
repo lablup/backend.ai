@@ -702,6 +702,7 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select[Any]:
+<<<<<<< HEAD
     from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 
     if scaling_group is not None:
@@ -712,6 +713,19 @@ async def _append_sgroup_from_clause(
             sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
             names = [sgroup.name for sgroup in sgroups]
         query = query.where(AgentRow.scaling_group.in_(names))
+=======
+    async with graph_ctx.db.begin_readonly() as conn:
+        domain_name, user_id, group_ids = await _query_domain_groups_by_ak(
+            conn, access_key, domain_name
+        )
+    domain_id = await graph_ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
+    allowed = await graph_ctx.scheduler_repository.query_allowed_resource_groups(
+        domain_id=domain_id, project_ids=group_ids, user_id=user_id
+    )
+    query = query.where(AgentRow.scaling_group.in_([rg.name for rg in allowed]))
+    if scaling_group is not None:
+        query = query.where(AgentRow.scaling_group == scaling_group)
+>>>>>>> 9d8684d85 (fix(BA-9000): bound five legacy GraphQL reads to what the requester may read (#16826))
     return query
 
 
