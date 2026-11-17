@@ -653,7 +653,7 @@ class EventDispatcher(EventDispatcherGroup):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        async for msg in self._msg_queue.consume_queue():  # type: ignore
+        async for msg in self._msg_queue.consume_queue():
             if self._closed:
                 return
             try:
@@ -665,7 +665,7 @@ class EventDispatcher(EventDispatcherGroup):
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
+        async for msg in self._msg_queue.subscribe_queue():
             if self._closed:
                 return
             try:

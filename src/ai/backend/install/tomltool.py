@@ -2,7 +2,7 @@ import io
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import tomlkit
 from tomlkit.exceptions import NonExistentKey
@@ -19,7 +19,7 @@ def toml_get(filepath: str, key: str) -> str:
     doc = tomlkit.load(file)
     keytree = key.split(".")
     keytree_traversed = keytree[:]
-    table = doc
+    table: Any = doc
     k: str = ""
     try:
         while True:
@@ -30,10 +30,10 @@ def toml_get(filepath: str, key: str) -> str:
             if (match_index := rx_index.search(k)) and (
                 (index := match_index.group("index")) is not None
             ):
-                table = table[match_index.group("key")][int(index)]  # type: ignore
+                table = table[match_index.group("key")][int(index)]
             else:
-                table = table[k]  # type: ignore
-        return table  # type: ignore
+                table = table[k]
+        return cast(str, table)
     finally:
         if isinstance(file, io.BufferedIOBase):
             file.close()
