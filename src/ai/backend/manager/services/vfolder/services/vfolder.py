@@ -129,6 +129,7 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
+<<<<<<< HEAD
 from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
     ResolveIdsByNamesAction,
     ResolveIdsByNamesActionResult,
@@ -136,6 +137,10 @@ from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
+=======
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
 )
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersAction,
@@ -240,6 +245,7 @@ class VFolderService:
     ) -> BatchLoadVFoldersByIdsActionResult:
         """Batch fetch vfolders by IDs for cross-entity reference resolution.
 
+<<<<<<< HEAD
         Audit log records this as ``vfolder.GET`` (not as a search).
         """
         data = await self._vfolder_repository.batch_load_by_ids(action.ids)
@@ -266,6 +272,44 @@ class VFolderService:
         if missing:
             raise VFolderNotFound(extra_data=missing)
         return ResolveIdsByNamesActionResult(name_to_id=name_to_id)
+=======
+    async def bulk_load_mount_levels(
+        self, action: BulkLoadVFolderMountLevelsAction
+    ) -> PartialBulkResult[VFolderMountPolicy]:
+        """The mount level the caller gets on each folder named: the folder's default,
+        their own policy row, and read-write on a personal folder they own."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        user_id = UserID(me.user_id)
+        held = await self._own_check.held(action.vfolder_ids)
+        folders = await self._vfolder_repository.batch_load_by_ids(list(action.vfolder_ids))
+        policies = await self._vfolder_repository.user_mount_policies_of(
+            user_id, action.vfolder_ids
+        )
+        items: list[PartialBulkEntityResult[VFolderMountPolicy]] = []
+        for vfolder_id, folder in zip(action.vfolder_ids, folders, strict=True):
+            if folder is None:
+                items.append(
+                    PartialBulkEntityResult[VFolderMountPolicy].nothing(
+                        vfolder_id, "no such folder"
+                    )
+                )
+                continue
+            level = resolve_mount_policy(
+                user_id,
+                owner_user_id=folder.user,
+                default_mount_permission=folder.default_mount_permission,
+                held=held.get(vfolder_id, Permission.NONE),
+                user_policy=policies.get(vfolder_id),
+            )
+            items.append(
+                PartialBulkEntityResult[VFolderMountPolicy].succeeded(
+                    vfolder_id, level, description="resolved"
+                )
+            )
+        return PartialBulkResult(items=items)
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role

@@ -175,9 +175,19 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
+<<<<<<< HEAD
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
     ResolveIdsByNamesAction,
+=======
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
+)
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.vfolder.actions.base import (
+    GetTaskLogsAction,
+    LookupAccessibleVFolderAction,
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
 )
 
 if TYPE_CHECKING:
@@ -431,7 +441,9 @@ class SessionHandler:
             raise UnreachableError("authenticated user missing from request context")
         return user.user_id
 
-    async def _normalize_legacy_mounts(self, validated_config: dict[str, Any]) -> dict[str, Any]:
+    async def _normalize_legacy_mounts(
+        self, validated_config: dict[str, Any], owner_access_key: AccessKey
+    ) -> dict[str, Any]:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
         ``mount_options`` surfaces: route UUID-shaped entries onto the
         UUID-keyed buckets, then resolve any remaining names to UUIDs and
@@ -447,6 +459,7 @@ class SessionHandler:
             validated_config.get("mounts") or (),
             validated_config.get("mount_map") or {},
             validated_config.get("mount_options") or {},
+            owner_access_key,
         )
         return _merge_resolved_legacy_mounts(validated_config, resolutions)
 
@@ -455,6 +468,7 @@ class SessionHandler:
         mounts: Sequence[str],
         mount_map: Mapping[str, str],
         mount_options: Mapping[str, Any],
+        owner_access_key: AccessKey,
     ) -> dict[str, LegacyMountResolution]:
         """Resolve legacy v1 CLI name-keyed mount surfaces into a map
         ``name → LegacyMountResolution(vfid, subpath_or_None)``.
@@ -505,9 +519,25 @@ class SessionHandler:
         if not names_to_resolve:
             return {}
 
+<<<<<<< HEAD
         result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
             ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
         )
+=======
+        owner = await self._user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=owner_access_key)
+        )
+        resolved = {
+            name: (
+                await self._vfolder.get_accessible_vfolder.run(
+                    LookupAccessibleVFolderAction(
+                        user_uuid=owner.entity_id(), folder_id_or_name=name
+                    )
+                )
+            ).entity_id()
+            for name in names_to_resolve
+        }
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
         return {
             name: LegacyMountResolution(vfid=vfid, subpath=subpath_by_name.get(name))
             for name, vfid in result.name_to_id.items()
@@ -535,6 +565,7 @@ class SessionHandler:
             template=True,
         )
 
+<<<<<<< HEAD
         validated_config = await self._normalize_legacy_mounts(validated_config)
 
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
@@ -542,10 +573,15 @@ class SessionHandler:
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
+=======
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
                 owner_access_key=params.owner_access_key,
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
+        validated_config = await self._normalize_legacy_mounts(validated_config, owner_access_key)
 
         log.info(
             "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
@@ -639,8 +675,6 @@ class SessionHandler:
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
 
-        validated_config = await self._normalize_legacy_mounts(validated_config)
-
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
             if (
@@ -661,6 +695,7 @@ class SessionHandler:
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
+<<<<<<< HEAD
         log.info(
             "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
             requester_access_key,
@@ -668,6 +703,9 @@ class SessionHandler:
             params.image,
             params.session_name,
         )
+=======
+        validated_config = await self._normalize_legacy_mounts(validated_config, owner_access_key)
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
         architecture = params.architecture or DEFAULT_IMAGE_ARCH
 
         result = await self._session.create_from_params.wait_for_complete(

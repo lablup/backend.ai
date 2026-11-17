@@ -60,6 +60,7 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
+<<<<<<< HEAD
 from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
     ResolveIdsByNamesAction,
     ResolveIdsByNamesActionResult,
@@ -67,6 +68,10 @@ from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
+=======
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
 )
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersAction,
@@ -178,6 +183,14 @@ class VFolderProcessors(AbstractProcessorPackage):
         ResolveIdsByNamesAction,
         ResolveIdsByNamesActionResult,
     ]
+<<<<<<< HEAD
+=======
+    bulk_get: PartialBulkActionProcessor[BulkGetVFoldersAction, VFolderData]
+    bulk_load_permissions: PartialBulkActionProcessor[BulkLoadVFolderPermissionsAction, Permission]
+    bulk_load_mount_levels: PartialBulkActionProcessor[
+        BulkLoadVFolderMountLevelsAction, VFolderMountPolicy
+    ]
+>>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     get_folder_usage: SingleEntityActionProcessor[
         GetVFolderUsageAction, GetVFolderUsageActionResult
