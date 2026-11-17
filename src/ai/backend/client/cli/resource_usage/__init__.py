@@ -1,11 +1,4 @@
 """Resource Usage CLI package."""
 
-import click
-
-
-@click.group()
-def resource_usage() -> None:
-    """Resource usage history operations (superadmin only)."""
-
-
-from . import commands  # noqa
+from . import commands as commands
+from .group import resource_usage as resource_usage

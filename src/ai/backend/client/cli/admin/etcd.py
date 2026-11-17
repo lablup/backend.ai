@@ -7,7 +7,7 @@ import click
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.pretty import print_error, print_fail, print_pretty
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

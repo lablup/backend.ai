@@ -1,6 +1,25 @@
 from ai.backend.cli.main import main as cli_main
 from ai.backend.common.cli import LazyGroup
 
+# Groups with aliases in subcommands - still eager load
+from . import admin as admin
+from . import app as app
+
+# Non-group modules that register commands directly
+from . import config as config
+
+# extensions is a helper module, not a command module
+from . import extensions as extensions
+from . import logs as logs
+
+# To include the main module as an explicit dependency
+from . import main as main
+from . import proxy as proxy
+from . import service_auto_scaling_rule as service_auto_scaling_rule
+from . import session as session
+from . import session_template as session_template
+from . import vfolder as vfolder
+
 
 # Group commands without aliases - lazy loaded
 @cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.image:image")
@@ -70,21 +89,3 @@ def v2() -> None:
     from dotenv import find_dotenv, load_dotenv
 
     load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
-
-
-# Groups with aliases in subcommands - still eager load
-from . import admin  # noqa  # type: ignore
-from . import vfolder  # noqa  # type: ignore
-from . import session  # noqa  # type: ignore
-from . import session_template  # noqa  # type: ignore
-
-# Non-group modules that register commands directly
-from . import config  # noqa  # type: ignore
-from . import app, logs, proxy  # noqa  # type: ignore
-from . import service_auto_scaling_rule  # noqa  # type: ignore
-
-# extensions is a helper module, not a command module
-from . import extensions  # noqa  # type: ignore
-
-# To include the main module as an explicit dependency
-from . import main  # noqa

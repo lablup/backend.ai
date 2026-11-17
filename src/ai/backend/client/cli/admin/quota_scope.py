@@ -12,7 +12,7 @@ from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.types import QuotaScopeType
 
-from . import admin
+from ._group import admin
 
 if TYPE_CHECKING:
     from ai.backend.client.session import Session

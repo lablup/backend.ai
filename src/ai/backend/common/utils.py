@@ -30,14 +30,20 @@ from pydantic import BaseModel
 # into the single "utils" module.
 # Let's categorize them by purpose and domain, and keep
 # refactoring to use the proper module names.
-from .asyncio import (  # for legacy imports  # noqa
-    AsyncBarrier,
-    cancel_tasks,
-    current_loop,
-    run_through,
+from .asyncio import (  # for legacy imports
+    AsyncBarrier as AsyncBarrier,
+)
+from .asyncio import (
+    cancel_tasks as cancel_tasks,
+)
+from .asyncio import (
+    current_loop as current_loop,
+)
+from .asyncio import (
+    run_through as run_through,
 )
 from .defs import DEFAULT_FILE_IO_TIMEOUT
-from .enum_extension import StringSetFlag  # for legacy imports  # noqa
+from .enum_extension import StringSetFlag as StringSetFlag  # for legacy imports
 from .exception import (
     BaseNFSMountCheckFailed,
     ExportPathNotFound,
@@ -48,8 +54,9 @@ from .exception import (
     VolumeMountFailed,
     VolumeUnmountFailed,
 )
-from .files import AsyncFileWriter  # for legacy imports  # noqa
-from .networking import curl, find_free_port  # for legacy imports  # noqa
+from .files import AsyncFileWriter as AsyncFileWriter  # for legacy imports
+from .networking import curl as curl  # for legacy imports
+from .networking import find_free_port as find_free_port
 from .types import BinarySize
 
 if TYPE_CHECKING:

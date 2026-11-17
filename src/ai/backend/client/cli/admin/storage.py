@@ -10,7 +10,7 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.session import Session
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

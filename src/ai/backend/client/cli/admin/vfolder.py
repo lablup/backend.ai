@@ -13,7 +13,7 @@ from ai.backend.client.cli.pretty import print_error
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.vfolder import vfolder as user_vfolder
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

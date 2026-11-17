@@ -9,7 +9,7 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.resource_usage import resource_usage
+from ai.backend.client.cli.resource_usage.group import resource_usage
 from ai.backend.client.cli.types import CLIContext
 
 # =============================================================================

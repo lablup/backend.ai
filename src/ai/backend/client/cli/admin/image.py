@@ -15,7 +15,7 @@ from ai.backend.client.cli.pretty import (
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.compat import asyncio_run
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

@@ -18,7 +18,7 @@ from ai.backend.client.output.fields import session_fields, session_fields_v5
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import Session
 
-from . import admin
+from ._group import admin
 
 SessionItem = dict[str, Any]
 

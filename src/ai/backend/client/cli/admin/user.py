@@ -17,7 +17,7 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()
