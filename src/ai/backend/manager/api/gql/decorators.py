@@ -42,6 +42,7 @@ from strawberry.types.field import field as strawberry_field
 
 from ai.backend.common.meta import BackendAIGQLMeta
 from ai.backend.manager.api.gql.pydantic_compat import (
+    MissingKeepingFromPydantic,
     PydanticInputMixin,
     PydanticNodeMixin,
 )
@@ -269,6 +270,7 @@ def gql_pydantic_type[PydanticModel: BaseModel](
             declared = declared_descriptions.get(field.python_name)
             if declared is not None:
                 field.description = declared
+        MissingKeepingFromPydantic.wrap(model, wrapped)
         return wrapped
 
     return wrap

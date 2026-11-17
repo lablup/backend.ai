@@ -5,7 +5,6 @@ import strawberry
 from graphql import GraphQLError
 from strawberry.extensions import QueryDepthLimiter
 from strawberry.federation import Schema
-from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
 from ai.backend.manager.api.gql.agent.resolver import (
@@ -627,6 +626,7 @@ from ai.backend.manager.api.gql.scheduling_history.resolver import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from ai.backend.manager.api.gql.schema_config import GQLSchemaConfig
 from ai.backend.manager.api.gql.secret.resolver import admin_reencrypt_secrets, admin_secret_status
 from ai.backend.manager.api.gql.service_catalog.resolver import admin_service_catalogs
 from ai.backend.manager.api.gql.session.resolver.session import (
@@ -1614,7 +1614,7 @@ schema = CustomizedSchema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
-    config=StrawberryConfig(auto_camel_case=True),
+    config=GQLSchemaConfig(auto_camel_case=True),
     federation_version="2.7",
     # Federation stubs bridging legacy graphene Node types into the Strawberry-owned
     # node(id:) resolver. Listed explicitly so they are part of the schema (and the Node
@@ -1667,7 +1667,7 @@ class PublicQueries:
 # carries no auth middleware: anonymous queries compose against this subgraph alone.
 public_schema = Schema(
     query=PublicQueries,
-    config=StrawberryConfig(auto_camel_case=True),
+    config=GQLSchemaConfig(auto_camel_case=True),
     federation_version="2.7",
     extensions=[
         GQLLoggingExtension,

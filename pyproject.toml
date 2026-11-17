@@ -207,6 +207,9 @@ ignore = [
 "pydantic.validator" = {msg = "Pydantic v1 API; use pydantic.field_validator."}
 "pydantic.root_validator" = {msg = "Pydantic v1 API; use pydantic.model_validator."}
 "sqlalchemy.ext.declarative" = {msg = "Deprecated; use sqlalchemy.orm.declarative_base."}
+"pydantic_core.MISSING" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
+"pydantic.experimental.missing_sentinel.MISSING" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
+"typing_extensions.Sentinel" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend", "bai_scenario"]
@@ -215,6 +218,8 @@ known-third-party = ["alembic", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
+# unset.py defines UNSET and Unset from pydantic MISSING
+"src/ai/backend/common/tristate/unset.py" = ["TID251"]
 # decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
 "src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
 # schema.py defines GQL schema roots (Query, Mutation, Subscription) using @strawberry.type

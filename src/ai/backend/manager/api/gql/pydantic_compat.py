@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import dataclasses
 import types
+from collections.abc import Callable
 from decimal import Decimal
 from enum import Enum
 from typing import (
@@ -57,8 +58,16 @@ from uuid import UUID
 from pydantic import BaseModel
 from strawberry import ID as StrawberryID
 from strawberry import UNSET
+from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
 from strawberry.relay import Node
-from strawberry.types.base import StrawberryObjectDefinition
+from strawberry.types.base import (
+    StrawberryList,
+    StrawberryObjectDefinition,
+    StrawberryOptional,
+    get_object_definition,
+)
+
+from ai.backend.common.tristate import unset
 
 
 def _from_pydantic_kwargs(
@@ -430,3 +439,54 @@ def _unwrap_list_item(type_hint: Any) -> Any:
             return args[0]
 
     return None
+
+
+@final
+class MissingKeepingFromPydantic:
+    """Strawberry's ``from_pydantic`` keeping ``MISSING`` in DTO fields typed ``T | Unset``.
+
+    Strawberry turns a nested ``MISSING`` into an empty object and fails on a list one.
+    """
+
+    _convert: Callable[[BaseModel, dict[str, Any] | None], Any]
+    _placeholders: tuple[tuple[str, object], ...]
+
+    def __init__(
+        self,
+        convert: Callable[[BaseModel, dict[str, Any] | None], Any],
+        placeholders: tuple[tuple[str, object], ...],
+    ) -> None:
+        self._convert = convert
+        self._placeholders = placeholders
+
+    @classmethod
+    def wrap(cls, model: type[BaseModel], gql_type: type[StrawberryTypeFromPydantic[Any]]) -> None:
+        """Replace ``gql_type.from_pydantic`` when ``model`` has a field typed ``T | Unset``."""
+        placeholders = tuple(
+            (field.python_name, cls._placeholder(field.type))
+            for field in get_object_definition(gql_type, strict=True).fields
+            if (info := model.model_fields.get(field.python_name)) is not None
+            and unset.Unset in get_args(info.annotation)
+        )
+        if placeholders:
+            setattr(gql_type, "from_pydantic", cls(gql_type.from_pydantic, placeholders))
+
+    @classmethod
+    def _placeholder(cls, field_type: object) -> object:
+        # Stands in for MISSING during the conversion; a list type has to be iterable.
+        if isinstance(field_type, StrawberryOptional):
+            field_type = field_type.of_type
+        return () if isinstance(field_type, StrawberryList) else None
+
+    def __call__(self, instance: BaseModel, extra: dict[str, Any] | None = None) -> Any:
+        missing = [
+            (name, placeholder)
+            for name, placeholder in self._placeholders
+            if getattr(instance, name, None) is unset.UNSET
+        ]
+        if not missing:
+            return self._convert(instance, extra)
+        converted = self._convert(instance.model_copy(update=dict(missing)), extra)
+        for name, _ in missing:
+            setattr(converted, name, unset.UNSET)
+        return converted
