@@ -41,7 +41,7 @@ This package replaces the condition functions and order methods written by hand 
 
 - With functions, a "field" existed only in a naming convention, so a missing operation or order went unnoticed.
 - A declaration carries a filter slot and an order slot together, so whether a field can be filtered or ordered shows in the declaration.
-- mypy checks orders through `match` + `assert_never`; a sweep test checks that filter DTOs and declarations pair up.
+- mypy checks orders through `match` + `assert_never`; a sweep test checks that filter DTOs and declarations match.
 
 ## Building data from a row through the declaration makes omissions a type error
 
@@ -107,9 +107,10 @@ This package replaces the condition functions and order methods written by hand 
 |---|---|---|
 | own | The entity's own columns | The entity's field cap |
 | nested | Rows in another table that the entity owns | The entity's field cap (path `labels.key`) |
-| linked | Connections to other entities | Scopes, the other entity's permission |
+| linked | Connections whose foreign key sits on the other entity, computed relations | Scopes, the other entity's permission |
 
 - The split follows ownership, not tables. Labels live in another table but are the vfolder's data.
+- A foreign key on the searched row is an own filter, one on an owned row a nested filter. Only one on the other entity's side is linked.
 - One entry point means the sweep test and the permission check start from one place. The classes behind it are never referenced by name, so they are private.
 
 ## Fields of other tables are nested, not flattened
@@ -194,7 +195,8 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 - govern means "the scope's roles reach everything the target owns", so a project role governing a session would reach the vfolders it mounts.
 - own + cap (a share) does not spread for per-entity permission, but a scoped search's reach ignores caps, so the listing would leak.
 - So a usage only narrows and grants nothing. Its source of truth stays one foreign key column.
-- Which table the column sits on does not decide whether it is a usage. `roles.role_preset_id` sits on the searched row and is one.
+- A foreign key on the searched row or an owned row is not declared as a usage. `roles.role_preset_id` is a field of the role, filtered under the role's field cap.
+- A relation with a lifecycle condition (the image a deployment's current revision uses) cannot be a nested filter and stays a usage.
 - An id inside a JSON value (`extra_mounts`, `vfolder_mounts`) is not a foreign key and is not a usage. It becomes one after it is normalized into rows with a foreign key.
 
 ## A condition naming an entity the caller cannot read rejects the search
@@ -211,7 +213,7 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 - used_by exists only on searches and means nothing to other scope actions such as create, so it started as a separate validator. BA-8024 merged it into the scope validator, which now reads both in one database round trip.
 - A global search does not check the named entities: the SUPERADMIN gate answers for the unscoped read.
 - The two directions sit in one bundle because the check and the narrowing are the same. Either way the named entity's READ is checked and the result is narrowed with AND. What the direction settles is which column the condition lands on.
-- A plain column filter does not replace this. It checks no permission on the named entity, so whether a result comes back tells the caller that a row they cannot read exists.
+- When the foreign key sits on the other entity, a column filter does not replace this. The connection is the other entity's data, so the searched entity's field cap cannot block it, and whether a result comes back tells the caller that a row they cannot read exists.
 - "Who uses my resource" is answered by `uses`: the using side is searched, narrowed by the used entity's id.
 - The direction is named because the searched side's name alone does not say which side uses
   which. A condition joining a session and an agent, sent as `used_by` alone, does not say
