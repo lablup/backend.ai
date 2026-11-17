@@ -19,7 +19,7 @@ import sqlalchemy as sa
 import yarl
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine
 
 from ai.backend.appproxy.common.errors import InvalidAPIParameters

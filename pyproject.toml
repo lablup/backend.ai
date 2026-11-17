@@ -204,6 +204,9 @@ ignore = [
 "ai.backend.common.logging.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
 "ai.backend.common.logging_utils.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
 "ai.backend.logging.utils.with_log_context_fields" = {msg = "Deprecated; use ai.backend.logging.structured.with_log_context."}
+"pydantic.validator" = {msg = "Pydantic v1 API; use pydantic.field_validator."}
+"pydantic.root_validator" = {msg = "Pydantic v1 API; use pydantic.model_validator."}
+"sqlalchemy.ext.declarative" = {msg = "Deprecated; use sqlalchemy.orm.declarative_base."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend", "bai_scenario"]
