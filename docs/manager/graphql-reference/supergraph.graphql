@@ -960,34 +960,6 @@ enum AllocatedResourceSlotOrderField
   RANK @join__enumValue(graph: STRAWBERRY)
 }
 
-"""
-Added in 26.10.0. Input for allowing container registries for a domain.
-"""
-input AllowDomainContainerRegistriesInput
-  @join__type(graph: STRAWBERRY)
-{
-  """ID of the domain."""
-  domainId: UUID!
-
-  """IDs of the container registries to allow for the domain. At least one."""
-  containerRegistryIds: [UUID!]!
-}
-
-"""
-Added in 26.10.0. Payload for allowing container registries for a domain.
-"""
-type AllowDomainContainerRegistriesPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries this request allowed. A registry already allowed is left out.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
 """Added in 26.4.2. Payload containing allowed domain names."""
 type AllowedDomainsPayload
   @join__type(graph: STRAWBERRY)
@@ -7498,36 +7470,6 @@ type DeployVFolderV2Payload
   deploymentName: String!
 }
 
-"""
-Added in 26.10.0. Input for disallowing container registries for a domain.
-"""
-input DisallowDomainContainerRegistriesInput
-  @join__type(graph: STRAWBERRY)
-{
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries to disallow for the domain. At least one.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
-"""
-Added in 26.10.0. Payload for disallowing container registries for a domain.
-"""
-type DisallowDomainContainerRegistriesPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries this request disallowed. A registry not allowed is left out.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
 type DisassociateAllScalingGroupsWithDomain
   @join__type(graph: GRAPHENE)
 {
@@ -7630,6 +7572,30 @@ type DomainConnection
 
   """Total count of the GQL nodes of the query."""
   count: Int
+}
+
+"""Added in 26.10.0. One domain and one container registry linked to it."""
+type DomainContainerRegistryLink
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the domain."""
+  domainId: UUID!
+
+  """ID of the container registry."""
+  containerRegistryId: UUID!
+}
+
+"""
+Added in 26.10.0. One domain and one container registry to link or unlink.
+"""
+input DomainContainerRegistryLinkInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the domain."""
+  domainId: UUID!
+
+  """ID of the container registry."""
+  containerRegistryId: UUID!
 }
 
 """Added in 24.12.0 A Relay edge containing a `Domain` and its cursor."""
@@ -12155,6 +12121,22 @@ enum link__Purpose {
   EXECUTION
 }
 
+"""Added in 26.10.0. Input for linking container registries to domains."""
+input LinkDomainContainerRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The domain and container registry pairs to link. At least one."""
+  items: [DomainContainerRegistryLinkInput!]!
+}
+
+"""Added in 26.10.0. Payload for linking container registries to domains."""
+type LinkDomainContainerRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The pairs this request linked. A pair already linked is left out."""
+  items: [DomainContainerRegistryLink!]!
+}
+
 """Added in 26.4.2. Input for listing files in a virtual folder."""
 input ListFilesV2Input
   @join__type(graph: STRAWBERRY)
@@ -15368,14 +15350,14 @@ type Mutation
   partialBulkRestoreDomainsV2(input: PartialBulkRestoreDomainsInput!): PartialBulkDomainsPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.10.0. Allow container registries for a domain. A registry already allowed is left as it stands.
+  Added in 26.10.0. Link container registries to domains. A pair already linked is left as it stands.
   """
-  allowDomainContainerRegistries(input: AllowDomainContainerRegistriesInput!): AllowDomainContainerRegistriesPayload @join__field(graph: STRAWBERRY)
+  linkDomainContainerRegistries(input: LinkDomainContainerRegistriesInput!): LinkDomainContainerRegistriesPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.10.0. Disallow container registries for a domain. A registry not allowed is skipped.
+  Added in 26.10.0. Unlink container registries from domains. A pair not linked is skipped.
   """
-  disallowDomainContainerRegistries(input: DisallowDomainContainerRegistriesInput!): DisallowDomainContainerRegistriesPayload @join__field(graph: STRAWBERRY)
+  unlinkDomainContainerRegistries(input: UnlinkDomainContainerRegistriesInput!): UnlinkDomainContainerRegistriesPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
@@ -28601,6 +28583,26 @@ type UnblockUserPayload
 {
   """Whether the unblock was successful"""
   success: Boolean!
+}
+
+"""
+Added in 26.10.0. Input for unlinking container registries from domains.
+"""
+input UnlinkDomainContainerRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The domain and container registry pairs to unlink. At least one."""
+  items: [DomainContainerRegistryLinkInput!]!
+}
+
+"""
+Added in 26.10.0. Payload for unlinking container registries from domains.
+"""
+type UnlinkDomainContainerRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The pairs this request unlinked. A pair not linked is left out."""
+  items: [DomainContainerRegistryLink!]!
 }
 
 type UnloadImage

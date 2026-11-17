@@ -689,30 +689,6 @@ enum AllocatedResourceSlotOrderField {
   RANK
 }
 
-"""
-Added in 26.10.0. Input for allowing container registries for a domain.
-"""
-input AllowDomainContainerRegistriesInput {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """IDs of the container registries to allow for the domain. At least one."""
-  containerRegistryIds: [UUID!]!
-}
-
-"""
-Added in 26.10.0. Payload for allowing container registries for a domain.
-"""
-type AllowDomainContainerRegistriesPayload {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries this request allowed. A registry already allowed is left out.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
 """Added in 26.4.2. Payload containing allowed domain names."""
 type AllowedDomainsPayload {
   """Allowed domain names."""
@@ -5423,32 +5399,6 @@ input DeploymentUses {
 }
 
 """
-Added in 26.10.0. Input for disallowing container registries for a domain.
-"""
-input DisallowDomainContainerRegistriesInput {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries to disallow for the domain. At least one.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
-"""
-Added in 26.10.0. Payload for disallowing container registries for a domain.
-"""
-type DisallowDomainContainerRegistriesPayload {
-  """ID of the domain."""
-  domainId: UUID!
-
-  """
-  IDs of the container registries this request disallowed. A registry not allowed is left out.
-  """
-  containerRegistryIds: [UUID!]!
-}
-
-"""
 Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
 """
 type DomainBasicInfo {
@@ -5460,6 +5410,26 @@ type DomainBasicInfo {
 
   """External system integration identifier."""
   integrationName: String
+}
+
+"""Added in 26.10.0. One domain and one container registry linked to it."""
+type DomainContainerRegistryLink {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """ID of the container registry."""
+  containerRegistryId: UUID!
+}
+
+"""
+Added in 26.10.0. One domain and one container registry to link or unlink.
+"""
+input DomainContainerRegistryLinkInput {
+  """ID of the domain."""
+  domainId: UUID!
+
+  """ID of the container registry."""
+  containerRegistryId: UUID!
 }
 
 """
@@ -8720,6 +8690,18 @@ enum KeypairResourcePolicyV2OrderField {
   MAX_PRIORITY
 }
 
+"""Added in 26.10.0. Input for linking container registries to domains."""
+input LinkDomainContainerRegistriesInput {
+  """The domain and container registry pairs to link. At least one."""
+  items: [DomainContainerRegistryLinkInput!]!
+}
+
+"""Added in 26.10.0. Payload for linking container registries to domains."""
+type LinkDomainContainerRegistriesPayload {
+  """The pairs this request linked. A pair already linked is left out."""
+  items: [DomainContainerRegistryLink!]!
+}
+
 """Added in 26.4.2. Input for listing files in a virtual folder."""
 input ListFilesV2Input {
   """Directory path to list files from."""
@@ -10866,14 +10848,14 @@ type Mutation {
   partialBulkRestoreDomainsV2(input: PartialBulkRestoreDomainsInput!): PartialBulkDomainsPayload!
 
   """
-  Added in 26.10.0. Allow container registries for a domain. A registry already allowed is left as it stands.
+  Added in 26.10.0. Link container registries to domains. A pair already linked is left as it stands.
   """
-  allowDomainContainerRegistries(input: AllowDomainContainerRegistriesInput!): AllowDomainContainerRegistriesPayload
+  linkDomainContainerRegistries(input: LinkDomainContainerRegistriesInput!): LinkDomainContainerRegistriesPayload
 
   """
-  Added in 26.10.0. Disallow container registries for a domain. A registry not allowed is skipped.
+  Added in 26.10.0. Unlink container registries from domains. A pair not linked is skipped.
   """
-  disallowDomainContainerRegistries(input: DisallowDomainContainerRegistriesInput!): DisallowDomainContainerRegistriesPayload
+  unlinkDomainContainerRegistries(input: UnlinkDomainContainerRegistriesInput!): UnlinkDomainContainerRegistriesPayload
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
@@ -21842,6 +21824,22 @@ Added in 26.4.2. Payload returned after clearing a user's failed-login block.
 type UnblockUserPayload {
   """Whether the unblock was successful"""
   success: Boolean!
+}
+
+"""
+Added in 26.10.0. Input for unlinking container registries from domains.
+"""
+input UnlinkDomainContainerRegistriesInput {
+  """The domain and container registry pairs to unlink. At least one."""
+  items: [DomainContainerRegistryLinkInput!]!
+}
+
+"""
+Added in 26.10.0. Payload for unlinking container registries from domains.
+"""
+type UnlinkDomainContainerRegistriesPayload {
+  """The pairs this request unlinked. A pair not linked is left out."""
+  items: [DomainContainerRegistryLink!]!
 }
 
 """Added in 25.15.0. Input type for unregistering a storage namespace."""

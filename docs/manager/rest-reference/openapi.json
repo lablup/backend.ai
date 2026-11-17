@@ -11232,8 +11232,8 @@
         "title": "PurgeDomainInput",
         "type": "object"
       },
-      "AllowDomainContainerRegistriesInput": {
-        "description": "Input for allowing container registries for a domain.",
+      "DomainContainerRegistryLinkInput": {
+        "description": "One domain and one container registry to link or unlink.",
         "properties": {
           "domain_id": {
             "description": "ID of the domain.",
@@ -11241,37 +11241,53 @@
             "title": "Domain Id",
             "type": "string"
           },
-          "container_registry_ids": {
-            "$ref": "#/components/schemas/NonEmptyList_UUID_",
-            "description": "IDs of the container registries to allow for the domain. At least one."
+          "container_registry_id": {
+            "description": "ID of the container registry.",
+            "format": "uuid",
+            "title": "Container Registry Id",
+            "type": "string"
           }
         },
         "required": [
           "domain_id",
-          "container_registry_ids"
+          "container_registry_id"
         ],
-        "title": "AllowDomainContainerRegistriesInput",
+        "title": "DomainContainerRegistryLinkInput",
         "type": "object"
       },
-      "DisallowDomainContainerRegistriesInput": {
-        "description": "Input for disallowing container registries for a domain.",
+      "NonEmptyList_DomainContainerRegistryLinkInput_": {
+        "items": {
+          "$ref": "#/components/schemas/DomainContainerRegistryLinkInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "LinkDomainContainerRegistriesInput": {
+        "description": "Input for linking container registries to domains.",
         "properties": {
-          "domain_id": {
-            "description": "ID of the domain.",
-            "format": "uuid",
-            "title": "Domain Id",
-            "type": "string"
-          },
-          "container_registry_ids": {
-            "$ref": "#/components/schemas/NonEmptyList_UUID_",
-            "description": "IDs of the container registries to disallow for the domain. At least one."
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_DomainContainerRegistryLinkInput_",
+            "description": "The domain and container registry pairs to link. At least one."
           }
         },
         "required": [
-          "domain_id",
-          "container_registry_ids"
+          "items"
         ],
-        "title": "DisallowDomainContainerRegistriesInput",
+        "title": "LinkDomainContainerRegistriesInput",
+        "type": "object"
+      },
+      "UnlinkDomainContainerRegistriesInput": {
+        "description": "Input for unlinking container registries from domains.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_DomainContainerRegistryLinkInput_",
+            "description": "The domain and container registry pairs to unlink. At least one."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "UnlinkDomainContainerRegistriesInput",
         "type": "object"
       },
       "DeleteDomainInput": {
@@ -55947,9 +55963,9 @@
         "description": "Permanently purge a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/domains/container-registries/allow": {
+    "/v2/domains/container-registries/link": {
       "post": {
-        "operationId": "v2/domains.allow_container_registries",
+        "operationId": "v2/domains.link_container_registries",
         "tags": [
           "v2/domains"
         ],
@@ -55967,18 +55983,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AllowDomainContainerRegistriesInput"
+                "$ref": "#/components/schemas/LinkDomainContainerRegistriesInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Allow container registries for a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Link container registries to domains.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/domains/container-registries/disallow": {
+    "/v2/domains/container-registries/unlink": {
       "post": {
-        "operationId": "v2/domains.disallow_container_registries",
+        "operationId": "v2/domains.unlink_container_registries",
         "tags": [
           "v2/domains"
         ],
@@ -55996,13 +56012,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DisallowDomainContainerRegistriesInput"
+                "$ref": "#/components/schemas/UnlinkDomainContainerRegistriesInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Disallow container registries for a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Unlink container registries from domains.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/domains/delete": {
