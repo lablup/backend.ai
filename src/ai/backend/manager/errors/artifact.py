@@ -45,22 +45,19 @@ class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-<<<<<<< HEAD
-class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
-=======
-class ArtifactRevisionImportInProgressError(FieldError, web.HTTPConflict):
+class ArtifactRevisionImportInProgressError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/artifact-revision-import-in-progress"
     error_title = "Artifact Revision Import In Progress"
 
-    @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            ArtifactRevisionFieldType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
-class ArtifactRevisionDeletionBadRequestError(FieldError, web.HTTPBadRequest):
->>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
+class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Bad Request"
 

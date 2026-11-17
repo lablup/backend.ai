@@ -10,14 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-<<<<<<< HEAD
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.storage.registries.types import ModelData
-=======
-from ai.backend.common.data.artifact.types import VerificationStepResult
-from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
->>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -37,11 +32,8 @@ from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
-<<<<<<< HEAD
     ArtifactNotVerified,
-=======
     ArtifactRevisionImportInProgressError,
->>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
     ArtifactRevisionNotFoundError,
     ArtifactUpdateError,
 )
@@ -588,9 +580,7 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    async def mark_artifact_revision_pulling(
-        self, artifact_revision_id: ArtifactRevisionID
-    ) -> None:
+    async def mark_artifact_revision_pulling(self, artifact_revision_id: uuid.UUID) -> None:
         async with self._db.begin_session() as db_sess:
             status = await db_sess.scalar(
                 sa.select(ArtifactRevisionRow.status)

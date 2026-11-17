@@ -7,11 +7,7 @@ Includes tests for ArtifactService methods that deal with revisions.
 from __future__ import annotations
 
 import uuid
-<<<<<<< HEAD
-=======
-from collections.abc import Iterator
 from dataclasses import dataclass, replace
->>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -38,11 +34,7 @@ from ai.backend.manager.data.association.types import AssociationArtifactsStorag
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactImportBadRequestError,
-<<<<<<< HEAD
-=======
-    ArtifactRevisionDeletionBadRequestError,
     ArtifactRevisionImportInProgressError,
->>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
@@ -839,12 +831,11 @@ class TestImportArtifactRevisionAction:
     def revision_already_importing(
         self,
         request: pytest.FixtureRequest,
-        mock_revision_ops: MagicMock,
         mock_artifact_repository: MagicMock,
         sample_revision: ArtifactRevisionData,
     ) -> ArtifactRevisionData:
         revision = replace(sample_revision, status=request.param)
-        mock_revision_ops.get_field = AsyncMock(return_value=revision)
+        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock()
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         return revision
@@ -871,7 +862,6 @@ class TestImportArtifactRevisionAction:
     def huggingface_import_started_first_by_another_request(
         self,
         mock_artifact_repository: MagicMock,
-        mock_revision_ops: MagicMock,
         mock_huggingface_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
@@ -881,7 +871,7 @@ class TestImportArtifactRevisionAction:
         sample_artifact: ArtifactData,
     ) -> _ImportStartedFirstByAnotherRequest:
         revision = replace(sample_revision, status=ArtifactStatus.SCANNED)
-        mock_revision_ops.get_field = AsyncMock(return_value=revision)
+        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
         mock_artifact_repository.mark_artifact_revision_pulling = AsyncMock(
             side_effect=ArtifactRevisionImportInProgressError()
@@ -924,7 +914,6 @@ class TestImportArtifactRevisionAction:
     def reservoir_import_started_first_by_another_request(
         self,
         mock_artifact_repository: MagicMock,
-        mock_revision_ops: MagicMock,
         mock_reservoir_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
@@ -940,7 +929,7 @@ class TestImportArtifactRevisionAction:
             registry_type=ArtifactRegistryType.RESERVOIR,
             source_registry_type=ArtifactRegistryType.RESERVOIR,
         )
-        mock_revision_ops.get_field = AsyncMock(return_value=revision)
+        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=reservoir_artifact)
         mock_artifact_repository.mark_artifact_revision_pulling = AsyncMock(
             side_effect=ArtifactRevisionImportInProgressError()

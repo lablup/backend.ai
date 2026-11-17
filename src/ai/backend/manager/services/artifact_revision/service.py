@@ -52,11 +52,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
     ArtifactImportBadRequestError,
-<<<<<<< HEAD:src/ai/backend/manager/services/artifact_revision/service.py
-=======
-    ArtifactRevisionDeletionBadRequestError,
     ArtifactRevisionImportInProgressError,
->>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730)):src/ai/backend/manager/services/artifact/revision/service.py
     RemoteReservoirArtifactImportError,
 )
 from ai.backend.manager.errors.artifact_registry import (
