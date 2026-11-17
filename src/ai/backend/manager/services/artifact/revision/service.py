@@ -44,7 +44,6 @@ from ai.backend.manager.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.manager.data.artifact.types import (
-    ARTIFACT_IMPORT_IN_PROGRESS_STATUSES,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
     ArtifactStatus,
@@ -407,7 +406,7 @@ class ArtifactRevisionService:
             revision_data = await self._revision_ops.get_field(
                 ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
             )
-            if revision_data.status in ARTIFACT_IMPORT_IN_PROGRESS_STATUSES:
+            if revision_data.status in ArtifactStatus.import_in_progress():
                 raise ArtifactRevisionImportInProgressError(
                     f"Artifact revision {revision_data.id} is already being imported"
                 )

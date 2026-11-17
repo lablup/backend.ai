@@ -12,7 +12,6 @@ from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
-    ARTIFACT_IMPORT_IN_PROGRESS_STATUSES,
     ArtifactAvailability,
     ArtifactData,
     ArtifactRemoteStatus,
@@ -261,7 +260,7 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError(
                     f"Artifact revision {artifact_revision_id} not found"
                 )
-            if status in ARTIFACT_IMPORT_IN_PROGRESS_STATUSES:
+            if status in ArtifactStatus.import_in_progress():
                 raise ArtifactRevisionImportInProgressError(
                     f"Artifact revision {artifact_revision_id} is already being imported"
                 )

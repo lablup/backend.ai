@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Final, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -34,6 +34,10 @@ class ArtifactStatus(enum.StrEnum):
     FAILED = "FAILED"
     REJECTED = "REJECTED"
 
+    @classmethod
+    def import_in_progress(cls) -> frozenset[Self]:
+        return frozenset({cls.PULLING, cls.VERIFYING})
+
 
 class ArtifactRemoteStatus(enum.StrEnum):
     """
@@ -54,12 +58,6 @@ class ArtifactAvailability(enum.StrEnum):
 
     ALIVE = "ALIVE"
     DELETED = "DELETED"
-
-
-ARTIFACT_IMPORT_IN_PROGRESS_STATUSES: Final[frozenset[ArtifactStatus]] = frozenset({
-    ArtifactStatus.PULLING,
-    ArtifactStatus.VERIFYING,
-})
 
 
 @dataclass
