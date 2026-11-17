@@ -50,9 +50,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 받아들인 공유가 통째로 옵니다](#answering-a-project-answerer-accepts-the-offer-to-the-project) | 성공 |
+| [프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 받아들이면 받아들인 공유가 통째로 옵니다](#answering-a-project-answerer-accepts-the-offer-to-the-project) | 성공 |
 | [자기 스코프에서 공유에 답할 수 있는 사용자가 제안을 받아들이면 받아들인 공유가 통째로 옵니다](#answering-the-recipient-accepts-the-offer) | 성공 |
-| [프로젝트에서 공유를 읽을 수만 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 권한 부족으로 거부됩니다](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | 거부 |
+| [프로젝트 앞으로 온 제안을 그 프로젝트에서 공유를 읽을 수만 있는 사용자가 받아들이면 권한 부족으로 거부됩니다](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | 거부 |
 | [아무 권한도 없는 사용자가 제안을 받아들이면 공유를 찾을 수 없다는 이유로 거부됩니다](#answering-a-user-granted-nothing-may-not-accept-the-offer) | 거부 |
 
 **cancel**
@@ -81,7 +81,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 거절하면 거절된 공유가 통째로 옵니다](#answering-a-project-answerer-rejects-the-offer-to-the-project) | 성공 |
+| [프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 거절하면 거절된 공유가 통째로 옵니다](#answering-a-project-answerer-rejects-the-offer-to-the-project) | 성공 |
 | [자기 스코프에서 공유에 답할 수 있는 사용자가 제안을 거절하면 거절된 공유가 통째로 옵니다](#answering-the-recipient-rejects-the-offer) | 성공 |
 | [아무 권한도 없는 사용자가 제안을 거절해도 공유를 찾을 수 없다는 이유로 거부됩니다](#answering-a-user-granted-nothing-may-not-reject-the-offer) | 거부 |
 
@@ -643,7 +643,7 @@ Then
 
 #### [a-project-answerer-accepts-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 받아들인 공유가 통째로 옵니다
+프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 받아들이면 받아들인 공유가 통째로 옵니다
 
 Given
 
@@ -771,7 +771,7 @@ Then
 
 #### [a-project-reader-may-not-accept-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-프로젝트에서 공유를 읽을 수만 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 권한 부족으로 거부됩니다
+프로젝트 앞으로 온 제안을 그 프로젝트에서 공유를 읽을 수만 있는 사용자가 받아들이면 권한 부족으로 거부됩니다
 
 Given
 
@@ -1290,7 +1290,7 @@ Then
 
 #### [a-project-answerer-rejects-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 거절하면 거절된 공유가 통째로 옵니다
+프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 거절하면 거절된 공유가 통째로 옵니다
 
 Given
 

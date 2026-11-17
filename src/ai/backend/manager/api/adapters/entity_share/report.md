@@ -50,9 +50,9 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user who can answer shares in a project accepts the offer to that project, the accepted share comes back whole](#answering-a-project-answerer-accepts-the-offer-to-the-project) | answered |
+| [when a user who can answer shares in a project accepts an offer addressed to that project, the accepted share comes back whole](#answering-a-project-answerer-accepts-the-offer-to-the-project) | answered |
 | [when a user who can answer shares in their own scope accepts the offer, the accepted share comes back whole](#answering-the-recipient-accepts-the-offer) | answered |
-| [when a user who can only read shares in a project accepts the offer to that project, the call is rejected for lack of permission](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | rejected |
+| [when a user who can only read shares in a project accepts an offer addressed to that project, the call is rejected for lack of permission](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | rejected |
 | [when a user granted nothing accepts the offer, it is rejected because the share cannot be resolved](#answering-a-user-granted-nothing-may-not-accept-the-offer) | rejected |
 
 **cancel**
@@ -81,7 +81,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user who can answer shares in a project rejects the offer to that project, the rejected share comes back whole](#answering-a-project-answerer-rejects-the-offer-to-the-project) | answered |
+| [when a user who can answer shares in a project rejects an offer addressed to that project, the rejected share comes back whole](#answering-a-project-answerer-rejects-the-offer-to-the-project) | answered |
 | [when a user who can answer shares in their own scope rejects the offer, the rejected share comes back whole](#answering-the-recipient-rejects-the-offer) | answered |
 | [when a user granted nothing rejects the offer, it is rejected because the share cannot be resolved](#answering-a-user-granted-nothing-may-not-reject-the-offer) | rejected |
 
@@ -643,7 +643,7 @@ Then
 
 #### [a-project-answerer-accepts-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user who can answer shares in a project accepts the offer to that project, the accepted share comes back whole
+when a user who can answer shares in a project accepts an offer addressed to that project, the accepted share comes back whole
 
 Given
 
@@ -771,7 +771,7 @@ Then
 
 #### [a-project-reader-may-not-accept-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user who can only read shares in a project accepts the offer to that project, the call is rejected for lack of permission
+when a user who can only read shares in a project accepts an offer addressed to that project, the call is rejected for lack of permission
 
 Given
 
@@ -1290,7 +1290,7 @@ Then
 
 #### [a-project-answerer-rejects-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user who can answer shares in a project rejects the offer to that project, the rejected share comes back whole
+when a user who can answer shares in a project rejects an offer addressed to that project, the rejected share comes back whole
 
 Given
 

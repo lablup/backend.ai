@@ -167,11 +167,11 @@ SCENARIOS: list[AnswerStep] = [
     AnswerRow(
         named="a-project-answerer-accepts-the-offer-to-the-project",
         guarantees=Says(
-            "프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 "
+            "프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 받아들이면 "
             "받아들인 공유가 통째로 옵니다",
             english=(
-                "when a user who can answer shares in a project accepts the offer to that "
-                "project, the accepted share comes back whole"
+                "when a user who can answer shares in a project accepts an offer addressed to "
+                "that project, the accepted share comes back whole"
             ),
         ),
         situation=PROJECT_RECIPIENT,
@@ -180,11 +180,11 @@ SCENARIOS: list[AnswerStep] = [
     AnswerRow(
         named="a-project-answerer-rejects-the-offer-to-the-project",
         guarantees=Says(
-            "프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 거절하면 "
+            "프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 거절하면 "
             "거절된 공유가 통째로 옵니다",
             english=(
-                "when a user who can answer shares in a project rejects the offer to that "
-                "project, the rejected share comes back whole"
+                "when a user who can answer shares in a project rejects an offer addressed to "
+                "that project, the rejected share comes back whole"
             ),
         ),
         situation=PROJECT_RECIPIENT,
@@ -193,11 +193,11 @@ SCENARIOS: list[AnswerStep] = [
     AnswerRow(
         named="a-project-reader-may-not-accept-the-offer-to-the-project",
         guarantees=Says(
-            "프로젝트에서 공유를 읽을 수만 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 "
+            "프로젝트 앞으로 온 제안을 그 프로젝트에서 공유를 읽을 수만 있는 사용자가 받아들이면 "
             "권한 부족으로 거부됩니다",
             english=(
-                "when a user who can only read shares in a project accepts the offer to that "
-                "project, the call is rejected for lack of permission"
+                "when a user who can only read shares in a project accepts an offer addressed to "
+                "that project, the call is rejected for lack of permission"
             ),
         ),
         situation=PROJECT_READER,
