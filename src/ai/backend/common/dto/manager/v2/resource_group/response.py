@@ -13,6 +13,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
@@ -23,7 +24,13 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -41,6 +48,8 @@ __all__ = (
     "ResourceGroupNetworkConfigInfo",
     "ResourceGroupNode",
     "ResourceGroupSchedulerConfigInfo",
+    "ResourceGroupSchedulerOptionsConfigInfo",
+    "ResourceGroupSchedulerOptionsInfo",
     "ResourceGroupStatusInfo",
     "ResourceInfoNode",
     "UpdateResourceGroupConfigPayloadNode",
@@ -181,6 +190,57 @@ class ResourceGroupNetworkConfigInfo(BaseResponseModel):
     )
 
 
+class ResourceGroupSchedulerOptionsConfigInfo(BaseResponseModel):
+    """The ``config`` section of a resource group's scheduler options."""
+
+    num_retries_to_skip: int | None = Field(
+        default=None,
+        description=(
+            "Number of scheduling retries before a pending session is skipped. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+
+
+class ResourceGroupSchedulerOptionsInfo(BaseResponseModel):
+    """Scheduler options of a resource group, other than the preemption configuration."""
+
+    allowed_session_types: list[SessionTypes] = Field(
+        description=(
+            "Session types that may be created in the resource group. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    pending_timeout: float = Field(
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout). "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    config: ResourceGroupSchedulerOptionsConfigInfo = Field(
+        description=(
+            f"The ``config`` section of the scheduler options. Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    agent_selection_strategy: AgentSelectionStrategy = Field(
+        description=(
+            f"How agents are chosen for a session's kernels. Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    allow_fractional_resource_fragmentation: bool = Field(
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
+        description=(
+            "Route health statuses whose routes are cleaned up automatically. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+
+
 class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
     """Scheduler configuration DTO for a resource group."""
 
@@ -189,6 +249,12 @@ class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
     )
     preemption: PreemptionConfigInfo = Field(
         description="Preemption configuration for this resource group."
+    )
+    options: ResourceGroupSchedulerOptionsInfo = Field(
+        description=(
+            "Scheduler options other than the preemption configuration. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
     )
 
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from pydantic import ConfigDict, Field, field_serializer
+from pydantic import ConfigDict, Field, field_serializer, field_validator
 
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -12,7 +13,12 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 
-__all__ = ("ResourceGroupOpts",)
+__all__ = (
+    "NUM_RETRIES_TO_SKIP_CONFIG_KEY",
+    "ResourceGroupOpts",
+)
+
+NUM_RETRIES_TO_SKIP_CONFIG_KEY = "num_retries_to_skip"
 
 
 class ResourceGroupOpts(BackendAISchema):
@@ -46,7 +52,9 @@ class ResourceGroupOpts(BackendAISchema):
     allow_fractional_resource_fragmentation: bool = True
     """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
 
-    route_cleanup_target_statuses: list[str] = Field(default_factory=lambda: ["unhealthy"])
+    route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
+        default_factory=lambda: [RouteHealthStatus.UNHEALTHY]
+    )
     """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
 
     preemption: PreemptionConfig = Field(default_factory=PreemptionConfig)
@@ -63,3 +71,22 @@ class ResourceGroupOpts(BackendAISchema):
     @field_serializer("agent_selection_strategy", mode="plain")
     def serialize_agent_selection_strategy(self, value: AgentSelectionStrategy) -> str:
         return value.value
+
+    @field_serializer("route_cleanup_target_statuses", mode="plain")
+    def serialize_route_cleanup_target_statuses(self, value: list[RouteHealthStatus]) -> list[str]:
+        return [item.value for item in value]
+
+    @field_validator("route_cleanup_target_statuses", mode="before")
+    @classmethod
+    def drop_unknown_route_cleanup_target_statuses(cls, value: Any) -> Any:
+        # Stored rows may hold strings that name no status; route eviction has always ignored them,
+        # so they are dropped here instead of failing every read of the row.
+        if not isinstance(value, list):
+            return value
+        known_statuses: list[RouteHealthStatus] = []
+        for stored_status in value:
+            try:
+                known_statuses.append(RouteHealthStatus(stored_status))
+            except ValueError:
+                continue
+        return known_statuses
