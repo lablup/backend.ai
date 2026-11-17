@@ -226,7 +226,6 @@ class TestStatusReplyExtensionTypes:
         assert await runner.ping() is None
 
 
-
 def _unanswered_socket_pair() -> SocketPair:
     return SocketPair(
         RobustSocket(zmq.PUSH, "tcp://127.0.0.1:1"),
