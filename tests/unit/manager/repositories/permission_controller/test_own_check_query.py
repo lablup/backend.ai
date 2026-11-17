@@ -772,14 +772,16 @@ async def test_benchmark_at_scale(database: ExtendedAsyncSAEngine) -> None:
     for name, (entity_type, entity_ids) in cases.items():
         keys = [OwnCheckKey(user_id=seed.user_id, entity=e) for e in entity_ids]
 
-        async def current() -> Mapping[uuid.UUID, Permission]:
+        async def current(keys: list[OwnCheckKey] = keys) -> Mapping[uuid.UUID, Permission]:
             async with provider.read_ops() as r:
                 answered = await r.owned_permissions(keys)
             # The previous query left unreached entities out; the current one maps
             # them to NONE. Compare what is reached.
             return {key.entity: bits for key, bits in answered.items() if bits}
 
-        async def previous() -> Mapping[uuid.UUID, Permission]:
+        async def previous(
+            entity_type: Any = entity_type, entity_ids: Any = entity_ids
+        ) -> Mapping[uuid.UUID, Permission]:
             async with database.begin_readonly_session() as sess:
                 return dict(await _previous_query(sess, seed.user_id, entity_type, entity_ids))
 
