@@ -9,6 +9,7 @@ import pytest_mock
 
 from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.proxy.frontend.tcp import TCPFrontend
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressFrontendKey
 
 _PORT = 10200
 
@@ -31,9 +32,11 @@ class TestTCPFrontend:
             side_effect=IngressNotRegisteredError("no layer holds the frontend")
         )
         frontend = TCPFrontend(root_context)
-        circuit = mocker.MagicMock(id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372"))
-        backend = mocker.MagicMock(circuit=circuit, bind=AsyncMock())
-        frontend.backends[_PORT] = backend
+        backend = mocker.MagicMock(
+            circuit=mocker.MagicMock(id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372")),
+            bind=AsyncMock(),
+        )
+        frontend.backends[IngressFrontendKey(f"port-{_PORT}")] = backend
         return _TCPConnectionSituation(
             frontend=frontend,
             reader=mocker.MagicMock(),
