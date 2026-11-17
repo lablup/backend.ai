@@ -31,12 +31,19 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 
 AUTHORITY = IngressAuthority("worker-1")
 FRONTEND_KEY = IngressFrontendKey("port-10205")
+ANOTHER_FRONTEND_KEY = IngressFrontendKey("port-10206")
 NEGATIVE_TTL = 5.0
 
 
 @dataclass(frozen=True)
 class _LayersCase:
     layers: list[str]
+
+
+@dataclass(frozen=True)
+class _InvalidationDuringRedisReadCase:
+    invalidated_key: IngressFrontendKey
+    expected_held_keys: list[IngressFrontendKey]
 
 
 class _MemoryStateBeforeInvalidation(StrEnum):
@@ -132,7 +139,22 @@ async def layered_with_redis_holding_a_newer_ingress_than_memory(
 
 
 @pytest.fixture
-def layered_with_the_key_invalidated_during_the_redis_read(
+def layered_with_a_key_invalidated_during_the_redis_read(
+    case: _InvalidationDuringRedisReadCase,
+    layered: LayeredIngressState,
+    redis: AsyncMock,
+    ingress: Ingress,
+) -> LayeredIngressState:
+    async def read_redis_while_a_key_is_invalidated(frontend_key: IngressFrontendKey) -> Ingress:
+        await layered.invalidate([case.invalidated_key])
+        return ingress
+
+    redis.get.side_effect = read_redis_while_a_key_is_invalidated
+    return layered
+
+
+@pytest.fixture
+async def layered_after_a_read_its_key_was_invalidated_during(
     layered: LayeredIngressState, redis: AsyncMock, ingress: Ingress
 ) -> LayeredIngressState:
     async def read_redis_while_the_key_is_invalidated(frontend_key: IngressFrontendKey) -> Ingress:
@@ -140,6 +162,9 @@ def layered_with_the_key_invalidated_during_the_redis_read(
         return ingress
 
     redis.get.side_effect = read_redis_while_the_key_is_invalidated
+    await layered.get(FRONTEND_KEY)
+    redis.get.side_effect = None
+    redis.get.return_value = ingress
     return layered
 
 
@@ -223,13 +248,37 @@ class TestLayeredIngressState:
 
         assert await layered.get(FRONTEND_KEY) == ingress
 
-    async def test_redis_hit_read_across_an_invalidation_is_not_written_to_memory(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _InvalidationDuringRedisReadCase(invalidated_key=FRONTEND_KEY, expected_held_keys=[]),
+            _InvalidationDuringRedisReadCase(
+                invalidated_key=ANOTHER_FRONTEND_KEY, expected_held_keys=[FRONTEND_KEY]
+            ),
+        ],
+        ids=lambda case: case.invalidated_key,
+    )
+    async def test_redis_hit_is_written_to_memory_unless_its_key_is_invalidated_during_the_read(
         self,
-        layered_with_the_key_invalidated_during_the_redis_read: LayeredIngressState,
+        case: _InvalidationDuringRedisReadCase,
+        layered_with_a_key_invalidated_during_the_redis_read: LayeredIngressState,
         memory: InMemoryIngressState,
         ingress: Ingress,
     ) -> None:
-        layered = layered_with_the_key_invalidated_during_the_redis_read
+        layered = layered_with_a_key_invalidated_during_the_redis_read
         assert await layered.get(FRONTEND_KEY) == ingress
 
-        assert await memory.get(FRONTEND_KEY) is None
+        held_ingresses = await memory.get_all()
+        assert [
+            held_ingress.frontend.key() for held_ingress in held_ingresses
+        ] == case.expected_held_keys
+
+    async def test_key_invalidated_during_a_finished_read_is_written_to_memory_on_the_next_read(
+        self,
+        layered_after_a_read_its_key_was_invalidated_during: LayeredIngressState,
+        memory: InMemoryIngressState,
+        ingress: Ingress,
+    ) -> None:
+        await layered_after_a_read_its_key_was_invalidated_during.get(FRONTEND_KEY)
+
+        assert await memory.get(FRONTEND_KEY) == ingress
