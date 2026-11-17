@@ -87,7 +87,7 @@ _ENTRIES = (
 
 
 @pytest.fixture
-async def card_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def card_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [ResourceSlotTypeRow, ModelCardResourceRequirementRow]):
         async with ops_db.begin_session() as sess:
             sess.add_all([

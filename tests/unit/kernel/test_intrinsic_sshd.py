@@ -37,12 +37,12 @@ class TestPrepareSshdService:
         return {"port": [2200, 2201, 2202]}
 
     @pytest.fixture
-    def mock_agent_key_present(self) -> Generator[None, None, None]:
+    def mock_agent_key_present(self) -> Generator[None]:
         with patch.object(Path, "is_file", return_value=True):
             yield
 
     @pytest.fixture
-    def mock_agent_key_absent(self) -> Generator[None, None, None]:
+    def mock_agent_key_absent(self) -> Generator[None]:
         with patch.object(Path, "is_file", return_value=False):
             yield
 
@@ -120,7 +120,7 @@ class TestInitSshdServiceHostKey:
         return _make_proc(returncode=0)
 
     @pytest.fixture
-    def mock_fs_ops(self) -> Generator[None, None, None]:
+    def mock_fs_ops(self) -> Generator[None]:
         """Patch all filesystem operations used by init_sshd_service."""
         with (
             patch.object(Path, "is_dir", return_value=False),
@@ -137,7 +137,7 @@ class TestInitSshdServiceHostKey:
         mock_fs_ops: None,
         user_keygen_proc: AsyncMock,
         user_convert_proc: AsyncMock,
-    ) -> Generator[AsyncMock, None, None]:
+    ) -> Generator[AsyncMock]:
         """Agent host key EXISTS — only user keygen + convert, no host keygen."""
         mock_create = AsyncMock(side_effect=[user_keygen_proc, user_convert_proc])
         with (
@@ -158,7 +158,7 @@ class TestInitSshdServiceHostKey:
         user_keygen_proc: AsyncMock,
         user_convert_proc: AsyncMock,
         host_keygen_proc: AsyncMock,
-    ) -> Generator[AsyncMock, None, None]:
+    ) -> Generator[AsyncMock]:
         """Agent host key ABSENT — user keygen + convert + host keygen."""
         mock_create = AsyncMock(side_effect=[user_keygen_proc, user_convert_proc, host_keygen_proc])
         with (

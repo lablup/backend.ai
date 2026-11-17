@@ -163,7 +163,7 @@ class _FakeRegistryScanner(BaseContainerRegistry):
 @pytest.fixture
 async def db_with_cleanup(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """The global entities come with it: an image of a global registry joins
     `public`, which needs that singleton's id."""
     async with with_tables(

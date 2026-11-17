@@ -83,7 +83,7 @@ class TestKeypairResourcePolicyOps:
     async def db_with_cleanup(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             global_entity_ids,

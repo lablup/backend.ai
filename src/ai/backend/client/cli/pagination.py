@@ -63,12 +63,10 @@ def tabulate_items(
             widths = [0] * num_cols
             if headers:
                 for i, h in enumerate(headers):
-                    if len(h) > widths[i]:
-                        widths[i] = len(h)
+                    widths[i] = max(widths[i], len(h))
             for row in formatted_rows:
                 for i, cell in enumerate(row):
-                    if len(cell) > widths[i]:
-                        widths[i] = len(cell)
+                    widths[i] = max(widths[i], len(cell))
             pinned_widths.extend(widths)
         else:
             # Allow widening only if a later cell exceeds the pinned width.
@@ -76,8 +74,7 @@ def tabulate_items(
             # subsequent chunks self-consistent in that rare case.
             for row in formatted_rows:
                 for i, cell in enumerate(row):
-                    if len(cell) > pinned_widths[i]:
-                        pinned_widths[i] = len(cell)
+                    pinned_widths[i] = max(pinned_widths[i], len(cell))
 
         # Pad each cell to the pinned width so tabulate() computes the
         # same column widths it produced for the first chunk.

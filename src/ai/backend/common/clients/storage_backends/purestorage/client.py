@@ -107,9 +107,7 @@ class PurityClient:
             raise UnauthorizedPurityClient("The auth token for Purity API is not initialized.")
         return {"x-auth-token": self._auth_token}
 
-    async def _pages(
-        self, path: str, query: PurityListQuery
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    async def _pages(self, path: str, query: PurityListQuery) -> AsyncGenerator[dict[str, Any]]:
         """Yields each page of a listing, following its continuation token."""
         pagination_token = ""
         while True:
@@ -146,7 +144,7 @@ class PurityClient:
             console_url=str(self._endpoint),
         )
 
-    async def get_nfs_metric(self, fs_name: str) -> AsyncGenerator[PurityNFSMetric, None]:
+    async def get_nfs_metric(self, fs_name: str) -> AsyncGenerator[PurityNFSMetric]:
         async for page in self._pages(
             "file-systems/performance", PurityListQuery(names=fs_name, protocol="NFS")
         ):

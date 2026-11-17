@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def pagination_test_db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[tuple[AsyncConnection, sa.Table], None]:
+) -> AsyncGenerator[tuple[AsyncConnection, sa.Table]]:
     """Create test table with 100 items for pagination testing."""
     metadata = sa.MetaData()
     test_items = sa.Table(

@@ -119,14 +119,13 @@ class ValkeyLeaderElection(AbstractLeaderElection):
                             server_id=self._config.server_id,
                             leader_key=self._config.leader_key,
                         )
-                else:
-                    if was_leader:
-                        self._is_leader = False
-                        log.info(
-                            "leadership lost",
-                            server_id=self._config.server_id,
-                            leader_key=self._config.leader_key,
-                        )
+                elif was_leader:
+                    self._is_leader = False
+                    log.info(
+                        "leadership lost",
+                        server_id=self._config.server_id,
+                        leader_key=self._config.leader_key,
+                    )
             except Exception:
                 failure_count += 1
                 log.warning(

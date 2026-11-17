@@ -39,7 +39,7 @@ class TestValkeyScheduleClient:
     async def valkey_schedule_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+    ) -> AsyncGenerator[ValkeyScheduleClient]:
         """Create ValkeyScheduleClient with real Redis container"""
         _, hostport_pair = redis_container
 
@@ -329,7 +329,7 @@ class TestKernelPresenceStatus:
     async def valkey_schedule_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+    ) -> AsyncGenerator[ValkeyScheduleClient]:
         """Create ValkeyScheduleClient with real Redis container."""
         _, hostport_pair = redis_container
 
@@ -638,7 +638,7 @@ class TestAgentLastCheck:
     async def valkey_schedule_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+    ) -> AsyncGenerator[ValkeyScheduleClient]:
         """Create ValkeyScheduleClient with real Redis container."""
         _, hostport_pair = redis_container
 
@@ -852,7 +852,7 @@ class TestForceTerminatedCleanupQueue:
     async def valkey_schedule_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+    ) -> AsyncGenerator[ValkeyScheduleClient]:
         _, hostport_pair = redis_container
         valkey_target = ValkeyTarget(addr=hostport_pair.address)
         client = await ValkeyScheduleClient.create(
@@ -912,7 +912,7 @@ class TestReplicaProbeTargetClient:
     async def valkey_schedule_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+    ) -> AsyncGenerator[ValkeyScheduleClient]:
         _, hostport_pair = redis_container
         client = await ValkeyScheduleClient.create(
             valkey_target=ValkeyTarget(addr=hostport_pair.address),
@@ -1004,7 +1004,7 @@ class TestReplicaHealthStatusClient:
     async def valkey_schedule_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+    ) -> AsyncGenerator[ValkeyScheduleClient]:
         _, hostport_pair = redis_container
         client = await ValkeyScheduleClient.create(
             valkey_target=ValkeyTarget(addr=hostport_pair.address),

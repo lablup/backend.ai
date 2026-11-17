@@ -87,7 +87,7 @@ class _World:
 
 
 @pytest.fixture
-async def bucket_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def bucket_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [DomainUsageBucketRow]):
         yield ops_db
 

@@ -247,7 +247,7 @@ class TestActor:
 
 
 @pytest.fixture
-async def preset_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def preset_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [RolePresetRow]):
         yield ops_db
 

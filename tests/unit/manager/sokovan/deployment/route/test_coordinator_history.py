@@ -288,7 +288,7 @@ def coordinator_with_provisioning_routes(
     mock_client_pool: MagicMock,
     mock_service_discovery: MagicMock,
     sample_route_data: RouteData,
-) -> Generator[RouteCoordinator, None, None]:
+) -> Generator[RouteCoordinator]:
     """Coordinator with PROVISIONING routes available."""
     mock_deployment_repository.search_route_datas_with_last_history = AsyncMock(
         return_value=[sample_route_data]
@@ -318,7 +318,7 @@ def coordinator_without_routes(
     mock_scheduling_controller: MagicMock,
     mock_client_pool: MagicMock,
     mock_service_discovery: MagicMock,
-) -> Generator[RouteCoordinator, None, None]:
+) -> Generator[RouteCoordinator]:
     """Coordinator with no routes available."""
     mock_deployment_repository.search_route_datas_with_last_history = AsyncMock(return_value=[])
 

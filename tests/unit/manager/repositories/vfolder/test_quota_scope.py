@@ -64,7 +64,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -108,7 +108,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name"""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
@@ -132,7 +132,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def other_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create other test domain and return domain name"""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
@@ -156,7 +156,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid4().hex[:8]}"
 
@@ -179,7 +179,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Create admin user and return user UUID"""
         user_uuid = uuid4()
         password_info = PasswordInfo(
@@ -214,7 +214,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Create regular user and return user UUID"""
         user_uuid = uuid4()
         password_info = PasswordInfo(
@@ -249,7 +249,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         db_with_cleanup: ExtendedAsyncSAEngine,
         other_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Create user in other domain and return user UUID"""
         user_uuid = uuid4()
         password_info = PasswordInfo(
@@ -300,7 +300,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test project resource policy and return policy name"""
         policy_name = f"test-group-policy-{uuid4().hex[:8]}"
 
@@ -322,7 +322,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Create test group and return group UUID"""
         group_uuid = uuid4()
 
@@ -413,7 +413,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         db_with_cleanup: ExtendedAsyncSAEngine,
         regular_user: UUID,
         test_group: UUID,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Enroll regular_user in test_group."""
         async with db_with_cleanup.begin_session() as session:
             await VirtualEntitySeeder().enroll_user_in_project(session, test_group, regular_user)
@@ -427,7 +427,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         regular_user: UUID,
         test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """A separate group in the same domain, with regular_user enrolled in it."""
         other_group_id = uuid4()
         async with db_with_cleanup.begin_session() as session:

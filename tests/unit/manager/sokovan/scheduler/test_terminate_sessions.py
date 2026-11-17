@@ -326,7 +326,6 @@ class TestTerminateSessions:
         # Add delay to agent calls to verify concurrency
         async def delayed_destroy(*args: Any, **kwargs: Any) -> None:
             await asyncio.sleep(0.1)
-            return
 
         for agent_id in all_agent_ids:
             mock_agent = mock_agent_client_pool.get_agent_client(agent_id)

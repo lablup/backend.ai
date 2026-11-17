@@ -157,7 +157,7 @@ async def _seed_default_keypair(db: ExtendedAsyncSAEngine, actors: Actors) -> Ke
 
 
 @pytest.fixture
-async def log_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def log_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [ErrorLogRow]):
         yield ops_db
 

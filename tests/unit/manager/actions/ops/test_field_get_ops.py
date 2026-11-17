@@ -57,7 +57,7 @@ _OPERATION = GetArtifactRevisionAction.action_name()
 @pytest.fixture
 async def artifact_db(
     ops_db: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         ops_db,
         [

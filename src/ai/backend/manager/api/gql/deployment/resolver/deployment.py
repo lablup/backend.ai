@@ -422,7 +422,7 @@ async def admin_refresh_deployment_revisions(
 )
 async def deployment_status_changed(
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
+) -> AsyncGenerator[DeploymentStatusChangedPayload]:
     """Subscribe to deployment status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
     raise NotImplementedAPI("Subscription not implemented")

@@ -106,7 +106,7 @@ class TestDomainRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self, global_entity_ids: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [
@@ -155,7 +155,7 @@ class TestDomainRepository:
     @pytest.fixture
     async def db_with_default_resource_policies(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database with default resource policies seeded for domain creation."""
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -227,7 +227,7 @@ class TestDomainRepository:
     @pytest.fixture
     async def sample_domain(
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[DomainData, None]:
+    ) -> AsyncGenerator[DomainData]:
         """Create a sample domain for testing."""
         async with db_with_default_resource_policies.begin() as conn:
             domain_data = {

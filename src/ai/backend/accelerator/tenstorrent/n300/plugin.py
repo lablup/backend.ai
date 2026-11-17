@@ -124,8 +124,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
             numa_node_idx_path = Path(pci_base_path) / "device" / "numa_node"
             numa_node_idx = int(numa_node_idx_path.read_text())
-            if numa_node_idx < 0:
-                numa_node_idx = 0
+            numa_node_idx = max(numa_node_idx, 0)
 
             device = TTn300Device(
                 model_name="Tenstorrent n300",

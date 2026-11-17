@@ -1231,15 +1231,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         )
         if self.output_queue is None:
             self.output_queue = q
+        elif self.current_run_id == run_id:
+            # No need to wait if we are continuing.
+            pass
         else:
-            if self.current_run_id == run_id:
-                # No need to wait if we are continuing.
-                pass
-            else:
-                # If there is an outstanding ongoning execution,
-                # wait until it has "finished".
-                await activated.wait()
-                activated.clear()
+            # If there is an outstanding ongoning execution,
+            # wait until it has "finished".
+            await activated.wait()
+            activated.clear()
         self.current_run_id = run_id
         if self.output_queue is not q:
             raise OutputQueueMismatchError

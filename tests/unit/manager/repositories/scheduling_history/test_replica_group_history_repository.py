@@ -92,7 +92,7 @@ class TestReplicaGroupHistoryRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -121,7 +121,7 @@ class TestReplicaGroupHistoryRepository:
     async def scheduling_history_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[SchedulingHistoryRepository, None]:
+    ) -> AsyncGenerator[SchedulingHistoryRepository]:
         """Create SchedulingHistoryRepository instance with database"""
         repo = SchedulingHistoryRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo

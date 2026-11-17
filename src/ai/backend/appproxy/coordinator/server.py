@@ -996,7 +996,7 @@ async def server_main(
     loop.set_debug(local_config.debug.asyncio)
 
     @asynccontextmanager
-    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None, None]:
+    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None]:
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
@@ -1024,7 +1024,7 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx() -> AsyncGenerator[None, None]:
+    async def webapp_ctx() -> AsyncGenerator[None]:
         ssl_ctx = None
         if local_config.proxy_coordinator.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

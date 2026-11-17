@@ -188,7 +188,7 @@ class TestExecuteStreamingExport:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(database_connection, [ExportTestRow]):
             yield database_connection
@@ -197,7 +197,7 @@ class TestExecuteStreamingExport:
     async def sample_data(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[dict[str, str | int]], None]:
+    ) -> AsyncGenerator[list[dict[str, str | int]]]:
         """Insert sample data and return list of inserted data."""
         data: list[dict[str, str | int]] = [
             {
@@ -366,7 +366,7 @@ class TestExecuteStreamingExport:
     async def db_with_join_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database with parent-child tables for JOIN testing."""
         async with with_tables(database_connection, [ExportTestRow, ExportTestChildRow]):
             yield database_connection
@@ -375,7 +375,7 @@ class TestExecuteStreamingExport:
     async def parent_child_data(
         self,
         db_with_join_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Insert parent with two children, return parent_id."""
         parent_id = str(uuid4())
         async with db_with_join_tables.begin_session() as db_sess:

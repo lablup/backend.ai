@@ -78,7 +78,7 @@ from ai.backend.testutils.db import with_tables
 @pytest.fixture
 async def database(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     # FK order: app_config_definitions (parent), then the allow-list, then the
     # fragments hanging off the allow-list (cascade tests need them).
     async with with_tables(

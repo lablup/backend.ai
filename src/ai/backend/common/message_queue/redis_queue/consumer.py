@@ -180,7 +180,7 @@ class RedisConsumer(AbstractConsumer):
         )
 
     @override
-    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore[override]
+    async def consume_queue(self) -> AsyncGenerator[MQMessage]:  # type: ignore[override]
         """
         Consume messages from the queue.
 

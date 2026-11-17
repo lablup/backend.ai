@@ -116,7 +116,7 @@ class TransitionRecorder[EntityIdT: UUID]:
         self,
         name: str,
         success_detail: str | None = None,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         """
         Enter a phase.
 
@@ -157,7 +157,7 @@ class TransitionRecorder[EntityIdT: UUID]:
         self,
         name: str,
         success_detail: str | None = None,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         """
         Execute a step with automatic success/failure recording.
 

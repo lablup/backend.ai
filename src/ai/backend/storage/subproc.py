@@ -37,7 +37,7 @@ async def spawn_and_watch(
     *,
     cwd: os.PathLike[str] | None = None,
     tail_length: int = 50,
-) -> AsyncGenerator[bytes, None]:
+) -> AsyncGenerator[bytes]:
     last_lines: list[bytes] = []
     proc = await asyncio.create_subprocess_exec(
         *cmdargs,

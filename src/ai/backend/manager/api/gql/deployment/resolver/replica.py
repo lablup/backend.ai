@@ -95,7 +95,7 @@ async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | No
 )
 async def replica_status_changed(
     revision_id: ID,
-) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
+) -> AsyncGenerator[ReplicaStatusChangedPayload]:
     """Subscribe to replica status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
     raise NotImplementedAPI("Subscription not implemented")

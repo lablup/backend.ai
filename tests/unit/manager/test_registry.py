@@ -64,8 +64,7 @@ class DummyEtcd:
 async def registry_ctx() -> AsyncGenerator[
     tuple[
         AgentRegistry, MagicMock, MagicMock, MagicMock, ManagerConfigProvider, MagicMock, MagicMock
-    ],
-    None,
+    ]
 ]:
     mocked_etcd = DummyEtcd()
     mock_etcd_config_loader = MagicMock()

@@ -35,7 +35,7 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 
 @pytest.fixture(scope="session")
-def logging_config() -> Generator[LoggingConfig, None, None]:
+def logging_config() -> Generator[LoggingConfig]:
     config = LoggingConfig(
         version=1,
         disable_existing_loggers=False,
@@ -72,7 +72,7 @@ def local_config(
     logging_config: LoggingConfig,
     etcd_container: tuple[object, object],
     redis_container: tuple[object, object],
-) -> Generator[AgentUnifiedConfig, None, None]:
+) -> Generator[AgentUnifiedConfig]:
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"

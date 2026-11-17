@@ -49,7 +49,7 @@ OTHER_GROUP_NAME = "other-group"
 @pytest.fixture
 async def db(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         global_entity_ids,
         [

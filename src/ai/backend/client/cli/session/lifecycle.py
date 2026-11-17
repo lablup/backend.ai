@@ -661,21 +661,20 @@ def _destroy_cmd(docs: str | None = None) -> Callable[..., None]:
                 except Exception as e:
                     print_error(e)
                     has_failure = True
-            else:
-                if not has_failure:
-                    print_done("Done.")
-                    if forced:
-                        print_warn(
-                            "If you have destroyed a session whose status is one of "
-                            "[`CREATING`, `TERMINATING`, `ERROR`], "
-                            "Manual cleanup of actual containers may be required."
-                        )
-                if stats:
-                    stats_data = ret.get("stats", None) if ret else None
-                    if stats_data:
-                        print(format_stats(stats_data))
-                    else:
-                        print("Statistics is not available.")
+            if not has_failure:
+                print_done("Done.")
+                if forced:
+                    print_warn(
+                        "If you have destroyed a session whose status is one of "
+                        "[`CREATING`, `TERMINATING`, `ERROR`], "
+                        "Manual cleanup of actual containers may be required."
+                    )
+            if stats:
+                stats_data = ret.get("stats", None) if ret else None
+                if stats_data:
+                    print(format_stats(stats_data))
+                else:
+                    print("Statistics is not available.")
             if has_failure:
                 sys.exit(ExitCode.FAILURE)
 
@@ -725,9 +724,8 @@ def _restart_cmd(docs: str | None = None) -> Callable[..., None]:
                 except Exception as e:
                     print_error(e)
                     has_failure = True
-            else:
-                if not has_failure:
-                    print_done("Done.")
+            if not has_failure:
+                print_done("Done.")
             if has_failure:
                 sys.exit(ExitCode.FAILURE)
 

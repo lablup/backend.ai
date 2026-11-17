@@ -42,7 +42,7 @@ class TestReportAllKernelCommitStatusMap:
         return agent
 
     @pytest.fixture
-    def mock_log(self) -> Generator[Mock, None, None]:
+    def mock_log(self) -> Generator[Mock]:
         with patch("ai.backend.agent.agent.log") as _mock_log:
             yield _mock_log
 

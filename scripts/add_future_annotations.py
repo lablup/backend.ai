@@ -98,11 +98,10 @@ def get_insertion_point(content: str) -> int:
                         if line.count(quote_char) >= 2:
                             idx = i + 1
                             break
-                else:
-                    # Check for docstring end
-                    if quote_char in line:
-                        idx = i + 1
-                        break
+                # Check for docstring end
+                elif quote_char in line:
+                    idx = i + 1
+                    break
     except SyntaxError:
         pass
 
@@ -120,16 +119,15 @@ def add_future_import(content: str) -> str:
 
     # Check if there are already imports at insertion point
     has_imports = insertion_idx < len(lines) and (
-        lines[insertion_idx].startswith("import ") or
-        lines[insertion_idx].startswith("from ")
+        lines[insertion_idx].startswith("import ") or lines[insertion_idx].startswith("from ")
     )
 
     # Build new content
     new_lines = (
-        lines[:insertion_idx] +
-        [FUTURE_IMPORT + "\n"] +
-        (["\n"] if has_imports else []) +
-        lines[insertion_idx:]
+        lines[:insertion_idx]
+        + [FUTURE_IMPORT + "\n"]
+        + (["\n"] if has_imports else [])
+        + lines[insertion_idx:]
     )
 
     return "".join(new_lines)

@@ -132,7 +132,7 @@ _AGENT_ADDR = "127.0.0.1:6001"
 @pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Database connection with the scheduler table set created (TRUNCATE CASCADE cleanup)."""
     async with with_tables(database_connection, _SCHEDULER_ROWS):
         yield database_connection
@@ -152,7 +152,7 @@ def test_scaling_group_id() -> ResourceGroupID:
 async def test_domain(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_domain_id: DomainID,
-) -> AsyncGenerator[DomainFixtureData, None]:
+) -> AsyncGenerator[DomainFixtureData]:
     domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -173,7 +173,7 @@ async def test_domain(
 async def test_scaling_group_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_scaling_group_id: ResourceGroupID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -198,7 +198,7 @@ async def test_scaling_group_name(
 @pytest.fixture
 async def test_resource_policy_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -216,7 +216,7 @@ async def test_resource_policy_name(
 @pytest.fixture
 async def test_user_resource_policy_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -235,7 +235,7 @@ async def test_user_resource_policy_name(
 @pytest.fixture
 async def test_keypair_resource_policy_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -262,7 +262,7 @@ async def test_user_uuid(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_domain: DomainFixtureData,
     test_user_resource_policy_name: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     user_uuid = uuid.uuid4()
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -286,7 +286,7 @@ async def test_access_key(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_user_uuid: uuid.UUID,
     test_keypair_resource_policy_name: str,
-) -> AsyncGenerator[AccessKey, None]:
+) -> AsyncGenerator[AccessKey]:
     access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -310,7 +310,7 @@ async def test_group_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_domain: DomainFixtureData,
     test_resource_policy_name: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     group_id = uuid.uuid4()
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -334,7 +334,7 @@ async def test_agent_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_scaling_group_name: str,
     test_scaling_group_id: ResourceGroupID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -356,7 +356,7 @@ async def test_agent_id(
 @pytest.fixture
 async def resource_slot_types(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[None]:
     """Seed resource slot types required by the resource_allocations FK."""
     async with db_with_cleanup.begin_session() as db_sess:
         for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:

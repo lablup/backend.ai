@@ -39,9 +39,7 @@ def rpc_auth_key_config(tmp_path_factory: pytest.TempPathFactory) -> dict[str, P
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(
-    session_mocker: MockerFixture, test_id: str
-) -> Generator[None, None, None]:
+def test_local_instance_id(session_mocker: MockerFixture, test_id: str) -> Generator[None]:
     mock_generate_local_instance_id = session_mocker.patch.object(
         agent_module,
         "generate_local_instance_id",

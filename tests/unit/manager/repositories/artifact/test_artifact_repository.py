@@ -72,7 +72,7 @@ class TestArtifactRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -119,7 +119,7 @@ class TestArtifactRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample artifact directly in DB and return its ID"""
         artifact_id = uuid.uuid4()
 
@@ -146,7 +146,7 @@ class TestArtifactRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[dict[ArtifactType, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[ArtifactType, uuid.UUID]]:
         """Create sample artifacts with different types for filter testing"""
         artifact_map: dict[ArtifactType, uuid.UUID] = {}
         types = [ArtifactType.MODEL, ArtifactType.PACKAGE]
@@ -177,7 +177,7 @@ class TestArtifactRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample artifacts with predictable names for ordering tests"""
         artifact_ids = []
         names = ["alpha-model", "beta-model", "gamma-model", "delta-model"]
@@ -208,7 +208,7 @@ class TestArtifactRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample artifacts for pagination testing"""
         artifact_ids = []
         now = datetime.now(UTC)
@@ -241,7 +241,7 @@ class TestArtifactRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample artifacts for combined pagination, filter, and ordering tests"""
         artifact_ids = []
         # Create 10 ALIVE MODEL artifacts and 5 DELETED MODEL artifacts
@@ -276,7 +276,7 @@ class TestArtifactRepository:
     async def artifact_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ArtifactRepository, None]:
+    ) -> AsyncGenerator[ArtifactRepository]:
         """Create ArtifactRepository instance with database"""
         repo = ArtifactRepository(
             db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)

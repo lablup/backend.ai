@@ -15,7 +15,7 @@ from ai.backend.testutils.db import TableOrORM, with_tables
 
 
 @asynccontextmanager
-async def with_global_entities(engine: AsyncEngine) -> AsyncGenerator[None, None]:
+async def with_global_entities(engine: AsyncEngine) -> AsyncGenerator[None]:
     """
     Create the global entity rows and their virtual entities, as the migration does.
     Tables are truncated on exit.

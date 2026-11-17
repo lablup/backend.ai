@@ -88,7 +88,7 @@ class TestImageRepositorySearch:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -137,7 +137,7 @@ class TestImageRepositorySearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: UUID,
-    ) -> AsyncGenerator[list[ImageID], None]:
+    ) -> AsyncGenerator[list[ImageID]]:
         """Create sample images for testing"""
         images_data = [
             ("python:3.9", "x86_64", ImageType.COMPUTE),
@@ -178,7 +178,7 @@ class TestImageRepositorySearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: UUID,
-    ) -> AsyncGenerator[list[ImageID], None]:
+    ) -> AsyncGenerator[list[ImageID]]:
         """Create 25 images for pagination testing"""
         image_rows: list[ImageRow] = []
 
@@ -367,7 +367,7 @@ class TestImageRepositorySearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: UUID,
-    ) -> AsyncGenerator[list[ImageID], None]:
+    ) -> AsyncGenerator[list[ImageID]]:
         """Create images with aliases for alias filter testing."""
         images_data = [
             ("python:3.9", "x86_64", ImageType.COMPUTE, ["py39"]),
@@ -460,7 +460,7 @@ class TestImageRepositoryLastUsedAt:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with all tables needed for kernel queries."""
         async with with_tables(
             database_connection,
@@ -754,7 +754,7 @@ class TestImageRepositoryRestore:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -858,7 +858,7 @@ class TestImageRepositoryOwnership:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -1007,7 +1007,7 @@ class TestImageRepositoryDigest:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [

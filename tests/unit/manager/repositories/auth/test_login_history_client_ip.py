@@ -43,7 +43,7 @@ class TestLoginHistoryClientIP:
     @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -58,7 +58,7 @@ class TestLoginHistoryClientIP:
     @pytest.fixture
     async def sample_user(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[SampleUserData, None]:
+    ) -> AsyncGenerator[SampleUserData]:
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4()}"
         user_id = UserID(uuid.uuid4())

@@ -51,7 +51,7 @@ class TestUserResourcePolicyRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -95,7 +95,7 @@ class TestUserResourcePolicyRepository:
     @pytest.fixture
     async def sample_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[UserResourcePolicyData, None]:
+    ) -> AsyncGenerator[UserResourcePolicyData]:
         """Create a sample policy in the database for testing"""
         policy_name = "test-policy-sample"
         async with db_with_cleanup.begin_session() as db_sess:

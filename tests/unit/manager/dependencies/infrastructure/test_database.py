@@ -45,7 +45,7 @@ class TestDatabaseDependency:
         mock_loader.return_value.load = AsyncMock()
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock, None]:
+        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock]:
             yield mock_engine
 
         mock_connect_db.return_value = mock_context(mock_config)
@@ -75,7 +75,7 @@ class TestDatabaseDependency:
         cleanup_called = False
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock, None]:
+        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock]:
             nonlocal cleanup_called
             try:
                 yield mock_engine
@@ -105,7 +105,7 @@ class TestDatabaseDependency:
         cleanup_called = False
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock, None]:
+        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock]:
             nonlocal cleanup_called
             try:
                 yield MagicMock()

@@ -167,8 +167,7 @@ class TPUPlugin(AbstractComputePlugin):
                         f"TPU_NAME={device.hw_location}",
                     ]
                 }
-        else:
-            raise RuntimeError("Should not reach here")
+        raise RuntimeError("Should not reach here")
 
     async def get_attached_devices(
         self,

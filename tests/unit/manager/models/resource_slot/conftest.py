@@ -44,7 +44,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 @pytest.fixture
 async def database_with_resource_slot_tables(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Set up tables required for resource slot normalization tests."""
     async with with_tables(
         global_entity_ids,
@@ -85,7 +85,7 @@ def resource_group_id() -> ResourceGroupID:
 @pytest.fixture
 async def domain_fixture(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[DomainFixtureData, None]:
+) -> AsyncGenerator[DomainFixtureData]:
     domain_id = DomainID(uuid.uuid4())
     name = "test-domain"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
@@ -97,7 +97,7 @@ async def domain_fixture(
 async def resource_group(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     name = "default"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
@@ -120,7 +120,7 @@ async def resource_group(
 @pytest.fixture
 async def user_resource_policy(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     name = "test-user-policy"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
@@ -138,7 +138,7 @@ async def user_resource_policy(
 @pytest.fixture
 async def project_resource_policy(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     name = "test-project-policy"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
@@ -157,7 +157,7 @@ async def user_uuid(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     user_resource_policy: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     user_id = uuid.uuid4()
     password_info = PasswordInfo(
         password="test_password",
@@ -185,7 +185,7 @@ async def project_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     project_resource_policy: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     group_id = uuid.uuid4()
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
@@ -216,7 +216,7 @@ async def agent_id(
     resource_group: str,
     resource_group_id: ResourceGroupID,
     agent_uuid: AgentUUID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     aid = "i-test-agent-001"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
@@ -246,7 +246,7 @@ async def kernel_id(
     resource_group_id: ResourceGroupID,
     resource_group: str,
     agent_id: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     kid = uuid.uuid4()
     sid = uuid.uuid4()
     async with database_with_resource_slot_tables.begin_session() as db_sess:
