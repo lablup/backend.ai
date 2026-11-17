@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
 from ai.backend.common.data.partial import PartialRecord, selectable
 from ai.backend.common.errors.partial_record import (
@@ -11,6 +12,7 @@ from ai.backend.common.errors.partial_record import (
     InvalidPartialRecordError,
     NotSelectedError,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class _Group(PartialRecord):
@@ -99,3 +101,38 @@ class TestEquality:
 
     def test_unselected_differs_from_none(self) -> None:
         assert _Group(count=0) != _Group(count=0, created_at_max=None)
+
+
+class _GroupResponse(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    count: int
+    status: str | Unset = UNSET
+    created_at_max: datetime | None | Unset = UNSET
+
+
+class _GroupMapper:
+    def to_response(self, group: _Group) -> _GroupResponse:
+        return _GroupResponse(
+            count=group.count,
+            status=group.or_missing(lambda: group.status),
+            created_at_max=group.or_missing(lambda: group.created_at_max),
+        )
+
+
+class TestOrMissing:
+    def test_selected_field_returns_value(self, status_only: _Group) -> None:
+        assert status_only.or_missing(lambda: status_only.status) == "ok"
+
+    def test_unselected_field_returns_missing(self, status_only: _Group) -> None:
+        assert status_only.or_missing(lambda: status_only.created_at_max) is UNSET
+
+    def test_unselected_field_is_left_out_of_json(self, status_only: _Group) -> None:
+        response = _GroupMapper().to_response(status_only)
+
+        assert response.model_dump(mode="json") == {"count": 3, "status": "ok"}
+
+    def test_field_selected_as_none_is_null_in_json(self, null_created_at: _Group) -> None:
+        response = _GroupMapper().to_response(null_created_at)
+
+        assert response.model_dump(mode="json") == {"count": 0, "created_at_max": None}

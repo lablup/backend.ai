@@ -8,7 +8,7 @@ A subclass of `PartialRecord` declares its fields as annotations. A field assign
 from __future__ import annotations
 
 import inspect
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, ClassVar, dataclass_transform, final, override
 
 from ai.backend.common.errors.partial_record import (
@@ -16,6 +16,7 @@ from ai.backend.common.errors.partial_record import (
     InvalidPartialRecordError,
     NotSelectedError,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 @final
@@ -84,6 +85,13 @@ class PartialRecord:
     @override
     def __delattr__(self, name: str) -> None:
         raise FrozenPartialRecordError(f"{type(self).__name__}.{name} cannot be deleted")
+
+    def or_missing[T](self, read: Callable[[], T]) -> T | Unset:
+        """Return what ``read`` reads from this record, or pydantic ``MISSING`` if not selected."""
+        try:
+            return read()
+        except NotSelectedError:
+            return UNSET
 
     def is_selected(self, name: str) -> bool:
         return name in self.__dict__
