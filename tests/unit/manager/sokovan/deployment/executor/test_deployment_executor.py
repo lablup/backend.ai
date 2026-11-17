@@ -331,9 +331,12 @@ class TestBulkDispatchCancellation:
 
     @pytest.fixture
     def build_item(self, deployment_executor: DeploymentExecutor) -> Iterator[AsyncMock]:
-        with patch.object(
-            deployment_executor, "_build_endpoint_item", new_callable=AsyncMock
-        ) as mock:
+        with (
+            patch.object(
+                deployment_executor, "_build_endpoint_item", new_callable=AsyncMock
+            ) as mock,
+            patch("ai.backend.manager.sokovan.deployment.executor.BulkCreateEndpointRequest"),
+        ):
             yield mock
 
     @pytest.fixture
