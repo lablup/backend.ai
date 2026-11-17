@@ -8,8 +8,6 @@ from uuid import UUID
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
@@ -19,9 +17,7 @@ from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
-from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
     parse_resource_usage_groups,
@@ -37,14 +33,6 @@ from ai.backend.manager.services.project.actions.clear_default_registry import (
     ClearProjectDefaultRegistryActionResult,
 )
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
-from ai.backend.manager.services.project.actions.create_project_dotfile import (
-    CreateProjectDotfileAction,
-    CreateProjectDotfileActionResult,
-)
-from ai.backend.manager.services.project.actions.delete_project_dotfile import (
-    DeleteProjectDotfileAction,
-    DeleteProjectDotfileActionResult,
-)
 from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
     PartialBulkUpdateProjectsAction,
 )
@@ -59,10 +47,6 @@ from ai.backend.manager.services.project.actions.switch_default_registry import 
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
     UpdateProjectActionResult,
-)
-from ai.backend.manager.services.project.actions.update_project_dotfile import (
-    UpdateProjectDotfileAction,
-    UpdateProjectDotfileActionResult,
 )
 from ai.backend.manager.services.project.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -213,35 +197,3 @@ class ProjectService:
         result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
         log.debug("project usage retrieved for period", start_date=start_date, end_date=end_date)
         return UsagePerPeriodActionResult(result=result)
-
-    async def create_dotfile(
-        self, action: CreateProjectDotfileAction
-    ) -> CreateProjectDotfileActionResult:
-        DotfilePath(action.entry.path)
-        entries = (await self._read_dotfiles(action.project_id)).added(action.entry)
-        await self._write_dotfiles(action.project_id, entries)
-        return CreateProjectDotfileActionResult(entries=entries.entries)
-
-    async def update_dotfile(
-        self, action: UpdateProjectDotfileAction
-    ) -> UpdateProjectDotfileActionResult:
-        DotfilePath(action.entry.path)
-        entries = (await self._read_dotfiles(action.project_id)).replaced(action.entry)
-        await self._write_dotfiles(action.project_id, entries)
-        return UpdateProjectDotfileActionResult(entries=entries.entries)
-
-    async def delete_dotfile(
-        self, action: DeleteProjectDotfileAction
-    ) -> DeleteProjectDotfileActionResult:
-        entries = (await self._read_dotfiles(action.project_id)).removed(action.path)
-        await self._write_dotfiles(action.project_id, entries)
-        return DeleteProjectDotfileActionResult(entries=entries.entries)
-
-    async def _read_dotfiles(self, project_id: ProjectID) -> DotfileEntries:
-        data = await self._group_repository.get_project(project_id)
-        return DotfileEntries.unpack(data.dotfiles)
-
-    async def _write_dotfiles(self, project_id: ProjectID, entries: DotfileEntries) -> None:
-        await self._group_repository.update_dotfiles(
-            ProjectDotfilesUpdater(project_id=project_id, dotfiles=entries.pack())
-        )

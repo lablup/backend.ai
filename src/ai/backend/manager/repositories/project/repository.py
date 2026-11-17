@@ -43,7 +43,7 @@ from ai.backend.manager.models.association_container_registries_groups.updaters 
 from ai.backend.manager.models.container_registry.queriers import BulkContainerRegistryQuerier
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
+from ai.backend.manager.models.project.updaters import ProjectUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -138,15 +138,6 @@ class ProjectRepository:
                 except Exception as e:
                     errors[updater.project_id] = e
         return BulkResultWithFailures(successes=successes, errors=errors)
-
-    @project_repository_resilience.apply()
-    async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:
-        """Replace a project's packed dotfile entries."""
-        async with self._v2_ops.write_ops() as w:
-            data = await w.update_data(updater)
-            if data is None:
-                raise ProjectNotFound(f"Project not found: {updater.target_id_value()}")
-            return data
 
     @project_repository_resilience.apply()
     async def switch_default_registry(
