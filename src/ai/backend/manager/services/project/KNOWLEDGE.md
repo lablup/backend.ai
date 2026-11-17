@@ -1,12 +1,13 @@
 ---
 name: project-service-composition
 type: decision-table
-description: why a project's operations take the shapes they do, why membership takes a path of its own, what a personal project changes
+description: why a project's operations take the shapes they do, why dotfiles are a column of the project row, why membership takes a path of its own, what a personal project changes
 scope: src/ai/backend/manager/services/project
 keywords:
   - GroupProcessors
   - GroupCreator
   - GroupUpdater
+  - GroupDotfilesUpdater
   - assign_users_to_project
   - RoleManagedEntityCreator
   - ProjectType

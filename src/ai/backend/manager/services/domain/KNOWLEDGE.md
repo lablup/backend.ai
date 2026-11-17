@@ -1,12 +1,14 @@
 ---
 name: domain-service-composition
 type: decision-table
-description: why a domain's operations take the shapes they do, which operations keep a service method and why
+description: why a domain's operations take the shapes they do, why dotfiles are a column of the domain row, which operations keep a service method and why
 scope: src/ai/backend/manager/services/domain
 keywords:
   - DomainProcessors
   - DomainCreator
   - DomainUpdater
+  - DomainDotfilesUpdater
+  - dotfile
   - RoleManagedEntityCreator
 sources:
   - src/ai/backend/manager/services/domain/processors.py
