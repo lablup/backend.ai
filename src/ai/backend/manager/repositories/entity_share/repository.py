@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from ai.backend.common.data.entity.entity_share import EntityShareID
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType, EntityShareID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.queriers import EntityShareQuerier
@@ -52,11 +54,16 @@ class EntityShareRepository:
 
     async def answering_scope(self, share_id: EntityShareID) -> EntityIdentifier:
         """The scope that answers the share: the scope it names, or the user holding the
-        address it was sent to while it names none."""
+        address it was sent to while it names none. A miss is a lookup miss, so the lookup
+        answers it the way it answers a scope the caller cannot read."""
         async with self._ops.read_ops() as r:
             share = await r.query_data(EntityShareQuerier(share_id=share_id))
             if share is None:
-                raise EntityShareNotFound(f"No share {share_id}")
+                raise EntityNotFoundError(
+                    f"No share {share_id}",
+                    entity_type=EntityShareEntityType(),
+                    operation=ActionOperationType.LOOKUP,
+                )
             if share.recipient is not None:
                 return share.recipient
             holder = (
@@ -65,7 +72,11 @@ class EntityShareRepository:
                 else None
             )
             if holder is None:
-                raise EntityShareNotFound(f"No user holds the address share {share_id} names")
+                raise EntityNotFoundError(
+                    f"No user holds the address share {share_id} names",
+                    entity_type=EntityShareEntityType(),
+                    operation=ActionOperationType.LOOKUP,
+                )
             return holder
 
     async def accept(

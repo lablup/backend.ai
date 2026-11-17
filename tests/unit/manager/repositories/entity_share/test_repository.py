@@ -32,6 +32,7 @@ from ai.backend.manager.data.entity_share.types import (
     EntityShareStatus,
 )
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.entity_share import (
     EntityShareNotFound,
     ShareToAPersonalProject,
@@ -594,13 +595,19 @@ class TestAnsweringScope:
     ) -> None:
         assert await repository.answering_scope(offered_share_id) == case.expected_recipient
 
-    async def test_an_address_no_account_holds_is_not_found(
+    async def test_an_address_no_account_holds_is_a_lookup_miss(
         self,
         repository: EntityShareRepository,
         share_to_an_address_no_account_holds: EntityShareID,
     ) -> None:
-        with pytest.raises(EntityShareNotFound):
+        with pytest.raises(EntityNotFoundError):
             await repository.answering_scope(share_to_an_address_no_account_holds)
+
+    async def test_a_share_that_was_never_there_is_a_lookup_miss(
+        self, repository: EntityShareRepository
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.answering_scope(EntityShareID(uuid4()))
 
 
 class TestRevoke:
