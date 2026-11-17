@@ -341,6 +341,7 @@ class AsyncEtcd(AbstractKVStore):
     _request_options: ConnectOptions
     _connection: EtcdClient | None
     _communicator: EtcdCommunicator | None
+    request_deadline: float
 
     def __init__(
         self,
@@ -356,6 +357,7 @@ class AsyncEtcd(AbstractKVStore):
         request_timeout: float = 5.0,
         request_retries: int = 3,
         request_retry_intvl: float = 0.05,
+        request_deadline: float = 30.0,
         keep_alive_interval: float = 5.0,
         keep_alive_timeout: float = 3.0,
     ) -> None:
@@ -402,6 +404,7 @@ class AsyncEtcd(AbstractKVStore):
         self.watch_reconnect_max_intvl = watch_reconnect_max_intvl
         self.request_retries = request_retries
         self.request_retry_intvl = request_retry_intvl
+        self.request_deadline = request_deadline
         self.etcd = EtcdClient(
             [f"{scheme}://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
@@ -515,8 +518,17 @@ class AsyncEtcd(AbstractKVStore):
         attempt = 0
         while True:
             try:
-                async with self._connect() as communicator:
-                    return await request(communicator)
+                # A request on a lost channel can stay pending past ``request_timeout``;
+                # the deadline bounds one attempt, connecting included.
+                async with asyncio.timeout(self.request_deadline):
+                    async with self._connect() as communicator:
+                        return await request(communicator)
+            except TimeoutError:
+                if attempt >= self.request_retries or not read:
+                    raise
+                attempt += 1
+                log.warning("etcd request passed its deadline, retrying", retry_count=attempt)
+                continue
             except GRPCStatusError as e:
                 if attempt >= self.request_retries or not self._should_retry(
                     e, conditional=conditional, read=read
