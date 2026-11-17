@@ -83,6 +83,7 @@ from ai.backend.common.dto.manager.session.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     KernelId,
 )
@@ -95,11 +96,15 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.vfolder import VFolderPermissionSetAlias
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
 )
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
+    ResolveUserIDByAccessKeyAction,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -175,19 +180,9 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
-<<<<<<< HEAD
-from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
-from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
-    ResolveIdsByNamesAction,
-=======
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupKeypairOwnerByAccessKeyAction,
-)
-from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.base import (
+    GetAccessibleVFolderAction,
     GetTaskLogsAction,
-    LookupAccessibleVFolderAction,
->>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
 )
 
 if TYPE_CHECKING:
@@ -442,7 +437,7 @@ class SessionHandler:
         return user.user_id
 
     async def _normalize_legacy_mounts(
-        self, validated_config: dict[str, Any], owner_access_key: AccessKey
+        self, validated_config: dict[str, Any], owner_access_key: AccessKey, domain_name: str
     ) -> dict[str, Any]:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
         ``mount_options`` surfaces: route UUID-shaped entries onto the
@@ -460,6 +455,7 @@ class SessionHandler:
             validated_config.get("mount_map") or {},
             validated_config.get("mount_options") or {},
             owner_access_key,
+            domain_name,
         )
         return _merge_resolved_legacy_mounts(validated_config, resolutions)
 
@@ -469,6 +465,7 @@ class SessionHandler:
         mount_map: Mapping[str, str],
         mount_options: Mapping[str, Any],
         owner_access_key: AccessKey,
+        domain_name: str,
     ) -> dict[str, LegacyMountResolution]:
         """Resolve legacy v1 CLI name-keyed mount surfaces into a map
         ``name → LegacyMountResolution(vfid, subpath_or_None)``.
@@ -519,28 +516,29 @@ class SessionHandler:
         if not names_to_resolve:
             return {}
 
-<<<<<<< HEAD
-        result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
-            ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
+        owner = await self._auth.resolve_user_id_by_access_key.wait_for_complete(
+            ResolveUserIDByAccessKeyAction(access_key=owner_access_key)
         )
-=======
-        owner = await self._user.lookup_keypair_owner.run(
-            LookupKeypairOwnerByAccessKeyAction(access_key=owner_access_key)
-        )
+        # The owner's own, shared and joined-project folders, whatever the owner's role:
+        # an admin role would reach every project folder of the domain by that name.
         resolved = {
             name: (
-                await self._vfolder.get_accessible_vfolder.run(
-                    LookupAccessibleVFolderAction(
-                        user_uuid=owner.entity_id(), folder_id_or_name=name
+                await self._vfolder.get_accessible_vfolder.wait_for_complete(
+                    GetAccessibleVFolderAction(
+                        user_uuid=owner.user_id,
+                        user_role=UserRole.USER,
+                        domain_name=domain_name,
+                        is_admin=False,
+                        perm=VFolderPermissionSetAlias.READABLE,
+                        folder_id_or_name=name,
                     )
                 )
-            ).entity_id()
+            ).row["id"]
             for name in names_to_resolve
         }
->>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
         return {
             name: LegacyMountResolution(vfid=vfid, subpath=subpath_by_name.get(name))
-            for name, vfid in result.name_to_id.items()
+            for name, vfid in resolved.items()
         }
 
     # ------------------------------------------------------------------
@@ -565,23 +563,15 @@ class SessionHandler:
             template=True,
         )
 
-<<<<<<< HEAD
-        validated_config = await self._normalize_legacy_mounts(validated_config)
-
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
-=======
-        scope = await self._auth.public_resolve_access_key_scope.run(
-            PublicResolveAccessKeyScopeAction(
->>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
                 owner_access_key=params.owner_access_key,
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-        validated_config = await self._normalize_legacy_mounts(validated_config, owner_access_key)
 
         log.info(
             "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
@@ -592,6 +582,9 @@ class SessionHandler:
         )
 
         domain_name = params.domain or request["user"]["domain_name"]
+        validated_config = await self._normalize_legacy_mounts(
+            validated_config, owner_access_key, domain_name
+        )
 
         # Use model_fields_set to detect which fields were explicitly provided
         # (equivalent to the old Trafaret ``undefined`` sentinel).
@@ -695,7 +688,6 @@ class SessionHandler:
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-<<<<<<< HEAD
         log.info(
             "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
             requester_access_key,
@@ -703,9 +695,9 @@ class SessionHandler:
             params.image,
             params.session_name,
         )
-=======
-        validated_config = await self._normalize_legacy_mounts(validated_config, owner_access_key)
->>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
+        validated_config = await self._normalize_legacy_mounts(
+            validated_config, owner_access_key, domain_name
+        )
         architecture = params.architecture or DEFAULT_IMAGE_ARCH
 
         result = await self._session.create_from_params.wait_for_complete(

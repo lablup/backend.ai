@@ -549,42 +549,9 @@ class VfolderRepository:
             return VFolderListResult(vfolders=vfolder_access_infos)
 
     @vfolder_repository_resilience.apply()
-<<<<<<< HEAD
-    async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
-        """Look up vfolder UUIDs for a batch of names in a single query.
-
-        Returns only the names that match an existing row; the caller
-        decides what to do with any missing names (typically raise).
-
-        No access scoping or status filtering — callers (e.g. session-create
-        paths) are responsible for validating both user access and lifecycle
-        state of the resolved ids in their own downstream flow.
-        """
-        if not names:
-            return {}
-        async with self._db.begin_readonly_session() as session:
-            rows = (
-                await session.execute(
-                    sa.select(VFolderRow.name, VFolderRow.id).where(
-                        VFolderRow.name.in_(list(names))
-                    )
-                )
-            ).all()
-        return {row.name: cast(uuid.UUID, row.id) for row in rows}
-
-    @vfolder_repository_resilience.apply()
     async def create_vfolder_with_permission(
         self, params: VFolderCreateParams, create_owner_permission: bool = False
     ) -> VFolderData:
-=======
-    async def get_personal_project_id(self, user_id: uuid.UUID) -> ProjectID:
-        """The project what is given to a person lands in (BEP-1077 5.5).
-
-        Answered by ``groups.creator_id`` on the personal project, which a partial
-        unique index keeps to one per user. Raises ``PersonalProjectNotFound`` when the
-        user has none: every user is given one, so the absence is a broken account and
-        not a case to fall back from.
->>>>>>> d21a38f57 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
         """
         Create a new VFolder with the given parameters and optionally create owner permission.
         Returns the created VFolderData.

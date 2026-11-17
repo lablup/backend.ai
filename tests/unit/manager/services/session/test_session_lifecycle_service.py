@@ -18,6 +18,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.exception import InvalidAPIParameters, UnknownImageReference
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
@@ -58,6 +59,9 @@ from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
+    ResolveUserIDByAccessKeyResult,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
 )
@@ -98,8 +102,8 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
-from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
-    ResolveIdsByNamesActionResult,
+from ai.backend.manager.services.vfolder.actions.base import (
+    GetAccessibleVFolderActionResult,
 )
 from ai.backend.manager.types import UserScope
 
@@ -1075,16 +1079,22 @@ class TestCreateFromParams:
         """
         vfid = UUID("11111111-1111-1111-1111-111111111111")
 
-        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
-            assert list(action.vfolder_names) == ["vf-a"]
-            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+        async def _wait_for_complete(action: Any) -> GetAccessibleVFolderActionResult:
+            assert action.user_uuid == sample_user_id
+            assert action.folder_id_or_name == "vf-a"
+            return GetAccessibleVFolderActionResult(row={"id": vfid})
 
         resolver = MagicMock()
         resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
         vfolder_pkg = MagicMock()
-        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        vfolder_pkg.get_accessible_vfolder = resolver
+        auth_pkg = MagicMock()
+        auth_pkg.resolve_user_id_by_access_key.wait_for_complete = AsyncMock(
+            return_value=ResolveUserIDByAccessKeyResult(user_id=UserID(sample_user_id))
+        )
         handler = SessionHandler.__new__(SessionHandler)
         handler._vfolder = vfolder_pkg
+        handler._auth = auth_pkg
 
         # Step 1: handler-side resolution & merge of legacy surfaces.
         legacy_config: dict[str, Any] = {
@@ -1096,7 +1106,10 @@ class TestCreateFromParams:
             legacy_config["mounts"],
             legacy_config["mount_map"],
             legacy_config["mount_options"],
+            sample_access_key,
+            "default",
         )
+        resolver.wait_for_complete.assert_awaited_once()
         resolved_config = _merge_resolved_legacy_mounts(legacy_config, resolutions)
 
         # Step 2: feed the resolved config to the service and verify it
@@ -1288,23 +1301,33 @@ class TestCreateFromParams:
         """
         vfid = self.LEGACY_MOUNT_VFID
 
-        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+        async def _wait_for_complete(action: Any) -> GetAccessibleVFolderActionResult:
             # The bare name must be resolved — not the slashed source — and
             # UUID-shaped keys must already have been lifted by the route step.
-            assert list(action.vfolder_names) == ["vf-a"]
-            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+            assert action.folder_id_or_name == "vf-a"
+            return GetAccessibleVFolderActionResult(row={"id": vfid})
 
         resolver = MagicMock()
         resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
         vfolder_pkg = MagicMock()
-        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        vfolder_pkg.get_accessible_vfolder = resolver
+        auth_pkg = MagicMock()
+        auth_pkg.resolve_user_id_by_access_key.wait_for_complete = AsyncMock(
+            return_value=ResolveUserIDByAccessKeyResult(user_id=UserID(uuid4()))
+        )
         handler = SessionHandler.__new__(SessionHandler)
         handler._vfolder = vfolder_pkg
+        handler._auth = auth_pkg
 
         routed = _route_legacy_uuid_mounts(case.legacy_config)
         resolutions = await handler._resolve_legacy_name_mounts(
-            routed["mounts"], routed["mount_map"], routed["mount_options"]
+            routed["mounts"],
+            routed["mount_map"],
+            routed["mount_options"],
+            AccessKey("AKIAIOSFODNN7EXAMPLE"),
+            "default",
         )
+        resolver.wait_for_complete.assert_awaited_once()
         assert resolutions == {
             "vf-a": LegacyMountResolution(vfid=vfid, subpath=case.expected.subpath),
         }

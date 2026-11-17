@@ -458,6 +458,167 @@ class TestVfolderRepository:
 
         assert [row["status"] for row in rows] == [case.expected_status]
 
+    @pytest.fixture
+    async def ready_id_of_a_deleted_and_a_ready_personal_vfolder(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+    ) -> uuid.UUID:
+        ready_vfolder_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=uuid.uuid4(),
+                    name=_REUSED_VFOLDER_NAME,
+                    host="local",
+                    domain_name=test_domain_name,
+                    quota_scope_id=f"user:{test_user}",
+                    permission=VFolderPermission.READ_WRITE,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=test_user,
+                    group=None,
+                    creator=f"test-{test_user.hex[:8]}@example.com",
+                    creator_id=test_user,
+                    unmanaged_path=None,
+                    cloneable=False,
+                    status=VFolderOperationStatus.DELETE_COMPLETE,
+                )
+            )
+            db_sess.add(
+                VFolderRow(
+                    id=ready_vfolder_id,
+                    name=_REUSED_VFOLDER_NAME,
+                    host="local",
+                    domain_name=test_domain_name,
+                    quota_scope_id=f"user:{test_user}",
+                    permission=VFolderPermission.READ_WRITE,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=test_user,
+                    group=None,
+                    creator=f"test-{test_user.hex[:8]}@example.com",
+                    creator_id=test_user,
+                    unmanaged_path=None,
+                    cloneable=False,
+                    status=VFolderOperationStatus.READY,
+                )
+            )
+            await db_sess.flush()
+        return ready_vfolder_id
+
+    async def test_personal_vfolder_name_left_by_a_deleted_vfolder_resolves_to_the_ready_one(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        ready_id_of_a_deleted_and_a_ready_personal_vfolder: uuid.UUID,
+    ) -> None:
+        rows = await vfolder_repository.get_accessible_rows(
+            user_uuid=test_user,
+            user_role=UserRole.USER,
+            domain_name=test_domain_name,
+            is_admin=False,
+            allowed_vfolder_types=["user", "group"],
+            perm=VFolderPermissionSetAlias.READABLE,
+            folder_id_or_name=_REUSED_VFOLDER_NAME,
+        )
+
+        assert [row["id"] for row in rows] == [ready_id_of_a_deleted_and_a_ready_personal_vfolder]
+
+    @pytest.fixture
+    async def ids_of_a_personal_and_a_joined_project_vfolder_of_one_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> frozenset[uuid.UUID]:
+        project_id = uuid.uuid4()
+        personal_vfolder_id = uuid.uuid4()
+        project_vfolder_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=test_domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=PermissionScopeType.PROJECT,
+                    scope_id=str(project_id),
+                    entity_type=PermissionEntityType.USER,
+                    entity_id=str(test_user),
+                )
+            )
+            db_sess.add(
+                VFolderRow(
+                    id=personal_vfolder_id,
+                    name=_REUSED_VFOLDER_NAME,
+                    host="local",
+                    domain_name=test_domain_name,
+                    quota_scope_id=f"user:{test_user}",
+                    permission=VFolderPermission.READ_WRITE,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=test_user,
+                    group=None,
+                    creator=f"test-{test_user.hex[:8]}@example.com",
+                    creator_id=test_user,
+                    unmanaged_path=None,
+                    cloneable=False,
+                    status=VFolderOperationStatus.READY,
+                )
+            )
+            db_sess.add(
+                VFolderRow(
+                    id=project_vfolder_id,
+                    name=_REUSED_VFOLDER_NAME,
+                    host="local",
+                    domain_name=test_domain_name,
+                    quota_scope_id=f"project:{project_id}",
+                    permission=VFolderPermission.READ_WRITE,
+                    ownership_type=VFolderOwnershipType.GROUP,
+                    user=None,
+                    group=project_id,
+                    creator=f"test-{test_user.hex[:8]}@example.com",
+                    creator_id=test_user,
+                    unmanaged_path=None,
+                    cloneable=False,
+                    status=VFolderOperationStatus.READY,
+                )
+            )
+            await db_sess.flush()
+        return frozenset({personal_vfolder_id, project_vfolder_id})
+
+    async def test_vfolder_name_held_by_a_personal_and_a_joined_project_vfolder_matches_both(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        ids_of_a_personal_and_a_joined_project_vfolder_of_one_name: frozenset[uuid.UUID],
+    ) -> None:
+        rows = await vfolder_repository.get_accessible_rows(
+            user_uuid=test_user,
+            user_role=UserRole.USER,
+            domain_name=test_domain_name,
+            is_admin=False,
+            allowed_vfolder_types=["user", "group"],
+            perm=VFolderPermissionSetAlias.READABLE,
+            folder_id_or_name=_REUSED_VFOLDER_NAME,
+        )
+
+        assert {
+            row["id"] for row in rows
+        } == ids_of_a_personal_and_a_joined_project_vfolder_of_one_name
+
 
 class TestVfolderRepositoryAllowedVfolderHosts:
     """Tests for VfolderRepository.get_allowed_vfolder_hosts() method"""
