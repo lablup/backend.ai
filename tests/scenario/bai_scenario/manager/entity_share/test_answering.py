@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.dto.manager.v2.entity_share.response import EntityShareNode
 from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
 from ai.backend.manager.api.adapters.entity_share.adapter import EntityShareAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -104,6 +105,10 @@ class AnswerRow(
 STARTED = datetime.now(UTC)
 RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT)
 SOMEBODY = ASharedFolderAndSomeone(who=Side.SOMEBODY)
+PROJECT_RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT, to_a_project=True)
+PROJECT_READER = ASharedFolderAndSomeone(
+    who=Side.RECIPIENT, to_a_project=True, recipient_granted=(Permission.READ,)
+)
 
 SCENARIOS: list[AnswerStep] = [
     AnswerRow(
@@ -156,6 +161,46 @@ SCENARIOS: list[AnswerStep] = [
         ),
         situation=SOMEBODY,
         accepting=False,
+        refused=True,
+    ),
+    AnswerRow(
+        named="a-project-answerer-accepts-the-offer-to-the-project",
+        guarantees=Says(
+            "프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 "
+            "받아들인 공유가 통째로 옵니다",
+            english=(
+                "when a user who can answer shares in a project accepts the offer to that "
+                "project, the accepted share comes back whole"
+            ),
+        ),
+        situation=PROJECT_RECIPIENT,
+        accepting=True,
+    ),
+    AnswerRow(
+        named="a-project-answerer-rejects-the-offer-to-the-project",
+        guarantees=Says(
+            "프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 거절하면 "
+            "거절된 공유가 통째로 옵니다",
+            english=(
+                "when a user who can answer shares in a project rejects the offer to that "
+                "project, the rejected share comes back whole"
+            ),
+        ),
+        situation=PROJECT_RECIPIENT,
+        accepting=False,
+    ),
+    AnswerRow(
+        named="a-project-reader-may-not-accept-the-offer-to-the-project",
+        guarantees=Says(
+            "프로젝트에서 공유를 읽을 수만 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user who can only read shares in a project accepts the offer to that "
+                "project, the call is rejected for lack of permission"
+            ),
+        ),
+        situation=PROJECT_READER,
+        accepting=True,
         refused=True,
     ),
 ]

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
+    LookupOpsResult,
     ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -25,6 +28,9 @@ from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareActionResult,
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
+from ai.backend.manager.services.entity_share.actions.lookup_answering_scope import (
+    LookupEntityShareAnsweringScopeAction,
+)
 from ai.backend.manager.services.entity_share.actions.search import (
     SearchEntitySharesAction,
 )
@@ -42,6 +48,9 @@ class EntityShareProcessors:
     get: SingleEntityActionProcessor[GetEntityShareAction, EntityOpsResult[EntityShareData]]
     bulk_get: PartialBulkActionProcessor[BulkGetEntitySharesAction, EntityShareData]
     search: ScopeActionProcessor[SearchEntitySharesAction, ScopedBatchOpsResult[EntityShareData]]
+    lookup_answering_scope: LookupActionProcessor[
+        LookupEntityShareAnsweringScopeAction, LookupOpsResult[EntityIdentifier]
+    ]
     accept: ScopeActionProcessor[AcceptEntityShareAction, EntityShareAnswerResult]
     reject: ScopeActionProcessor[RejectEntityShareAction, EntityShareAnswerResult]
     cancel: SingleEntityActionProcessor[CancelEntityShareAction, CancelEntityShareActionResult]
@@ -57,6 +66,7 @@ class EntityShareProcessors:
         self.get = group.single_get_ops(GetEntityShareAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetEntitySharesAction)
         self.search = group.scoped_search_ops(SearchEntitySharesAction)
+        self.lookup_answering_scope = group.public_lookup_ops(LookupEntityShareAnsweringScopeAction)
         self.accept = group.scope(AcceptEntityShareAction, service.accept)
         self.reject = group.scope(RejectEntityShareAction, service.reject)
         self.cancel = group.single_entity(CancelEntityShareAction, service.cancel)

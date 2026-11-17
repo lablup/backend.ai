@@ -43,7 +43,11 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
-from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
+from bai_scenario.seeds.entity_share.share import (
+    TestSeedShareTaken,
+    TestSeedVFolderShare,
+    TestSeedVFolderShareToProject,
+)
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
@@ -68,12 +72,12 @@ class Side(enum.Enum):
 
 @dataclass(frozen=True)
 class ASharedFolderAndACaller:
-    """폴더 하나, 그 폴더에 걸린 공유, 빌려준 사람, 빌린 사람, 그리고 부르는 사람."""
+    """폴더 하나, 그 폴더에 걸린 공유, 빌려준 사람, 빌린 사람이나 프로젝트, 그리고 부르는 사람."""
 
     folder: VFolderData
     share: EntityShareData | None
     sharer: UserData
-    recipient: UserData
+    recipient: UserData | ProjectData
     caller: UserData
 
 
@@ -84,6 +88,7 @@ class SomeoneGrantedOnTheProject(TestSeedNest[Laid[UserData]]):
     domain: Laid[DomainData]
     project: Laid[ProjectData]
     granted: tuple[Permission, ...]
+    role_name_hint: str = "share-lender"
 
     @override
     def kind(self) -> str:
@@ -96,7 +101,7 @@ class SomeoneGrantedOnTheProject(TestSeedNest[Laid[UserData]]):
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain))
         role = seed.creating_from(
-            TestSeedRole(lambda p: ProjectID(p.id), name_hint="share-lender"), self.project
+            TestSeedRole(lambda p: ProjectID(p.id), name_hint=self.role_name_hint), self.project
         )
         for one in self.granted:
             seed.adding(
@@ -150,26 +155,33 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
     ``offered`` 면 폴더를 두 번째 사람에게 빌려주는 제안이 서 있고, ``taken`` 면 그 제안을
     받아들여 공유가 서 있다. ``elsewhere`` 면 범위 밖의 폴더 하나와 받는 사람이 그 폴더를
     빌려주는 제안, 그리고 같은 폴더를 세 번째 사람에게 빌려주는 제안이 함께 서 있다.
-    ``who`` 가 부르는 사람이다.
+    ``to_a_project`` 면 두 번째 사람 대신 다른 프로젝트에 빌려주고, 그 프로젝트에서
+    ``recipient_granted`` 를 받은 사람이 빌린 쪽으로 부른다. ``who`` 가 부르는 사람이다.
     """
 
     who: Side = Side.SHARER
     offered: bool = True
     taken: bool = False
     elsewhere: bool = False
+    to_a_project: bool = False
     cap: Permission | None = None
     sharer_granted: tuple[Permission, ...] = SHARER_ON_PROJECT
     recipient_granted: tuple[Permission, ...] = RECIPIENT_IN_OWN_SCOPE
 
     @override
     def describe(self) -> str:
-        who_ko = _who(self.who, "폴더를 빌려주는 사람", "폴더를 빌린 사람", "아무 관련 없는 사람")
-        who_en = _who(
-            self.who,
-            "the person lending the folder",
-            "the person the folder is lent to",
-            "someone unrelated",
-        )
+        if self.to_a_project:
+            recipient_ko = "폴더를 빌린 프로젝트에서 공유 권한을 받은 사람"
+            recipient_en = "a person granted share permissions in the project the folder is lent to"
+            lent_to_ko = "다른 프로젝트에"
+            lent_to_en = "another project"
+        else:
+            recipient_ko = "폴더를 빌린 사람"
+            recipient_en = "the person the folder is lent to"
+            lent_to_ko = "다른 사람에게"
+            lent_to_en = "another person"
+        who_ko = _who(self.who, "폴더를 빌려주는 사람", recipient_ko, "아무 관련 없는 사람")
+        who_en = _who(self.who, "the person lending the folder", recipient_en, "someone unrelated")
         outside_ko = (
             "범위 밖의 폴더 하나와 받는 사람이 내는 제안 하나, 같은 폴더를 세 번째 사람에게 "
             "빌려주는 제안 하나, "
@@ -184,17 +196,17 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
         )
         if self.taken:
             return Says(
-                f"{outside_ko}프로젝트 폴더 하나와, 다른 사람에게 빌려준 공유, 그리고 {who_ko}",
+                f"{outside_ko}프로젝트 폴더 하나와, {lent_to_ko} 빌려준 공유, 그리고 {who_ko}",
                 english=(
-                    f"{outside_en}one project folder with a share lent to another person, "
+                    f"{outside_en}one project folder with a share lent to {lent_to_en}, "
                     f"and {who_en}"
                 ),
             )
         if self.offered:
             return Says(
-                f"{outside_ko}프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 {who_ko}",
+                f"{outside_ko}프로젝트 폴더 하나와, {lent_to_ko} 보낸 제안, 그리고 {who_ko}",
                 english=(
-                    f"{outside_en}one project folder with an offer to another person, and {who_en}"
+                    f"{outside_en}one project folder with an offer to {lent_to_en}, and {who_en}"
                 ),
             )
         return Says(
@@ -215,28 +227,48 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
         if self.sharer_granted:
             await seeding.within(SomeoneAnsweringInTheirOwnScope(sharer, (Permission.READ,)))
         folder = await seeding.creating_from_two(TestSeedProjectVFolder(host=HOST), project, sharer)
-        recipient = await seeding.within(SomeoneOf(domain))
-        if self.recipient_granted:
-            await seeding.within(SomeoneAnsweringInTheirOwnScope(recipient, self.recipient_granted))
+        recipient: Laid[UserData] | Laid[ProjectData]
+        answerer: Laid[UserData]
+        if self.to_a_project:
+            borrowing_project = await seeding.creating_from_two(
+                TestSeedProject(name_hint="borrowing-team"), domain, policy
+            )
+            answerer = await seeding.within(
+                SomeoneGrantedOnTheProject(
+                    domain,
+                    borrowing_project,
+                    self.recipient_granted,
+                    role_name_hint="share-recipient",
+                )
+            )
+            recipient = borrowing_project
+        else:
+            borrowing_user = await seeding.within(SomeoneOf(domain))
+            if self.recipient_granted:
+                await seeding.within(
+                    SomeoneAnsweringInTheirOwnScope(borrowing_user, self.recipient_granted)
+                )
+            answerer = borrowing_user
+            recipient = borrowing_user
         share: Laid[EntityShareData] | None = None
         if self.offered or self.taken:
-            share = await seeding.creating_from_three(
-                TestSeedVFolderShare(cap=self.cap),
-                sharer,
-                folder,
-                recipient,
+            offer = (
+                TestSeedVFolderShareToProject(cap=self.cap)
+                if self.to_a_project
+                else TestSeedVFolderShare(cap=self.cap)
             )
+            share = await seeding.creating_from_three(offer, sharer, folder, recipient)
         if self.taken:
             if share is None:
                 raise LookupError("a taken share needs the offer it settled")
             await seeding.accepting(TestSeedShareTaken(), share)
         if self.elsewhere:
             other_folder = await seeding.creating_from_two(
-                TestSeedProjectVFolder(host=HOST, name_hint="other-folder"), project, recipient
+                TestSeedProjectVFolder(host=HOST, name_hint="other-folder"), project, answerer
             )
             await seeding.creating_from_three(
                 TestSeedVFolderShare(cap=self.cap, name_hint="other-share"),
-                recipient,
+                answerer,
                 other_folder,
                 sharer,
             )
@@ -252,7 +284,7 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
             case Side.SHARER:
                 caller = sharer
             case Side.RECIPIENT:
-                caller = recipient
+                caller = answerer
             case Side.SOMEBODY:
                 caller = await seeding.within(SomeoneOf(domain))
         return ASharedFolderAndACaller(
@@ -277,10 +309,22 @@ class ShareLook:
         node: EntityShareNode,
         folder: VFolderData,
         sharer: UserData,
-        recipient: UserData,
+        recipient: UserData | ProjectData,
         status: EntityShareStatusDTO,
     ) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
+        if isinstance(recipient, ProjectData):
+            recipient_type = "project"
+            recipient_id_source = Says(
+                "미리 만든 폴더를 빌린 프로젝트의 id",
+                english="the id of the project the folder is lent to",
+            )
+        else:
+            recipient_type = "user"
+            recipient_id_source = Says(
+                "미리 만든 빌린 사람의 id",
+                english="the id of the person the folder is lent to",
+            )
         verdicts: list[Verdict] = [
             Held[UUID | None](
                 f"{prefix}sharer_user_id",
@@ -296,18 +340,12 @@ class ShareLook:
             Same(
                 f"{prefix}recipient_entity_type",
                 node.recipient_entity_type.name() if node.recipient_entity_type else None,
-                "user",
+                recipient_type,
             ),
             Held[UUID | None](
                 f"{prefix}recipient_entity_id",
                 node.recipient_entity_id,
-                SameAs[UUID | None](
-                    recipient.id,
-                    Says(
-                        "미리 만든 빌린 사람의 id",
-                        english="the id of the person the folder is lent to",
-                    ),
-                ),
+                SameAs[UUID | None](recipient.id, recipient_id_source),
             ),
             Same(f"{prefix}recipient_email", node.recipient_email, None),
             Same(f"{prefix}target_entity_type", node.target_entity_type.name(), "vfolder"),

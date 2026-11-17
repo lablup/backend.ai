@@ -113,6 +113,7 @@ RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT)
 SOMEBODY = ASharedFolderAndSomeone(who=Side.SOMEBODY)
 TAKEN_SHARER = ASharedFolderAndSomeone(who=Side.SHARER, taken=True)
 TAKEN_RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT, taken=True)
+TAKEN_PROJECT_RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT, taken=True, to_a_project=True)
 
 
 SCENARIOS: list[EndStep] = [
@@ -151,6 +152,20 @@ SCENARIOS: list[EndStep] = [
             ),
         ),
         situation=TAKEN_RECIPIENT,
+        how="leave",
+        status=EntityShareStatusDTO.REVOKED,
+    ),
+    EndRow(
+        named="a-project-answerer-leaves-the-share-the-project-took",
+        guarantees=Says(
+            "프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트가 빌린 공유에서 탈퇴하면 "
+            "회수된 공유가 통째로 옵니다",
+            english=(
+                "when a user who can answer shares in a project leaves the share that project "
+                "took, the revoked share comes back whole"
+            ),
+        ),
+        situation=TAKEN_PROJECT_RECIPIENT,
         how="leave",
         status=EntityShareStatusDTO.REVOKED,
     ),
