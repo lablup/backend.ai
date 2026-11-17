@@ -336,10 +336,16 @@ class PrometheusMetrics:
     memory_used_vms: prometheus_client.Gauge
 
 
+@dataclass(frozen=True)
+class LastUsedTimeMark:
+    valkey_keys: list[str]
+    used_at: float
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
-    proxy_frontend: BaseFrontend[Any, Any]
+    proxy_frontend: BaseFrontend[Any]
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     sentinel_monitors: SentinelMonitorSet
@@ -348,8 +354,8 @@ class RootContext:
     http_client_pool: ClientPool
     worker_id: UUID
     local_config: ServerConfig
-    last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
-    request_counter_redis_queue: asyncio.Queue[str]
+    last_used_time_mark_queue: asyncio.Queue[LastUsedTimeMark]
+    request_counter_key_queue: asyncio.Queue[str]
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
@@ -478,31 +484,41 @@ class Circuit(SerializableCircuit):
             revision=0,
             frontend=frontend,
             access=access,
-            backend=self.ingress_backend_of_routes(self.route_info),
+            backend=IngressBackend(
+                # TODO: Use the backend id once ingresses are stored as their own entity.
+                id=IngressBackendID(str(UUID(int=0))),
+                # TODO: Use the replica groups once the manager sends target groups; until then the
+                # routes with traffic share one group evenly, and the routes without it sit in a group
+                # of weight 0 that receives no traffic but is still handed to nghttpx.
+                target_groups=[
+                    IngressTargetGroup(
+                        id=IngressTargetGroupID(str(UUID(int=0))),
+                        weight=1,
+                        targets=[
+                            self._session_target_of_route(route)
+                            for route in self.route_info
+                            if route.traffic_ratio > 0
+                        ],
+                    ),
+                    IngressTargetGroup(
+                        id=IngressTargetGroupID(str(UUID(int=0))),
+                        weight=0,
+                        targets=[
+                            self._session_target_of_route(route)
+                            for route in self.route_info
+                            if route.traffic_ratio <= 0
+                        ],
+                    ),
+                ],
+            ),
         )
 
     @staticmethod
-    def ingress_backend_of_routes(routes: list[RouteInfo]) -> IngressBackend:
-        return IngressBackend(
-            # TODO: Use the backend id once ingresses are stored as their own entity.
-            id=IngressBackendID(str(UUID(int=0))),
-            # TODO: Use the replica groups once the manager sends target groups; until then the
-            # routes are the targets of one group, which spreads traffic over them evenly.
-            target_groups=[
-                IngressTargetGroup(
-                    id=IngressTargetGroupID(str(UUID(int=0))),
-                    weight=1,
-                    targets=[
-                        SessionIngressTarget(
-                            host=route.current_kernel_host,
-                            port=route.kernel_port,
-                            session_id=SessionId(route.session_id),
-                        )
-                        for route in routes
-                        if route.traffic_ratio > 0
-                    ],
-                )
-            ],
+    def _session_target_of_route(route: RouteInfo) -> SessionIngressTarget:
+        return SessionIngressTarget(
+            host=route.current_kernel_host,
+            port=route.kernel_port,
+            session_id=SessionId(route.session_id),
         )
 
     def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
@@ -526,10 +542,11 @@ class Circuit(SerializableCircuit):
                     kind=IngressFrontendKind.PORT, protocol=protocol, port=PortFrontend(number=port)
                 )
             case SubdomainFrontendInfo(subdomain=subdomain):
+                # The subdomain frontends match a request host in lowercase.
                 return IngressFrontend(
                     kind=IngressFrontendKind.WILDCARD,
                     protocol=protocol,
-                    wildcard=WildcardFrontend(subdomain=subdomain),
+                    wildcard=WildcardFrontend(subdomain=subdomain.lower()),
                 )
             case _:
                 raise UnreachableError("a circuit holds only a port or subdomain frontend")

@@ -127,6 +127,8 @@ __all__ = (
     "SearchDeploymentPoliciesInput",
     "SearchReplicasInput",
     "SearchRoutesInput",
+    "ServiceArgumentInterpolationDelimiterInput",
+    "ServiceArgumentInterpolationInput",
     "SyncReplicaInput",
     "UpdateAutoScalingRuleInput",
     "UpdateDeploymentInput",
@@ -161,6 +163,18 @@ class ModelMetadataInput(BaseRequestModel):
     min_resource: dict[str, Any] | None = None
 
 
+class ServiceArgumentInterpolationDelimiterInput(BaseRequestModel):
+    start: str = Field(min_length=1, description="Opening delimiter, e.g. `{{`.")
+    end: str = Field(min_length=1, description="Closing delimiter, e.g. `}}`.")
+
+
+class ServiceArgumentInterpolationInput(BaseRequestModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInput] = Field(
+        min_length=1,
+        description="Delimiters that mark the variables to fill in the service arguments.",
+    )
+
+
 class ModelServiceConfigInput(BaseRequestModel):
     pre_start_actions: list[PreStartAction] | None = None
     command: str | None = None
@@ -174,6 +188,13 @@ class ModelServiceConfigInput(BaseRequestModel):
     )
     port: int | None = None
     health_check: ModelHealthCheckInput | None = None
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit to inherit it; the default is `${{ }}` and `{ }`."
+        ),
+    )
 
 
 class ModelConfigInput(BaseRequestModel):

@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     PreemptionOrder,
@@ -194,7 +195,10 @@ class ResourceGroupSchedulerOptionsConfigInfo(BaseResponseModel):
 
     num_retries_to_skip: int | None = Field(
         default=None,
-        description="Number of scheduling retries before a pending session is skipped.",
+        description=(
+            "Number of scheduling retries before a pending session is skipped. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
@@ -202,24 +206,38 @@ class ResourceGroupSchedulerOptionsInfo(BaseResponseModel):
     """Scheduler options of a resource group, other than the preemption configuration."""
 
     allowed_session_types: list[SessionTypes] = Field(
-        description="Session types that may be created in the resource group."
+        description=(
+            "Session types that may be created in the resource group. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
     )
     pending_timeout: float = Field(
-        description="Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout). "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
     )
     config: ResourceGroupSchedulerOptionsConfigInfo = Field(
-        description="The ``config`` section of the scheduler options."
+        description=(
+            f"The ``config`` section of the scheduler options. Added in {NEXT_RELEASE_VERSION}."
+        )
     )
     agent_selection_strategy: AgentSelectionStrategy = Field(
-        description="How agents are chosen for a session's kernels."
+        description=(
+            f"How agents are chosen for a session's kernels. Added in {NEXT_RELEASE_VERSION}."
+        )
     )
     allow_fractional_resource_fragmentation: bool = Field(
         description=(
-            "Whether an agent may start a kernel that fragments a fractional resource request."
+            "Whether an agent may start a kernel that fragments a fractional resource request. "
+            f"Added in {NEXT_RELEASE_VERSION}."
         )
     )
     route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
-        description="Route health statuses whose routes are cleaned up automatically."
+        description=(
+            "Route health statuses whose routes are cleaned up automatically. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
     )
 
 
@@ -233,7 +251,10 @@ class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
         description="Preemption configuration for this resource group."
     )
     options: ResourceGroupSchedulerOptionsInfo = Field(
-        description="Scheduler options other than the preemption configuration."
+        description=(
+            "Scheduler options other than the preemption configuration. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
     )
 
 

@@ -50,6 +50,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     UnregisterRoutesItem,
     UpdateRoutesItem,
 )
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -616,20 +617,26 @@ class EndpointRepository:
         preferred_port: int | None = None
         preferred_subdomain: str | None = None
         worker_id: UUID | None = None
-        if item.tags.endpoint.existing_url:
-            url = URL(item.tags.endpoint.existing_url)
+        existing_url = item.tags.endpoint.existing_url
+        if existing_url is not None:
             (
                 worker_id,
                 preferred_port,
                 preferred_subdomain,
-            ) = await self._match_worker_for_existing_url(sess, url)
+            ) = await self._match_worker_for_existing_url(sess, URL(str(existing_url)))
 
-        # Translate common-DTO tag shapes into coordinator-internal
-        # ones expected by ``add_circuit`` (they differ only in field
-        # types — UUID vs str — so ``model_dump`` round-trip is the
-        # smallest coupling point).
-        session_cfg = SessionConfig.model_validate(item.tags.session.model_dump())
-        endpoint_cfg = EndpointConfig.model_validate(item.tags.endpoint.model_dump())
+        session_cfg = SessionConfig(
+            id=None,
+            access_key=None,
+            user_uuid=item.tags.session.user_uuid,
+            project_id=item.tags.session.project_id,
+            domain_name=item.tags.session.domain_name,
+        )
+        endpoint_cfg = EndpointConfig(
+            id=item.tags.endpoint.id,
+            runtime_variant=RuntimeVariant(item.tags.endpoint.runtime_variant),
+            existing_url=existing_url,
+        )
 
         circuit, _worker = await add_circuit(
             sess,

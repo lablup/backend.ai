@@ -17,10 +17,11 @@ from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
@@ -38,8 +39,9 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentTarget
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
-from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher, DeploymentSearcher
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -65,14 +67,19 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.scheduling_history.row import DeploymentHistoryRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _REQUIRED_TABLES: list[TableOrORM] = [
     DomainRow,
@@ -101,6 +108,9 @@ _REQUIRED_TABLES: list[TableOrORM] = [
     PrometheusQueryPresetRow,
     EndpointAutoScalingRuleRow,
     DeploymentHistoryRow,
+    VirtualEntityRow,
+    EntityMembershipRow,
+    ScopeBindingRow,
 ]
 
 
@@ -415,6 +425,63 @@ class TestSearchLegacyEndpoints:
 
         assert info.deploying_revision_id is None
         assert info.deploying_revision is None
+
+
+class TestScopedSearchDeployments:
+    @pytest.fixture
+    async def seeded_in_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        seeder: DeploymentSeeder,
+        project_id: uuid.UUID,
+    ) -> SeededDeployment:
+        """A seeded deployment created in the project, as the project scope reads it."""
+        seeded = await seeder.seed(deploying_revision_exists=True)
+        async with db_with_cleanup.begin_session() as db_sess:
+            await VirtualEntitySeeder().create_in(
+                db_sess,
+                DeploymentEntityType(),
+                seeded.endpoint_id,
+                [(ProjectEntityType(), project_id)],
+            )
+        return seeded
+
+    async def test_fills_the_policy(
+        self,
+        deployment_repository: DeploymentRepository,
+        seeded_in_project: SeededDeployment,
+        project_id: uuid.UUID,
+    ) -> None:
+        seeded = seeded_in_project
+
+        result = await deployment_repository.scoped_search_deployments(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=ProjectID(project_id))],
+                used_by=[],
+                searcher=DeploymentSearcher(pagination=NoPagination()),
+            )
+        )
+
+        (item,) = result.items
+        assert item.id == seeded.endpoint_id
+        assert item.policy is not None
+        assert item.policy.strategy == DeploymentStrategy.ROLLING
+
+
+class TestGlobalSearchDeployments:
+    async def test_fills_the_policy(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+
+        result = await deployment_repository.global_search_deployments(
+            GlobalSearcher(used_by=[], searcher=DeploymentSearcher(pagination=NoPagination()))
+        )
+
+        (item,) = result.items
+        assert item.id == seeded.endpoint_id
+        assert item.policy is not None
+        assert item.policy.strategy == DeploymentStrategy.ROLLING
 
 
 class TestSearchDeploymentsWithLastHistory:

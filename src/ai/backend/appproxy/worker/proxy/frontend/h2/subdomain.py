@@ -6,10 +6,10 @@ from typing import Any, override
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
-from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
-from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
-from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
+from ai.backend.appproxy.worker.errors import SubprocessPipeError
+from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend, H2BackendArgs
+from ai.backend.appproxy.worker.types import Circuit
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import H2Frontend
@@ -17,7 +17,7 @@ from .base import H2Frontend
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class SubdomainFrontend(H2Frontend[str]):
+class SubdomainFrontend(H2Frontend):
     process: subprocess.Process | None
     log_monitor_tasks: list[asyncio.Task[Any]]
     proc_monitor_task: asyncio.Task[Any] | None
@@ -87,24 +87,21 @@ class SubdomainFrontend(H2Frontend[str]):
                 self.api_port_pool.add(self.api_port)
 
     @override
-    async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> H2Backend:
-        backend = H2Backend(URL(f"http://localhost:{self.api_port}"), self.root_context, circuit)
-        return await self.update_backend(backend, routes)
-
-    @override
-    async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
-        backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
-        await backend.update_config(backend_configs)
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> H2Backend:
+        backend = H2Backend(
+            H2BackendArgs(
+                last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
+                request_counter_key_queue=self.root_context.request_counter_key_queue,
+                ingress=ingress,
+                circuit=circuit,
+                api_endpoint=URL(f"http://localhost:{self.api_port}"),
+            )
+        )
+        await backend.update_ingress(ingress)
         return backend
 
     @override
     async def terminate_backend(self, backend: H2Backend) -> None:
         await backend.update_config([])
-
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> str:
-        if not isinstance(circuit.frontend, SubdomainFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected SubdomainFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.subdomain.lower()

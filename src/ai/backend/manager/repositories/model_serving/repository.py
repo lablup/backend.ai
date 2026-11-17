@@ -60,7 +60,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData as ResourceGroupEntityData,
 )
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
@@ -981,7 +981,10 @@ class ModelServingRepository:
                     vfolders.c.usage_mode == VFolderUsageMode.MODEL
                 )
             matched_vfolders = await query_reachable_vfolders(
-                conn, owner_scope, model_condition, owner_held
+                conn,
+                owner_scope,
+                model_condition & vfolders.c.status.not_in(VFolderOperationStatus.dead()),
+                owner_held,
             )
             if len(matched_vfolders) == 0:
                 raise VFolderNotFound("Cannot find model folder")

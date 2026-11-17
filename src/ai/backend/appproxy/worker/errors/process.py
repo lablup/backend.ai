@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class SubprocessPipeError(BackendAIError):
+class SubprocessPipeError(BackendAIError, web.HTTPInternalServerError):
     """Raised when subprocess pipe is not available."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/subprocess-pipe-error"

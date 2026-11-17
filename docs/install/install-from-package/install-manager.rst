@@ -40,7 +40,7 @@ Local configuration
 
 Backend.AI Manager uses a TOML file (``manager.toml``) to configure local
 service. Refer to the
-`manager.toml sample file <https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.toml>`_
+`manager.toml sample template <https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.toml.j2>`_
 for a detailed description of each section and item. A configuration example
 would be:
 

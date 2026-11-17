@@ -2,9 +2,9 @@
 
 [배경](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-시나리오: 미완성 4 / 44
+시나리오: 미완성 1 / 44
 
-- ops 구성 (21)
+- ops 구성 (20)
   - UserAdapter.admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - UserAdapter.admin_search_keypairs: 대표 성공 ✓ · 대표 거부 ✓
   - UserAdapter.batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
@@ -22,11 +22,10 @@
   - UserAdapter.role_search: 대표 성공 ✓ · 대표 거부 ✓
   - UserAdapter.scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - UserAdapter.search_my_keypairs: 대표 성공 ✓ · 대표 거부 ✓
-  - UserConfigAdapter.delete_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
-  - UserConfigAdapter.get_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
+  - UserConfigAdapter.delete_default_auto_generated_file: 대표 성공 ✓ · 대표 거부 ✓
+  - UserConfigAdapter.get_default_auto_generated_file: 대표 성공 ✓ · 대표 거부 ✓
   - UserConfigAdapter.get_default_auto_generated_files: 대표 성공 ✓ · 대표 거부 ✓
-  - UserConfigAdapter.update_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
-- ops + 직접 구현 (12)
+- ops + 직접 구현 (13)
   - UserAdapter.admin_create_keypair: 성공 없음 · 거부 있음 3 (atomic_bulk_scoped_search_ops, single_entity): SCENARIO-GAP
   - UserAdapter.admin_get_keypair: 성공 있음 1 · 거부 있음 1 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.admin_update_keypair: 성공 있음 1 · 거부 있음 3 (atomic_bulk_scoped_search_ops, single_field)
@@ -39,6 +38,7 @@
   - UserAdapter.issue_my_keypair: 성공 있음 1 · 거부 있음 2 (atomic_bulk_scoped_search_ops, single_entity)
   - UserAdapter.update_my_keypair: 성공 있음 1 · 거부 있음 3 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.update_user_by_id: 성공 있음 7 · 거부 있음 6 (atomic_bulk_get_ops, single_entity)
+  - UserConfigAdapter.update_default_auto_generated_file: 성공 있음 1 · 거부 있음 2 (scope_search_ops, single_entity)
 - 직접 구현 (11)
   - UserAdapter.admin_delete_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
   - UserAdapter.admin_delete_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
@@ -50,7 +50,7 @@
   - UserAdapter.revoke_my_keypair: 성공 있음 1 · 거부 있음 4 (single_field)
   - UserAdapter.switch_default_access_key: 성공 있음 1 · 거부 있음 2 (single_entity)
   - UserAdapter.update_user: 성공 있음 1 · 거부 있음 1 (single_entity)
-  - UserConfigAdapter.create_auto_generated_file: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserConfigAdapter.create_auto_generated_file: 성공 있음 1 · 거부 있음 2 (scope)
 
 **UserAdapter.admin_search**
 
@@ -181,29 +181,24 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [권한을 받지 않은 사용자가 자기 설정 파일을 지우려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-delete-a-config-file) | 거부 |
-| [READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
+| [READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정된 auto-generated file 을 지우면, 지웠다는 응답이 오고 파일과 그 revision 이 모두 지워집니다](#config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one) | 성공 |
+| [권한을 받지 않은 사용자가 자기 auto-generated file 을 지우려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file) | 거부 |
+| [READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정되지 않은 auto-generated file 을 지우려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | 거부 |
 
 **UserConfigAdapter.get_default_auto_generated_file**
 
 | 시나리오 | 판정 |
 |---|---|
-| [READ 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 읽으려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
-| [권한을 받지 않은 사용자가 자기 설정 파일을 읽으려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-read-a-config-file) | 거부 |
+| [READ 를 받은 사용자가 default 로 지정된 auto-generated file 을 읽으면, 가장 마지막 revision 의 내용이 옵니다](#config_files-a-user-granted-read-on-their-auto-generated-files-reads-the-default-one) | 성공 |
+| [권한을 받지 않은 사용자가 자기 auto-generated file 을 읽으려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-read-an-auto-generated-file) | 거부 |
+| [READ 를 받은 사용자가 default 로 지정되지 않은 auto-generated file 을 읽으려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | 거부 |
 
 **UserConfigAdapter.get_default_auto_generated_files**
 
 | 시나리오 | 판정 |
 |---|---|
-| [READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다](#config_files-a-user-granted-read-on-themselves-lists-no-default-config-file) | 성공 |
-| [권한을 받지 않은 사용자가 자기 설정 파일을 훑으려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-list-their-config-files) | 거부 |
-
-**UserConfigAdapter.update_default_auto_generated_file**
-
-| 시나리오 | 판정 |
-|---|---|
-| [권한을 받지 않은 사용자가 자기 설정 파일을 고치려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-update-a-config-file) | 거부 |
-| [READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 고치려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-updating-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
+| [READ 를 받은 사용자가 자기 auto-generated file 목록을 조회하면, default 로 지정된 파일만 가장 마지막 revision 의 내용과 함께 옵니다](#config_files-a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones) | 성공 |
+| [권한을 받지 않은 사용자가 자기 auto-generated file 목록을 조회하려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files) | 거부 |
 
 **UserAdapter.admin_create_keypair**
 
@@ -309,6 +304,14 @@
 | [대상 사용자 스코프에서 UPDATE 와 READ 만 받은 사용자가 수정으로 DELETED 를 주면, 삭제의 엔티티 권한 문이 막습니다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | 거부 |
 | [삭제 상태 사용자에 수정으로 DELETED 만 주면, 아무것도 변경되지 않고 그 사용자가 응답으로 옵니다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | 거부 |
 
+**UserConfigAdapter.update_default_auto_generated_file**
+
+| 시나리오 | 판정 |
+|---|---|
+| [READ 와 UPDATE 를 받은 사용자가 default 로 지정된 auto-generated file 을 고치면, 빈 응답이 오고, 파일의 권한이 바뀌며 새 내용이 revision 2 로 추가됩니다](#config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one) | 성공 |
+| [권한을 받지 않은 사용자가 자기 auto-generated file 을 고치려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file) | 거부 |
+| [READ 와 UPDATE 를 받은 사용자가 default 로 지정되지 않은 auto-generated file 을 고치려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | 거부 |
+
 **UserAdapter.admin_delete_keypair**
 
 | 시나리오 | 판정 |
@@ -394,9 +397,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 자신에게 UPDATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다](#config_files-a-user-granted-update-on-themselves-writes-their-own-config-file) | 성공 |
-| [UPDATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | 거부 |
-| [권한을 받지 않은 사용자가 자기 설정 파일을 만들려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-write-a-config-file) | 거부 |
+| [자기 auto-generated file 에 CREATE 를 받은 사용자가 auto-generated file 을 만들면, 빈 응답이 오고, 그 파일은 내용을 revision 1 로 갖고 그 경로의 default 로 지정됩니다](#config_files-a-user-granted-create-on-their-auto-generated-files-writes-one) | 성공 |
+| [권한을 받지 않은 사용자가 자기 auto-generated file 을 만들려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file) | 거부 |
+| [CREATE 를 받은 사용자가 관리자가 쓰는 자리에 auto-generated file 을 만들려 하면, 입력 검증이 거부합니다](#config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused) | 거부 |
 
 ### UserAdapter.admin_search
 
@@ -1911,11 +1914,44 @@ Then
 
 ### UserConfigAdapter.delete_default_auto_generated_file
 
-<a id="config_files-a-user-granted-nothing-may-not-delete-a-config-file"></a>
+<a id="config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one"></a>
 
-#### [a-user-granted-nothing-may-not-delete-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-권한을 받지 않은 사용자가 자기 설정 파일을 지우려 하면, 권한 부족으로 거부됩니다
+READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정된 auto-generated file 을 지우면, 지웠다는 응답이 오고 파일과 그 revision 이 모두 지워집니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정된 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ, HARD_DELETE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
+  - 자기 auto-generated file READ, HARD_DELETE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 역할 config-file-role-1: auto_generated_file 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 auto-generated file 하나를 지웁니다
+
+Then
+
+- 지웠다는 응답이 옵니다
+  - response = {'success': True}
+
+<a id="config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-delete-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 auto-generated file 을 지우려 하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -1929,38 +1965,39 @@ Given
 
 When
 
-- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 설정 파일 하나를 지웁니다
+- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 auto-generated file 하나를 지웁니다
 
 Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-<a id="config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found"></a>
+<a id="config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
 
-#### [deleting-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다
+READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정되지 않은 auto-generated file 을 지우려 하면, 대상이 없다는 것으로 거부됩니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ, UPDATE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정되지 않은 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ, HARD_DELETE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - 자기 auto-generated file READ, HARD_DELETE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 역할 config-file-role-1: auto_generated_file 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
-- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 설정 파일 하나를 지웁니다
+- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 auto-generated file 하나를 지웁니다
 
 Then
 
@@ -1969,41 +2006,43 @@ Then
 
 ### UserConfigAdapter.get_default_auto_generated_file
 
-<a id="config_files-a-config-file-that-is-not-marked-default-is-not-found"></a>
+<a id="config_files-a-user-granted-read-on-their-auto-generated-files-reads-the-default-one"></a>
 
-#### [a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-on-their-auto-generated-files-reads-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-READ 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 읽으려 하면, 대상이 없다는 것으로 거부됩니다
+READ 를 받은 사용자가 default 로 지정된 auto-generated file 을 읽으면, 가장 마지막 revision 의 내용이 옵니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정된 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
+  - 자기 auto-generated file READ 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
-- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 설정 파일 하나를 읽습니다
+- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 auto-generated file 하나를 읽습니다
 
 Then
 
-- 거부됩니다
-  - 거부: DotfileNotFound
+- 그 경로의 default 파일이 가장 마지막 revision 의 내용과 함께 옵니다
+  - response = {'path': '.vimrc', 'perm': '644', 'data': 'set number\n'}
 
-<a id="config_files-a-user-granted-nothing-may-not-read-a-config-file"></a>
+<a id="config_files-a-user-granted-nothing-may-not-read-an-auto-generated-file"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-nothing-may-not-read-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-권한을 받지 않은 사용자가 자기 설정 파일을 읽으려 하면, 권한 부족으로 거부됩니다
+권한을 받지 않은 사용자가 자기 auto-generated file 을 읽으려 하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -2017,76 +2056,85 @@ Given
 
 When
 
-- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 설정 파일 하나를 읽습니다
+- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 auto-generated file 하나를 읽습니다
 
 Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+<a id="config_files-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 를 받은 사용자가 default 로 지정되지 않은 auto-generated file 을 읽으려 하면, 대상이 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정되지 않은 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - 자기 auto-generated file READ 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 auto-generated file 하나를 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: DotfileNotFound
 
 ### UserConfigAdapter.get_default_auto_generated_files
 
-<a id="config_files-a-user-granted-read-on-themselves-lists-no-default-config-file"></a>
+<a id="config_files-a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones"></a>
 
-#### [a-user-granted-read-on-themselves-lists-no-default-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다
+READ 를 받은 사용자가 자기 auto-generated file 목록을 조회하면, default 로 지정된 파일만 가장 마지막 revision 의 내용과 함께 옵니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 READ 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정된 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 default 로 지정되지 않은 .bashrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'export EDITOR=vim\n'), 사용자는 자기 auto-generated file 에 대한 READ 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
+  - auto-generated file .bashrc: 권한 644
+  - auto-generated file .bashrc: 내용이 'export EDITOR=vim\n' 인 revision 하나를 갖습니다
+  - 자기 auto-generated file READ 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
-- UserConfigAdapter.get_default_auto_generated_files: user-1이 기본으로 표시된 자기 설정 파일을 훑습니다
+- UserConfigAdapter.get_default_auto_generated_files: user-1이 default 로 지정된 자기 auto-generated file 목록을 조회합니다
 
 Then
 
-- 기본으로 표시된 파일이 없어 빈 목록이 옵니다
-  - files = []
+- default 로 지정된 .vimrc 파일만 가장 마지막 revision 의 내용과 함께 목록에 옵니다
+  - files = [('.vimrc', '644', 'set number\n')]
 
-<a id="config_files-a-user-granted-nothing-may-not-list-their-config-files"></a>
+<a id="config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files"></a>
 
-#### [a-user-granted-nothing-may-not-list-their-config-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-nothing-may-not-list-their-auto-generated-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-권한을 받지 않은 사용자가 자기 설정 파일을 훑으려 하면, 권한 부족으로 거부됩니다
-
-Given
-
-- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- UserConfigAdapter.get_default_auto_generated_files: user-1이 기본으로 표시된 자기 설정 파일을 훑습니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
-### UserConfigAdapter.update_default_auto_generated_file
-
-<a id="config_files-a-user-granted-nothing-may-not-update-a-config-file"></a>
-
-#### [a-user-granted-nothing-may-not-update-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
-
-권한을 받지 않은 사용자가 자기 설정 파일을 고치려 하면, 권한 부족으로 거부됩니다
+권한을 받지 않은 사용자가 자기 auto-generated file 목록을 조회하려 하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -2100,43 +2148,12 @@ Given
 
 When
 
-- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 설정 파일 하나의 권한과 내용을 바꿉니다
+- UserConfigAdapter.get_default_auto_generated_files: user-1이 default 로 지정된 자기 auto-generated file 목록을 조회합니다
 
 Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
-
-<a id="config_files-updating-a-config-file-that-is-not-marked-default-is-not-found"></a>
-
-#### [updating-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
-
-READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 고치려 하면, 대상이 없다는 것으로 거부됩니다
-
-Given
-
-- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ, UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 설정 파일 하나의 권한과 내용을 바꿉니다
-
-Then
-
-- 거부됩니다
-  - 거부: DotfileNotFound
 
 ### UserAdapter.admin_create_keypair
 
@@ -4011,6 +4028,98 @@ Then
 - 삭제 상태 그대로인 사용자 전체가 응답으로 옵니다
   - 거부: NotEnoughPermission
 
+### UserConfigAdapter.update_default_auto_generated_file
+
+<a id="config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one"></a>
+
+#### [a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 와 UPDATE 를 받은 사용자가 default 로 지정된 auto-generated file 을 고치면, 빈 응답이 오고, 파일의 권한이 바뀌며 새 내용이 revision 2 로 추가됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정된 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
+  - 자기 auto-generated file READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 역할 config-file-role-1: auto_generated_file 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 .vimrc auto-generated file 의 권한을 600, 내용을 'set nonumber\n' 로 바꿉니다
+
+Then
+
+- legacy API 는 응답 본문이 없어 빈 응답이 옵니다
+  - response = {}
+
+<a id="config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-update-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 auto-generated file 을 고치려 하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 .vimrc auto-generated file 의 권한을 600, 내용을 'set nonumber\n' 로 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 와 UPDATE 를 받은 사용자가 default 로 지정되지 않은 auto-generated file 을 고치려 하면, 대상이 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정되지 않은 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - auto-generated file .vimrc: 권한 644
+  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - 자기 auto-generated file READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
+    - 역할 config-file-role-1: auto_generated_file 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 .vimrc auto-generated file 의 권한을 600, 내용을 'set nonumber\n' 로 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: DotfileNotFound
+
 ### UserAdapter.admin_delete_keypair
 
 <a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
@@ -5124,69 +5233,40 @@ Then
 
 ### UserConfigAdapter.create_auto_generated_file
 
-<a id="config_files-a-user-granted-update-on-themselves-writes-their-own-config-file"></a>
+<a id="config_files-a-user-granted-create-on-their-auto-generated-files-writes-one"></a>
 
-#### [a-user-granted-update-on-themselves-writes-their-own-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-create-on-their-auto-generated-files-writes-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-자기 자신에게 UPDATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다
+자기 auto-generated file 에 CREATE 를 받은 사용자가 auto-generated file 을 만들면, 빈 응답이 오고, 그 파일은 내용을 revision 1 로 갖고 그 경로의 default 로 지정됩니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 UPDATE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 자기 auto-generated file 에 대한 CREATE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
+  - 자기 auto-generated file CREATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
 When
 
-- UserConfigAdapter.create_auto_generated_file: user-1이 자기 설정 파일을 하나 만듭니다
+- UserConfigAdapter.create_auto_generated_file: user-1이 자기 auto-generated file 을 하나 만듭니다
 
 Then
 
-- 빈 응답이 옵니다
+- legacy API 는 응답 본문이 없어 빈 응답이 옵니다
   - response = {}
 
-<a id="config_files-a-config-file-in-a-place-the-manager-keeps-is-refused"></a>
+<a id="config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file"></a>
 
-#### [a-config-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-nothing-may-not-write-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-UPDATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다
-
-Given
-
-- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserConfigAdapter.create_auto_generated_file: user-1이 관리자가 쓰는 자리에 설정 파일을 만들려 합니다
-
-Then
-
-- 거부됩니다
-  - 거부: InvalidDotfilePath
-
-<a id="config_files-a-user-granted-nothing-may-not-write-a-config-file"></a>
-
-#### [a-user-granted-nothing-may-not-write-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
-
-권한을 받지 않은 사용자가 자기 설정 파일을 만들려 하면, 권한 부족으로 거부됩니다
+권한을 받지 않은 사용자가 자기 auto-generated file 을 만들려 하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -5200,10 +5280,39 @@ Given
 
 When
 
-- UserConfigAdapter.create_auto_generated_file: user-1이 자기 설정 파일을 하나 만듭니다
+- UserConfigAdapter.create_auto_generated_file: user-1이 자기 auto-generated file 을 하나 만듭니다
 
 Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+<a id="config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused"></a>
+
+#### [an-auto-generated-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+CREATE 를 받은 사용자가 관리자가 쓰는 자리에 auto-generated file 을 만들려 하면, 입력 검증이 거부합니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 자기 auto-generated file 에 대한 CREATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자기 auto-generated file CREATE 권한을 부여한 역할 배정
+    - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 config-file-role-1: auto_generated_file 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 config-file-role-1 보유
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1이 관리자가 쓰는 자리에 auto-generated file 을 만들려 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidDotfilePath
 

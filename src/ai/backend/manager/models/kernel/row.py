@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import logging
 import uuid
-from collections.abc import Sequence
 from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
@@ -12,7 +10,6 @@ from typing import (
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
@@ -35,7 +32,6 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -77,53 +73,9 @@ from ai.backend.manager.models.utils import (
 )
 
 __all__ = (
-    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "DEAD_KERNEL_STATUSES",
-    "LIVE_STATUS",
-    "RESOURCE_USAGE_KERNEL_STATUSES",
-    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
     "kernels",
 )
-
-log = StructuredLogger(logging.getLogger("ai.backend.manager.models.kernel"))
-
-
-# statuses to consider when calculating current resource usage
-AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
-    e
-    for e in KernelStatus
-    if e
-    not in (
-        KernelStatus.TERMINATED,
-        KernelStatus.PENDING,
-        KernelStatus.CANCELLED,
-    )
-)
-
-USER_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
-    e
-    for e in KernelStatus
-    if e
-    not in (
-        KernelStatus.TERMINATED,
-        KernelStatus.PENDING,
-        KernelStatus.CANCELLED,
-    )
-)
-
-# statuses to consider when calculating historical resource usage
-RESOURCE_USAGE_KERNEL_STATUSES = (
-    KernelStatus.TERMINATED,
-    KernelStatus.RUNNING,
-)
-
-DEAD_KERNEL_STATUSES = (
-    KernelStatus.CANCELLED,
-    KernelStatus.TERMINATED,
-)
-
-LIVE_STATUS = (KernelStatus.RUNNING,)
 
 
 def default_hostname(context: Any) -> str:
@@ -440,6 +392,8 @@ class KernelRow(CreatedAtMixin, Base):
     )
 
     session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
+    # image_row, group_row and user_row are read only by gql_legacy (kernel.py). Delete them
+    # together with the gql_legacy cleanup.
     image_row: Mapped[ImageRow | None] = relationship(
         "ImageRow",
         foreign_keys="KernelRow.image_id",
@@ -468,17 +422,6 @@ class KernelRow(CreatedAtMixin, Base):
         return None
 
     @staticmethod
-    async def batch_load_main_kernels_by_session_id(
-        session: SASession, session_ids: list[uuid.UUID]
-    ) -> Sequence[KernelRow]:
-        query = (
-            sa.select(KernelRow)
-            .where(KernelRow.session_id.in_(session_ids))
-            .where(KernelRow.cluster_role == DEFAULT_ROLE)
-        )
-        return (await session.execute(query)).scalars().all()
-
-    @staticmethod
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
@@ -501,7 +444,7 @@ class KernelRow(CreatedAtMixin, Base):
                     cand = [
                         k
                         for k in result
-                        if (k.status not in DEAD_KERNEL_STATUSES)
+                        if (k.status not in KernelStatus.terminal_statuses())
                         and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
                     ]
                 if not cand:
@@ -607,6 +550,7 @@ class KernelRow(CreatedAtMixin, Base):
 # For compatibility
 kernels = KernelRow.__table__
 
+# Read only by gql_legacy (kernel.py). Delete it together with the gql_legacy cleanup.
 DEFAULT_KERNEL_ORDERING = [
     sa.desc(
         sa.func.greatest(

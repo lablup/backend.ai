@@ -2,9 +2,9 @@
 
 [background](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-Scenario: incomplete 4 / 44
+Scenario: incomplete 1 / 44
 
-- built from ops (21)
+- built from ops (20)
   - UserAdapter.admin_search: representative success ✓ · representative rejection ✓
   - UserAdapter.admin_search_keypairs: representative success ✓ · representative rejection ✓
   - UserAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
@@ -22,11 +22,10 @@ Scenario: incomplete 4 / 44
   - UserAdapter.role_search: representative success ✓ · representative rejection ✓
   - UserAdapter.scoped_search: representative success ✓ · representative rejection ✓
   - UserAdapter.search_my_keypairs: representative success ✓ · representative rejection ✓
-  - UserConfigAdapter.delete_default_auto_generated_file: representative success ✗ · representative rejection ✓: SCENARIO-GAP
-  - UserConfigAdapter.get_default_auto_generated_file: representative success ✗ · representative rejection ✓: SCENARIO-GAP
+  - UserConfigAdapter.delete_default_auto_generated_file: representative success ✓ · representative rejection ✓
+  - UserConfigAdapter.get_default_auto_generated_file: representative success ✓ · representative rejection ✓
   - UserConfigAdapter.get_default_auto_generated_files: representative success ✓ · representative rejection ✓
-  - UserConfigAdapter.update_default_auto_generated_file: representative success ✗ · representative rejection ✓: SCENARIO-GAP
-- ops + direct implementation (12)
+- ops + direct implementation (13)
   - UserAdapter.admin_create_keypair: success absent · rejection present 3 (atomic_bulk_scoped_search_ops, single_entity): SCENARIO-GAP
   - UserAdapter.admin_get_keypair: success present 1 · rejection present 1 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.admin_update_keypair: success present 1 · rejection present 3 (atomic_bulk_scoped_search_ops, single_field)
@@ -39,6 +38,7 @@ Scenario: incomplete 4 / 44
   - UserAdapter.issue_my_keypair: success present 1 · rejection present 2 (atomic_bulk_scoped_search_ops, single_entity)
   - UserAdapter.update_my_keypair: success present 1 · rejection present 3 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
+  - UserConfigAdapter.update_default_auto_generated_file: success present 1 · rejection present 2 (scope_search_ops, single_entity)
 - direct implementation (11)
   - UserAdapter.admin_delete_keypair: success present 1 · rejection present 3 (single_field)
   - UserAdapter.admin_delete_ssh_keypair: success present 1 · rejection present 2 (single_entity)
@@ -50,7 +50,7 @@ Scenario: incomplete 4 / 44
   - UserAdapter.revoke_my_keypair: success present 1 · rejection present 4 (single_field)
   - UserAdapter.switch_default_access_key: success present 1 · rejection present 2 (single_entity)
   - UserAdapter.update_user: success present 1 · rejection present 1 (single_entity)
-  - UserConfigAdapter.create_auto_generated_file: success present 1 · rejection present 2 (single_entity)
+  - UserConfigAdapter.create_auto_generated_file: success present 1 · rejection present 2 (scope)
 
 **UserAdapter.admin_search**
 
@@ -181,29 +181,24 @@ Scenario: incomplete 4 / 44
 
 | scenario | verdict |
 |---|---|
-| [a user holding no permission who tries to delete their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-a-config-file) | rejected |
-| [when a user holding READ and UPDATE deletes a config file not marked as default, it is rejected as not found](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
+| [when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone](#config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one) | answered |
+| [a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file) | rejected |
+| [when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found](#config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
 
 **UserConfigAdapter.get_default_auto_generated_file**
 
 | scenario | verdict |
 |---|---|
-| [when a user holding READ reads a config file not marked as default, it is rejected as not found](#config_files-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
-| [a user holding no permission who tries to read their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-read-a-config-file) | rejected |
+| [when a user holding READ reads an auto-generated file set as default, the content of its last revision comes back](#config_files-a-user-granted-read-on-their-auto-generated-files-reads-the-default-one) | answered |
+| [a user holding no permission who tries to read their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-read-an-auto-generated-file) | rejected |
+| [when a user holding READ reads an auto-generated file not set as default, it is rejected as not found](#config_files-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
 
 **UserConfigAdapter.get_default_auto_generated_files**
 
 | scenario | verdict |
 |---|---|
-| [when a user holding READ lists the config files of theirs marked as default, an empty list comes back](#config_files-a-user-granted-read-on-themselves-lists-no-default-config-file) | answered |
-| [a user holding no permission who tries to list their own config files is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-list-their-config-files) | rejected |
-
-**UserConfigAdapter.update_default_auto_generated_file**
-
-| scenario | verdict |
-|---|---|
-| [a user holding no permission who tries to change their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-update-a-config-file) | rejected |
-| [when a user holding READ and UPDATE changes a config file not marked as default, it is rejected as not found](#config_files-updating-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
+| [when a user holding READ lists their auto-generated files, only the ones set as default come back, with their last revision's content](#config_files-a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones) | answered |
+| [a user holding no permission who tries to list their own auto-generated files is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files) | rejected |
 
 **UserAdapter.admin_create_keypair**
 
@@ -309,6 +304,14 @@ Scenario: incomplete 4 / 44
 | [when a user granted only UPDATE and READ in the target user scope gives DELETED in an edit, the entity permission gate of the delete rejects it](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | rejected |
 | [when only DELETED is given in an edit of a deleted user, nothing changes and that user comes back](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | rejected |
 
+**UserConfigAdapter.update_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ and UPDATE changes an auto-generated file set as default, an empty response comes back, the file's permission changes and the new content is added as revision 2](#config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one) | answered |
+| [a user holding no permission who tries to change their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file) | rejected |
+| [when a user holding READ and UPDATE changes an auto-generated file not set as default, it is rejected as not found](#config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
+
 **UserAdapter.admin_delete_keypair**
 
 | scenario | verdict |
@@ -394,9 +397,9 @@ Scenario: incomplete 4 / 44
 
 | scenario | verdict |
 |---|---|
-| [when a user holding UPDATE on themselves writes a config file, an empty response comes back](#config_files-a-user-granted-update-on-themselves-writes-their-own-config-file) | answered |
-| [when a user holding UPDATE tries to write a config file where the manager keeps its own, input validation rejects it](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | rejected |
-| [a user holding no permission who tries to write their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-write-a-config-file) | rejected |
+| [when a user holding CREATE on their own auto-generated files writes one, an empty response comes back, and the file holds its content as revision 1 and is set as the default of its path](#config_files-a-user-granted-create-on-their-auto-generated-files-writes-one) | answered |
+| [a user holding no permission who tries to write their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file) | rejected |
+| [when a user holding CREATE tries to write an auto-generated file where the manager keeps its own, input validation rejects it](#config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused) | rejected |
 
 ### UserAdapter.admin_search
 
@@ -1911,11 +1914,44 @@ Then
 
 ### UserConfigAdapter.delete_default_auto_generated_file
 
-<a id="config_files-a-user-granted-nothing-may-not-delete-a-config-file"></a>
+<a id="config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one"></a>
 
-#### [a-user-granted-nothing-may-not-delete-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-a user holding no permission who tries to delete their own config file is rejected for lack of permission
+when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- a response saying it was deleted comes back
+  - response = {'success': True}
+
+<a id="config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-delete-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission
 
 Given
 
@@ -1929,38 +1965,39 @@ Given
 
 When
 
-- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own config files
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
 
 Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
 
-<a id="config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found"></a>
+<a id="config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
 
-#### [deleting-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding READ and UPDATE deletes a config file not marked as default, it is rejected as not found
+when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found
 
 Given
 
-- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one config file that is not marked default
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
-- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own config files
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
 
 Then
 
@@ -1969,41 +2006,43 @@ Then
 
 ### UserConfigAdapter.get_default_auto_generated_file
 
-<a id="config_files-a-config-file-that-is-not-marked-default-is-not-found"></a>
+<a id="config_files-a-user-granted-read-on-their-auto-generated-files-reads-the-default-one"></a>
 
-#### [a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-on-their-auto-generated-files-reads-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding READ reads a config file not marked as default, it is rejected as not found
+when a user holding READ reads an auto-generated file set as default, the content of its last revision comes back
 
 Given
 
-- one domain and one user, the user holds one config file not marked as default, the user holds the READ permission on themselves
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one config file that is not marked default
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
-- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own config files
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own auto-generated files
 
 Then
 
-- the call is rejected
-  - rejected: DotfileNotFound
+- the default file of the path comes back with its last revision's content
+  - response = {'path': '.vimrc', 'perm': '644', 'data': 'set number\n'}
 
-<a id="config_files-a-user-granted-nothing-may-not-read-a-config-file"></a>
+<a id="config_files-a-user-granted-nothing-may-not-read-an-auto-generated-file"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-nothing-may-not-read-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-a user holding no permission who tries to read their own config file is rejected for lack of permission
+a user holding no permission who tries to read their own auto-generated file is rejected for lack of permission
 
 Given
 
@@ -2017,76 +2056,85 @@ Given
 
 When
 
-- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own config files
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own auto-generated files
 
 Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+<a id="config_files-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ reads an auto-generated file not set as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
 
 ### UserConfigAdapter.get_default_auto_generated_files
 
-<a id="config_files-a-user-granted-read-on-themselves-lists-no-default-config-file"></a>
+<a id="config_files-a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones"></a>
 
-#### [a-user-granted-read-on-themselves-lists-no-default-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding READ lists the config files of theirs marked as default, an empty list comes back
+when a user holding READ lists their auto-generated files, only the ones set as default come back, with their last revision's content
 
 Given
 
-- one domain and one user, the user holds the READ permission on themselves
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds a .bashrc auto-generated file not set as default (permission 644, revision 1 holding 'export EDITOR=vim\n'), the user holds the READ permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - Auto-generated file .bashrc: permission 644
+  - Auto-generated file .bashrc: has one revision whose content is 'export EDITOR=vim\n'
+  - a role assignment granting the READ permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
-- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the config files of theirs marked as default
+- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the auto-generated files of theirs set as default
 
 Then
 
-- no file is marked default, so an empty list comes back
-  - files = []
+- only the .vimrc file set as default is listed, with its last revision's content
+  - files = [('.vimrc', '644', 'set number\n')]
 
-<a id="config_files-a-user-granted-nothing-may-not-list-their-config-files"></a>
+<a id="config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files"></a>
 
-#### [a-user-granted-nothing-may-not-list-their-config-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-nothing-may-not-list-their-auto-generated-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-a user holding no permission who tries to list their own config files is rejected for lack of permission
-
-Given
-
-- one domain and one user, the user holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the config files of theirs marked as default
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-### UserConfigAdapter.update_default_auto_generated_file
-
-<a id="config_files-a-user-granted-nothing-may-not-update-a-config-file"></a>
-
-#### [a-user-granted-nothing-may-not-update-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
-
-a user holding no permission who tries to change their own config file is rejected for lack of permission
+a user holding no permission who tries to list their own auto-generated files is rejected for lack of permission
 
 Given
 
@@ -2100,43 +2148,12 @@ Given
 
 When
 
-- UserConfigAdapter.update_default_auto_generated_file: user-1 changes the permission and content of one of their config files
+- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the auto-generated files of theirs set as default
 
 Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
-
-<a id="config_files-updating-a-config-file-that-is-not-marked-default-is-not-found"></a>
-
-#### [updating-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
-
-when a user holding READ and UPDATE changes a config file not marked as default, it is rejected as not found
-
-Given
-
-- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one config file that is not marked default
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserConfigAdapter.update_default_auto_generated_file: user-1 changes the permission and content of one of their config files
-
-Then
-
-- the call is rejected
-  - rejected: DotfileNotFound
 
 ### UserAdapter.admin_create_keypair
 
@@ -4011,6 +4028,98 @@ Then
 - the whole user still in the deleted state comes back
   - rejected: NotEnoughPermission
 
+### UserConfigAdapter.update_default_auto_generated_file
+
+<a id="config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one"></a>
+
+#### [a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ and UPDATE changes an auto-generated file set as default, an empty response comes back, the file's permission changes and the new content is added as revision 2
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, UPDATE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ, UPDATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: UPDATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes their .vimrc auto-generated file to permission 600 and content 'set nonumber\n'
+
+Then
+
+- the legacy API has no response body, so an empty response comes back
+  - response = {}
+
+<a id="config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-update-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to change their own auto-generated file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes their .vimrc auto-generated file to permission 600 and content 'set nonumber\n'
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ and UPDATE changes an auto-generated file not set as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, UPDATE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ, UPDATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: UPDATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes their .vimrc auto-generated file to permission 600 and content 'set nonumber\n'
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
 ### UserAdapter.admin_delete_keypair
 
 <a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
@@ -5124,69 +5233,40 @@ Then
 
 ### UserConfigAdapter.create_auto_generated_file
 
-<a id="config_files-a-user-granted-update-on-themselves-writes-their-own-config-file"></a>
+<a id="config_files-a-user-granted-create-on-their-auto-generated-files-writes-one"></a>
 
-#### [a-user-granted-update-on-themselves-writes-their-own-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-create-on-their-auto-generated-files-writes-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding UPDATE on themselves writes a config file, an empty response comes back
+when a user holding CREATE on their own auto-generated files writes one, an empty response comes back, and the file holds its content as revision 1 and is set as the default of its path
 
 Given
 
-- one domain and one user, the user holds the UPDATE permission on themselves
+- one domain and one user, the user holds the CREATE permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
+  - a role assignment granting the CREATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: CREATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
-- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own config files
+- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own auto-generated files
 
 Then
 
-- an empty response comes back
+- the legacy API has no response body, so an empty response comes back
   - response = {}
 
-<a id="config_files-a-config-file-in-a-place-the-manager-keeps-is-refused"></a>
+<a id="config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file"></a>
 
-#### [a-config-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+#### [a-user-granted-nothing-may-not-write-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when a user holding UPDATE tries to write a config file where the manager keeps its own, input validation rejects it
-
-Given
-
-- one domain and one user, the user holds the UPDATE permission on themselves
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserConfigAdapter.create_auto_generated_file: user-1 tries to write a config file where the manager keeps its own
-
-Then
-
-- the call is rejected
-  - rejected: InvalidDotfilePath
-
-<a id="config_files-a-user-granted-nothing-may-not-write-a-config-file"></a>
-
-#### [a-user-granted-nothing-may-not-write-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
-
-a user holding no permission who tries to write their own config file is rejected for lack of permission
+a user holding no permission who tries to write their own auto-generated file is rejected for lack of permission
 
 Given
 
@@ -5200,10 +5280,39 @@ Given
 
 When
 
-- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own config files
+- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own auto-generated files
 
 Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+<a id="config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused"></a>
+
+#### [an-auto-generated-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding CREATE tries to write an auto-generated file where the manager keeps its own, input validation rejects it
+
+Given
+
+- one domain and one user, the user holds the CREATE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the CREATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: CREATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 tries to write an auto-generated file where the manager keeps its own
+
+Then
+
+- the call is rejected
+  - rejected: InvalidDotfilePath
 

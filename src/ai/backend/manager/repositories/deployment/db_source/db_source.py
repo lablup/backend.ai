@@ -29,10 +29,12 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
@@ -79,6 +81,7 @@ from ai.backend.manager.data.deployment.types import (
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
     ModelRevisionData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -105,6 +108,7 @@ from ai.backend.manager.data.session.creation import (
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
@@ -181,6 +185,9 @@ from ai.backend.manager.models.endpoint.updaters import (
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
@@ -220,6 +227,7 @@ from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, SearcherResult
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
@@ -1209,6 +1217,30 @@ class DeploymentDBSource:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def scoped_search_deployments(
+        self, scoped: ScopedSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of the deployments the scopes reach, each with its policy."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.scoped_search(scoped)
+            return await self._attach_policies(r, result)
+
+    async def global_search_deployments(
+        self, global_searcher: GlobalSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of every deployment, each with its policy."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.global_search(global_searcher)
+            return await self._attach_policies(r, result)
+
+    async def _attach_policies(
+        self, r: V2ReadOps, result: SearcherResult[ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """``result`` with the policy of each deployment that has one."""
+        policies = await self._read_policies(r, [item.id for item in result.items])
+        items = [replace(item, policy=policies.get(item.id)) for item in result.items]
+        return replace(result, items=items)
 
     async def get_endpoint_id_by_session(
         self,
@@ -2277,36 +2309,52 @@ class DeploymentDBSource:
                     )
                 )
             ).items
-        live_session_ids = {session.id for session in live_sessions}
-        route_by_session: dict[SessionId, RouteInfo] = {
-            route.session_id: route
-            for route in routes
-            if route.session_id is not None and route.session_id in live_session_ids
-        }
-        if not route_by_session:
-            return result_map
+            live_session_ids = {session.id for session in live_sessions}
+            route_by_session: dict[SessionId, RouteInfo] = {
+                route.session_id: route
+                for route in routes
+                if route.session_id is not None and route.session_id in live_session_ids
+            }
+            if not route_by_session:
+                return result_map
+            main_kernels = (
+                await r.search_with_scopes(
+                    [
+                        SessionKernelTarget(session_id=SessionID(session_id))
+                        for session_id in route_by_session
+                    ],
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            KernelSearchableFields.own.cluster_role.filter.equals(
+                                StringMatchSpec(
+                                    value=DEFAULT_ROLE, case_insensitive=False, negated=False
+                                )
+                            )
+                        ],
+                    ),
+                )
+            ).items
 
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            kernels = await KernelRow.batch_load_main_kernels_by_session_id(
-                db_sess, list(route_by_session.keys())
-            )
-
-        for kernel in kernels:
-            route = route_by_session.get(kernel.session_id)
-            if route is None or kernel.service_ports is None or not kernel.kernel_host:
+        for kernel in main_kernels:
+            session_id = SessionId(uuid.UUID(kernel.session.session_id))
+            route = route_by_session.get(session_id)
+            service_ports = kernel.network.service_ports
+            kernel_host = kernel.network.kernel_host
+            if route is None or service_ports is None or not kernel_host:
                 continue
             # First inference port wins (legacy single-inference-port
             # contract preserved during the row-method removal).
             inference_port = next(
-                (p for p in kernel.service_ports if p.get("is_inference")),
+                (p for p in service_ports if p.get("is_inference")),
                 None,
             )
             if inference_port is None or not inference_port.get("host_ports"):
                 continue
             entry = AppProxyRouteEntry(
-                session_id=kernel.session_id,
+                session_id=session_id,
                 route_id=route.route_id,
-                kernel_host=kernel.kernel_host,
+                kernel_host=kernel_host,
                 kernel_port=inference_port["host_ports"][0],
             )
             result_map.setdefault(uuid.UUID(str(route.deployment_id)), []).append(entry)
