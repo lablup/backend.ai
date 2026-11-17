@@ -72,13 +72,18 @@ class Side(enum.Enum):
 
 @dataclass(frozen=True)
 class ASharedFolderAndACaller:
-    """폴더 하나, 그 폴더에 걸린 공유, 빌려준 사람, 빌린 사람이나 프로젝트, 그리고 부르는 사람."""
+    """폴더 하나, 그 폴더에 걸린 공유, 빌려준 사람, 빌린 사람, 그리고 부르는 사람.
+
+    ``borrowing_project`` 가 있으면 공유는 그 프로젝트에 빌려준 것이고, ``recipient`` 는
+    그 프로젝트에서 공유에 답하는 사람이다.
+    """
 
     folder: VFolderData
     share: EntityShareData | None
     sharer: UserData
-    recipient: UserData | ProjectData
+    recipient: UserData
     caller: UserData
+    borrowing_project: ProjectData | None = None
 
 
 @dataclass(frozen=True)
@@ -227,13 +232,13 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
         if self.sharer_granted:
             await seeding.within(SomeoneAnsweringInTheirOwnScope(sharer, (Permission.READ,)))
         folder = await seeding.creating_from_two(TestSeedProjectVFolder(host=HOST), project, sharer)
-        recipient: Laid[UserData] | Laid[ProjectData]
-        answerer: Laid[UserData]
+        recipient: Laid[UserData]
+        borrowing_project: Laid[ProjectData] | None = None
         if self.to_a_project:
             borrowing_project = await seeding.creating_from_two(
                 TestSeedProject(name_hint="borrowing-team"), domain, policy
             )
-            answerer = await seeding.within(
+            recipient = await seeding.within(
                 SomeoneGrantedOnTheProject(
                     domain,
                     borrowing_project,
@@ -241,34 +246,33 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
                     role_name_hint="share-recipient",
                 )
             )
-            recipient = borrowing_project
         else:
-            borrowing_user = await seeding.within(SomeoneOf(domain))
+            recipient = await seeding.within(SomeoneOf(domain))
             if self.recipient_granted:
                 await seeding.within(
-                    SomeoneAnsweringInTheirOwnScope(borrowing_user, self.recipient_granted)
+                    SomeoneAnsweringInTheirOwnScope(recipient, self.recipient_granted)
                 )
-            answerer = borrowing_user
-            recipient = borrowing_user
         share: Laid[EntityShareData] | None = None
         if self.offered or self.taken:
-            offer = (
-                TestSeedVFolderShareToProject(cap=self.cap)
-                if self.to_a_project
-                else TestSeedVFolderShare(cap=self.cap)
-            )
-            share = await seeding.creating_from_three(offer, sharer, folder, recipient)
+            if borrowing_project is not None:
+                share = await seeding.creating_from_three(
+                    TestSeedVFolderShareToProject(cap=self.cap), sharer, folder, borrowing_project
+                )
+            else:
+                share = await seeding.creating_from_three(
+                    TestSeedVFolderShare(cap=self.cap), sharer, folder, recipient
+                )
         if self.taken:
             if share is None:
                 raise LookupError("a taken share needs the offer it settled")
             await seeding.accepting(TestSeedShareTaken(), share)
         if self.elsewhere:
             other_folder = await seeding.creating_from_two(
-                TestSeedProjectVFolder(host=HOST, name_hint="other-folder"), project, answerer
+                TestSeedProjectVFolder(host=HOST, name_hint="other-folder"), project, recipient
             )
             await seeding.creating_from_three(
                 TestSeedVFolderShare(cap=self.cap, name_hint="other-share"),
-                answerer,
+                recipient,
                 other_folder,
                 sharer,
             )
@@ -284,7 +288,7 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
             case Side.SHARER:
                 caller = sharer
             case Side.RECIPIENT:
-                caller = answerer
+                caller = recipient
             case Side.SOMEBODY:
                 caller = await seeding.within(SomeoneOf(domain))
         return ASharedFolderAndACaller(
@@ -293,6 +297,9 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
             sharer=seeding.made(sharer),
             recipient=seeding.made(recipient),
             caller=seeding.made(caller),
+            borrowing_project=(
+                seeding.made(borrowing_project) if borrowing_project is not None else None
+            ),
         )
 
 
@@ -309,18 +316,21 @@ class ShareLook:
         node: EntityShareNode,
         folder: VFolderData,
         sharer: UserData,
-        recipient: UserData | ProjectData,
+        recipient: UserData,
+        borrowing_project: ProjectData | None,
         status: EntityShareStatusDTO,
     ) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
-        if isinstance(recipient, ProjectData):
+        if borrowing_project is not None:
             recipient_type = "project"
+            recipient_id = borrowing_project.id
             recipient_id_source = Says(
                 "미리 만든 폴더를 빌린 프로젝트의 id",
                 english="the id of the project the folder is lent to",
             )
         else:
             recipient_type = "user"
+            recipient_id = recipient.id
             recipient_id_source = Says(
                 "미리 만든 빌린 사람의 id",
                 english="the id of the person the folder is lent to",
@@ -345,7 +355,7 @@ class ShareLook:
             Held[UUID | None](
                 f"{prefix}recipient_entity_id",
                 node.recipient_entity_id,
-                SameAs[UUID | None](recipient.id, recipient_id_source),
+                SameAs[UUID | None](recipient_id, recipient_id_source),
             ),
             Same(f"{prefix}recipient_email", node.recipient_email, None),
             Same(f"{prefix}target_entity_type", node.target_entity_type.name(), "vfolder"),
@@ -432,7 +442,13 @@ class TheShareNode(Then[ASharedFolderAndACaller, EntityShareNode]):
         if node is None:
             return [MissingResponse(answered.raised)]
         return ShareLook(self.started, None if self.fresh else laid.share).verdicts(
-            "", node, laid.folder, laid.sharer, laid.recipient, self.status
+            "",
+            node,
+            laid.folder,
+            laid.sharer,
+            laid.recipient,
+            laid.borrowing_project,
+            self.status,
         )
 
 
@@ -479,6 +495,7 @@ class TheSharesComeBack(Then[ASharedFolderAndACaller, list[EntityShareNode | Exc
                 laid.folder,
                 laid.sharer,
                 laid.recipient,
+                laid.borrowing_project,
                 EntityShareStatusDTO.PENDING,
             )
         else:
@@ -529,6 +546,7 @@ class TheSearchedShares(Then[ASharedFolderAndACaller, SearchEntitySharesPayload]
                 laid.folder,
                 laid.sharer,
                 laid.recipient,
+                laid.borrowing_project,
                 self.status,
             )
         return verdicts
