@@ -226,20 +226,20 @@ class ContainerRegistryService:
                     ),
                 )
 
-            # Validate webhook authorization: if the registry configured a secret,
-            # the request MUST present a matching header (omitting it must fail).
+            # The webhook skips keypair auth, so a registry without a secret rejects it.
             expected_auth = (registry_row.extra or {}).get("webhook_auth_header")
-            if expected_auth:
-                if not action.auth_header or not secrets.compare_digest(
-                    action.auth_header.encode(), expected_auth.encode()
-                ):
-                    raise ContainerRegistryWebhookAuthorizationFailed(
-                        extra_msg=(
-                            f"Unauthorized webhook request"
-                            f" (registry: {registry_row.registry_name},"
-                            f" project: {action.project})"
-                        ),
-                    )
+            if (
+                not expected_auth
+                or not action.auth_header
+                or not secrets.compare_digest(action.auth_header.encode(), expected_auth.encode())
+            ):
+                raise ContainerRegistryWebhookAuthorizationFailed(
+                    extra_msg=(
+                        f"Unauthorized webhook request"
+                        f" (registry: {registry_row.registry_name},"
+                        f" project: {action.project})"
+                    ),
+                )
 
             # Handle event by type
             if action.event_type == "PUSH_ARTIFACT":
