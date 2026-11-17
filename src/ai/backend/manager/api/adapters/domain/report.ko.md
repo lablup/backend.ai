@@ -18,11 +18,11 @@
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (5)
-  - allow_container_registries: 성공 있음 2 · 거부 있음 2 (relation)
   - create: 성공 있음 2 · 거부 있음 4 (global_scope)
-  - disallow_container_registries: 성공 있음 2 · 거부 있음 1 (relation)
+  - link_container_registries: 성공 있음 2 · 거부 있음 2 (relation)
   - purge: 성공 있음 1 · 거부 있음 4 (single_entity)
   - sync_registry_relations: 성공 있음 2 · 거부 있음 1 (relation)
+  - unlink_container_registries: 성공 있음 2 · 거부 있음 1 (relation)
 
 **bulk_get_ids**
 
@@ -124,15 +124,6 @@
 | [아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부됩니다](#editing-a-user-granted-nothing-may-not-edit-a-domain) | 거부 |
 | [아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부됩니다](#editing-editing-a-name-nothing-answers-to-is-not-found) | 거부 |
 
-**allow_container_registries**
-
-| 시나리오 | 판정 |
-|---|---|
-| [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 허용할 수 있습니다](#allowing_registries-a-user-granted-on-both-scopes-allows-a-registry-for-a-domain) | 성공 |
-| [이미 허용된 레지스트리를 다시 허용해도 거부되지 않고, 응답에서는 빠집니다](#allowing_registries-allowing-an-already-allowed-registry-leaves-it-out-of-the-response) | 성공 |
-| [존재하지 않는 레지스트리를 도메인에 허용하려 하면 그 레지스트리가 없다는 이유로 거부됩니다](#allowing_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | 거부 |
-| [레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 허용하려 하면 거부됩니다](#allowing_registries-a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain) | 거부 |
-
 **create**
 
 | 시나리오 | 판정 |
@@ -144,13 +135,14 @@
 | [superadmin 이 아닌 사용자가 도메인을 생성하려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | 거부 |
 | [엔티티 권한 집행을 꺼도 도메인 생성은 여전히 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사하기 때문입니다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | 거부 |
 
-**disallow_container_registries**
+**link_container_registries**
 
 | 시나리오 | 판정 |
 |---|---|
-| [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에서 그 레지스트리의 허용을 거둘 수 있습니다](#disallowing_registries-a-user-granted-on-both-scopes-disallows-a-registry-for-a-domain) | 성공 |
-| [허용되지 않은 레지스트리의 허용을 거둬도 거부되지 않고, 응답에서는 빠집니다](#disallowing_registries-disallowing-a-registry-not-allowed-leaves-it-out-of-the-response) | 성공 |
-| [레지스트리에만 권한을 받은 사용자가 도메인에서 그 레지스트리의 허용을 거두려 하면 거부됩니다](#disallowing_registries-a-user-granted-on-the-registry-alone-may-not-disallow-it-for-a-domain) | 거부 |
+| [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 link할 수 있습니다](#linking_registries-a-user-granted-on-both-scopes-links-a-registry-to-a-domain) | 성공 |
+| [이미 link된 레지스트리를 다시 link해도 거부되지 않고, 응답에서는 빠집니다](#linking_registries-linking-an-already-linked-registry-leaves-it-out-of-the-response) | 성공 |
+| [존재하지 않는 레지스트리를 도메인에 link하려 하면 그 레지스트리가 없다는 이유로 거부됩니다](#linking_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | 거부 |
+| [레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 link하려 하면 거부됩니다](#linking_registries-a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain) | 거부 |
 
 **purge**
 
@@ -169,6 +161,14 @@
 | [슈퍼관리자가 레지스트리를 넘겨 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다](#syncing_registry_relations-giving-a-registry-links-the-domain-to-it) | 성공 |
 | [relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | 성공 |
 | [도메인에 아무 권한이 없는 사용자가 relation 을 맞추려 하면 거부됩니다](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | 거부 |
+
+**unlink_container_registries**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에서 그 레지스트리를 unlink할 수 있습니다](#unlinking_registries-a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain) | 성공 |
+| [link되지 않은 레지스트리를 unlink해도 거부되지 않고, 응답에서는 빠집니다](#unlinking_registries-unlinking-a-registry-not-linked-leaves-it-out-of-the-response) | 성공 |
+| [레지스트리에만 권한을 받은 사용자가 도메인에서 그 레지스트리를 unlink하려 하면 거부됩니다](#unlinking_registries-a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain) | 거부 |
 
 ### bulk_get_ids
 
@@ -1505,150 +1505,6 @@ Then
 - 거부됩니다
   - 거부: EntityNotFoundError
 
-### allow_container_registries
-
-<a id="allowing_registries-a-user-granted-on-both-scopes-allows-a-registry-for-a-domain"></a>
-
-#### [a-user-granted-on-both-scopes-allows-a-registry-for-a-domain](/tests/scenario/bai_scenario/manager/domain/test_allowing_registries.py): pass
-
-도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 허용할 수 있습니다
-
-Given
-
-- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
-  - allow-on-domain 권한을 받은 사용자 준비
-    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
-    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
-
-When
-
-- DomainAdapter.allow_container_registries: user-1이 home-1에 그 레지스트리를 허용합니다
-
-Then
-
-- 도메인 id 와 새로 허용한 레지스트리의 id 가 옵니다
-  - domain_id: 요청한 도메인의 id 와 같다
-  - container_registry_ids: 요청한 레지스트리의 id 하나와 같다
-
-<a id="allowing_registries-allowing-an-already-allowed-registry-leaves-it-out-of-the-response"></a>
-
-#### [allowing-an-already-allowed-registry-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_allowing_registries.py): pass
-
-이미 허용된 레지스트리를 다시 허용해도 거부되지 않고, 응답에서는 빠집니다
-
-Given
-
-- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명, 도메인은 그 레지스트리를 이미 허용하고 있음
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
-  - allow-on-domain 권한을 받은 사용자 준비
-    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
-    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
-
-When
-
-- DomainAdapter.allow_container_registries: user-1이 home-1에 그 레지스트리를 허용합니다
-
-Then
-
-- 도메인 id 와 빈 레지스트리 목록이 옵니다
-  - domain_id: 요청한 도메인의 id 와 같다
-  - container_registry_ids = []
-
-<a id="allowing_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
-
-#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_allowing_registries.py): pass
-
-존재하지 않는 레지스트리를 도메인에 허용하려 하면 그 레지스트리가 없다는 이유로 거부됩니다
-
-Given
-
-- 도메인 하나, 레지스트리 하나, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - superadmin user-1: 역할 allow-on-registry-1 보유
-  - allow-on-domain 권한을 받은 사용자 준비
-    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
-    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
-    - superadmin user-1: 역할 allow-on-domain-1 보유
-
-When
-
-- DomainAdapter.allow_container_registries: user-1이 home-1에 존재하지 않는 레지스트리를 허용합니다
-
-Then
-
-- 거부됩니다
-  - 거부: ContainerRegistryNotFound
-
-<a id="allowing_registries-a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain"></a>
-
-#### [a-user-granted-on-the-registry-alone-may-not-allow-it-for-a-domain](/tests/scenario/bai_scenario/manager/domain/test_allowing_registries.py): pass
-
-레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 허용하려 하면 거부됩니다
-
-Given
-
-- 도메인 하나, 레지스트리 하나, 레지스트리에만 권한이 있는 사용자 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
-
-When
-
-- DomainAdapter.allow_container_registries: user-1이 home-1에 그 레지스트리를 허용합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
 ### create
 
 <a id="creating-creating-a-domain-also-creates-its-model-store-project"></a>
@@ -1817,51 +1673,13 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### disallow_container_registries
+### link_container_registries
 
-<a id="disallowing_registries-a-user-granted-on-both-scopes-disallows-a-registry-for-a-domain"></a>
+<a id="linking_registries-a-user-granted-on-both-scopes-links-a-registry-to-a-domain"></a>
 
-#### [a-user-granted-on-both-scopes-disallows-a-registry-for-a-domain](/tests/scenario/bai_scenario/manager/domain/test_disallowing_registries.py): pass
+#### [a-user-granted-on-both-scopes-links-a-registry-to-a-domain](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
 
-도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에서 그 레지스트리의 허용을 거둘 수 있습니다
-
-Given
-
-- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명, 도메인은 그 레지스트리를 이미 허용하고 있음
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - allow-on-registry 권한을 받은 사용자 준비
-    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
-    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
-  - allow-on-domain 권한을 받은 사용자 준비
-    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
-    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
-
-When
-
-- DomainAdapter.disallow_container_registries: user-1이 home-1에서 그 레지스트리의 허용을 거둡니다
-
-Then
-
-- 도메인 id 와 허용을 거둔 레지스트리의 id 가 옵니다
-  - domain_id: 요청한 도메인의 id 와 같다
-  - container_registry_ids: 요청한 레지스트리의 id 하나와 같다
-
-<a id="disallowing_registries-disallowing-a-registry-not-allowed-leaves-it-out-of-the-response"></a>
-
-#### [disallowing-a-registry-not-allowed-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_disallowing_registries.py): pass
-
-허용되지 않은 레지스트리의 허용을 거둬도 거부되지 않고, 응답에서는 빠집니다
+도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 link할 수 있습니다
 
 Given
 
@@ -1886,23 +1704,22 @@ Given
 
 When
 
-- DomainAdapter.disallow_container_registries: user-1이 home-1에서 그 레지스트리의 허용을 거둡니다
+- DomainAdapter.link_container_registries: user-1이 home-1에 그 레지스트리를 link합니다
 
 Then
 
-- 도메인 id 와 빈 레지스트리 목록이 옵니다
-  - domain_id: 요청한 도메인의 id 와 같다
-  - container_registry_ids = []
+- 새로 link한 도메인과 레지스트리 한 쌍이 옵니다
+  - items: 요청한 도메인과 레지스트리 한 쌍와 같다
 
-<a id="disallowing_registries-a-user-granted-on-the-registry-alone-may-not-disallow-it-for-a-domain"></a>
+<a id="linking_registries-linking-an-already-linked-registry-leaves-it-out-of-the-response"></a>
 
-#### [a-user-granted-on-the-registry-alone-may-not-disallow-it-for-a-domain](/tests/scenario/bai_scenario/manager/domain/test_disallowing_registries.py): pass
+#### [linking-an-already-linked-registry-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
 
-레지스트리에만 권한을 받은 사용자가 도메인에서 그 레지스트리의 허용을 거두려 하면 거부됩니다
+이미 link된 레지스트리를 다시 link해도 거부되지 않고, 응답에서는 빠집니다
 
 Given
 
-- 도메인 하나, 레지스트리 하나, 레지스트리에만 권한이 있는 사용자 한 명, 도메인은 그 레지스트리를 이미 허용하고 있음
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명, 도메인과 그 레지스트리는 이미 link되어 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
@@ -1916,10 +1733,82 @@ Given
     - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
     - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
 
 When
 
-- DomainAdapter.disallow_container_registries: user-1이 home-1에서 그 레지스트리의 허용을 거둡니다
+- DomainAdapter.link_container_registries: user-1이 home-1에 그 레지스트리를 link합니다
+
+Then
+
+- 빈 목록이 옵니다
+  - items = []
+
+<a id="linking_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
+
+존재하지 않는 레지스트리를 도메인에 link하려 하면 그 레지스트리가 없다는 이유로 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.link_container_registries: user-1이 home-1에 존재하지 않는 레지스트리를 link합니다
+
+Then
+
+- 거부됩니다
+  - 거부: ContainerRegistryNotFound
+
+<a id="linking_registries-a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
+
+레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 link하려 하면 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 레지스트리에만 권한이 있는 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- DomainAdapter.link_container_registries: user-1이 home-1에 그 레지스트리를 link합니다
 
 Then
 
@@ -2137,6 +2026,113 @@ Given
 When
 
 - DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리에 맞춥니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### unlink_container_registries
+
+<a id="unlinking_registries-a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain"></a>
+
+#### [a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain](/tests/scenario/bai_scenario/manager/domain/test_unlinking_registries.py): pass
+
+도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에서 그 레지스트리를 unlink할 수 있습니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명, 도메인과 그 레지스트리는 이미 link되어 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.unlink_container_registries: user-1이 home-1에서 그 레지스트리를 unlink합니다
+
+Then
+
+- unlink한 도메인과 레지스트리 한 쌍이 옵니다
+  - items: 요청한 도메인과 레지스트리 한 쌍와 같다
+
+<a id="unlinking_registries-unlinking-a-registry-not-linked-leaves-it-out-of-the-response"></a>
+
+#### [unlinking-a-registry-not-linked-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_unlinking_registries.py): pass
+
+link되지 않은 레지스트리를 unlink해도 거부되지 않고, 응답에서는 빠집니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.unlink_container_registries: user-1이 home-1에서 그 레지스트리를 unlink합니다
+
+Then
+
+- 빈 목록이 옵니다
+  - items = []
+
+<a id="unlinking_registries-a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain](/tests/scenario/bai_scenario/manager/domain/test_unlinking_registries.py): pass
+
+레지스트리에만 권한을 받은 사용자가 도메인에서 그 레지스트리를 unlink하려 하면 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 레지스트리에만 권한이 있는 사용자 한 명, 도메인과 그 레지스트리는 이미 link되어 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- DomainAdapter.unlink_container_registries: user-1이 home-1에서 그 레지스트리를 unlink합니다
 
 Then
 

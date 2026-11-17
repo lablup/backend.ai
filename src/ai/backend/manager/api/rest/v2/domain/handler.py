@@ -10,16 +10,16 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
-    AllowDomainContainerRegistriesInput,
     CreateDomainInput,
     DeleteDomainInput,
-    DisallowDomainContainerRegistriesInput,
+    LinkDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
     PurgeDomainInput,
     RestoreDomainInput,
     ScopedSearchDomainsInput,
+    UnlinkDomainContainerRegistriesInput,
     UpdateDomainInput,
 )
 from ai.backend.logging.structured import StructuredLogger
@@ -120,20 +120,20 @@ class V2DomainHandler:
         result = await self._adapter.partial_bulk_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def allow_container_registries(
+    async def link_container_registries(
         self,
-        body: BodyParam[AllowDomainContainerRegistriesInput],
+        body: BodyParam[LinkDomainContainerRegistriesInput],
     ) -> APIResponse:
-        """Allow container registries for a domain."""
-        result = await self._adapter.allow_container_registries(body.parsed)
+        """Link container registries to domains."""
+        result = await self._adapter.link_container_registries(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def disallow_container_registries(
+    async def unlink_container_registries(
         self,
-        body: BodyParam[DisallowDomainContainerRegistriesInput],
+        body: BodyParam[UnlinkDomainContainerRegistriesInput],
     ) -> APIResponse:
-        """Disallow container registries for a domain."""
-        result = await self._adapter.disallow_container_registries(body.parsed)
+        """Unlink container registries from domains."""
+        result = await self._adapter.unlink_container_registries(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_update(

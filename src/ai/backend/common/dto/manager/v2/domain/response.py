@@ -17,7 +17,8 @@ from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchDomainsPayload",
-    "AllowDomainContainerRegistriesPayload",
+    "DomainContainerRegistryLink",
+    "LinkDomainContainerRegistriesPayload",
     "DeleteDomainPayload",
     "RestoreDomainPayload",
     "DomainBasicInfo",
@@ -25,7 +26,7 @@ __all__ = (
     "DomainNode",
     "DomainPayload",
     "DomainRegistryInfo",
-    "DisallowDomainContainerRegistriesPayload",
+    "UnlinkDomainContainerRegistriesPayload",
     "PurgeDomainPayload",
     "SearchDomainsPayload",
 )
@@ -155,25 +156,24 @@ class PurgeDomainPayload(BaseResponseModel):
     )
 
 
-class AllowDomainContainerRegistriesPayload(BaseResponseModel):
-    """Payload for allowing container registries for a domain."""
+class DomainContainerRegistryLink(BaseResponseModel):
+    """One domain and one container registry linked to it."""
 
     domain_id: UUID = Field(description="ID of the domain.")
-    container_registry_ids: list[UUID] = Field(
-        description=(
-            "IDs of the container registries this request allowed. "
-            "A registry already allowed is left out."
-        )
+    container_registry_id: UUID = Field(description="ID of the container registry.")
+
+
+class LinkDomainContainerRegistriesPayload(BaseResponseModel):
+    """Payload for linking container registries to domains."""
+
+    items: list[DomainContainerRegistryLink] = Field(
+        description="The pairs this request linked. A pair already linked is left out."
     )
 
 
-class DisallowDomainContainerRegistriesPayload(BaseResponseModel):
-    """Payload for disallowing container registries for a domain."""
+class UnlinkDomainContainerRegistriesPayload(BaseResponseModel):
+    """Payload for unlinking container registries from domains."""
 
-    domain_id: UUID = Field(description="ID of the domain.")
-    container_registry_ids: list[UUID] = Field(
-        description=(
-            "IDs of the container registries this request disallowed. "
-            "A registry not allowed is left out."
-        )
+    items: list[DomainContainerRegistryLink] = Field(
+        description="The pairs this request unlinked. A pair not linked is left out."
     )

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import assert_never
-from uuid import UUID
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -13,30 +12,31 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
-    AllowDomainContainerRegistriesInput,
     CreateDomainInput,
-    DisallowDomainContainerRegistriesInput,
     DomainFilter,
     DomainOrder,
+    LinkDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
     PurgeDomainInput,
     ScopedSearchDomainsInput,
+    UnlinkDomainContainerRegistriesInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
-    AllowDomainContainerRegistriesPayload,
     DeleteDomainPayload,
-    DisallowDomainContainerRegistriesPayload,
     DomainBasicInfo,
+    DomainContainerRegistryLink,
     DomainLifecycleInfo,
     DomainNode,
     DomainPayload,
     DomainRegistryInfo,
+    LinkDomainContainerRegistriesPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
+    UnlinkDomainContainerRegistriesPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
@@ -344,51 +344,59 @@ class DomainAdapter(BaseAdapter):
             )
         )
 
-    async def allow_container_registries(
-        self, input: AllowDomainContainerRegistriesInput
-    ) -> AllowDomainContainerRegistriesPayload:
-        """Relate the domain to the named registries. The permission is asked of the domain
-        and of every registry; a pair already related is left as it stands."""
-        domain_id = DomainID(input.domain_id)
+    async def link_container_registries(
+        self, input: LinkDomainContainerRegistriesInput
+    ) -> LinkDomainContainerRegistriesPayload:
+        """Link each named registry to its domain. The permission is asked of every domain
+        and every registry; a pair already linked is left as it stands."""
         result = await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[
-                    RelationPair(scope=domain_id, target=ContainerRegistryID(registry_id))
-                    for registry_id in input.container_registry_ids
+                    RelationPair(
+                        scope=DomainID(item.domain_id),
+                        target=ContainerRegistryID(item.container_registry_id),
+                    )
+                    for item in input.items
                 ],
                 creator=DomainContainerRegistryRelationCreator(),
             )
         )
-        linked: list[UUID] = []
+        linked: list[DomainContainerRegistryLink] = []
         for link in result.results:
             if link.linked:
-                linked.append(link.pair.target)
-        return AllowDomainContainerRegistriesPayload(
-            domain_id=domain_id, container_registry_ids=linked
-        )
+                linked.append(
+                    DomainContainerRegistryLink(
+                        domain_id=link.pair.scope, container_registry_id=link.pair.target
+                    )
+                )
+        return LinkDomainContainerRegistriesPayload(items=linked)
 
-    async def disallow_container_registries(
-        self, input: DisallowDomainContainerRegistriesInput
-    ) -> DisallowDomainContainerRegistriesPayload:
-        """Remove the relations between the domain and the named registries. The permission
-        is asked of the domain and of every registry; a pair not related is skipped."""
-        domain_id = DomainID(input.domain_id)
+    async def unlink_container_registries(
+        self, input: UnlinkDomainContainerRegistriesInput
+    ) -> UnlinkDomainContainerRegistriesPayload:
+        """Unlink each named registry from its domain. The permission is asked of every
+        domain and every registry; a pair not linked is skipped."""
         result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
-                    RelationPair(scope=domain_id, target=ContainerRegistryID(registry_id))
-                    for registry_id in input.container_registry_ids
+                    RelationPair(
+                        scope=DomainID(item.domain_id),
+                        target=ContainerRegistryID(item.container_registry_id),
+                    )
+                    for item in input.items
                 ],
                 purger=DomainContainerRegistryRelationPurger(),
             )
         )
-        unlinked: list[UUID] = []
+        unlinked: list[DomainContainerRegistryLink] = []
         for unlink in result.results:
             if unlink.unlinked:
-                unlinked.append(unlink.pair.target)
-        return DisallowDomainContainerRegistriesPayload(
-            domain_id=domain_id, container_registry_ids=unlinked
-        )
+                unlinked.append(
+                    DomainContainerRegistryLink(
+                        domain_id=unlink.pair.scope, container_registry_id=unlink.pair.target
+                    )
+                )
+        return UnlinkDomainContainerRegistriesPayload(items=unlinked)
 
     async def _apply_deprecated_is_active(
         self, data: DomainData, is_active: bool | None | Unset

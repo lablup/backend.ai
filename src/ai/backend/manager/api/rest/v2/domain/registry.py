@@ -43,14 +43,14 @@ def register_v2_domain_routes(
     reg.add("POST", "/purge", handler.admin_purge, middlewares=[superadmin_required])
     reg.add(
         "POST",
-        "/container-registries/allow",
-        handler.allow_container_registries,
+        "/container-registries/link",
+        handler.link_container_registries,
         middlewares=[auth_required],
     )
     reg.add(
         "POST",
-        "/container-registries/disallow",
-        handler.disallow_container_registries,
+        "/container-registries/unlink",
+        handler.unlink_container_registries,
         middlewares=[auth_required],
     )
     # Deprecated since NEXT_RELEASE_VERSION.

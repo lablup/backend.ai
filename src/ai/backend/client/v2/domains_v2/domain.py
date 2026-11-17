@@ -8,25 +8,25 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
-    AllowDomainContainerRegistriesInput,
     CreateDomainInput,
     DeleteDomainInput,
-    DisallowDomainContainerRegistriesInput,
+    LinkDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
     PurgeDomainInput,
+    UnlinkDomainContainerRegistriesInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
-    AllowDomainContainerRegistriesPayload,
     DeleteDomainPayload,
-    DisallowDomainContainerRegistriesPayload,
     DomainNode,
     DomainPayload,
+    LinkDomainContainerRegistriesPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
+    UnlinkDomainContainerRegistriesPayload,
 )
 
 _PATH = "/v2/domains"
@@ -122,26 +122,26 @@ class V2DomainClient(BaseDomainClient):
             response_model=PartialBulkPayload[DomainNode],
         )
 
-    async def allow_container_registries(
-        self, request: AllowDomainContainerRegistriesInput
-    ) -> AllowDomainContainerRegistriesPayload:
-        """Allow container registries for a domain."""
+    async def link_container_registries(
+        self, request: LinkDomainContainerRegistriesInput
+    ) -> LinkDomainContainerRegistriesPayload:
+        """Link container registries to domains."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/container-registries/allow",
+            f"{_PATH}/container-registries/link",
             request=request,
-            response_model=AllowDomainContainerRegistriesPayload,
+            response_model=LinkDomainContainerRegistriesPayload,
         )
 
-    async def disallow_container_registries(
-        self, request: DisallowDomainContainerRegistriesInput
-    ) -> DisallowDomainContainerRegistriesPayload:
-        """Disallow container registries for a domain."""
+    async def unlink_container_registries(
+        self, request: UnlinkDomainContainerRegistriesInput
+    ) -> UnlinkDomainContainerRegistriesPayload:
+        """Unlink container registries from domains."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/container-registries/disallow",
+            f"{_PATH}/container-registries/unlink",
             request=request,
-            response_model=DisallowDomainContainerRegistriesPayload,
+            response_model=UnlinkDomainContainerRegistriesPayload,
         )
 
     async def admin_update(self, domain_name: str, request: UpdateDomainInput) -> DomainPayload:

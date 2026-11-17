@@ -25,7 +25,8 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchDomainsInput",
-    "AllowDomainContainerRegistriesInput",
+    "DomainContainerRegistryLinkInput",
+    "LinkDomainContainerRegistriesInput",
     "CreateDomainInput",
     "DeleteDomainInput",
     "RestoreDomainInput",
@@ -35,7 +36,7 @@ __all__ = (
     "PartialBulkRestoreDomainsInput",
     "PartialBulkUpdateDomainItemInput",
     "PartialBulkUpdateDomainsInput",
-    "DisallowDomainContainerRegistriesInput",
+    "UnlinkDomainContainerRegistriesInput",
     "PurgeDomainInput",
     "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
@@ -117,21 +118,26 @@ class PurgeDomainInput(BaseRequestModel):
     name: str = Field(description="Name of the domain to permanently purge.")
 
 
-class AllowDomainContainerRegistriesInput(BaseRequestModel):
-    """Input for allowing container registries for a domain."""
+class DomainContainerRegistryLinkInput(BaseRequestModel):
+    """One domain and one container registry to link or unlink."""
 
     domain_id: UUID = Field(description="ID of the domain.")
-    container_registry_ids: NonEmptyList[UUID] = Field(
-        description="IDs of the container registries to allow for the domain. At least one."
+    container_registry_id: UUID = Field(description="ID of the container registry.")
+
+
+class LinkDomainContainerRegistriesInput(BaseRequestModel):
+    """Input for linking container registries to domains."""
+
+    items: NonEmptyList[DomainContainerRegistryLinkInput] = Field(
+        description="The domain and container registry pairs to link. At least one."
     )
 
 
-class DisallowDomainContainerRegistriesInput(BaseRequestModel):
-    """Input for disallowing container registries for a domain."""
+class UnlinkDomainContainerRegistriesInput(BaseRequestModel):
+    """Input for unlinking container registries from domains."""
 
-    domain_id: UUID = Field(description="ID of the domain.")
-    container_registry_ids: NonEmptyList[UUID] = Field(
-        description="IDs of the container registries to disallow for the domain. At least one."
+    items: NonEmptyList[DomainContainerRegistryLinkInput] = Field(
+        description="The domain and container registry pairs to unlink. At least one."
     )
 
 

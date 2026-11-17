@@ -159,13 +159,13 @@ from ai.backend.manager.api.gql.domain_v2.resolver.mutation import (
     admin_purge_domain_v2,
     admin_restore_domain_v2,
     admin_update_domain_v2,
-    allow_domain_container_registries,
     delete_domain_v2,
-    disallow_domain_container_registries,
+    link_domain_container_registries,
     partial_bulk_delete_domains_v2,
     partial_bulk_restore_domains_v2,
     partial_bulk_update_domains_v2,
     restore_domain_v2,
+    unlink_domain_container_registries,
     update_domain_v2,
 )
 from ai.backend.manager.api.gql.domain_v2.resolver.query import (
@@ -1293,8 +1293,8 @@ class Mutation:
     partial_bulk_update_domains_v2 = partial_bulk_update_domains_v2
     partial_bulk_delete_domains_v2 = partial_bulk_delete_domains_v2
     partial_bulk_restore_domains_v2 = partial_bulk_restore_domains_v2
-    allow_domain_container_registries = allow_domain_container_registries
-    disallow_domain_container_registries = disallow_domain_container_registries
+    link_domain_container_registries = link_domain_container_registries
+    unlink_domain_container_registries = unlink_domain_container_registries
     # Project V2 APIs
     admin_create_project_v2 = admin_create_project_v2
     admin_update_project_v2 = admin_update_project_v2

@@ -46,11 +46,11 @@ class DomainContainerRegistryRelationCreator(
             IntegrityErrorCheck(
                 violation_type=ForeignKeyViolationError,
                 constraint_name="fk_domain_container_registry_relations_domain_id_domains",
-                error=DomainNotFound("The domain to allow registries for does not exist"),
+                error=DomainNotFound("The domain to link registries to does not exist"),
             ),
             IntegrityErrorCheck(
                 violation_type=ForeignKeyViolationError,
                 constraint_name="fk_domain_container_registry_relations_container_registry_id",
-                error=ContainerRegistryNotFound("A container registry to allow does not exist"),
+                error=ContainerRegistryNotFound("A container registry to link does not exist"),
             ),
         )

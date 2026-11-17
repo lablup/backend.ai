@@ -37,18 +37,24 @@ def get(domain_name: str) -> None:
 @domain.command()
 @click.argument("domain_id", type=click.UUID)
 @click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
-def allow_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
-    """Allow container registries for a domain."""
+def link_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
+    """Link container registries to a domain."""
     from ai.backend.common.dto.manager.v2.domain.request import (
-        AllowDomainContainerRegistriesInput,
+        DomainContainerRegistryLinkInput,
+        LinkDomainContainerRegistriesInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.allow_container_registries(
-                AllowDomainContainerRegistriesInput(
-                    domain_id=domain_id, container_registry_ids=list(container_registry_ids)
+            result = await registry.domain.link_container_registries(
+                LinkDomainContainerRegistriesInput(
+                    items=[
+                        DomainContainerRegistryLinkInput(
+                            domain_id=domain_id, container_registry_id=registry_id
+                        )
+                        for registry_id in container_registry_ids
+                    ]
                 )
             )
             print_result(result)
@@ -61,20 +67,24 @@ def allow_container_registries(domain_id: UUID, container_registry_ids: tuple[UU
 @domain.command()
 @click.argument("domain_id", type=click.UUID)
 @click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
-def disallow_container_registries(
-    domain_id: UUID, container_registry_ids: tuple[UUID, ...]
-) -> None:
-    """Disallow container registries for a domain."""
+def unlink_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
+    """Unlink container registries from a domain."""
     from ai.backend.common.dto.manager.v2.domain.request import (
-        DisallowDomainContainerRegistriesInput,
+        DomainContainerRegistryLinkInput,
+        UnlinkDomainContainerRegistriesInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.disallow_container_registries(
-                DisallowDomainContainerRegistriesInput(
-                    domain_id=domain_id, container_registry_ids=list(container_registry_ids)
+            result = await registry.domain.unlink_container_registries(
+                UnlinkDomainContainerRegistriesInput(
+                    items=[
+                        DomainContainerRegistryLinkInput(
+                            domain_id=domain_id, container_registry_id=registry_id
+                        )
+                        for registry_id in container_registry_ids
+                    ]
                 )
             )
             print_result(result)

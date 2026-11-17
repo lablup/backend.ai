@@ -8,13 +8,13 @@ from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
-    AllowDomainContainerRegistriesInput as AllowDomainContainerRegistriesInputDTO,
-)
-from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput as CreateDomainInputDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.request import (
-    DisallowDomainContainerRegistriesInput as DisallowDomainContainerRegistriesInputDTO,
+    DomainContainerRegistryLinkInput as DomainContainerRegistryLinkInputDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.request import (
+    LinkDomainContainerRegistriesInput as LinkDomainContainerRegistriesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.request import (
     PartialBulkDeleteDomainsInput as PartialBulkDeleteDomainsInputDTO,
@@ -29,16 +29,16 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     PartialBulkUpdateDomainsInput as PartialBulkUpdateDomainsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.request import (
-    UpdateDomainInput as UpdateDomainInputDTO,
+    UnlinkDomainContainerRegistriesInput as UnlinkDomainContainerRegistriesInputDTO,
 )
-from ai.backend.common.dto.manager.v2.domain.response import (
-    AllowDomainContainerRegistriesPayload as AllowDomainContainerRegistriesPayloadDTO,
+from ai.backend.common.dto.manager.v2.domain.request import (
+    UpdateDomainInput as UpdateDomainInputDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     DeleteDomainPayload as DeleteDomainPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
-    DisallowDomainContainerRegistriesPayload as DisallowDomainContainerRegistriesPayloadDTO,
+    DomainContainerRegistryLink as DomainContainerRegistryLinkDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainNode,
@@ -47,10 +47,16 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     DomainPayload as DomainPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
+    LinkDomainContainerRegistriesPayload as LinkDomainContainerRegistriesPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload as PurgeDomainPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     RestoreDomainPayload as RestoreDomainPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    UnlinkDomainContainerRegistriesPayload as UnlinkDomainContainerRegistriesPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
@@ -170,32 +176,42 @@ class PartialBulkRestoreDomainsInputGQL(PydanticInputMixin[PartialBulkRestoreDom
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Input for allowing container registries for a domain.",
+        description="One domain and one container registry to link or unlink.",
     ),
-    name="AllowDomainContainerRegistriesInput",
+    name="DomainContainerRegistryLinkInput",
 )
-class AllowDomainContainerRegistriesInputGQL(
-    PydanticInputMixin[AllowDomainContainerRegistriesInputDTO]
-):
+class DomainContainerRegistryLinkInputGQL(PydanticInputMixin[DomainContainerRegistryLinkInputDTO]):
     domain_id: UUID = gql_field(description="ID of the domain.")
-    container_registry_ids: list[UUID] = gql_field(
-        description="IDs of the container registries to allow for the domain. At least one."
+    container_registry_id: UUID = gql_field(description="ID of the container registry.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for linking container registries to domains.",
+    ),
+    name="LinkDomainContainerRegistriesInput",
+)
+class LinkDomainContainerRegistriesInputGQL(
+    PydanticInputMixin[LinkDomainContainerRegistriesInputDTO]
+):
+    items: list[DomainContainerRegistryLinkInputGQL] = gql_field(
+        description="The domain and container registry pairs to link. At least one."
     )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Input for disallowing container registries for a domain.",
+        description="Input for unlinking container registries from domains.",
     ),
-    name="DisallowDomainContainerRegistriesInput",
+    name="UnlinkDomainContainerRegistriesInput",
 )
-class DisallowDomainContainerRegistriesInputGQL(
-    PydanticInputMixin[DisallowDomainContainerRegistriesInputDTO]
+class UnlinkDomainContainerRegistriesInputGQL(
+    PydanticInputMixin[UnlinkDomainContainerRegistriesInputDTO]
 ):
-    domain_id: UUID = gql_field(description="ID of the domain.")
-    container_registry_ids: list[UUID] = gql_field(
-        description="IDs of the container registries to disallow for the domain. At least one."
+    items: list[DomainContainerRegistryLinkInputGQL] = gql_field(
+        description="The domain and container registry pairs to unlink. At least one."
     )
 
 
@@ -297,38 +313,43 @@ class PartialBulkDomainsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[Domain
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload for allowing container registries for a domain.",
+        description="One domain and one container registry linked to it.",
     ),
-    model=AllowDomainContainerRegistriesPayloadDTO,
-    name="AllowDomainContainerRegistriesPayload",
+    model=DomainContainerRegistryLinkDTO,
+    name="DomainContainerRegistryLink",
 )
-class AllowDomainContainerRegistriesPayloadGQL(
-    PydanticOutputMixin[AllowDomainContainerRegistriesPayloadDTO]
-):
+class DomainContainerRegistryLinkGQL(PydanticOutputMixin[DomainContainerRegistryLinkDTO]):
     domain_id: UUID = gql_field(description="ID of the domain.")
-    container_registry_ids: list[UUID] = gql_field(
-        description=(
-            "IDs of the container registries this request allowed. "
-            "A registry already allowed is left out."
-        )
+    container_registry_id: UUID = gql_field(description="ID of the container registry.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for linking container registries to domains.",
+    ),
+    model=LinkDomainContainerRegistriesPayloadDTO,
+    name="LinkDomainContainerRegistriesPayload",
+)
+class LinkDomainContainerRegistriesPayloadGQL(
+    PydanticOutputMixin[LinkDomainContainerRegistriesPayloadDTO]
+):
+    items: list[DomainContainerRegistryLinkGQL] = gql_field(
+        description="The pairs this request linked. A pair already linked is left out."
     )
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload for disallowing container registries for a domain.",
+        description="Payload for unlinking container registries from domains.",
     ),
-    model=DisallowDomainContainerRegistriesPayloadDTO,
-    name="DisallowDomainContainerRegistriesPayload",
+    model=UnlinkDomainContainerRegistriesPayloadDTO,
+    name="UnlinkDomainContainerRegistriesPayload",
 )
-class DisallowDomainContainerRegistriesPayloadGQL(
-    PydanticOutputMixin[DisallowDomainContainerRegistriesPayloadDTO]
+class UnlinkDomainContainerRegistriesPayloadGQL(
+    PydanticOutputMixin[UnlinkDomainContainerRegistriesPayloadDTO]
 ):
-    domain_id: UUID = gql_field(description="ID of the domain.")
-    container_registry_ids: list[UUID] = gql_field(
-        description=(
-            "IDs of the container registries this request disallowed. "
-            "A registry not allowed is left out."
-        )
+    items: list[DomainContainerRegistryLinkGQL] = gql_field(
+        description="The pairs this request unlinked. A pair not linked is left out."
     )

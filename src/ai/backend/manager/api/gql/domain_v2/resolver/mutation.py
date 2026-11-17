@@ -14,19 +14,19 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
 )
 from ai.backend.manager.api.gql.domain_v2.types.mutations import (
-    AllowDomainContainerRegistriesInputGQL,
-    AllowDomainContainerRegistriesPayloadGQL,
     CreateDomainInputGQL,
     DeleteDomainPayloadGQL,
-    DisallowDomainContainerRegistriesInputGQL,
-    DisallowDomainContainerRegistriesPayloadGQL,
     DomainPayloadGQL,
+    LinkDomainContainerRegistriesInputGQL,
+    LinkDomainContainerRegistriesPayloadGQL,
     PartialBulkDeleteDomainsInputGQL,
     PartialBulkDomainsPayloadGQL,
     PartialBulkRestoreDomainsInputGQL,
     PartialBulkUpdateDomainsInputGQL,
     PurgeDomainPayloadGQL,
     RestoreDomainPayloadGQL,
+    UnlinkDomainContainerRegistriesInputGQL,
+    UnlinkDomainContainerRegistriesPayloadGQL,
     UpdateDomainInputGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -207,29 +207,27 @@ async def admin_purge_domain_v2(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Allow container registries for a domain. A registry already allowed is left as it stands."
+            "Link container registries to domains. A pair already linked is left as it stands."
         ),
     )
 )
-async def allow_domain_container_registries(
+async def link_domain_container_registries(
     info: Info[StrawberryGQLContext],
-    input: AllowDomainContainerRegistriesInputGQL,
-) -> AllowDomainContainerRegistriesPayloadGQL | None:
-    payload = await info.context.adapters.domain.allow_container_registries(input.to_pydantic())
-    return AllowDomainContainerRegistriesPayloadGQL.from_pydantic(payload)
+    input: LinkDomainContainerRegistriesInputGQL,
+) -> LinkDomainContainerRegistriesPayloadGQL | None:
+    payload = await info.context.adapters.domain.link_container_registries(input.to_pydantic())
+    return LinkDomainContainerRegistriesPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Disallow container registries for a domain. A registry not allowed is skipped."
-        ),
+        description=("Unlink container registries from domains. A pair not linked is skipped."),
     )
 )
-async def disallow_domain_container_registries(
+async def unlink_domain_container_registries(
     info: Info[StrawberryGQLContext],
-    input: DisallowDomainContainerRegistriesInputGQL,
-) -> DisallowDomainContainerRegistriesPayloadGQL | None:
-    payload = await info.context.adapters.domain.disallow_container_registries(input.to_pydantic())
-    return DisallowDomainContainerRegistriesPayloadGQL.from_pydantic(payload)
+    input: UnlinkDomainContainerRegistriesInputGQL,
+) -> UnlinkDomainContainerRegistriesPayloadGQL | None:
+    payload = await info.context.adapters.domain.unlink_container_registries(input.to_pydantic())
+    return UnlinkDomainContainerRegistriesPayloadGQL.from_pydantic(payload)
