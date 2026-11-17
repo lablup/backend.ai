@@ -224,6 +224,8 @@ class TestStatusReplyExtensionTypes:
         runner.kernel_id = cast(Any, "k")
         await runner.status_queue.put(msgpack.packb({"started_at": Decimal("1.5")}))
         assert await runner.ping() is None
+
+
 def _unanswered_socket_pair() -> SocketPair:
     return SocketPair(
         RobustSocket(zmq.PUSH, "tcp://127.0.0.1:1"),
@@ -251,4 +253,3 @@ class TestAClosedRunnerStaysClosed:
             assert not sockets.input_sock.socket.closed
         finally:
             sockets.close()
->>>>>>> efa89495f (fix(agent): never leave a code runner's sockets open after its kernel… (#16710))
