@@ -20,7 +20,7 @@ Scenario: incomplete 2 / 25
 - direct implementation (14)
   - admin_replace_default_deployment_options: success present 2 · rejection present 2 (single_entity)
   - admin_replace_default_session_options: success present 1 · rejection present 2 (single_entity)
-  - create: success present 3 · rejection present 3 (global_scope)
+  - create: success present 4 · rejection present 3 (global_scope)
   - get_allowed_domains_for_resource_group: success present 2 · rejection present 1 (single_entity)
   - get_allowed_projects_for_resource_group: success present 1 · rejection present 1 (single_entity)
   - get_resource_info: success present 2 · rejection present 2 (single_entity)
@@ -148,6 +148,7 @@ Scenario: incomplete 2 / 25
 |---|---|
 | [when no default group exists and the superadmin creates one designated as the default, the group comes back as the default](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
 | [when the superadmin creates a resource group with only a name, the whole group comes back active, public and not the default, filled from the defaults in the code](#creating-the-superadmin-makes-a-resource-group) | answered |
+| [when the superadmin creates a resource group with its scheduler options, the whole group comes back with those options](#creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options) | answered |
 | [when the superadmin creates a resource group inactive, private and with the lifo scheduler, the whole group comes back with those values](#creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler) | answered |
 | [creating with a name another resource group already holds is rejected as a duplicate name](#creating-a-name-another-resource-group-already-holds-is-refused) | rejected |
 | [when a user who is not the superadmin tries to create a resource group, the call is rejected for lacking the role](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | rejected |
@@ -1874,6 +1875,54 @@ Then
   - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
   - scheduler.options.allow_fractional_resource_fragmentation = True
   - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
+<a id="creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options"></a>
+
+#### [the-superadmin-makes-a-resource-group-with-its-scheduler-options](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
+
+when the superadmin creates a resource group with its scheduler options, the whole group comes back with those options
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.create: user-1 creates batch-only with the allowed session types, the pending timeout, the retries before skipping a pending session, the agent selection strategy, whether fractional resources may fragment and the route statuses to clean up
+
+Then
+
+- the whole resource group just created comes back
+  - id: skipped: the database generates it
+  - name = 'batch-only'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.options.pending_timeout = 60.0
+  - scheduler.options.config.num_retries_to_skip = 3
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
