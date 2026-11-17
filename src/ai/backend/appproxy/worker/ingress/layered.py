@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections import Counter
+import asyncio
 from collections.abc import Sequence
 from typing import override
+from weakref import WeakValueDictionary
 
 from ai.backend.appproxy.worker.errors.ingress import (
     IngressNotFoundError,
@@ -22,16 +23,14 @@ class LayeredIngressState(IngressReader):
 
     _layers: list[IngressReader]
     _in_memory: InMemoryIngressState | None
-    _in_flight_read_counts: Counter[IngressFrontendKey]
-    _keys_invalidated_during_read: set[IngressFrontendKey]
+    _memory_fill_locks: WeakValueDictionary[IngressFrontendKey, asyncio.Lock]
 
     def __init__(
         self, layers: Sequence[IngressReader], in_memory: InMemoryIngressState | None
     ) -> None:
         self._layers = list(layers)
         self._in_memory = in_memory
-        self._in_flight_read_counts = Counter()
-        self._keys_invalidated_during_read = set()
+        self._memory_fill_locks = WeakValueDictionary()
 
     @property
     def layers(self) -> Sequence[IngressReader]:
@@ -39,31 +38,21 @@ class LayeredIngressState(IngressReader):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        self._in_flight_read_counts[frontend_key] += 1
         try:
             for layer in self._layers:
-                ingress = await layer.get(frontend_key)
-                if ingress is None:
-                    continue
-                if (
-                    self._in_memory is not None
-                    and layer is not self._in_memory
-                    and frontend_key not in self._keys_invalidated_during_read
-                ):
-                    # Cache another layer's hit in memory so the next read stops at memory. A hit
-                    # read while its key is invalidated may predate the change, so it is not cached.
-                    await self._in_memory.apply([ingress])
-                return ingress
+                if self._in_memory is None or layer is self._in_memory:
+                    ingress = await layer.get(frontend_key)
+                else:
+                    ingress = await self._read_layer_into_memory(
+                        layer, self._in_memory, frontend_key
+                    )
+                if ingress is not None:
+                    return ingress
             # Requests keep reaching a key that is gone and no longer remembered; surface it.
             raise IngressNotRegisteredError(f"no layer holds frontend {frontend_key}")
         except IngressNotFoundError:
             # The key was remembered missing on removal to skip reading the later layers.
             return None
-        finally:
-            self._in_flight_read_counts[frontend_key] -= 1
-            if self._in_flight_read_counts[frontend_key] == 0:
-                del self._in_flight_read_counts[frontend_key]
-                self._keys_invalidated_during_read.discard(frontend_key)
 
     @override
     async def get_all(self) -> list[Ingress]:
@@ -71,9 +60,31 @@ class LayeredIngressState(IngressReader):
 
     async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
         if self._in_memory is not None:
-            self._keys_invalidated_during_read.update(
-                frontend_key
-                for frontend_key in frontend_keys
-                if frontend_key in self._in_flight_read_counts
-            )
-            await self._in_memory.invalidate(frontend_keys)
+            for frontend_key in frontend_keys:
+                async with self._memory_fill_lock(frontend_key):
+                    await self._in_memory.invalidate([frontend_key])
+
+    async def _read_layer_into_memory(
+        self,
+        layer: IngressReader,
+        in_memory: InMemoryIngressState,
+        frontend_key: IngressFrontendKey,
+    ) -> Ingress | None:
+        # invalidate takes the same lock, so it cannot land between this read and the write of
+        # what it read; an invalidation that arrives meanwhile drops the written hit after it.
+        async with self._memory_fill_lock(frontend_key):
+            # A read that held the lock before may have filled memory with the key already.
+            held_ingress = await in_memory.get(frontend_key)
+            if held_ingress is not None:
+                return held_ingress
+            ingress = await layer.get(frontend_key)
+            if ingress is not None:
+                await in_memory.apply([ingress])
+            return ingress
+
+    def _memory_fill_lock(self, frontend_key: IngressFrontendKey) -> asyncio.Lock:
+        lock = self._memory_fill_locks.get(frontend_key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._memory_fill_locks[frontend_key] = lock
+        return lock

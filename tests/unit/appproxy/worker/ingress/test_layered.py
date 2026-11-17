@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from enum import StrEnum
 from unittest.mock import AsyncMock
@@ -44,6 +45,15 @@ class _LayersCase:
 class _InvalidationDuringRedisReadCase:
     invalidated_key: IngressFrontendKey
     expected_held_keys: list[IngressFrontendKey]
+
+
+@dataclass(frozen=True)
+class _LayeredWithTheRedisReadHeldOpen:
+    layered: LayeredIngressState
+    memory: InMemoryIngressState
+    redis: AsyncMock
+    redis_read_started: asyncio.Event
+    release_redis_read: asyncio.Event
 
 
 class _MemoryStateBeforeInvalidation(StrEnum):
@@ -139,33 +149,28 @@ async def layered_with_redis_holding_a_newer_ingress_than_memory(
 
 
 @pytest.fixture
-def layered_with_a_key_invalidated_during_the_redis_read(
-    case: _InvalidationDuringRedisReadCase,
+def layered_with_the_redis_read_held_open(
     layered: LayeredIngressState,
+    memory: InMemoryIngressState,
     redis: AsyncMock,
     ingress: Ingress,
-) -> LayeredIngressState:
-    async def read_redis_while_a_key_is_invalidated(frontend_key: IngressFrontendKey) -> Ingress:
-        await layered.invalidate([case.invalidated_key])
+) -> _LayeredWithTheRedisReadHeldOpen:
+    redis_read_started = asyncio.Event()
+    release_redis_read = asyncio.Event()
+
+    async def read_redis_once_released(frontend_key: IngressFrontendKey) -> Ingress:
+        redis_read_started.set()
+        await release_redis_read.wait()
         return ingress
 
-    redis.get.side_effect = read_redis_while_a_key_is_invalidated
-    return layered
-
-
-@pytest.fixture
-async def layered_after_a_read_its_key_was_invalidated_during(
-    layered: LayeredIngressState, redis: AsyncMock, ingress: Ingress
-) -> LayeredIngressState:
-    async def read_redis_while_the_key_is_invalidated(frontend_key: IngressFrontendKey) -> Ingress:
-        await layered.invalidate([frontend_key])
-        return ingress
-
-    redis.get.side_effect = read_redis_while_the_key_is_invalidated
-    await layered.get(FRONTEND_KEY)
-    redis.get.side_effect = None
-    redis.get.return_value = ingress
-    return layered
+    redis.get.side_effect = read_redis_once_released
+    return _LayeredWithTheRedisReadHeldOpen(
+        layered=layered,
+        memory=memory,
+        redis=redis,
+        redis_read_started=redis_read_started,
+        release_redis_read=release_redis_read,
+    )
 
 
 class TestLayeredIngressState:
@@ -258,27 +263,31 @@ class TestLayeredIngressState:
         ],
         ids=lambda case: case.invalidated_key,
     )
-    async def test_redis_hit_is_written_to_memory_unless_its_key_is_invalidated_during_the_read(
+    async def test_redis_hit_stays_in_memory_unless_its_key_is_invalidated_during_the_read(
         self,
         case: _InvalidationDuringRedisReadCase,
-        layered_with_a_key_invalidated_during_the_redis_read: LayeredIngressState,
-        memory: InMemoryIngressState,
-        ingress: Ingress,
+        layered_with_the_redis_read_held_open: _LayeredWithTheRedisReadHeldOpen,
     ) -> None:
-        layered = layered_with_a_key_invalidated_during_the_redis_read
-        assert await layered.get(FRONTEND_KEY) == ingress
+        situation = layered_with_the_redis_read_held_open
+        read = asyncio.create_task(situation.layered.get(FRONTEND_KEY))
+        await situation.redis_read_started.wait()
+        invalidation = asyncio.create_task(situation.layered.invalidate([case.invalidated_key]))
+        await asyncio.sleep(0)
+        situation.release_redis_read.set()
+        await asyncio.gather(read, invalidation)
 
-        held_ingresses = await memory.get_all()
+        held_ingresses = await situation.memory.get_all()
         assert [
             held_ingress.frontend.key() for held_ingress in held_ingresses
         ] == case.expected_held_keys
 
-    async def test_key_invalidated_during_a_finished_read_is_written_to_memory_on_the_next_read(
-        self,
-        layered_after_a_read_its_key_was_invalidated_during: LayeredIngressState,
-        memory: InMemoryIngressState,
-        ingress: Ingress,
+    async def test_concurrent_reads_of_a_key_missing_in_memory_read_redis_once(
+        self, layered_with_the_redis_read_held_open: _LayeredWithTheRedisReadHeldOpen
     ) -> None:
-        await layered_after_a_read_its_key_was_invalidated_during.get(FRONTEND_KEY)
+        situation = layered_with_the_redis_read_held_open
+        reads = [asyncio.create_task(situation.layered.get(FRONTEND_KEY)) for _ in range(2)]
+        await situation.redis_read_started.wait()
+        situation.release_redis_read.set()
+        await asyncio.gather(*reads)
 
-        assert await memory.get(FRONTEND_KEY) == ingress
+        assert situation.redis.get.await_count == 1
