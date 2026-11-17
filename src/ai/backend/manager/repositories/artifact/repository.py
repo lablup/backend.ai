@@ -1,6 +1,13 @@
 import uuid
 
+<<<<<<< HEAD
 from ai.backend.common.data.artifact.types import VerificationStepResult
+=======
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+>>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import BackendAIError
@@ -132,6 +139,14 @@ class ArtifactRepository:
         self, artifact_revision_id: uuid.UUID, status: ArtifactStatus
     ) -> uuid.UUID:
         return await self._db_source.update_artifact_revision_status(artifact_revision_id, status)
+
+    @artifact_repository_resilience.apply()
+    async def mark_artifact_revision_pulling(
+        self, artifact_revision_id: ArtifactRevisionID
+    ) -> None:
+        """Raises ArtifactRevisionNotFoundError if the revision does not exist and
+        ArtifactRevisionImportInProgressError if it is already being imported."""
+        await self._db_source.mark_artifact_revision_pulling(artifact_revision_id)
 
     @artifact_repository_resilience.apply()
     async def update_artifact_revision_remote_status(

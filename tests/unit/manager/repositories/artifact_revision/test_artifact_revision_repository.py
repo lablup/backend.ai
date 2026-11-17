@@ -19,7 +19,22 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.errors.artifact import (
+<<<<<<< HEAD
     ArtifactRevisionNotFoundError,
+=======
+    ArtifactRevisionImportInProgressError,
+    ArtifactRevisionNotFoundError,
+)
+from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
+from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+>>>>>>> a3ee5d606 (fix(BA-8990): block a second import of an artifact revision that is still downloading (#16730))
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact import ArtifactRow
@@ -627,6 +642,70 @@ class TestArtifactRevisionRepository:
         # Verify status was updated
         revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
         assert revision.status == ArtifactStatus.VERIFYING
+
+    async def test_mark_artifact_revision_pulling(
+        self,
+        artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
+        sample_revision_id: uuid.UUID,
+    ) -> None:
+        await artifact_repository.mark_artifact_revision_pulling(
+            ArtifactRevisionID(sample_revision_id)
+        )
+
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
+        assert revision.status == ArtifactStatus.PULLING
+
+    @pytest.fixture(
+        params=[ArtifactStatus.PULLING, ArtifactStatus.VERIFYING], ids=["pulling", "verifying"]
+    )
+    async def revision_already_importing(
+        self,
+        request: pytest.FixtureRequest,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_artifact_id: uuid.UUID,
+    ) -> ArtifactRevisionData:
+        revision_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ArtifactRevisionRow(
+                    id=revision_id,
+                    artifact_id=sample_artifact_id,
+                    version="main",
+                    readme="",
+                    size=1024,
+                    status=request.param.value,
+                )
+            )
+            await db_sess.flush()
+        return await OpsRepository(V2DBOpsProvider(db_with_cleanup)).get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(revision_id))
+        )
+
+    async def test_mark_artifact_revision_pulling_rejects_a_revision_already_importing(
+        self,
+        artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
+        revision_already_importing: ArtifactRevisionData,
+    ) -> None:
+        with pytest.raises(ArtifactRevisionImportInProgressError):
+            await artifact_repository.mark_artifact_revision_pulling(revision_already_importing.id)
+
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=revision_already_importing.id)
+        )
+        assert revision.status == revision_already_importing.status
+
+    async def test_mark_artifact_revision_pulling_of_a_missing_revision_raises_not_found(
+        self,
+        artifact_repository: ArtifactRepository,
+    ) -> None:
+        with pytest.raises(ArtifactRevisionNotFoundError):
+            await artifact_repository.mark_artifact_revision_pulling(
+                ArtifactRevisionID(uuid.uuid4())
+            )
 
     async def test_update_artifact_revision_bytesize(
         self,
