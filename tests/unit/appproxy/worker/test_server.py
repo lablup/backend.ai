@@ -26,7 +26,6 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.worker import server
 from ai.backend.appproxy.worker.config import IngressLayerType
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
-from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.ingress.validating import ValidatingIngressWriter
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.h2.port import PortFrontend
@@ -340,7 +339,7 @@ class TestHandleIngressInvalidatedEvent:
                 ),
             )
         ])
-        root_context.ingress_state.reader = LayeredIngressState([memory], in_memory=memory)
+        root_context.ingress_state.in_memory = memory
         return _WorkerHoldingAnIngressInMemory(root_context=root_context, memory=memory)
 
     @pytest.mark.parametrize(
