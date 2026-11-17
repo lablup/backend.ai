@@ -137,7 +137,6 @@ from ai.backend.manager.models.bootstrap_script_revision.searchers import (
 )
 from ai.backend.manager.models.condition_utils import combine_conditions_or
 from ai.backend.manager.models.domain.row import domains
-from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageSearcher,
@@ -1973,23 +1972,6 @@ class AgentRegistry:
         )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
         return cast(str, endpoint_json["endpoint"])
-
-    async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
-        query = (
-            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
-            .select_from(resource_groups)
-            .where(resource_groups.c.name == endpoint.resource_group)
-        )
-
-        result = await db_sess.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise InvalidAPIParameters(f"Scaling group not found: {endpoint.resource_group}")
-        wsproxy_addr = sgroup.wsproxy_addr
-        wsproxy_api_token = sgroup.wsproxy_api_token
-
-        wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
-        await wsproxy_client.delete_endpoint(endpoint.id)
 
 
 def check_resource_group(

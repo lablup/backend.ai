@@ -143,26 +143,6 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
             ]
 
     @classmethod
-    async def load_all(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_id: uuid.UUID,
-        *,
-        project: uuid.UUID | None = None,
-        domain_name: str | None = None,
-        user_uuid: uuid.UUID | None = None,
-    ) -> Sequence[Routing]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await RoutingRow.list(
-                session,
-                endpoint_id,
-                project=project,
-                domain=domain_name,
-                user_uuid=user_uuid,
-            )
-        return [await Routing.from_row(ctx, row) for row in rows]
-
-    @classmethod
     async def load_item(
         cls,
         ctx: GraphQueryContext,

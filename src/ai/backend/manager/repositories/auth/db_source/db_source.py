@@ -32,7 +32,6 @@ from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
-    UserData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
@@ -296,29 +295,6 @@ class AuthDBSource:
         """The id a key names, or None when it names nothing."""
         async with self._v2_ops.read_ops() as r:
             return await r.lookup_entity_id(lookup)
-
-    def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
-        """Convert UserRow to UserData."""
-        return UserData(
-            uuid=row.uuid,
-            username=row.username,
-            email=row.email,
-            password=row.password,
-            need_password_change=row.need_password_change or False,
-            full_name=row.full_name,
-            description=row.description,
-            is_active=row.status == UserStatus.ACTIVE,
-            status=row.status or UserStatus.ACTIVE,
-            status_info=row.status_info,
-            created_at=row.created_at,
-            modified_at=row.updated_at,
-            password_changed_at=row.password_changed_at,
-            domain_name=row.domain_name or "",
-            role=row.role or UserRole.USER,
-            integration_name=row.integration_id,  # DB column is integration_id
-            resource_policy=row.resource_policy,
-            sudo_session_enabled=row.sudo_session_enabled,
-        )
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:

@@ -5,7 +5,6 @@ from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
-    TYPE_CHECKING,
     Any,
     Self,
     override,
@@ -14,7 +13,7 @@ from typing import (
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, load_only, mapped_column
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -43,9 +42,6 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -108,13 +104,6 @@ class DomainRow(LifecycleTimestampsMixin, Base):
     # dotfiles column, \x90 means empty list in msgpack
     dotfiles: Mapped[bytes] = mapped_column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
-    )
-
-    # Read only by build_ctx_in_domain_scope (the legacy RBAC) in
-    # models/resource_group/row.py, whose entry point _ensure_sgroup_permission in
-    # api/gql_legacy/domain.py nothing calls. Delete it with the legacy RBAC.
-    sgroup_for_domains_rows: Mapped[list[ResourceGroupForDomainRow]] = relationship(
-        "ResourceGroupForDomainRow",
     )
 
     @classmethod

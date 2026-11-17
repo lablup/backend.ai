@@ -600,34 +600,6 @@ class ModelServingRepository:
             routes[route.endpoint].append(route)
         return routes
 
-    async def _validate_endpoint_access(
-        self,
-        session: SASession,
-        endpoint: EndpointRow,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-    ) -> bool:
-        """
-        Private method to validate user access to endpoint.
-        """
-        query = sa.select(UserRow).where(UserRow.uuid == endpoint.session_owner)
-        result = await session.execute(query)
-        owner = result.scalar()
-
-        if owner is None:
-            return False
-
-        match user_role:
-            case UserRole.SUPERADMIN:
-                return True
-            case UserRole.ADMIN:
-                if owner.role == UserRole.SUPERADMIN:
-                    return False
-                return endpoint.domain == domain_name
-            case _:
-                return owner.uuid == user_id
-
     @model_serving_repository_resilience.apply()
     async def get_vfolder_ownership_type(self, vfolder_id: uuid.UUID) -> VFolderOwnershipType:
         """
