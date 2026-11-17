@@ -6,6 +6,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import ParamSpec, TypeVar, override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -22,7 +24,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class ResilienceTimeoutError(BackendAIError):
+class ResilienceTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     """Raised when an operation exceeds its timeout in resilience policy."""
 
     error_type = "https://api.backend.ai/probs/resilience-timeout"

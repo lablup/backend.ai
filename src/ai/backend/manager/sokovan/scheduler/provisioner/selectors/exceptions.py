@@ -106,7 +106,7 @@ class NoCompatibleAgentError(AgentSelectionError, web.HTTPNotFound):
         )
 
 
-class NoAvailableAgentError(AgentSelectionError):
+class NoAvailableAgentError(AgentSelectionError, web.HTTPServiceUnavailable):
     """Raised inside a stateful filter's recorder step when no candidates
     survive it.
 
@@ -142,7 +142,7 @@ class NoAvailableAgentError(AgentSelectionError):
         )
 
 
-class BatchAgentSelectionFailedError(AgentSelectionError):
+class BatchAgentSelectionFailedError(AgentSelectionError, web.HTTPServiceUnavailable):
     """The batch wrapper's rendering of computed placement failures.
 
     Carries the structured ``failures`` and composes the human-readable
