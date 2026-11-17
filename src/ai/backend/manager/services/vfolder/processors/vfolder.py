@@ -60,10 +60,6 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.lookup import (
-    LookupVFolderAction,
-    LookupVFolderActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
     PartialBulkDeleteVFoldersAction,
 )
@@ -184,7 +180,6 @@ class VFolderProcessors:
     bulk_load_mount_levels: PartialBulkActionProcessor[
         BulkLoadVFolderMountLevelsAction, VFolderMountPolicy
     ]
-    lookup: LookupActionProcessor[LookupVFolderAction, LookupVFolderActionResult]
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     get_folder_usage: SingleEntityActionProcessor[
         GetVFolderUsageAction, GetVFolderUsageActionResult
@@ -267,7 +262,6 @@ class VFolderProcessors:
         self.bulk_load_mount_levels = group.partial_bulk(
             BulkLoadVFolderMountLevelsAction, service.bulk_load_mount_levels
         )
-        self.lookup = group.lookup(LookupVFolderAction, service.lookup_vfolder)
 
         # V2 actions
         self.get_v2 = group.single_entity(GetVFolderV2Action, service.get_v2)
