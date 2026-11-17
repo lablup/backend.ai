@@ -35,7 +35,7 @@ class ArtifactStatus(enum.StrEnum):
     REJECTED = "REJECTED"
 
     @classmethod
-    def import_in_progress(cls) -> frozenset[Self]:
+    def import_in_progress(cls) -> "frozenset[ArtifactStatus]":
         return frozenset({cls.PULLING, cls.VERIFYING})
 
 
