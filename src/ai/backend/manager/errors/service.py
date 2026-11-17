@@ -17,7 +17,7 @@ from ai.backend.common.exception import (
 from .common import GenericForbidden, ObjectNotFound
 
 
-class NoUpdatesToApply(BackendAIError):
+class NoUpdatesToApply(BackendAIError, web.HTTPBadRequest):
     """Raised when there are no updates to apply to an endpoint."""
 
     def __init__(self, message: str = "No updates to apply") -> None:

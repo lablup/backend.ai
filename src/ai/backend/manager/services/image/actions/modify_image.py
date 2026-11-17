@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -40,7 +42,7 @@ class ModifyImageActionResult(BaseActionResult):
         return str(self.image.id)
 
 
-class ModifyImageActionUnknownImageReferenceError(BackendAIError):
+class ModifyImageActionUnknownImageReferenceError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/image-not-found"
     error_title = "Unknown image reference."
 

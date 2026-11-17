@@ -13,7 +13,7 @@ class HammerspaceError(BackendAIError):
     """Base error for Hammerspace-related errors."""
 
 
-class ConfigurationError(HammerspaceError):
+class ConfigurationError(HammerspaceError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/hammerspace-invalid-configuration"
     error_title = "Hammerspace configuration is invalid."
 

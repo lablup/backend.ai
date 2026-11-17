@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -25,7 +27,7 @@ class LeaderElectionError(BackendAIError):
         )
 
 
-class AlreadyStartedError(LeaderElectionError):
+class AlreadyStartedError(LeaderElectionError, web.HTTPInternalServerError):
     """Raised when trying to start an already started election or register tasks after start."""
 
     error_type = "https://api.backend.ai/probs/leader-already-started"

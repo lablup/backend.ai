@@ -7,6 +7,8 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Iterable, Mapping, Sequence
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -61,7 +63,7 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
         )
 
 
-class NoAvailableAgentError(AgentSelectionError):
+class NoAvailableAgentError(AgentSelectionError, web.HTTPServiceUnavailable):
     """Raised when no agents can satisfy a kernel-group's resource requirement.
 
     The constructor accepts the structured inputs that describe *which*

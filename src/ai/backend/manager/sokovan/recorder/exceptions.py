@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -23,7 +25,7 @@ class RecorderError(BackendAIError):
         )
 
 
-class NestedPhaseError(RecorderError):
+class NestedPhaseError(RecorderError, web.HTTPInternalServerError):
     """Raised when attempting to nest phases."""
 
     error_type = "https://api.backend.ai/probs/nested-phase-error"
@@ -46,7 +48,7 @@ class NestedPhaseError(RecorderError):
         )
 
 
-class StepWithoutPhaseError(RecorderError):
+class StepWithoutPhaseError(RecorderError, web.HTTPInternalServerError):
     """Raised when attempting to record a step without an active phase."""
 
     error_type = "https://api.backend.ai/probs/step-without-phase-error"

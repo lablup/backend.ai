@@ -159,7 +159,7 @@ class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class RouteSessionNotFound(BackendAIError):
+class RouteSessionNotFound(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/route-session-not-found"
     error_title = "No session associated with route."
 
@@ -171,7 +171,7 @@ class RouteSessionNotFound(BackendAIError):
         )
 
 
-class RouteSessionTerminated(BackendAIError):
+class RouteSessionTerminated(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/route-session-terminated"
     error_title = "Route session is in terminal state."
 
