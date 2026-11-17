@@ -21,12 +21,14 @@ class LayeredIngressState(IngressReader):
 
     _layers: list[IngressReader]
     _in_memory: InMemoryIngressState | None
+    _invalidation_count: int
 
     def __init__(
         self, layers: Sequence[IngressReader], in_memory: InMemoryIngressState | None
     ) -> None:
         self._layers = list(layers)
         self._in_memory = in_memory
+        self._invalidation_count = 0
 
     @property
     def layers(self) -> Sequence[IngressReader]:
@@ -34,13 +36,19 @@ class LayeredIngressState(IngressReader):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
+        invalidation_count_before_read = self._invalidation_count
         try:
             for layer in self._layers:
                 ingress = await layer.get(frontend_key)
                 if ingress is None:
                     continue
-                if self._in_memory is not None and layer is not self._in_memory:
-                    # Cache another layer's hit in memory so the next read stops at memory.
+                if (
+                    self._in_memory is not None
+                    and layer is not self._in_memory
+                    and self._invalidation_count == invalidation_count_before_read
+                ):
+                    # Cache another layer's hit in memory so the next read stops at memory. A hit
+                    # read across an invalidation may predate the change, so it is not cached.
                     await self._in_memory.apply([ingress])
                 return ingress
             # Requests keep reaching a key that is gone and no longer remembered; surface it.
@@ -55,4 +63,5 @@ class LayeredIngressState(IngressReader):
 
     async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
         if self._in_memory is not None:
+            self._invalidation_count += 1
             await self._in_memory.invalidate(frontend_keys)

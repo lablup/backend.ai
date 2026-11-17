@@ -131,6 +131,18 @@ async def layered_with_redis_holding_a_newer_ingress_than_memory(
     return layered
 
 
+@pytest.fixture
+def layered_with_the_key_invalidated_during_the_redis_read(
+    layered: LayeredIngressState, redis: AsyncMock, ingress: Ingress
+) -> LayeredIngressState:
+    async def read_redis_while_the_key_is_invalidated(frontend_key: IngressFrontendKey) -> Ingress:
+        await layered.invalidate([frontend_key])
+        return ingress
+
+    redis.get.side_effect = read_redis_while_the_key_is_invalidated
+    return layered
+
+
 class TestLayeredIngressState:
     @pytest.mark.usefixtures("ingress_in_memory")
     async def test_get_returns_a_memory_hit_without_reading_redis(
@@ -210,3 +222,14 @@ class TestLayeredIngressState:
         await layered.invalidate([FRONTEND_KEY])
 
         assert await layered.get(FRONTEND_KEY) == ingress
+
+    async def test_redis_hit_read_across_an_invalidation_is_not_written_to_memory(
+        self,
+        layered_with_the_key_invalidated_during_the_redis_read: LayeredIngressState,
+        memory: InMemoryIngressState,
+        ingress: Ingress,
+    ) -> None:
+        layered = layered_with_the_key_invalidated_during_the_redis_read
+        assert await layered.get(FRONTEND_KEY) == ingress
+
+        assert await memory.get(FRONTEND_KEY) is None
