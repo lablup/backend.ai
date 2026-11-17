@@ -1916,6 +1916,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
