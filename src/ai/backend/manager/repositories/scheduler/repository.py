@@ -844,7 +844,8 @@ class SchedulerRepository:
     ) -> KernelListResult:
         """Search kernels for kernel handler execution.
 
-        This method is used by KernelLifecycleHandler implementations.
+        This method is used by KernelLifecycleHandler implementations and the stream
+        cleanup event handler.
         """
         return await self._db_source.search_kernels_for_handler(searcher)
 

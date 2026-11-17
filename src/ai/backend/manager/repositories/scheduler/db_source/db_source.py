@@ -4217,7 +4217,7 @@ class ScheduleDBSource:
     ) -> KernelListResult:
         """Search kernels for kernel handler execution.
 
-        This method is for KernelLifecycleHandler.
+        This method is for KernelLifecycleHandler and the stream cleanup event handler.
         """
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_in_global(searcher)
