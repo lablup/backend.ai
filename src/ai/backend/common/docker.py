@@ -420,7 +420,9 @@ class PlatformTagSet(Mapping[str, str]):
     def __len__(self) -> int:
         return len(self._data)
 
-    __hash__ = None
+    @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
 
     @override
     def __eq__(self, other: Any) -> bool:

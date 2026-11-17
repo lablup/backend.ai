@@ -286,7 +286,9 @@ class FstabEntry:
         self.d = d
         self.p = p
 
-    __hash__ = None
+    @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
 
     @override
     def __eq__(self, o: Any) -> bool:
