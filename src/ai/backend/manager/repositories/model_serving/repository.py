@@ -5,13 +5,12 @@ from collections.abc import Sequence
 from dataclasses import replace
 from decimal import Decimal
 from functools import partial
-from typing import Any, cast
+from typing import Any
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
@@ -21,7 +20,11 @@ from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -38,6 +41,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
     ModelDeploymentAccessTokenData,
     ModelRevisionData,
     RouteHealthStatus,
@@ -66,7 +70,8 @@ from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailabl
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.deployment_revision.scopes import DeploymentRevisionTarget
 from ai.backend.manager.models.deployment_revision.searchable_fields import (
     ModelRevisionSearchableFields,
 )
@@ -82,21 +87,26 @@ from ai.backend.manager.models.endpoint.updaters import (
 )
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.scopes import DeploymentReplicaTarget
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder.row import VFolderRow, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -161,18 +171,8 @@ class ModelServingRepository:
         Get endpoint by ID.
         Returns None if endpoint doesn't exist.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            endpoint = await self._get_endpoint_by_id(
-                session,
-                endpoint_id,
-                load_routes=True,
-                load_session_owner=True,
-                load_revisions=True,
-            )
-            if not endpoint:
-                return None
-
-            return endpoint.to_data()
+        async with self._v2_ops.read_ops() as r:
+            return await self._read_endpoint_data(r, endpoint_id)
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_access_validation_data(
@@ -206,38 +206,22 @@ class ModelServingRepository:
     ) -> list[EndpointData]:
         """
         List endpoints owned by a specific user with optional name filter.
-
-        Eagerly loads every relationship that ``EndpointRow.to_data()``
-        traverses (``routings``, ``session_owner_row``, ``created_user_row``,
-        ``revisions`` -> ``image_row``) so the projection runs entirely on
-        cached state and never triggers ``MissingGreenlet`` from sync
-        ``to_data()`` invoked inside an async transaction.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query_conds = (EndpointRow.session_owner == session_owner_id) & (
-                EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
-            )
-            if name:
-                query_conds &= EndpointRow.name == name
-
-            query = (
-                sa.select(EndpointRow)
-                .where(query_conds)
-                .options(
-                    selectinload(EndpointRow.routings),
-                    selectinload(EndpointRow.session_owner_row),
-                    selectinload(EndpointRow.created_user_row),
-                    selectinload(EndpointRow.current_revision_row).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                    selectinload(EndpointRow.deploying_revision_row).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+        fields = DeploymentSearchableFields.own
+        conditions = [
+            fields.session_owner.filter.equals(
+                UUIDEqualMatchSpec(value=session_owner_id, negated=False)
+            ),
+            fields.lifecycle_stage.filter.in_([EndpointLifecycle.CREATED]),
+        ]
+        if name:
+            conditions.append(
+                fields.name.filter.equals(
+                    StringMatchSpec(name, case_insensitive=False, negated=False)
                 )
             )
-            result = await session.execute(query)
-            rows = cast(list[EndpointRow], result.scalars().all())
-            return [row.to_data() for row in rows]
+        async with self._v2_ops.read_ops() as r:
+            return await self._read_endpoint_datas(r, conditions)
 
     @model_serving_repository_resilience.apply()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
@@ -365,21 +349,16 @@ class ModelServingRepository:
             )
             await session.execute(query)
 
-            endpoint = await self._get_endpoint_by_id(
-                session,
-                service_id,
-                load_routes=True,
-                load_session_owner=True,
-                load_revisions=True,
-            )
-            if endpoint is None:
-                raise EndpointNotFound
+        async with self._v2_ops.read_ops() as r:
+            data = await self._read_endpoint_data(r, service_id)
+        if data is None:
+            raise EndpointNotFound
 
-            await valkey_live.store_live_data(
-                f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
-                str(traffic_ratio),
-            )
-            return endpoint.to_data()
+        await valkey_live.store_live_data(
+            f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
+            str(traffic_ratio),
+        )
+        return data
 
     @model_serving_repository_resilience.apply()
     async def decrease_endpoint_replicas(self, service_id: uuid.UUID) -> bool:
@@ -388,7 +367,7 @@ class ModelServingRepository:
         Returns True if decreased, False if not found.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, service_id, load_session_owner=True)
+            endpoint = await self._get_endpoint_by_id(session, service_id)
             if not endpoint:
                 return False
 
@@ -457,29 +436,165 @@ class ModelServingRepository:
         self,
         session: SASession,
         endpoint_id: uuid.UUID,
-        load_routes: bool = False,
-        load_session_owner: bool = False,
-        load_revisions: bool = False,
     ) -> EndpointRow | None:
         """
         Private method to get endpoint by ID using an existing session.
         """
-        query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
-        if load_routes:
-            query = query.options(selectinload(EndpointRow.routings))
-        if load_session_owner:
-            query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
-            query = query.options(
-                selectinload(EndpointRow.current_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-                selectinload(EndpointRow.deploying_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-            )
-        endpoint: EndpointRow | None = await session.scalar(query)
+        endpoint: EndpointRow | None = await session.scalar(
+            sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+        )
         return endpoint
+
+    async def _read_endpoint_data(
+        self, r: V2ReadOps, endpoint_id: uuid.UUID
+    ) -> EndpointData | None:
+        """The endpoint ``endpoint_id``; ``None`` when it does not exist."""
+        datas = await self._read_endpoint_datas(
+            r,
+            [
+                DeploymentSearchableFields.own.entity_id.filter.equals(
+                    UUIDEqualMatchSpec(value=endpoint_id, negated=False)
+                )
+            ],
+        )
+        return datas[0] if datas else None
+
+    async def _read_endpoint_datas(
+        self, r: V2ReadOps, conditions: list[QueryCondition]
+    ) -> list[EndpointData]:
+        """The endpoints matching ``conditions``, with the revision each serves, its image,
+        the user emails and the routes."""
+        result = await r.search_in_global(
+            DeploymentInfoSearcher(pagination=NoPagination(), conditions=conditions)
+        )
+        deployments = result.items
+        revisions = await self._read_active_revisions(r, deployments)
+        images = await self._read_images(r, list(revisions.values()))
+        emails = await self._read_user_emails(r, deployments)
+        routes = await self._read_routes(r, deployments)
+
+        datas: list[EndpointData] = []
+        for info in deployments:
+            data = EndpointData.from_deployment(
+                info,
+                created_user_email=emails.get(info.metadata.created_user),
+                session_owner_email=emails.get(info.metadata.session_owner, ""),
+                routings=routes.get(info.id, []),
+            )
+            revision = revisions.get(info.id)
+            if revision is not None:
+                image = images.get(revision.image_id) if revision.image_id is not None else None
+                data = data.with_revision(revision, image)
+            datas.append(data)
+        return datas
+
+    async def _read_active_revisions(
+        self, r: V2ReadOps, deployments: Sequence[DeploymentInfo]
+    ) -> dict[DeploymentID, ModelRevisionData]:
+        """The revision each deployment serves: the current revision, or the deploying
+        revision while none is current."""
+        scopes: list[DeploymentRevisionTarget] = []
+        revision_ids: list[DeploymentRevisionID] = []
+        for info in deployments:
+            scopes.append(DeploymentRevisionTarget(deployment_id=info.id))
+            if info.current_revision_id is not None:
+                revision_ids.append(info.current_revision_id)
+            if info.deploying_revision_id is not None:
+                revision_ids.append(info.deploying_revision_id)
+        if not revision_ids:
+            return {}
+        result = await r.search_with_scopes(
+            scopes,
+            ModelRevisionSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    ModelRevisionSearchableFields.own.field_id.filter.in_(
+                        UUIDInMatchSpec(values=revision_ids, negated=False)
+                    )
+                ],
+            ),
+        )
+        revisions: dict[DeploymentRevisionID, ModelRevisionData] = {}
+        for revision in result.items:
+            revisions[revision.id] = revision
+
+        active: dict[DeploymentID, ModelRevisionData] = {}
+        for info in deployments:
+            current = None
+            if info.current_revision_id is not None:
+                current = revisions.get(info.current_revision_id)
+            deploying = None
+            if info.deploying_revision_id is not None:
+                deploying = revisions.get(info.deploying_revision_id)
+            served = current or deploying
+            if served is not None:
+                active[info.id] = served
+        return active
+
+    async def _read_images(
+        self, r: V2ReadOps, revisions: Sequence[ModelRevisionData]
+    ) -> dict[uuid.UUID, ImageData]:
+        """The images ``revisions`` run, by the image id."""
+        image_ids: list[uuid.UUID] = []
+        for revision in revisions:
+            if revision.image_id is not None:
+                image_ids.append(revision.image_id)
+        if not image_ids:
+            return {}
+        result = await r.search_in_global(
+            ImageSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    ImageSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=image_ids, negated=False)
+                    )
+                ],
+            )
+        )
+        images: dict[uuid.UUID, ImageData] = {}
+        for image in result.items:
+            images[image.id] = image
+        return images
+
+    async def _read_user_emails(
+        self, r: V2ReadOps, deployments: Sequence[DeploymentInfo]
+    ) -> dict[uuid.UUID, str]:
+        """The email of the creator and the session owner of ``deployments``, by the user id."""
+        user_ids: list[uuid.UUID] = []
+        for info in deployments:
+            user_ids.append(info.metadata.created_user)
+            user_ids.append(info.metadata.session_owner)
+        if not user_ids:
+            return {}
+        result = await r.search_in_global(
+            UserSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    UserSearchableFields.own.uuid.filter.in_(
+                        UUIDInMatchSpec(values=user_ids, negated=False)
+                    )
+                ],
+            )
+        )
+        emails: dict[uuid.UUID, str] = {}
+        for user in result.items:
+            emails[user.uuid] = user.email
+        return emails
+
+    async def _read_routes(
+        self, r: V2ReadOps, deployments: Sequence[DeploymentInfo]
+    ) -> dict[uuid.UUID, list[RoutingData]]:
+        """The routes of ``deployments``, by the deployment id."""
+        if not deployments:
+            return {}
+        scopes: list[DeploymentReplicaTarget] = []
+        for info in deployments:
+            scopes.append(DeploymentReplicaTarget(deployment_id=info.id))
+        result = await r.search_with_scopes(scopes, RoutingDataSearcher(pagination=NoPagination()))
+        routes: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
+        for route in result.items:
+            routes[route.endpoint].append(route)
+        return routes
 
     async def _validate_endpoint_access(
         self,
@@ -706,12 +821,7 @@ class ModelServingRepository:
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin_session() as db_session:
-                endpoint_row = await self._get_endpoint_by_id(
-                    db_session,
-                    deployment_id,
-                    load_revisions=True,
-                    load_routes=True,
-                )
+                endpoint_row = await self._get_endpoint_by_id(db_session, deployment_id)
                 if endpoint_row is None:
                     raise EndpointNotFound
                 user_data = current_user()
@@ -763,27 +873,14 @@ class ModelServingRepository:
 
                 await db_session.commit()
 
-                # Reload with revisions for to_data()
-                endpoint_row = await db_session.scalar(
-                    sa.select(EndpointRow)
-                    .where(EndpointRow.id == endpoint_row.id)
-                    .options(
-                        selectinload(EndpointRow.created_user_row),
-                        selectinload(EndpointRow.session_owner_row),
-                        selectinload(EndpointRow.current_revision_row).selectinload(
-                            DeploymentRevisionRow.image_row
-                        ),
-                        selectinload(EndpointRow.deploying_revision_row).selectinload(
-                            DeploymentRevisionRow.image_row
-                        ),
-                    )
-                )
-                if endpoint_row is None:
+                async with self._v2_ops.read_ops() as r:
+                    data = await self._read_endpoint_data(r, endpoint_row.id)
+                if data is None:
                     raise EndpointNotFound
                 return MutationResult(
                     success=True,
                     message="success",
-                    data=endpoint_row.to_data(),
+                    data=data,
                 )
 
         try:
