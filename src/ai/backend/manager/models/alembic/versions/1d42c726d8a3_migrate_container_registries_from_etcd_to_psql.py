@@ -423,9 +423,7 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
         )
 
         logger.info(
-            'Following container registry row auto-generated: "%s" with the project "%s".',
-            registry_name,
-            project,
+            f'Following container registry row auto-generated: "{registry_name}" with the project "{project}".'
         )
 
     if added_projects:
