@@ -92,6 +92,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
@@ -1987,20 +1988,24 @@ class ScheduleDBSource:
                     )
                 matched_dependency_ids.append(SessionID(dependency_id))
 
-            # An agent id missing from ``agents`` designates nothing.
+            # Validate designated agents — each one must be registered.
+            requested_agent_ids = set(
+                spec.resource_spec.options.scheduling_target.designated_agents
+            )
             designated_agent_uuids: list[AgentUUID] = []
-            if spec.resource_spec.options.scheduling_target.designated_agents:
-                designated_agent_uuids = list(
-                    (
-                        await read_sess.scalars(
-                            sa.select(AgentRow.uuid).where(
-                                AgentRow.id.in_(
-                                    spec.resource_spec.options.scheduling_target.designated_agents
-                                )
-                            )
+            if requested_agent_ids:
+                registered = (
+                    await read_sess.execute(
+                        sa.select(AgentRow.id, AgentRow.uuid).where(
+                            AgentRow.id.in_(requested_agent_ids)
                         )
-                    ).all()
-                )
+                    )
+                ).all()
+                if unknown := requested_agent_ids - {row.id for row in registered}:
+                    raise AgentNotFound(
+                        f"Designated agents {sorted(unknown)} are not registered.",
+                    )
+                designated_agent_uuids = [row.uuid for row in registered]
 
         kernel_groups = spec.resource_spec.options.kernel_groups
         group_roles = {group.role for group in kernel_groups}
