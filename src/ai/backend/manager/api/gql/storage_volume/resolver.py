@@ -41,7 +41,7 @@ __all__ = (
         added_version=NEXT_RELEASE_VERSION,
         description="Read one storage volume.",
     )
-)  # type: ignore[misc]
+)
 async def storage_volume(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -54,7 +54,7 @@ async def storage_volume(
         added_version=NEXT_RELEASE_VERSION,
         description="Page through every declared storage volume. Admin only.",
     )
-)  # type: ignore[misc]
+)
 async def admin_storage_volumes(
     info: Info[StrawberryGQLContext],
     filter: StorageVolumeFilterGQL | None = None,

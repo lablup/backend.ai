@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -109,7 +110,7 @@ class TestRGUserFairShare:
             project_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         )
 
-        resolver_fn = user_resolver.rg_user_fair_share.base_resolver
+        resolver_fn = cast(Any, user_resolver.rg_user_fair_share).base_resolver
         result = await resolver_fn(
             info_with_user_fair_share_exists,
             scope,
@@ -135,7 +136,7 @@ class TestRGUserFairShare:
             project_id=project_id,
         )
 
-        resolver_fn = user_resolver.rg_user_fair_share.base_resolver
+        resolver_fn = cast(Any, user_resolver.rg_user_fair_share).base_resolver
         await resolver_fn(
             info_with_user_fair_share_exists,
             scope,
@@ -168,7 +169,7 @@ class TestRGUserFairShare:
         )
         user_uuid = UUID("11111111-2222-3333-4444-555555555555")
 
-        resolver_fn = user_resolver.rg_user_fair_share.base_resolver
+        resolver_fn = cast(Any, user_resolver.rg_user_fair_share).base_resolver
         with pytest.raises(UserNotFound):
             await resolver_fn(
                 info_with_user_not_found,
@@ -192,7 +193,7 @@ class TestRGUserFairShares:
             project_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         )
 
-        resolver_fn = user_resolver.rg_user_fair_shares.base_resolver
+        resolver_fn = cast(Any, user_resolver.rg_user_fair_shares).base_resolver
         await resolver_fn(
             info,
             scope,

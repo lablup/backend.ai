@@ -1643,7 +1643,7 @@ schema = CustomizedSchema(
 )
 
 
-@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))
 async def ping() -> str:
     return "pong"
 

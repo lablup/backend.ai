@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.login_history.response import LoginHistory
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -82,12 +83,12 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     )
     created_at: datetime = gql_field(description="Timestamp when the login attempt occurred.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The user who attempted to log in.",
         )
-    )  # type: ignore[misc]
+    )
     async def user(
         self,
         info: Info[StrawberryGQLContext],
@@ -100,12 +101,12 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     ):
         return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The domain at the time of the login attempt.",
         )
-    )  # type: ignore[misc]
+    )
     async def domain(
         self,
         info: Info[StrawberryGQLContext],

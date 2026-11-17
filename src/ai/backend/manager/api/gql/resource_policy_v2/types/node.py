@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -92,7 +93,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
         description="Allowed vfolder host permissions."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
@@ -100,7 +101,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
                 "node itself is readable by its own holder."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def keypairs(
         self,
         info: Info[StrawberryGQLContext],

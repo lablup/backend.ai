@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -50,7 +51,7 @@ class TestMyRoles:
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
             return_value=user_data,
         ):
-            resolver_fn = role_resolver.my_roles.base_resolver
+            resolver_fn = cast(Any, role_resolver.my_roles).base_resolver
             result = await resolver_fn(
                 info,
                 None,  # filter
@@ -76,7 +77,7 @@ class TestMyRoles:
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
             return_value=None,
         ):
-            resolver_fn = role_resolver.my_roles.base_resolver
+            resolver_fn = cast(Any, role_resolver.my_roles).base_resolver
             with pytest.raises(InsufficientPrivilege):
                 await resolver_fn(
                     info,
@@ -110,7 +111,7 @@ class TestMyRoles:
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
             return_value=user_data,
         ):
-            resolver_fn = role_resolver.my_roles.base_resolver
+            resolver_fn = cast(Any, role_resolver.my_roles).base_resolver
             await resolver_fn(
                 info,
                 None,  # filter

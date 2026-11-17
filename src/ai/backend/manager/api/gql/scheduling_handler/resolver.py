@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
             "``DeploymentOptions.handler_options.by_handler``."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scheduling_handlers(
     info: Info[StrawberryGQLContext],
 ) -> list[SchedulingHandlerNodeGQL] | None:

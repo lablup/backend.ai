@@ -60,7 +60,7 @@ class MyStorageHostPermissionsPayloadGQL(PydanticOutputMixin[MyStorageHostPermis
             "of permissions inherited from domain, project, and keypair resource policies."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_storage_host_permissions(
     info: Info[StrawberryGQLContext],
 ) -> MyStorageHostPermissionsPayloadGQL | None:

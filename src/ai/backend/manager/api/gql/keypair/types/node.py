@@ -17,6 +17,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -83,12 +84,12 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     )
     user_id: UUID = gql_field(description="UUID of the user who owns this keypair.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The user who owns this keypair.",
         )
-    )  # type: ignore[misc]
+    )
     async def user(
         self,
         info: Info[StrawberryGQLContext],

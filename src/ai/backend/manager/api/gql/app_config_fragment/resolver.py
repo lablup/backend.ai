@@ -53,7 +53,7 @@ from .types import (
         added_version="26.8.0",
         description="Get a single app config fragment by id.",
     )
-)  # type: ignore[misc]
+)
 async def app_config_fragment(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -70,7 +70,7 @@ async def app_config_fragment(
             "pagination (super admin only)."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_app_config_fragments(
     info: Info[StrawberryGQLContext],
     filter: AppConfigFragmentFilterGQL | None = None,
@@ -238,7 +238,7 @@ async def my_upsert_app_config_fragments(
             "where the scope holds no fragment for that name."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
     scope: AppConfigScopeRefGQL,
@@ -260,7 +260,7 @@ async def scoped_app_config_fragments_by_names(
             "position by position, null where the scope holds no fragment for that name."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
     config_names: list[str],

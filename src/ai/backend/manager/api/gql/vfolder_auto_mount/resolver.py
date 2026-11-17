@@ -45,7 +45,7 @@ from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
             "are left out unless the filter names `deletedAt`."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_vfolder_auto_mounts(
     info: Info[StrawberryGQLContext],
     scope: VFolderAutoMountScopeGQL,

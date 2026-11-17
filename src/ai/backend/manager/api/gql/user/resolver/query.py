@@ -34,7 +34,7 @@ from ai.backend.manager.errors.auth import AuthenticationRequired
         added_version="26.2.0",
         description="Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.",
     )
-)  # type: ignore[misc]
+)
 async def admin_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
@@ -49,7 +49,7 @@ async def admin_user_v2(
         added_version="26.2.0",
         description="List all users with filtering and pagination (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_users_v2(
     info: Info[StrawberryGQLContext],
     filter: UserFilterGQL | None = None,
@@ -96,7 +96,7 @@ async def admin_users_v2(
             "Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_users_v2(
     info: Info[StrawberryGQLContext],
     scope: UserScopeGQL,
@@ -141,7 +141,7 @@ async def scoped_users_v2(
         added_version="26.2.0",
         description="List users within a specific domain. Requires domain admin privileges or higher.",
     )
-)  # type: ignore[misc]
+)
 async def domain_users_v2(
     info: Info[StrawberryGQLContext],
     scope: DomainUserScopeGQL,
@@ -186,7 +186,7 @@ async def domain_users_v2(
         added_version="26.2.0",
         description="List users within a specific project. Requires project membership or higher privileges.",
     )
-)  # type: ignore[misc]
+)
 async def project_users_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectUserScopeGQL,
@@ -231,7 +231,7 @@ async def project_users_v2(
         added_version="26.2.0",
         description="Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.",
     )
-)  # type: ignore[misc]
+)
 async def my_user_v2(
     info: Info[StrawberryGQLContext],
 ) -> UserV2GQL | None:
@@ -248,7 +248,7 @@ async def my_user_v2(
         added_version="26.4.2",
         description="Get the current client's IP address as seen by the server. Useful for configuring IP allowlists.",
     )
-)  # type: ignore[misc]
+)
 async def my_client_ip(
     info: Info[StrawberryGQLContext],
 ) -> MyClientIpGQL | None:

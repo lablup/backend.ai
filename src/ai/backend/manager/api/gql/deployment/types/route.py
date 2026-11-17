@@ -43,12 +43,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -128,7 +130,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     created_at: datetime | None = gql_field(description="The timestamp when the route was created.")
     error_data: JSON | None = gql_field(description="Error data if the route is in a failed state.")
 
-    @gql_field(description="The deployment this route belongs to.")  # type: ignore[misc]
+    @gql_resolver(description="The deployment this route belongs to.")
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
@@ -141,10 +143,10 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
             raise EndpointNotFound(extra_msg=f"id={deployment_id}")
         return deployment_data
 
-    @gql_field(
+    @gql_resolver(
         description="The session associated with the route. Can be null if the route is still provisioning.",
         deprecation_reason="Use session_v2 instead.",
-    )  # type: ignore[misc]
+    )
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
         if self.session_id is None:
@@ -154,12 +156,12 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         )
         return ID(session_global_id)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The compute session associated with this route.",
         )
-    )  # type: ignore[misc]
+    )
     async def session_v2(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -176,7 +178,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
             SessionID(UUID(str(self.session_id)))
         )
 
-    @gql_field(description="The revision associated with the route.")  # type: ignore[misc]
+    @gql_resolver(description="The revision associated with the route.")
     async def revision(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:

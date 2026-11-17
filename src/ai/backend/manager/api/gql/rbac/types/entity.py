@@ -29,11 +29,12 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
-    gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
@@ -101,7 +102,7 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
         ])
         return [None if role is None else cls.from_role(role) for role in roles]
 
-    @gql_field(description="The resolved entity object.")  # type: ignore[misc]
+    @gql_resolver(description="The resolved entity object.")
     async def entity(
         self,
         *,
@@ -111,12 +112,12 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
             RuntimeEntityID(EntityType.from_name(self.entity_type), uuid.UUID(self.entity_id))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The resolved scope object in which the entity is registered.",
         )
-    )  # type: ignore[misc]
+    )
     async def scope(
         self,
         *,

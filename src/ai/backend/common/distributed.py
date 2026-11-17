@@ -42,7 +42,7 @@ class GlobalTimer:
         self.initial_delay = initial_delay
         self.task_name = task_name
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def generate_tick(self) -> None:
         with with_log_context(task_name=self.task_name):
             await self._generate_tick()

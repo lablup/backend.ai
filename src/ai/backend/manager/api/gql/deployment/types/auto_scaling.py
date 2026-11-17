@@ -71,6 +71,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -223,12 +224,12 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     created_at: datetime
     last_triggered_at: datetime | None
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The Prometheus query preset used for metric-based auto-scaling.",
         )
-    )  # type: ignore[misc]
+    )
     async def query_preset(
         self,
         info: Info[StrawberryGQLContext],

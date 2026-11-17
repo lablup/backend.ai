@@ -18,10 +18,12 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_federation_type,
     gql_field,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.fair_share.types.user import UserFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
@@ -128,9 +130,9 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     )
     timestamps: EntityTimestampsGQL = gql_field(description="Creation and modification timestamps.")
 
-    @gql_field(
+    @gql_resolver(
         description="Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
-    )  # type: ignore[misc]
+    )
     async def fair_share(
         self,
         info: Info,
@@ -151,9 +153,9 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 
         return UserFairShareGQL.from_pydantic(payload.item)
 
-    @gql_field(
+    @gql_resolver(
         description="Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time."
-    )  # type: ignore[misc]
+    )
     async def usage_buckets(
         self,
         info: Info,
@@ -206,7 +208,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             count=payload.total_count,
         )
 
-    @gql_field(description="The domain this user belongs to.")  # type: ignore[misc]
+    @gql_resolver(description="The domain this user belongs to.")
     async def domain(
         self,
         info: Info,
@@ -229,7 +231,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         )
         return domain
 
-    @gql_field(description="Projects this user is a member of.")  # type: ignore[misc]
+    @gql_resolver(description="Projects this user is a member of.")
     async def projects(
         self,
         info: Info,
@@ -294,12 +296,12 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Resource groups this user may schedule on.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_groups(
         self,
         info: Info[StrawberryGQLContext],
@@ -368,7 +370,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -376,7 +378,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
                 "user's personal project are not included."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def vfolder_auto_mounts(
         self,
         info: Info[StrawberryGQLContext],

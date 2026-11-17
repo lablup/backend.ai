@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@gql_root_field(  # type: ignore[misc]
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.8.0",
         description=(

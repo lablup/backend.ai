@@ -80,6 +80,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import MountPermission
 from ai.backend.manager.api.gql.pydantic_compat import (
@@ -160,7 +161,7 @@ class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
         description="Deletion timestamp. Null while the auto-mount is in use."
     )
 
-    @gql_field(description="The project the vfolder is auto-mounted in. Null for a user one.")  # type: ignore[misc]
+    @gql_resolver(description="The project the vfolder is auto-mounted in. Null for a user one.")
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -175,7 +176,7 @@ class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
             return None
         return await info.context.data_loaders.project_loader.load(ProjectID(self.scope_id))
 
-    @gql_field(description="The user the vfolder is auto-mounted for. Null for a project one.")  # type: ignore[misc]
+    @gql_resolver(description="The user the vfolder is auto-mounted for. Null for a project one.")
     async def user(
         self,
         info: Info[StrawberryGQLContext],
@@ -190,7 +191,7 @@ class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
             return None
         return await info.context.data_loaders.user_loader.load(UserID(self.scope_id))
 
-    @gql_field(description="The auto-mounted vfolder.")  # type: ignore[misc]
+    @gql_resolver(description="The auto-mounted vfolder.")
     async def vfolder(
         self,
         info: Info[StrawberryGQLContext],

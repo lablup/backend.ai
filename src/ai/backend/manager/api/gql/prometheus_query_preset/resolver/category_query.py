@@ -25,7 +25,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
         added_version="26.4.2",
         description="Get a single query preset category by ID. Available to any authenticated user.",
     )
-)  # type: ignore[misc]
+)
 async def prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     id: ID,
@@ -41,7 +41,7 @@ async def prometheus_query_preset_category(
         added_version="26.4.2",
         description="List query preset categories with filtering and pagination. Available to any authenticated user.",
     )
-)  # type: ignore[misc]
+)
 async def prometheus_query_preset_categories(
     info: Info[StrawberryGQLContext],
     filter: CategoryFilterGQL | None = None,

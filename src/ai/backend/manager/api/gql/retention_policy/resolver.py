@@ -44,7 +44,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.8.0",
         description="Search retention policies (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_retention_policies(
     info: Info[StrawberryGQLContext],
     filter: RetentionPolicyFilterGQL | None = None,
@@ -104,7 +104,7 @@ async def admin_retention_policies(
         added_version="26.8.0",
         description="Get a single retention policy by ID (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_retention_policy(
     info: Info[StrawberryGQLContext],
     id: UUID,

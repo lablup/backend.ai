@@ -25,7 +25,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
             "Requires superadmin privileges."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_secret_status(
     info: Info[StrawberryGQLContext],
 ) -> AdminSecretStatusPayloadGQL | None:

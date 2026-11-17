@@ -64,7 +64,7 @@ from ai.backend.manager.models.rbac_models.role.scopes import (
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.3.0", description="Get a single role by ID (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_role(
     info: Info[StrawberryGQLContext],
     id: uuid.UUID,
@@ -78,7 +78,7 @@ async def admin_role(
     BackendAIGQLMeta(
         added_version="26.3.0", description="List roles with filtering and pagination (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_roles(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -135,7 +135,7 @@ async def admin_roles(
         added_version="26.3.0",
         description="List role assignments with filtering and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_role_assignments(
     info: Info[StrawberryGQLContext],
     filter: RoleAssignmentFilter | None = None,
@@ -192,7 +192,7 @@ async def admin_role_assignments(
     deprecation_reason=(
         "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves."
     ),
-)  # type: ignore[misc]
+)
 async def my_roles(
     info: Info[StrawberryGQLContext],
     filter: RoleAssignmentFilter | None = None,
@@ -246,7 +246,7 @@ async def my_roles(
         added_version="26.9.0",
         description="List the roles the current authenticated user holds.",
     )
-)  # type: ignore[misc]
+)
 async def my_roles_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -302,7 +302,7 @@ async def my_roles_v2(
         added_version="26.4.2",
         description="List roles registered in a project scope.",
     )
-)  # type: ignore[misc]
+)
 async def project_roles(
     info: Info[StrawberryGQLContext],
     project_id: uuid.UUID,

@@ -111,6 +111,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -544,12 +545,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             ResourceGroupID(UUID(nid)) for nid in node_ids
         ])
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.1.0",
             description="Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.",
         )
-    )  # type: ignore[misc]
+    )
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
     ) -> FairShareResourceGroupSpecGQL | None:
@@ -558,24 +559,24 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         dto = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
         return FairShareResourceGroupSpecGQL.from_pydantic(dto)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.1.0",
             description="Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL | None:
         """Get resource information for this resource group."""
         ctx = info.context
         resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)
         return ResourceInfoGQL.from_pydantic(resource_info_dto)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Domains this resource group serves.",
         )
-    )  # type: ignore[misc]
+    )
     async def domains(
         self,
         info: Info[StrawberryGQLContext],
@@ -639,12 +640,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Projects this resource group serves.",
         )
-    )  # type: ignore[misc]
+    )
     async def projects(
         self,
         info: Info[StrawberryGQLContext],
@@ -711,12 +712,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this resource group.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],

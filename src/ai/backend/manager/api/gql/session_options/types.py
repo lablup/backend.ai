@@ -49,7 +49,7 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_added_field,
+    gql_added_resolver,
     gql_enum,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -242,12 +242,12 @@ class DefaultSessionKernelExecutionSpecInfoGQL:
     starts_at: datetime | None
     batch_timeout_sec: int | None
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The container image of this execution spec.",
         )
-    )  # type: ignore[misc]
+    )
     async def image_v2(
         self, info: Info[StrawberryGQLContext]
     ) -> (

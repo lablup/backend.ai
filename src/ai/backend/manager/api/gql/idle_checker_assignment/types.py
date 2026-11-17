@@ -67,6 +67,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -149,7 +150,7 @@ class IdleCheckerAssignmentGQL(PydanticNodeMixin[IdleCheckerAssignmentNode]):
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
-    @gql_field(description="The bound idle checker definition.")  # type: ignore[misc]
+    @gql_resolver(description="The bound idle checker definition.")
     async def idle_checker(
         self,
         info: Info,

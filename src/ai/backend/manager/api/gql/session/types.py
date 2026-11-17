@@ -119,6 +119,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -737,18 +738,18 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     runtime: SessionV2RuntimeInfoGQL = gql_field(description="Runtime execution configuration.")
     network: SessionV2NetworkInfoGQL = gql_field(description="Network configuration.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
-    )  # type: ignore[misc]
+    )
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
         if domain_id is None:
             return None
         return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
-    )  # type: ignore[misc]
+    )
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         if self.user_id is None:
             return None
@@ -759,9 +760,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return user_data
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(added_version="26.3.0", description="The project this session belongs to.")
-    )  # type: ignore[misc]
+    )
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         project_data = await info.context.data_loaders.project_loader.load(
             ProjectID(UUID(str(self.project_id)))
@@ -770,11 +771,11 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return project_data
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0", description="The resource group this session is assigned to."
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
         if self.resource.resource_group_name is None:
             return None
@@ -785,12 +786,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return resource_group_data
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
-    )  # type: ignore[misc]
+    )
     async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL | None:
         from ai.backend.manager.api.gql.image.types import ImageV2EdgeGQL
 
@@ -821,11 +822,11 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             count=len(nodes),
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0", description="The kernels belonging to this session."
         )
-    )  # type: ignore[misc]
+    )
     async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL | None:
         user = current_user()
         if user is None:
@@ -848,23 +849,23 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The main kernel group of this session.",
         )
-    )  # type: ignore[misc]
+    )
     async def main_kernel_group(self, info: Info[StrawberryGQLContext]) -> KernelGroupGQL | None:
         return await info.context.data_loaders.main_kernel_group_by_session_id_loader.load(
             SessionID(UUID(str(self.id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The kernel groups of this session, one per role.",
         )
-    )  # type: ignore[misc]
+    )
     async def kernel_groups(
         self,
         info: Info[StrawberryGQLContext],
@@ -903,7 +904,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
@@ -912,7 +913,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 "inference requests. Null for non-inference sessions."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def replica(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -928,7 +929,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             ReplicaID(UUID(str(self.replica_id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -936,7 +937,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 "session belongs to no group or to a group a deployment's replica group holds."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def session_group(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -952,7 +953,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             SessionGroupID(self.resource.session_group_id)
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description=(
@@ -962,18 +963,18 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 "freed or terminated (for statistics and billing)."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
         return await info.context.data_loaders.session_resource_allocation_loader.load(
             SessionID(UUID(str(self.id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this session.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],

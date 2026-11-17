@@ -31,6 +31,7 @@ from ai.backend.manager.api.gql.common_types import ResourceSlotGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -97,12 +98,12 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
         description="Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).",
         )
-    )  # type: ignore[misc]
+    )
     def average_daily_usage(self) -> ResourceSlotGQL | None:
         return calculate_average_daily_usage(
             self.resource_usage,
@@ -110,24 +111,24 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
             self.metadata.period_end,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.",
         )
-    )  # type: ignore[misc]
+    )
     def usage_capacity_ratio(self) -> ResourceSlotGQL | None:
         return calculate_usage_capacity_ratio(
             self.resource_usage,
             self.capacity_snapshot,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="The project entity this usage bucket belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -140,12 +141,12 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
     ):
         return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="The domain entity this usage bucket belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def domain(
         self,
         info: Info[StrawberryGQLContext],
@@ -161,12 +162,12 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
             return None
         return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="The resource group this usage was recorded in.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(
         self,
         info: Info[StrawberryGQLContext],
@@ -179,12 +180,12 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.1.0",
             description="User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.",
         )
-    )  # type: ignore[misc]
+    )
     async def user_usage_buckets(
         self,
         info: Info[StrawberryGQLContext],

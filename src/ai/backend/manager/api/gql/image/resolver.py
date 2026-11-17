@@ -70,7 +70,7 @@ from .types import (
         added_version="26.2.0",
         description="Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.",
     )
-)  # type: ignore[misc]
+)
 async def admin_images_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -133,7 +133,7 @@ async def admin_images_v2(
         ),
     ),
     name="scopedImagesV2",
-)  # type: ignore[misc]
+)
 async def scoped_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ImageSearchScopeGQL,
@@ -192,7 +192,7 @@ async def scoped_images_v2(
         description="Page through the images the current user can reach.",
     ),
     name="myImagesV2",
-)  # type: ignore[misc]
+)
 async def my_images_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -251,7 +251,7 @@ async def my_images_v2(
         added_version="26.2.0",
         description="Retrieve a specific image by its ID. Returns detailed information about the image including its identity, metadata, resource requirements, and permission settings.",
     )
-)  # type: ignore[misc]
+)
 async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
     image_data = await info.context.data_loaders.image_loader.load(ImageID(parse_uuid(id)))
     if image_data is None:
@@ -264,7 +264,7 @@ async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | Non
         added_version="26.2.0",
         description="Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.",
     )
-)  # type: ignore[misc]
+)
 async def container_registry_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ContainerRegistryScopeGQL,
@@ -312,7 +312,7 @@ async def container_registry_images_v2(
         added_version="26.2.0",
         description="Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.",
     )
-)  # type: ignore[misc]
+)
 async def admin_image_aliases(
     info: Info[StrawberryGQLContext],
     filter: ImageV2AliasFilterGQL | None = None,
@@ -360,7 +360,7 @@ async def admin_image_aliases(
         added_version="26.2.0",
         description="Retrieve a specific image alias by its ID. Returns the alias information including the alias string.",
     )
-)  # type: ignore[misc]
+)
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
     alias_data = await info.context.data_loaders.image_alias_loader.load(
         ImageAliasID(parse_uuid(id))
@@ -375,7 +375,7 @@ async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasG
         added_version="26.2.0",
         description="Query image aliases within a specific image with optional filtering, ordering, and pagination. Returns image aliases that belong to the specified image. Supports both cursor-based and offset-based pagination.",
     )
-)  # type: ignore[misc]
+)
 async def image_scoped_aliases(
     info: Info[StrawberryGQLContext],
     scope: ImageV2ScopeGQL,

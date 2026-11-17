@@ -42,7 +42,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
             "(superadmin only)."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_system_session_environs(
     info: Info[StrawberryGQLContext],
     filter: SystemSessionEnvironFilterGQL | None = None,
@@ -94,7 +94,7 @@ async def admin_system_session_environs(
             "``SystemSessionEnviron.valueSource`` holds."
         ),
     )
-)  # type: ignore[misc]
+)
 async def system_session_environ_value_sources(
     info: Info[StrawberryGQLContext],
 ) -> list[str] | None:
@@ -110,7 +110,7 @@ async def system_session_environ_value_sources(
             "with OR, soft-deleted ones included. Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_system_session_environs(
     info: Info[StrawberryGQLContext],
     scope: SystemSessionEnvironScopeGQL,
