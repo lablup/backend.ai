@@ -132,7 +132,7 @@ def test_nodes_built_from_a_row_carry_that_row_s_identifier() -> None:
 
 def _node_types() -> list[type[Any]]:
     found: list[type[Any]] = []
-    pending = [PydanticNodeMixin]
+    pending: list[type[PydanticNodeMixin[Any]]] = [PydanticNodeMixin]
     while pending:
         for subclass in pending.pop().__subclasses__():
             found.append(subclass)

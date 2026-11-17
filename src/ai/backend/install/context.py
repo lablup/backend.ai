@@ -1042,14 +1042,8 @@ class Context(metaclass=ABCMeta):
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
-            elif accelerator in (
-                Accelerator.CUDA_MOCK,
-                Accelerator.CUDA_MIG_MOCK,
-                Accelerator.ROCM_MOCK,
-            ):
-                plugin_list = ['"ai.backend.accelerator.mock"']
             else:
-                plugin_list = []
+                plugin_list = ['"ai.backend.accelerator.mock"']
 
             await self._configure_mock_accelerator(accelerator)
         else:

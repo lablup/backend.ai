@@ -402,8 +402,7 @@ def _define_functions() -> None:
                         family=socket.AF_INET,
                         type=socket.SOCK_STREAM,
                     )
-                    address: str = addrinfo[0][4][0]
-                    return address
+                    return str(addrinfo[0][4][0])
                 except (socket.gaierror, IndexError):
                     return "127.0.0.1"
 

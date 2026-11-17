@@ -8,7 +8,7 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, override
+from typing import Annotated, Any, cast, override
 
 import click
 from pydantic import (
@@ -446,7 +446,9 @@ def generate_example_json(
                 alternative_example = info.default
             if name not in res:
                 try:
-                    res[name] = generate_example_json(info.annotation, parent=config_key)
+                    res[name] = generate_example_json(
+                        cast(type[Any], info.annotation), parent=config_key
+                    )
                 except RuntimeError:
                     if alternative_example != Undefined:
                         res[name] = alternative_example
