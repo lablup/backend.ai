@@ -33,6 +33,7 @@ searcher 와 querier 가 GQL 이 요청한 필드의 column 만 조회하고 결
 |---|---|---|
 | `own` | `QueryColumn` (`SearchableField` 대체) | 요청값, condition, order, `to_data` |
 | `nested` | `NestedQueryColumn` (`NestedSearchableField` 대체) | to-many, to-one condition |
+| `linked` | FK 가 상대 엔티티 쪽에 있는 membership, usage 의 id 조건 | condition. 상대 엔티티 읽기 권한 검사 |
 | `aggregate` | `own` 의 `QueryColumn` 을 감싸는 group 항목, 집계 값 항목 | groupBy, 집계 값 (BEP-1080) |
 
 | `QueryColumn` | 의미 |
