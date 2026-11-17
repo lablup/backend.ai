@@ -348,16 +348,16 @@ class ModelServingRepository:
                 .values({"traffic_ratio": traffic_ratio})
             )
             await session.execute(query)
+            # Inside the transaction, so a failed Valkey write rolls the ratio back.
+            await valkey_live.store_live_data(
+                f"endpoint.{endpoint_id}.session.{route.session}.traffic_ratio",
+                str(traffic_ratio),
+            )
 
         async with self._v2_ops.read_ops() as r:
             data = await self._read_endpoint_data(r, endpoint_id)
         if data is None:
             raise EndpointNotFound
-
-        await valkey_live.store_live_data(
-            f"endpoint.{endpoint_id}.session.{route.session}.traffic_ratio",
-            str(traffic_ratio),
-        )
         return data
 
     @model_serving_repository_resilience.apply()
