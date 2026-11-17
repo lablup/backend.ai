@@ -65,7 +65,7 @@ def downgrade() -> None:
     if (row := next(cursor, None)) is None:
         return
 
-    _typname, _enumlabel, _enumsortorder, enumtypid = row
+    typname, enumlabel, enumsortorder, enumtypid = row
 
     conn.execute(
         text(

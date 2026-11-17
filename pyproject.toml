@@ -229,6 +229,7 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
 "src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
+"src/ai/backend/manager/models/alembic/versions/b5be363ab05c_.py" = ["RUF059"]  # a released migration cannot be edited in place
 # UP040 (type alias) exceptions - cannot use `type` statement when used as callable or base class
 "src/ai/backend/storage/volumes/netapp/netappclient.py" = ["UP040"]  # StorageID/VolumeID/QTreeID used as callables
 "src/ai/backend/manager/api/utils.py" = ["UP040"]  # LegacyBaseRequestModel used as base class
