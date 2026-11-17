@@ -89,7 +89,7 @@ groupBy 는 filter 처럼 field 마다 값 type 별 group input 을 받고, fiel
 |---|---|
 | group 칸 | 값 type 별 group. 민감한 값, Text, JSON, 배열 column 은 비움 |
 | 값 칸 | 값 type, 출처 테이블, 집계 값 정렬 |
-| 스코프 Target | `to_condition()` 외에 (scope_id, row_id) 쌍 select. 소유 column 이 아니라 RBAC 경로 |
+| 스코프 Target | `to_condition()` 외에 (scope_id, row_id) 쌍 select. Target 마다 선언한다. 엔티티는 소유 column 이 아니라 RBAC 경로, RBAC 그래프에 없는 row(감사 로그)는 그 row 의 column |
 | `ToManyCorrelation` | EXISTS 외에 (row_id, 자식 값) 쌍 select. `ToManyGroup` 이 사용 |
 | 세션 nested | kernels 아래 `resource_allocations` 추가 (깊이 2) |
 
@@ -100,7 +100,7 @@ groupBy 는 filter 처럼 field 마다 값 type 별 group input 을 받고, fiel
 - 기존 사용량 API (구현 순서 3, 4단계): 응답 형태 유지, 내부 계산만 변경
 - 스코프 소속 기준 (3, 4단계): share 로 연결된 세션도 포함해 기존 값과 달라질 수 있음
 - `activeResourceOverview` 의 세션 수 (4단계): 활성 자원 할당 커널 기준이라 filter 조정
-- 일관성: measure 별 쿼리를 REPEATABLE READ 트랜잭션 하나에서 실행
+- 일관성: total 과 groups 를 한 쿼리로 계산하고 기본 격리 수준(READ COMMITTED)에서 실행
 - 상한: 요청 스코프 수, groupBy field 수, group 수의 상한은 config
 
 ## 구현 순서

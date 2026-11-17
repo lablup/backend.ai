@@ -21,7 +21,8 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.scopes import AggregateScopeTarget, OperationScope
+from ai.backend.manager.models.specs.aggregate.aggregator import AggregateResult, Aggregator
 from ai.backend.manager.models.specs.lookup import (
     BulkDataLookup,
     BulkFieldKeyLookup,
@@ -45,6 +46,7 @@ from ai.backend.manager.models.specs.searcher import (
     Searcher,
     SearcherResult,
 )
+from ai.backend.manager.repositories.ops.v2.aggregate import AggregateStatement
 from ai.backend.manager.repositories.ops.v2.graph_read import V2GraphReadOpsBase
 
 
@@ -322,6 +324,25 @@ class V2ReadOps(V2GraphReadOpsBase):
         endpoints or internal system operations.
         """
         return await self._search((), searcher, ())
+
+    async def aggregate_in_global(self, aggregator: Aggregator[Any]) -> AggregateResult:
+        """Count across the entire table. Permitted only for callers holding full authority."""
+        statement = AggregateStatement(aggregator, None)
+        rows = (await self._sess.execute(statement.build())).all()
+        return statement.read(rows)[0]
+
+    async def aggregate_in_scopes(
+        self, targets: Sequence[AggregateScopeTarget], aggregator: Aggregator[Any]
+    ) -> list[AggregateResult]:
+        """Count within each target on its own; one result per target, in order."""
+        if not targets:
+            raise EmptyOperationScopeError(
+                "aggregate_in_scopes requires at least one scope; "
+                "use aggregate_in_global for an explicit unscoped aggregate."
+            )
+        statement = AggregateStatement(aggregator, targets)
+        rows = (await self._sess.execute(statement.build())).all()
+        return statement.read(rows)
 
     async def _search[TRow: Base, TData](
         self,
