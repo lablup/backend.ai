@@ -1,14 +1,11 @@
 """
-Regression test for issue #11372 (expanded scope):
-``ModelServingRepository.list_endpoints_by_owner_validated`` must drive
-``EndpointRow.to_data()`` end-to-end without raising ``MissingGreenlet``.
+``ModelServingRepository`` building ``EndpointData`` (issue #11372, expanded scope).
 
-The latent crash path is ``ModelServingService.list_serve``, which projects
-each returned ``EndpointData`` and reads ``endpoint.routings`` plus the
-revision-derived fields. ``_read_endpoint_datas`` reads the active revision,
-its image, the creator and owner emails and the routings with Searchers and
-builds ``EndpointData`` from them, so nothing lazy-loads inside the async
-transaction. ``search_services_paginated`` lists the same owned endpoint.
+``ModelServingService.list_serve`` projects each returned ``EndpointData`` and reads
+``endpoint.routings`` plus the revision-derived fields. ``_read_endpoint_datas`` reads
+the active revision, its image, the creator and owner emails and the routings with
+Searchers and builds ``EndpointData`` from them. ``search_services_paginated`` lists
+the same owned endpoint.
 """
 
 from __future__ import annotations
@@ -431,7 +428,7 @@ def repository(db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository
     )
 
 
-async def test_list_endpoints_by_owner_validated_drives_to_data_end_to_end(
+async def test_list_endpoints_by_owner_validated_returns_the_emails_revision_and_routes(
     repository: ModelServingRepository,
     test_user: tuple[uuid.UUID, str],
     test_creator_user: tuple[uuid.UUID, str],
@@ -609,3 +606,103 @@ class TestGetEndpointByIdActiveRevision:
         assert data.resource_slots == ResourceSlot({})
         assert data.runtime_variant_id is None
         assert data.routings == []
+
+
+@pytest.fixture
+async def endpoint_of_another_owner(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    test_creator_user: tuple[uuid.UUID, str],
+    test_domain: DomainFixtureData,
+    test_group_id: uuid.UUID,
+    test_scaling_group: str,
+) -> uuid.UUID:
+    """A CREATED endpoint ``test_creator_user`` owns."""
+    owner_id, _email = test_creator_user
+    endpoint_id = uuid.uuid4()
+    async with db_with_cleanup.begin_session() as sess:
+        sess.add(
+            EndpointRow(
+                id=endpoint_id,
+                name=f"test-ep-{uuid.uuid4().hex[:8]}",
+                created_user=owner_id,
+                session_owner=owner_id,
+                domain=test_domain.domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+                replicas=1,
+            )
+        )
+    return endpoint_id
+
+
+@pytest.fixture
+async def destroyed_endpoint(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    test_user: tuple[uuid.UUID, str],
+    test_domain: DomainFixtureData,
+    test_group_id: uuid.UUID,
+    test_scaling_group: str,
+) -> uuid.UUID:
+    """A DESTROYED endpoint ``test_user`` owns."""
+    user_id, _email = test_user
+    endpoint_id = uuid.uuid4()
+    async with db_with_cleanup.begin_session() as sess:
+        sess.add(
+            EndpointRow(
+                id=endpoint_id,
+                name=f"test-ep-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group,
+                lifecycle_stage=EndpointLifecycle.DESTROYED,
+                replicas=1,
+            )
+        )
+    return endpoint_id
+
+
+class TestListEndpointsByOwnerValidated:
+    async def test_the_name_narrows_the_list(
+        self,
+        repository: ModelServingRepository,
+        test_user: tuple[uuid.UUID, str],
+        listed_endpoint: tuple[uuid.UUID, str],
+        endpoint_without_revision: uuid.UUID,
+    ) -> None:
+        user_id, _email = test_user
+        endpoint_id, endpoint_name = listed_endpoint
+
+        results = await repository.list_endpoints_by_owner_validated(user_id, name=endpoint_name)
+
+        assert [endpoint.id for endpoint in results] == [endpoint_id]
+
+    async def test_an_endpoint_of_another_owner_is_left_out(
+        self,
+        repository: ModelServingRepository,
+        test_user: tuple[uuid.UUID, str],
+        listed_endpoint: tuple[uuid.UUID, str],
+        endpoint_of_another_owner: uuid.UUID,
+    ) -> None:
+        user_id, _email = test_user
+        endpoint_id, _endpoint_name = listed_endpoint
+
+        results = await repository.list_endpoints_by_owner_validated(user_id)
+
+        assert [endpoint.id for endpoint in results] == [endpoint_id]
+
+    async def test_an_endpoint_that_is_not_created_is_left_out(
+        self,
+        repository: ModelServingRepository,
+        test_user: tuple[uuid.UUID, str],
+        listed_endpoint: tuple[uuid.UUID, str],
+        destroyed_endpoint: uuid.UUID,
+    ) -> None:
+        user_id, _email = test_user
+        endpoint_id, _endpoint_name = listed_endpoint
+
+        results = await repository.list_endpoints_by_owner_validated(user_id)
+
+        assert [endpoint.id for endpoint in results] == [endpoint_id]
