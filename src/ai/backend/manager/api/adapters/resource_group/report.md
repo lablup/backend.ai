@@ -3217,7 +3217,7 @@ Given
 
 - one resource group and one superadmin
   - Domain home-1
-  - Resource group resource-group-1: uses the fifo scheduler, skips a pending session after 3 retries
+  - Resource group resource-group-1: uses the fifo scheduler, every scheduler option, 3 retries before skipping a pending session among them, and the preemption config differ from the defaults
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -3241,18 +3241,18 @@ Then
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
-  - scheduler.preemption.enabled = False
-  - scheduler.preemption.preemptible_priority = 5
-  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
-  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
-  - scheduler.preemption.preemption_min_runtime = 0.0
-  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.options.pending_timeout = 0.0
+  - scheduler.preemption.enabled = True
+  - scheduler.preemption.preemptible_priority = 3
+  - scheduler.preemption.order = <PreemptionOrder.NEWEST: 'newest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
+  - scheduler.preemption.preemption_min_runtime = 30.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.options.pending_timeout = 120.0
   - scheduler.options.config.num_retries_to_skip = None
-  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
-  - scheduler.options.allow_fractional_resource_fragmentation = True
-  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.ROUNDROBIN: 'roundrobin'>
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 

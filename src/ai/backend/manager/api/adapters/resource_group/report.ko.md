@@ -3217,7 +3217,7 @@ Given
 
 - 리소스 그룹 하나와, superadmin 한 명
   - 도메인 home-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다, 대기 세션 건너뛰기 재시도 횟수 3
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다, 대기 세션 건너뛰기 재시도 횟수 3을 비롯해 스케줄러 옵션과 선점 설정이 모두 기본값과 다릅니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
@@ -3241,18 +3241,18 @@ Then
   - network.wsproxy_addr = None
   - network.use_host_network = False
   - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
-  - scheduler.preemption.enabled = False
-  - scheduler.preemption.preemptible_priority = 5
-  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
-  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
-  - scheduler.preemption.preemption_min_runtime = 0.0
-  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.options.pending_timeout = 0.0
+  - scheduler.preemption.enabled = True
+  - scheduler.preemption.preemptible_priority = 3
+  - scheduler.preemption.order = <PreemptionOrder.NEWEST: 'newest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
+  - scheduler.preemption.preemption_min_runtime = 30.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.options.pending_timeout = 120.0
   - scheduler.options.config.num_retries_to_skip = None
-  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
-  - scheduler.options.allow_fractional_resource_fragmentation = True
-  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.ROUNDROBIN: 'roundrobin'>
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
   - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
   - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
 
