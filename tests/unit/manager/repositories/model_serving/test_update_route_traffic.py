@@ -416,7 +416,7 @@ async def test_update_route_traffic_returns_endpoint_data_when_revision_exists(
     result = await repository.update_route_traffic(
         valkey_live=mock_valkey_live,
         route_id=route_id,
-        service_id=endpoint_id,
+        endpoint_id=endpoint_id,
         traffic_ratio=0.0,
     )
 

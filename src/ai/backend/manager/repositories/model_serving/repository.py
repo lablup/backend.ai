@@ -324,7 +324,7 @@ class ModelServingRepository:
         self,
         valkey_live: ValkeyLiveClient,
         route_id: uuid.UUID,
-        service_id: uuid.UUID,
+        endpoint_id: uuid.UUID,
         traffic_ratio: float,
     ) -> EndpointData | None:
         """
@@ -339,7 +339,7 @@ class ModelServingRepository:
                     )
                 )
             ).one_or_none()
-            if route is None or route.endpoint != service_id:
+            if route is None or route.endpoint != endpoint_id:
                 return None
 
             query = (
@@ -350,12 +350,12 @@ class ModelServingRepository:
             await session.execute(query)
 
         async with self._v2_ops.read_ops() as r:
-            data = await self._read_endpoint_data(r, service_id)
+            data = await self._read_endpoint_data(r, endpoint_id)
         if data is None:
             raise EndpointNotFound
 
         await valkey_live.store_live_data(
-            f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
+            f"endpoint.{endpoint_id}.session.{route.session}.traffic_ratio",
             str(traffic_ratio),
         )
         return data
