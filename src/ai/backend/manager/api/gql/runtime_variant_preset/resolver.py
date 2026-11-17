@@ -42,7 +42,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Search runtime variant presets.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variant_presets(
     info: Info[StrawberryGQLContext],
     filter: RuntimeVariantPresetFilterGQL | None = None,
@@ -101,7 +101,7 @@ async def runtime_variant_presets(
         added_version="26.4.2",
         description="Get a single runtime variant preset by ID.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,

@@ -23,7 +23,7 @@ __all__ = ("admin_service_catalogs",)
     BackendAIGQLMeta(
         added_version="26.3.0", description="Query service catalog entries. Admin only."
     )
-)  # type: ignore[misc]
+)
 async def admin_service_catalogs(
     info: Info[StrawberryGQLContext],
     filter: ServiceCatalogFilterGQL | None = None,

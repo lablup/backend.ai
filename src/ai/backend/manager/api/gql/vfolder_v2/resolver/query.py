@@ -38,7 +38,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL, 
         added_version="26.4.2",
         description="Search all virtual folders (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_vfolders_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -94,7 +94,7 @@ async def admin_vfolders_v2(
         added_version="26.4.2",
         description="Get a single virtual folder by ID.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -113,7 +113,7 @@ async def vfolder_v2(
         ),
     ),
     name="scopedVFoldersV2",
-)  # type: ignore[misc]
+)
 async def scoped_vfolders_v2(
     info: Info[StrawberryGQLContext],
     scope: VFolderScopeGQL,
@@ -170,7 +170,7 @@ async def scoped_vfolders_v2(
         added_version="26.4.2",
         description="List virtual folders within a specific project.",
     )
-)  # type: ignore[misc]
+)
 async def project_vfolders(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -227,7 +227,7 @@ async def project_vfolders(
         added_version="26.4.2",
         description="Search virtual folders accessible to the current user with pagination and filtering.",
     )
-)  # type: ignore[misc]
+)
 async def my_vfolders(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -286,7 +286,7 @@ async def my_vfolders(
         added_version="26.9.0",
         description="The mount levels set on a virtual folder, one row per user.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_mount_policies(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,

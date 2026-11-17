@@ -63,6 +63,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -328,12 +329,12 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         default=None,
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The user a customized image was committed for.",
         )
-    )  # type: ignore[misc]
+    )
     async def creator(
         self,
         info: Info[StrawberryGQLContext],
@@ -348,19 +349,19 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
             return None
         return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0",
             description="Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
         )
-    )  # type: ignore[misc]
+    )
     def last_used(self) -> datetime | None:
         """Get the timestamp of the most recent session created with this image."""
         return self.metadata.last_used_at
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(added_version="26.2.0", description="Aliases for this image.")
-    )  # type: ignore[misc]
+    )
     async def aliases(
         self,
         info: Info[StrawberryGQLContext],
@@ -402,12 +403,12 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
             count=payload.total_count, edges=edges, page_info=page_info
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this image.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],

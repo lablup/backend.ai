@@ -38,7 +38,7 @@ from ai.backend.manager.errors.auth import SuperadminRequired
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Get domain fair share data (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -55,7 +55,7 @@ async def admin_domain_fair_share(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List domain fair shares (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_domain_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: DomainFairShareFilter | None = None,
@@ -109,7 +109,7 @@ async def admin_domain_fair_shares(
         added_version="26.2.0",
         description="Get domain fair share data within resource group scope.",
     )
-)  # type: ignore[misc]
+)
 async def rg_domain_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
@@ -126,7 +126,7 @@ async def rg_domain_fair_share(
     BackendAIGQLMeta(
         added_version="26.2.0", description="List domain fair shares within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_domain_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
@@ -180,7 +180,7 @@ async def rg_domain_fair_shares(
         added_version="26.1.0", description="Get domain fair share data (superadmin only)."
     ),
     deprecation_reason="Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -202,7 +202,7 @@ async def domain_fair_share(
         added_version="26.1.0", description="List domain fair shares (superadmin only)."
     ),
     deprecation_reason="Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def domain_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: DomainFairShareFilter | None = None,

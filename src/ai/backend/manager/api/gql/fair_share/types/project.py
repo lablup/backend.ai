@@ -47,6 +47,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -95,12 +96,12 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
     created_at: datetime = gql_field(description="Timestamp when this record was created.")
     updated_at: datetime = gql_field(description="Timestamp when this record was last updated.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="The project entity associated with this fair share record.",
         )
-    )  # type: ignore[misc]
+    )
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -118,12 +119,12 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
             return None
         return project_data
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="The domain entity associated with this fair share record.",
         )
-    )  # type: ignore[misc]
+    )
     async def domain(
         self,
         info: Info[StrawberryGQLContext],
@@ -139,12 +140,12 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
             return None
         return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="The resource group associated with this fair share record.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(
         self,
         info: Info[StrawberryGQLContext],

@@ -80,11 +80,13 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -277,12 +279,12 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     created_at: datetime
     updated_at: datetime
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The session this history record belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def session(
         self,
         info: Info[StrawberryGQLContext],
@@ -384,12 +386,12 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
         )
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The deployment this history record belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def deployment(
         self,
         info: Info[StrawberryGQLContext],
@@ -448,9 +450,9 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
     created_at: datetime
     updated_at: datetime
 
-    @gql_field(
+    @gql_resolver(
         description="The deployment the replica group belongs to.",
-    )  # type: ignore[misc]
+    )
     async def deployment(
         self,
         info: Info[StrawberryGQLContext],
@@ -503,12 +505,12 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     created_at: datetime
     updated_at: datetime
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The route this history record belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def route(
         self,
         info: Info[StrawberryGQLContext],
@@ -521,12 +523,12 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     ):
         return await info.context.data_loaders.route_loader.load(UUID(str(self.route_id)))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The deployment this history record belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def deployment(
         self,
         info: Info[StrawberryGQLContext],

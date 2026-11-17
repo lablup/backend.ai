@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -105,12 +106,12 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last modification timestamp.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Permission entries carried by this role preset.",
         )
-    )  # type: ignore[misc]
+    )
     async def permission_presets(
         self,
         info: Info[StrawberryGQLContext],

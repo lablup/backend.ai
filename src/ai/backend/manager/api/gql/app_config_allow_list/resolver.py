@@ -44,7 +44,7 @@ from .types import (
         added_version="26.7.0",
         description="Get a single app config allow-list entry by id (super admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_app_config_allow_list(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -62,7 +62,7 @@ async def admin_app_config_allow_list(
             "(super admin only)."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_app_config_allow_lists(
     info: Info[StrawberryGQLContext],
     filter: AppConfigAllowListFilterGQL | None = None,

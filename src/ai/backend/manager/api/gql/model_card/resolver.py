@@ -73,7 +73,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Search all model cards (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_model_cards_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -111,7 +111,7 @@ async def admin_model_cards_v2(
             "Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_model_cards_v2(
     info: Info[StrawberryGQLContext],
     scope: ModelCardScopeGQL,
@@ -156,7 +156,7 @@ async def scoped_model_cards_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Page through the model cards the current user holds through membership.",
     )
-)  # type: ignore[misc]
+)
 async def my_model_cards_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -202,7 +202,7 @@ async def my_model_cards_v2(
         added_version="26.4.2",
         description="Search model cards within a MODEL_STORE project.",
     )
-)  # type: ignore[misc]
+)
 async def project_model_cards_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectModelCardScopeGQL,
@@ -237,7 +237,7 @@ async def project_model_cards_v2(
         added_version="26.4.2",
         description="Get a single model card by ID.",
     )
-)  # type: ignore[misc]
+)
 async def model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -455,7 +455,7 @@ def _build_search_input(
         added_version="26.4.2",
         description="Search deployment revision presets that satisfy a model card's minimum resource requirements.",
     )
-)  # type: ignore[misc]
+)
 async def model_card_available_presets(
     info: Info[StrawberryGQLContext],
     scope: ModelCardAvailablePresetsScopeGQL,

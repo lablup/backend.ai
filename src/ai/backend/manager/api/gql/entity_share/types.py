@@ -53,6 +53,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -133,12 +134,12 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
     created_at: datetime = gql_field(description="When the offer was made.")
     updated_at: datetime = gql_field(description="When it was last written.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Who sent the offer, when the caller may read that user.",
         )
-    )  # type: ignore[misc]
+    )
     async def sharer(
         self,
         info: Info[StrawberryGQLContext],
@@ -153,7 +154,7 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
             return None
         return await info.context.data_loaders.user_loader.load(UserID(self.sharer_user_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -161,7 +162,7 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
                 "An address resolves to the user holding it."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def recipient_entity(
         self,
         info: Info[StrawberryGQLContext],
@@ -184,12 +185,12 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
         user_id = await data_loaders.user_id_by_email_loader.load(self.recipient_email)
         return await data_loaders.user_loader.load(user_id)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The entity being offered, when the caller may read it.",
         )
-    )  # type: ignore[misc]
+    )
     async def target_entity(
         self,
         info: Info[StrawberryGQLContext],

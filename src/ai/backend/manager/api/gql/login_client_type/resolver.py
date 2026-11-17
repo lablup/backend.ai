@@ -47,7 +47,7 @@ from .types import (
         added_version="26.4.2",
         description="Get a single login client type by id.",
     )
-)  # type: ignore[misc]
+)
 async def login_client_type(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -61,7 +61,7 @@ async def login_client_type(
         added_version="26.4.2",
         description=("Search login client types with filtering, ordering, and pagination."),
     )
-)  # type: ignore[misc]
+)
 async def login_client_types(
     info: Info[StrawberryGQLContext],
     filter: LoginClientTypeFilterGQL | None = None,

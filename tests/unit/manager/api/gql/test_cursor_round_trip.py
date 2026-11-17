@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -318,7 +318,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchRuntimeVariantsPayload,
         adapter_owner="runtime_variant",
         adapter_method="search",
-        call=lambda info, first, after: runtime_variants.base_resolver(
+        call=lambda info, first, after: cast(Any, runtime_variants).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -328,7 +328,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchRuntimeVariantPresetsPayload,
         adapter_owner="runtime_variant_preset",
         adapter_method="search",
-        call=lambda info, first, after: runtime_variant_presets.base_resolver(
+        call=lambda info, first, after: cast(Any, runtime_variant_presets).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -338,7 +338,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchRetentionPoliciesPayload,
         adapter_owner="retention_policy",
         adapter_method="search",
-        call=lambda info, first, after: admin_retention_policies.base_resolver(
+        call=lambda info, first, after: cast(Any, admin_retention_policies).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -348,7 +348,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchRolePresetsPayload,
         adapter_owner="role_preset",
         adapter_method="search",
-        call=lambda info, first, after: admin_role_presets.base_resolver(
+        call=lambda info, first, after: cast(Any, admin_role_presets).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -359,7 +359,7 @@ CASES: list[ConnectionCase] = [
         adapter_owner="role_preset",
         adapter_method="search_permission_presets",
         call=lambda info, first, after: RolePresetGQL.permission_presets(
-            SimpleNamespace(id=str(uuid.uuid4())), info, first=first, after=after
+            cast(Any, SimpleNamespace(id=str(uuid.uuid4()))), info, first=first, after=after
         ),
     ),
     ConnectionCase(
@@ -368,7 +368,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchDeploymentRevisionPresetsPayload,
         adapter_owner="deployment_revision_preset",
         adapter_method="search",
-        call=lambda info, first, after: deployment_revision_presets.base_resolver(
+        call=lambda info, first, after: cast(Any, deployment_revision_presets).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -378,7 +378,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchDeploymentRevisionPresetsPayload,
         adapter_owner="model_card",
         adapter_method="available_presets",
-        call=lambda info, first, after: model_card_available_presets.base_resolver(
+        call=lambda info, first, after: cast(Any, model_card_available_presets).base_resolver(
             info,
             ModelCardAvailablePresetsScopeGQL(model_card_id=uuid.uuid4()),
             first=first,
@@ -391,7 +391,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchModelCardsPayload,
         adapter_owner="model_card",
         adapter_method="admin_search",
-        call=lambda info, first, after: admin_model_cards_v2.base_resolver(
+        call=lambda info, first, after: cast(Any, admin_model_cards_v2).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -402,9 +402,12 @@ CASES: list[ConnectionCase] = [
         adapter_owner="model_card",
         adapter_method="ownership_search",
         call=lambda info, first, after: VFolderGQL.model_cards(
-            SimpleNamespace(
-                id=str(uuid.uuid4()),
-                ownership=SimpleNamespace(project_id=uuid.uuid4(), user_id=None),
+            cast(
+                Any,
+                SimpleNamespace(
+                    id=str(uuid.uuid4()),
+                    ownership=SimpleNamespace(project_id=uuid.uuid4(), user_id=None),
+                ),
             ),
             info,
             first=first,
@@ -417,7 +420,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchEntitySharesPayload,
         adapter_owner="entity_share",
         adapter_method="my_search",
-        call=lambda info, first, after: my_entity_shares.base_resolver(
+        call=lambda info, first, after: cast(Any, my_entity_shares).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -427,7 +430,7 @@ CASES: list[ConnectionCase] = [
         payload_type=SearchReplicasPayload,
         adapter_owner="deployment",
         adapter_method="admin_search_replicas",
-        call=lambda info, first, after: replicas_resolver.base_resolver(
+        call=lambda info, first, after: cast(Any, replicas_resolver).base_resolver(
             info, first=first, after=after
         ),
     ),
@@ -438,7 +441,7 @@ CASES: list[ConnectionCase] = [
         adapter_owner="deployment",
         adapter_method="search_replicas",
         call=lambda info, first, after: ModelDeployment.replicas(
-            SimpleNamespace(id=str(uuid.uuid4())), info, first=first, after=after
+            cast(Any, SimpleNamespace(id=str(uuid.uuid4()))), info, first=first, after=after
         ),
     ),
 ]

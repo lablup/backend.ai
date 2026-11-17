@@ -128,6 +128,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -733,7 +734,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     updated_at: datetime
     availability: ArtifactAvailability
 
-    @gql_field(description="The revisions of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The revisions of this entity.")
     async def revisions(
         self,
         info: Info[StrawberryGQLContext],
@@ -868,7 +869,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The artifact of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The artifact of this entity.")
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact | None:
         revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
         artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)

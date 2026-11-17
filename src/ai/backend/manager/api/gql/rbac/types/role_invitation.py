@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -90,7 +91,9 @@ class RoleInvitationGQL(PydanticNodeMixin[Any]):
     ) -> Iterable[Self | None]:
         return [None for _ in node_ids]
 
-    @gql_field(description="The user who sent this invitation. Null for system-issued invitations.")  # type: ignore[misc]
+    @gql_resolver(
+        description="The user who sent this invitation. Null for system-issued invitations."
+    )
     def inviter(
         self,
     ) -> (
@@ -102,9 +105,9 @@ class RoleInvitationGQL(PydanticNodeMixin[Any]):
     ):
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="The user who received this invitation. Null if the user no longer exists."
-    )  # type: ignore[misc]
+    )
     def invitee(
         self,
     ) -> (
@@ -116,9 +119,9 @@ class RoleInvitationGQL(PydanticNodeMixin[Any]):
     ):
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="The role this invitation grants on acceptance. Null if the role no longer exists."
-    )  # type: ignore[misc]
+    )
     def role(
         self,
     ) -> (

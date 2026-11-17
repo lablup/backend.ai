@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFi
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -95,12 +96,12 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     last_heartbeat: datetime = gql_field(description="Last heartbeat timestamp.")
     config_hash: str = gql_field(description="Hash of the service configuration.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The storage volumes attached to this service, one attachment per volume.",
         )
-    )  # type: ignore[misc]
+    )
     async def storage_volume_attachments(
         self,
         info: Info[StrawberryGQLContext],

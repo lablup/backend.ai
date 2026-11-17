@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -128,7 +129,7 @@ class TestAdminDomainFairShareSingleQuery:
         info = create_mock_info(context)
 
         with with_user_context(mock_superadmin_user):
-            result = await domain_resolver.admin_domain_fair_share.base_resolver(
+            result = await cast(Any, domain_resolver.admin_domain_fair_share).base_resolver(
                 info=info,
                 resource_group_name="default",
                 domain_name="test-domain",
@@ -156,7 +157,7 @@ class TestAdminDomainFairShareSingleQuery:
 
         with with_user_context(mock_superadmin_user):
             with pytest.raises(DomainNotFound):
-                await domain_resolver.admin_domain_fair_share.base_resolver(
+                await cast(Any, domain_resolver.admin_domain_fair_share).base_resolver(
                     info=info,
                     resource_group_name="default",
                     domain_name="nonexistent-domain",
@@ -173,7 +174,7 @@ class TestAdminDomainFairShareSingleQuery:
 
         with with_user_context(mock_regular_user):
             with pytest.raises(web.HTTPForbidden):
-                await domain_resolver.admin_domain_fair_share.base_resolver(
+                await cast(Any, domain_resolver.admin_domain_fair_share).base_resolver(
                     info=info,
                     resource_group_name="default",
                     domain_name="test-domain",
@@ -195,7 +196,7 @@ class TestAdminDomainFairShareSingleQuery:
         info = create_mock_info(context)
 
         with with_user_context(mock_superadmin_user):
-            result = await domain_resolver.admin_domain_fair_share.base_resolver(
+            result = await cast(Any, domain_resolver.admin_domain_fair_share).base_resolver(
                 info=info,
                 resource_group_name="default",
                 domain_name="test-domain",
@@ -223,7 +224,7 @@ class TestAdminDomainFairSharesListQuery:
         info = create_mock_info(context)
 
         with with_user_context(mock_superadmin_user):
-            await domain_resolver.admin_domain_fair_shares.base_resolver(
+            await cast(Any, domain_resolver.admin_domain_fair_shares).base_resolver(
                 info=info,
                 filter=None,
                 order_by=None,
@@ -252,7 +253,7 @@ class TestAdminDomainFairSharesListQuery:
         info = create_mock_info(context)
 
         with with_user_context(mock_superadmin_user):
-            result = await domain_resolver.admin_domain_fair_shares.base_resolver(
+            result = await cast(Any, domain_resolver.admin_domain_fair_shares).base_resolver(
                 info=info,
                 filter=None,
                 order_by=None,
@@ -277,7 +278,7 @@ class TestAdminDomainFairSharesListQuery:
 
         with with_user_context(mock_regular_user):
             with pytest.raises(web.HTTPForbidden):
-                await domain_resolver.admin_domain_fair_shares.base_resolver(
+                await cast(Any, domain_resolver.admin_domain_fair_shares).base_resolver(
                     info=info,
                     filter=None,
                     order_by=None,
@@ -303,7 +304,7 @@ class TestAdminDomainFairSharesListQuery:
         info = create_mock_info(context)
 
         with with_user_context(mock_superadmin_user):
-            result = await domain_resolver.admin_domain_fair_shares.base_resolver(
+            result = await cast(Any, domain_resolver.admin_domain_fair_shares).base_resolver(
                 info=info,
                 filter=None,
                 order_by=None,

@@ -97,7 +97,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     basic_info: DomainBasicInfoGQL
     # ...
 
-    @gql_field(description="Projects belonging to this domain.")
+    @gql_resolver(description="Projects belonging to this domain.")
     async def projects(self, info: Info[StrawberryGQLContext]) -> ...:
         return await info.context.data_loaders.project_loader.load(self.domain_name)
 ```
@@ -181,7 +181,7 @@ DomainStatusGQL = gql_enum(
 Every field that runs through a **resolver** must be declared nullable (`T | None`). This
 covers root `Query` / `Mutation` fields and any computed nested field on a Node,
 Connection, or Payload type: anything decorated with `@gql_root_field`, `@gql_mutation`,
-`@gql_field`, or `@gql_added_field`. It follows the GraphQL nullable-by-default best
+`@gql_resolver`, or `@gql_added_resolver`. It follows the GraphQL nullable-by-default best
 practice.
 
 **Why**
@@ -212,12 +212,12 @@ async def admin_audit_logs_v2(...) -> AuditLogV2ConnectionGQL | None: ...
 
 # Computed nested field — cross-entity DataLoader resolver
 class DomainV2GQL(PydanticNodeMixin[DomainNode]):
-    @gql_field(description="Projects belonging to this domain.")
+    @gql_resolver(description="Projects belonging to this domain.")
     async def projects(self, info: Info[StrawberryGQLContext]) -> ProjectV2ConnectionGQL | None: ...
 
 # Trivially derived scalar — exempt, see Exceptions below
 class FooConnection(Connection[Foo]):
-    @gql_field(description="Total count.")
+    @gql_resolver(description="Total count.")
     def count(self) -> int: ...
 
 # List — only the outer list is nullable; element non-null is fine
@@ -310,7 +310,7 @@ Use `strawberry.lazy()` to avoid circular imports:
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 
-@gql_field(description="Projects associated with this domain.")
+@gql_resolver(description="Projects associated with this domain.")
 async def projects(
     self, info: Info[StrawberryGQLContext]
 ) -> Annotated[ProjectV2GQL, strawberry.lazy("...project_v2.types.node")] | None:

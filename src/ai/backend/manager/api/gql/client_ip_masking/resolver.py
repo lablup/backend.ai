@@ -45,7 +45,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.9.0",
         description="Read the client IP masking set for every target (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_client_ip_masking_policies(
     info: Info[StrawberryGQLContext],
     filter: ClientIPMaskingPolicyFilterGQL | None = None,
