@@ -515,6 +515,7 @@ class EndpointRow(Base):
                 created_at=self.created_at,
                 revision_history_limit=self.revision_history_limit,
                 tag=self.tag,
+                destroyed_at=self.destroyed_at,
             ),
             state=DeploymentState(
                 lifecycle=self.lifecycle_stage,
