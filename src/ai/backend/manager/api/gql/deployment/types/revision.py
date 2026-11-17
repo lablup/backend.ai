@@ -87,6 +87,12 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder as RevisionOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ServiceArgumentInterpolationDelimiterInput as ServiceArgumentInterpolationDelimiterInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ServiceArgumentInterpolationInput as ServiceArgumentInterpolationInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload as ActivateRevisionPayloadDTO,
 )
@@ -111,7 +117,10 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
     RuntimeVariantPresetValueInfoDTO,
+    ServiceArgumentInterpolationDelimiterInfoDTO,
+    ServiceArgumentInterpolationInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -423,6 +432,33 @@ class ModelHealthCheckGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A pair of delimiters that marks a variable in the service arguments.",
+    ),
+    model=ServiceArgumentInterpolationDelimiterInfoDTO,
+    name="ServiceArgumentInterpolationDelimiter",
+)
+class ServiceArgumentInterpolationDelimiterGQL:
+    start: str = gql_field(description="Opening delimiter.")
+    end: str = gql_field(description="Closing delimiter.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Variable syntax of the service arguments of a model service.",
+    ),
+    model=ServiceArgumentInterpolationInfoDTO,
+    name="ServiceArgumentInterpolation",
+)
+class ServiceArgumentInterpolationGQL:
+    delimiters: list[ServiceArgumentInterpolationDelimiterGQL] = gql_field(
+        description="Delimiters that mark the variables to fill in the service arguments."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Service configuration for a model entry.",
     ),
@@ -456,6 +492,12 @@ class ModelServiceConfigGQL:
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
         default=None,
+    )
+    interpolation: ServiceArgumentInterpolationGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Variable syntax of the service arguments.",
+        ),
     )
 
 
@@ -1035,6 +1077,35 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="A pair of delimiters that marks a variable in the service arguments.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ServiceArgumentInterpolationDelimiterInput",
+)
+class ServiceArgumentInterpolationDelimiterInputGQL(
+    PydanticInputMixin[ServiceArgumentInterpolationDelimiterInputDTO]
+):
+    start: str = gql_field(description="Opening delimiter, e.g. `{{`.")
+    end: str = gql_field(description="Closing delimiter, e.g. `}}`.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Variable syntax of the service arguments of a model service.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ServiceArgumentInterpolationInput",
+)
+class ServiceArgumentInterpolationInputGQL(
+    PydanticInputMixin[ServiceArgumentInterpolationInputDTO]
+):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInputGQL] = gql_field(
+        description="Delimiters that mark the variables to fill in the service arguments."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Service configuration for a model, including startup command and health check.",
         added_version="26.4.0",
     ),
@@ -1071,6 +1142,16 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
     port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
+    )
+    interpolation: ServiceArgumentInterpolationInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Variable syntax of the service arguments. "
+                "Omit to inherit it; the default is `${{ }}` and `{ }`."
+            ),
+        ),
+        default=None,
     )
 
 

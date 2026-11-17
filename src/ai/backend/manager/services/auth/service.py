@@ -12,7 +12,6 @@ from sqlalchemy import RowMapping
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth.password import PasswordInfo
-from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -42,7 +41,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.auth.types import AuthorizationResult
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
@@ -94,10 +93,6 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
-)
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-    GenerateSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.get_role import (
     GetRoleAction,
@@ -831,19 +826,6 @@ class AuthService:
         return GetSSHKeypairActionResult(
             public_key=ssh_keypair.public_key if ssh_keypair is not None else "",
             access_key=action.access_key,
-        )
-
-    async def generate_ssh_keypair(
-        self, action: GenerateSSHKeypairAction
-    ) -> GenerateSSHKeypairActionResult:
-        pubkey, privkey = generate_ssh_keypair()
-        await self._user_repository.replace_default_ssh_keypair(action.user_id, pubkey, privkey)
-
-        return GenerateSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
         )
 
     async def upload_ssh_keypair(

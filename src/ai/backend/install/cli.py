@@ -7,7 +7,14 @@ from pathlib import Path
 import click
 
 from . import __version__
-from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, InstallModes
+from .types import (
+    Accelerator,
+    CliArgs,
+    EndpointProtocol,
+    FrontendMode,
+    InstallModes,
+    ProxyBackend,
+)
 
 
 @click.command(
@@ -110,7 +117,23 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     "--frontend-mode",
     type=click.Choice([m.value for m in FrontendMode], case_sensitive=False),
     default=FrontendMode.PORT.value,
-    help="App-proxy frontend mode: 'port' (default) or 'wildcard'.",
+    help=(
+        "App-proxy frontend traffic pattern: 'port' (default) or 'wildcard'. "
+        "'traefik' is a deprecated alias for '--frontend-mode port "
+        "--proxy-backend traefik'."
+    ),
+)
+@click.option(
+    "--proxy-backend",
+    type=click.Choice([m.value for m in ProxyBackend], case_sensitive=False),
+    default=ProxyBackend.BUILTIN.value,
+    help=(
+        "App-proxy dataplane implementation: 'builtin' (default; the worker "
+        "serves the traffic itself) or 'traefik' (a Traefik container in the "
+        "halfstack serves it, fed via the coordinator's etcd provider). "
+        "Composes with --frontend-mode: e.g. '--frontend-mode wildcard "
+        "--proxy-backend traefik'."
+    ),
 )
 @click.option(
     "--use-wildcard-binding",
@@ -244,6 +267,7 @@ def main(
     advertised_port: int,
     endpoint_protocol: str | None,
     frontend_mode: str,
+    proxy_backend: str,
     use_wildcard_binding: bool,
     otel_endpoint: str | None,
     metric_access_cidr: str,
@@ -272,6 +296,18 @@ def main(
             " the passwordless sudo privilege."
         )
         sys.exit(1)
+    # Normalize the deprecated "--frontend-mode traefik" alias into the
+    # orthogonal (traffic pattern, dataplane backend) pair.
+    parsed_frontend_mode = FrontendMode(frontend_mode)
+    parsed_proxy_backend = ProxyBackend(proxy_backend)
+    if parsed_frontend_mode == FrontendMode.TRAEFIK:
+        console_note = Console(stderr=True)
+        console_note.print(
+            "[yellow]'--frontend-mode traefik' is deprecated; use"
+            " '--frontend-mode port --proxy-backend traefik' instead.[/]"
+        )
+        parsed_frontend_mode = FrontendMode.PORT
+        parsed_proxy_backend = ProxyBackend.TRAEFIK
     # start installer
     args = CliArgs(
         mode=mode,
@@ -286,7 +322,8 @@ def main(
         tls_advertised=tls_advertised,
         advertised_port=advertised_port,
         endpoint_protocol=EndpointProtocol(endpoint_protocol) if endpoint_protocol else None,
-        frontend_mode=FrontendMode(frontend_mode),
+        frontend_mode=parsed_frontend_mode,
+        proxy_backend=parsed_proxy_backend,
         use_wildcard_binding=use_wildcard_binding,
         otel_endpoint=otel_endpoint,
         metric_access_cidr=metric_access_cidr,

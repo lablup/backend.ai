@@ -24,7 +24,7 @@ Scenario: incomplete 9 / 25
   - delegate_scan: success absent · rejection present 1 (global_scope): SCENARIO-GAP
   - delete_artifacts: success present 1 · rejection present 1 (global_scope)
   - get: success present 1 · rejection present 1 (single_entity)
-  - import_revision: success absent · rejection present 2 (single_field): SCENARIO-GAP
+  - import_revision: success absent · rejection present 3 (single_field): SCENARIO-GAP
   - reject_revision: success present 1 · rejection present 1 (single_field)
   - restore_artifacts: success present 1 · rejection present 1 (global_scope)
   - retrieve_models: success absent · rejection present 1 (global_scope): SCENARIO-GAP
@@ -164,6 +164,7 @@ Scenario: incomplete 9 / 25
 | scenario | verdict |
 |---|---|
 | [when a user granted only read permission tries to import a revision, it is rejected for lack of permission](#revision_transitions-a-user-granted-read-but-not-create-may-not-import-a-revision) | rejected |
+| [when a revision that is being pulled is imported again, it is rejected as an import already in progress](#revision_transitions-importing-a-revision-being-pulled-is-refused) | rejected |
 | [when a revision is imported without reservoir configuration, it is rejected as the server being misconfigured](#revision_transitions-importing-without-reservoir-configuration-is-refused) | rejected |
 
 **reject_revision**
@@ -1712,6 +1713,38 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+<a id="revision_transitions-importing-a-revision-being-pulled-is-refused"></a>
+
+#### [importing-a-revision-being-pulled-is-refused](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+
+when a revision that is being pulled is imported again, it is rejected as an import already in progress
+
+Given
+
+- one artifact with 1 revisions and one user granted READ, CREATE on artifacts
+  - Domain home-1
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: revision 1.0
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - Role artifact-keeper-1: CREATE allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
+
+When
+
+- ArtifactAdapter.import_revision: user-1 imports revision 1.0
+
+Then
+
+- the call is rejected
+  - rejected: ArtifactRevisionImportInProgressError
 
 <a id="revision_transitions-importing-without-reservoir-configuration-is-refused"></a>
 

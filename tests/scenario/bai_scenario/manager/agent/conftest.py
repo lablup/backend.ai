@@ -6,6 +6,7 @@ the scheduling controller are reached only by calls no row makes, so each refuse
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
@@ -14,6 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -40,8 +42,25 @@ from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.runner.unwired import unwired
 from bai_scenario.valkey import ScenarioValkey
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
 
 
 @pytest.fixture

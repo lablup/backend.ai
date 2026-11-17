@@ -10025,6 +10025,9 @@ type ModelServiceConfig {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
+
+  """Added in 26.10.0. Variable syntax of the service arguments."""
+  interpolation: ServiceArgumentInterpolation!
 }
 
 """
@@ -10054,6 +10057,11 @@ input ModelServiceConfigInput {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheckInput = null
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`.
+  """
+  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """
@@ -14032,6 +14040,11 @@ type PresetModelServiceConfig {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Null when the preset omits it to inherit it at revision resolution.
+  """
+  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.9.0. Service configuration for a preset model entry."""
@@ -14061,6 +14074,11 @@ input PresetModelServiceConfigInput {
 
   """Health check configuration for the model service."""
   healthCheck: PresetModelHealthCheckInput = null
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`.
+  """
+  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """
@@ -19408,6 +19426,11 @@ type RuntimeVariantModelServiceConfig {
 
   """Default model service health-check settings."""
   healthCheck: RuntimeVariantModelHealthCheck
+
+  """
+  Added in 26.10.0. Default variable syntax of the service arguments. Null when the runtime variant leaves it unset.
+  """
+  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.4.2. Order specification."""
@@ -20000,6 +20023,44 @@ type SecretKeyCount {
 
   """How many stored secrets that key holds."""
   count: Int!
+}
+
+"""
+Added in 26.10.0. Variable syntax of the service arguments of a model service.
+"""
+type ServiceArgumentInterpolation {
+  """Delimiters that mark the variables to fill in the service arguments."""
+  delimiters: [ServiceArgumentInterpolationDelimiter!]!
+}
+
+"""
+Added in 26.10.0. A pair of delimiters that marks a variable in the service arguments.
+"""
+type ServiceArgumentInterpolationDelimiter {
+  """Opening delimiter."""
+  start: String!
+
+  """Closing delimiter."""
+  end: String!
+}
+
+"""
+Added in 26.10.0. A pair of delimiters that marks a variable in the service arguments.
+"""
+input ServiceArgumentInterpolationDelimiterInput {
+  """Opening delimiter, e.g. `{{`."""
+  start: String!
+
+  """Closing delimiter, e.g. `}}`."""
+  end: String!
+}
+
+"""
+Added in 26.10.0. Variable syntax of the service arguments of a model service.
+"""
+input ServiceArgumentInterpolationInput {
+  """Delimiters that mark the variables to fill in the service arguments."""
+  delimiters: [ServiceArgumentInterpolationDelimiterInput!]!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""
@@ -22629,6 +22690,11 @@ input UpdatePresetModelServiceConfigInput {
   Health check configuration for the model service. Omit to keep the current value.
   """
   healthCheck: UpdatePresetModelHealthCheckInput
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Omit or null to keep the current value.
+  """
+  interpolation: ServiceArgumentInterpolationInput
 }
 
 """

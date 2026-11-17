@@ -47,6 +47,17 @@ class ArtifactRevisionUpdateError(FieldError, web.HTTPInternalServerError):
         )
 
 
+class ArtifactRevisionImportInProgressError(FieldError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/artifact-revision-import-in-progress"
+    error_title = "Artifact Revision Import In Progress"
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            ArtifactRevisionFieldType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )
+
+
 class ArtifactRevisionDeletionBadRequestError(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Bad Request"

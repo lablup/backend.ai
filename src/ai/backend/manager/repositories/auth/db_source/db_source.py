@@ -53,7 +53,6 @@ from ai.backend.manager.models.keypair.row import (
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
-from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
@@ -63,10 +62,7 @@ from ai.backend.manager.models.user.row import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.auth.keypair_secrets import (
-    generate_keypair_data,
-    generate_ssh_keypair_data,
-)
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
@@ -170,17 +166,11 @@ class AuthDBSource:
     ) -> UserCreationData:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
-        ssh_secrets = await generate_ssh_keypair_data(self._key_provider_pool)
         async with self._user_ops_provider.write_ops() as w:
             result = await w.create_user(
                 FullUserCreator(
                     user=user_spec,
                     keypair_secrets=await generate_keypair_data(self._key_provider_pool),
-                    ssh_keypair=SSHKeypairCreator(
-                        public_key=ssh_secrets.public_key,
-                        private_key=ssh_secrets.private_key,
-                        is_default=True,
-                    ),
                     keypair_resource_policy=keypair_resource_policy,
                     keypair_rate_limit=keypair_rate_limit,
                 )

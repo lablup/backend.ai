@@ -771,7 +771,7 @@ class BaseRunner(metaclass=ABCMeta):
                 "port": model_service_info["port"],
                 "ports": [model_service_info["port"]],
                 "protocol": "http",
-                "options": {},
+                "options": {"interpolation": model_service_info.get("interpolation")},
             }
             result = await self._start_service(
                 service_info,

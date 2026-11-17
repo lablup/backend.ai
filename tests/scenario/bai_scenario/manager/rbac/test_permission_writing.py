@@ -31,10 +31,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
-from ai.backend.manager.errors.permission import (
-    NotEnoughPermission,
-    ReplaceRolePermissionRoleIdMismatch,
-)
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.permission_field import ReplaceRolePermissionRoleIdMismatch
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,

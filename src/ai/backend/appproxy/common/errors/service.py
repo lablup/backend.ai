@@ -1,11 +1,7 @@
 """Service-related errors for App Proxy.
 
-Every BackendAIError subclass MUST also inherit from a concrete
-``aiohttp.web.HTTP*`` class so that the resulting HTTP status code is
-well-defined. ``web.HTTPError.status_code`` defaults to ``-1``, which
-aiohttp falls back to ``200 OK`` for — meaning errors that miss the
-HTTP base class get returned to clients with a 200 status and an
-error body, which is impossible to handle correctly.
+Every BackendAIError subclass MUST also inherit a concrete ``aiohttp.web.HTTP*`` class:
+one without it answers with 500 instead of the status it means.
 """
 
 from __future__ import annotations

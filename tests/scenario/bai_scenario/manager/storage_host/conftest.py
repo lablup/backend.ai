@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -35,11 +36,28 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
     FakeStorageSessionManager,
 )
 from bai_scenario.valkey import ScenarioValkey
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
 
 
 @pytest.fixture

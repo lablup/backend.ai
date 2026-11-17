@@ -69,7 +69,6 @@ from ai.backend.appproxy.common.events import (
 from ai.backend.appproxy.common.types import (
     AppCreator,
     EventLoopType,
-    FrontendMode,
     FrontendServerMode,
     ProxyProtocol,
     WebMiddleware,
@@ -96,7 +95,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -159,9 +158,7 @@ from .proxy.frontend import (
     HTTPPortFrontend,
     HTTPSubdomainFrontend,
     TCPFrontend,
-    TraefikPortFrontend,
-    TraefikSubdomainFrontend,
-    TraefikTCPFrontend,
+    TraefikFrontend,
 )
 from .tasks import WorkerHeartbeatTask
 from .types import Circuit, CleanupContext, RootContext, WorkerMetricRegistry
@@ -266,7 +263,7 @@ async def request_counter_marker(root_ctx: RootContext) -> None:
     """Request counter marker function using the valkey client."""
     failure_count = 0
     while True:
-        redis_key = await root_ctx.request_counter_redis_queue.get()
+        redis_key = await root_ctx.request_counter_key_queue.get()
         try:
             await root_ctx.valkey_live.incr_live_data(redis_key)
         except Exception as e:
@@ -288,20 +285,26 @@ async def last_used_time_marker(root_ctx: RootContext) -> None:
     """Last used time marker function using the valkey client."""
     failure_count = 0
     while True:
-        keys, last_used = await root_ctx.last_used_time_marker_redis_queue.get()
+        last_used_time_mark = await root_ctx.last_used_time_mark_queue.get()
         try:
-            data = {key: str(last_used) for key in keys}
+            data = {
+                key: str(last_used_time_mark.used_at) for key in last_used_time_mark.valkey_keys
+            }
             ttl = get_default_redis_key_ttl()
             await root_ctx.valkey_live.store_multiple_live_data(data, ex=ttl)
         except Exception as e:
             # Warn once per streak of failures and keep going on.
             failure_count += 1
             if failure_count == 1:
-                log.warning("last-used time store failed", exc_info=e, key_count=len(keys))
+                log.warning(
+                    "last-used time store failed",
+                    exc_info=e,
+                    key_count=len(last_used_time_mark.valkey_keys),
+                )
             else:
                 log.debug(
                     "last-used time store failed",
-                    key_count=len(keys),
+                    key_count=len(last_used_time_mark.valkey_keys),
                     failure_count=failure_count,
                 )
             continue
@@ -337,8 +340,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         human_readable_name="appproxy-worker",
         sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(stat_target),
     )
-    root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
-    root_ctx.request_counter_redis_queue = asyncio.Queue()
+    root_ctx.last_used_time_mark_queue = asyncio.Queue()
+    root_ctx.request_counter_key_queue = asyncio.Queue()
 
     last_used_time_marker_task = asyncio.create_task(last_used_time_marker(root_ctx))
     request_counter_marker_task = asyncio.create_task(request_counter_marker(root_ctx))
@@ -469,11 +472,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 raise MissingTraefikConfigError(
                     "Traefik configuration is required for TRAEFIK mode"
                 )
-            match root_ctx.local_config.proxy_worker.traefik.frontend_mode:
-                case FrontendMode.PORT:
-                    root_ctx.proxy_frontend = TraefikPortFrontend(root_ctx)
-                case FrontendMode.WILDCARD_DOMAIN:
-                    root_ctx.proxy_frontend = TraefikSubdomainFrontend(root_ctx)
+            root_ctx.proxy_frontend = TraefikFrontend(root_ctx)
         case (ProxyProtocol.TCP, FrontendServerMode.TRAEFIK):
             if not (
                 root_ctx.local_config.proxy_worker.traefik
@@ -482,7 +481,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 raise MissingPortProxyConfigError(
                     "Traefik and port proxy configuration are required for TCP TRAEFIK mode"
                 )
-            root_ctx.proxy_frontend = TraefikTCPFrontend(root_ctx)
+            root_ctx.proxy_frontend = TraefikFrontend(root_ctx)
         case (ProxyProtocol.HTTP, FrontendServerMode.PORT):
             root_ctx.proxy_frontend = HTTPPortFrontend(root_ctx)
         case (ProxyProtocol.HTTP, FrontendServerMode.WILDCARD_DOMAIN):
@@ -503,7 +502,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        await root_ctx.proxy_frontend.terminate_all_circuits()
+        await root_ctx.proxy_frontend.remove_all_ingresses()
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
@@ -533,17 +532,16 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
-    registered_circuits: list[Circuit] = []
+    ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
+    registered_ingresses: list[Ingress] = []
     for circuit in circuits:
-        if await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info):
-            registered_circuits.append(circuit)
+        ingress = circuit.to_ingress(ingress_authority)
+        if await root_ctx.proxy_frontend.register_ingress(ingress, circuit):
+            registered_ingresses.append(ingress)
     # Applied rather than replaced, so circuits from events handled meanwhile are kept.
     ingress_writer = root_ctx.ingress_state.writer
     if ingress_writer is not None:
-        ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
-        await ingress_writer.apply([
-            circuit.to_ingress(ingress_authority) for circuit in registered_circuits
-        ])
+        await ingress_writer.apply(registered_ingresses)
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -760,16 +758,13 @@ async def handle_proxy_route_event(
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
             created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
-            registered_circuits: list[Circuit] = []
+            registered_ingresses: list[Ingress] = []
             for created_circuit in created_circuits:
-                if await context.proxy_frontend.register_circuit(
-                    created_circuit, created_circuit.route_info
-                ):
-                    registered_circuits.append(created_circuit)
+                created_ingress = created_circuit.to_ingress(ingress_authority)
+                if await context.proxy_frontend.register_ingress(created_ingress, created_circuit):
+                    registered_ingresses.append(created_ingress)
             if ingress_writer is not None:
-                await ingress_writer.apply([
-                    circuit.to_ingress(ingress_authority) for circuit in registered_circuits
-                ])
+                await ingress_writer.apply(registered_ingresses)
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
@@ -779,19 +774,18 @@ async def handle_proxy_route_event(
         case AppProxyCircuitRouteUpdatedEvent():
             log.debug("circuit routes updated: {}", event.circuit.id)
             updated_circuit = Circuit.from_serialized_circuit(event.circuit)
-            await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
-            # The frontend stores the new routes on the circuit of the backend it holds and skips a
-            # circuit it holds no backend of.
-            held_backend = context.proxy_frontend.backends.get(
-                context.proxy_frontend.get_circuit_key(updated_circuit)
-            )
-            if ingress_writer is not None and held_backend is not None:
-                await ingress_writer.apply([held_backend.circuit.to_ingress(ingress_authority)])
+            updated_ingress = updated_circuit.to_ingress(ingress_authority)
+            await context.proxy_frontend.update_ingress(updated_ingress)
+            if (
+                ingress_writer is not None
+                and updated_ingress.frontend.key() in context.proxy_frontend.backends
+            ):
+                await ingress_writer.apply([updated_ingress])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
             for removed_circuit in removed_circuits:
-                await context.proxy_frontend.break_circuit(removed_circuit)
+                await context.proxy_frontend.remove_ingress(removed_circuit.to_ingress_frontend())
             if ingress_writer is not None:
                 await ingress_writer.remove([
                     circuit.to_ingress_key(ingress_authority) for circuit in removed_circuits

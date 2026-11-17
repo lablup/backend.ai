@@ -92,7 +92,9 @@ async def serving_subdomain_frontend(
         updated_at=datetime(2024, 7, 16, 5, 45, 45, 982452, tzinfo=UTC),
     )
     frontend.backends = {
-        _SUBDOMAIN: mocker.MagicMock(proxy_http=record_request_body, circuit=circuit)
+        circuit.to_ingress_frontend().key(): mocker.MagicMock(
+            proxy_http=record_request_body, circuit=circuit
+        )
     }
     root_context.ingress_state.reader.get = mocker.AsyncMock(
         return_value=circuit.to_ingress(_AUTHORITY)
