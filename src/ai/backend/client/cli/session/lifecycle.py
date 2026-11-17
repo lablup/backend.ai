@@ -1140,6 +1140,30 @@ session.command(
 )(_ssh_cmd())
 
 
+# The scp options that take a value (`man scp`).
+_SCP_OPTIONS_WITH_VALUE = frozenset("cDFiJloPSX")
+
+
+def _split_scp_args(args: Sequence[str]) -> tuple[list[str], list[str]]:
+    """Split the extra scp arguments into options and paths. scp reads options only
+    before the paths, so the caller places them there."""
+    options: list[str] = []
+    paths: list[str] = []
+    rest = iter(args)
+    for arg in rest:
+        if not arg.startswith("-") or arg == "-":
+            paths.append(arg)
+            continue
+        options.append(arg)
+        for index, flag in enumerate(arg[1:], start=2):
+            if flag in _SCP_OPTIONS_WITH_VALUE:
+                # The value follows in the next argument unless it is attached (`-ikey`).
+                if index == len(arg) and (value := next(rest, None)) is not None:
+                    options.append(value)
+                break
+    return options, paths
+
+
 def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.argument("src", type=str, metavar="SRC")
@@ -1193,6 +1217,7 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
         recursive_args = []
         if recursive:
             recursive_args.append("-r")
+        extra_options, extra_paths = _split_scp_args(ctx.args)
         try:
             with container_ssh_ctx(session_ref, port) as key_path:
                 scp_proc = subprocess.run(
@@ -1208,10 +1233,10 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
                         "-P",
                         str(port),
                         *recursive_args,
-                        # scp reads options only before the paths.
-                        *ctx.args,
+                        *extra_options,
                         src,
                         dst,
+                        *extra_paths,
                     ],
                     shell=False,
                     check=False,  # be transparent against the main command

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
+from click.testing import CliRunner
 
+from ai.backend.client.cli.session import lifecycle
 from ai.backend.client.cli.session.ssh import container_ssh_ctx
 
 KEY_CONTENT = b"-----BEGIN OPENSSH PRIVATE KEY-----\n"
@@ -149,3 +152,106 @@ def test_container_ssh_ctx_yields_none_when_the_session_holds_no_private_key(
         assert key_path is None
 
     assert not list((tmp_path / "home" / ".ssh").iterdir())
+
+
+class TestSshAndScpCommandsWithoutSessionKey:
+    """`session ssh` and `session scp` for a user who uploaded only a public key."""
+
+    @pytest.fixture
+    def ran_commands(self, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+        """Make the session hold no SSH key and record the commands `subprocess.run` gets."""
+
+        @contextlib.contextmanager
+        def no_session_key(session_ref: str, port: int) -> Iterator[Path | None]:
+            yield None
+
+        commands: list[list[str]] = []
+
+        def record(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+            commands.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0)
+
+        monkeypatch.setattr(lifecycle, "container_ssh_ctx", no_session_key)
+        monkeypatch.setattr(subprocess, "run", record)
+        return commands
+
+    @pytest.mark.parametrize(
+        ("args", "expected"),
+        [
+            (
+                ["ssh", "mysess"],
+                [
+                    "ssh",
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                    "-o",
+                    "NoHostAuthenticationForLocalhost=yes",
+                    "work@localhost",
+                    "-p",
+                    "9922",
+                ],
+            ),
+            (
+                ["scp", "mysess", "a", "b"],
+                [
+                    "scp",
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                    "-o",
+                    "NoHostAuthenticationForLocalhost=yes",
+                    "-P",
+                    "9922",
+                    "a",
+                    "b",
+                ],
+            ),
+        ],
+        ids=["ssh", "scp"],
+    )
+    def test_passes_no_identity(
+        self, ran_commands: list[list[str]], args: list[str], expected: list[str]
+    ) -> None:
+        result = CliRunner().invoke(lifecycle.session, args)
+
+        assert result.exit_code == 0, result.output
+        assert ran_commands == [expected]
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            ["-i", "mykey"],
+            ["-ikey"],
+            ["-qi", "mykey"],
+            ["-o", "BatchMode=yes"],
+        ],
+        ids=["value-apart", "value-attached", "bundled-flags", "other-value-option"],
+    )
+    def test_scp_places_extra_options_before_the_paths(
+        self, ran_commands: list[list[str]], options: list[str]
+    ) -> None:
+        # click takes `a` and `b` as SRC and DST, and passes the options and `c` on as extra
+        # arguments. `c` follows the options so that an option taking it as its value shows.
+        result = CliRunner().invoke(lifecycle.session, ["scp", "mysess", "a", "b", *options, "c"])
+
+        assert result.exit_code == 0, result.output
+        assert ran_commands == [
+            [
+                "scp",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "NoHostAuthenticationForLocalhost=yes",
+                "-P",
+                "9922",
+                *options,
+                "a",
+                "b",
+                "c",
+            ]
+        ]
