@@ -69,8 +69,8 @@ class InMemoryIngressState(IngressReader, IngressWriter):
             return
         self._missing_keys[frontend_key] = True
 
-    async def evict(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
-        """Unlike remove, an evicted key is read from the later layers again."""
+    async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
+        """Unlike remove, an invalidated key is read from the later layers again."""
         for frontend_key in frontend_keys:
             self._ingresses.pop(frontend_key, None)
             self._missing_keys.pop(frontend_key, None)

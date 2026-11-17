@@ -55,4 +55,4 @@ class LayeredIngressState(IngressReader):
 
     async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
         if self._in_memory is not None:
-            await self._in_memory.evict(frontend_keys)
+            await self._in_memory.invalidate(frontend_keys)

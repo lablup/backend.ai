@@ -353,7 +353,7 @@ class TestHandleIngressInvalidatedEvent:
         ],
         ids=lambda case: case.event_authority,
     )
-    async def test_evicts_only_the_keys_of_the_worker_authority(
+    async def test_invalidates_only_the_keys_of_the_worker_authority(
         self,
         case: _InvalidatedKeyAuthorityCase,
         worker_holding_an_ingress_in_memory: _WorkerHoldingAnIngressInMemory,
