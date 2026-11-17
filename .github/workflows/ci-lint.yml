@@ -74,6 +74,10 @@ jobs:
       run: python ./scripts/validate-changelog-fragments.py
     - name: Check the manager package __init__ files hold no imports
       run: python ./scripts/check-init-imports.py src/ai/backend/manager
+    - name: Check the import contracts
+      run: |
+        pip install import-linter==2.16
+        PYTHONPATH=src lint-imports --config .importlinter
     - name: Restore the Pants caches
       uses: ./.github/actions/pants-caches
       with:
