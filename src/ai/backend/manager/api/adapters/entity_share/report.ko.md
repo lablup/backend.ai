@@ -629,7 +629,7 @@ Then
 
 Given
 
-- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -655,6 +655,11 @@ Given
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
   - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - 프로젝트 borrowing-team-1
   - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
@@ -747,7 +752,7 @@ Then
 
 Given
 
-- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -771,6 +776,11 @@ Given
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
   - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - 프로젝트 borrowing-team-1
   - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
@@ -1064,7 +1074,7 @@ Then
 
 Given
 
-- 프로젝트 폴더 하나와, 다른 프로젝트에 빌려준 공유, 그리고 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+- 프로젝트 폴더 하나와, 다른 프로젝트에 빌려준 공유, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1090,6 +1100,11 @@ Given
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
   - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - 프로젝트 borrowing-team-1
   - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
@@ -1236,7 +1251,7 @@ Then
 
 Given
 
-- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1262,6 +1277,11 @@ Given
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
   - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - 프로젝트 borrowing-team-1
   - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다

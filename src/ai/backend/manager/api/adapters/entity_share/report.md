@@ -629,7 +629,7 @@ when a user who can answer shares in a project accepts the offer to that project
 
 Given
 
-- one project folder with an offer to another project, and a person granted share permissions in the project the folder is lent to
+- one project folder with an offer to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -655,6 +655,11 @@ Given
     - Role share-recipient-1: applies only within the scope it is granted in
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
   - Project vfolder folder-1: is placed in the project and is ready to use
   - Project borrowing-team-1
   - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
@@ -747,7 +752,7 @@ when a user who can only read shares in a project accepts the offer to that proj
 
 Given
 
-- one project folder with an offer to another project, and a person granted share permissions in the project the folder is lent to
+- one project folder with an offer to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -771,6 +776,11 @@ Given
     - Role share-recipient-1: applies only within the scope it is granted in
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
   - Project vfolder folder-1: is placed in the project and is ready to use
   - Project borrowing-team-1
   - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
@@ -1064,7 +1074,7 @@ when a user who can answer shares in a project leaves the share that project too
 
 Given
 
-- one project folder with a share lent to another project, and a person granted share permissions in the project the folder is lent to
+- one project folder with a share lent to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1090,6 +1100,11 @@ Given
     - Role share-recipient-1: applies only within the scope it is granted in
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
   - Project vfolder folder-1: is placed in the project and is ready to use
   - Project borrowing-team-1
   - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
@@ -1236,7 +1251,7 @@ when a user who can answer shares in a project rejects the offer to that project
 
 Given
 
-- one project folder with an offer to another project, and a person granted share permissions in the project the folder is lent to
+- one project folder with an offer to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1262,6 +1277,11 @@ Given
     - Role share-recipient-1: applies only within the scope it is granted in
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
   - Project vfolder folder-1: is placed in the project and is ready to use
   - Project borrowing-team-1
   - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet

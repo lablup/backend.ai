@@ -161,7 +161,8 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
     받아들여 공유가 서 있다. ``elsewhere`` 면 범위 밖의 폴더 하나와 받는 사람이 그 폴더를
     빌려주는 제안, 그리고 같은 폴더를 세 번째 사람에게 빌려주는 제안이 함께 서 있다.
     ``to_a_project`` 면 두 번째 사람 대신 다른 프로젝트에 빌려주고, 그 프로젝트에서
-    ``recipient_granted`` 를 받은 사람이 빌린 쪽으로 부른다. ``who`` 가 부르는 사람이다.
+    ``recipient_granted`` 를 받은 사람이 빌린 쪽으로 부른다. 그 사람은 모든 사용자처럼 자기
+    스코프에서도 공유에 답할 수 있다. ``who`` 가 부르는 사람이다.
     """
 
     who: Side = Side.SHARER
@@ -176,8 +177,11 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
     @override
     def describe(self) -> str:
         if self.to_a_project:
-            recipient_ko = "폴더를 빌린 프로젝트에서 공유 권한을 받은 사람"
-            recipient_en = "a person granted share permissions in the project the folder is lent to"
+            recipient_ko = "자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람"
+            recipient_en = (
+                "a person granted share permissions in their own scope and in the project the "
+                "folder is lent to"
+            )
             lent_to_ko = "다른 프로젝트에"
             lent_to_en = "another project"
         else:
@@ -246,6 +250,7 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
                     role_name_hint="share-recipient",
                 )
             )
+            await seeding.within(SomeoneAnsweringInTheirOwnScope(recipient, RECIPIENT_IN_OWN_SCOPE))
         else:
             recipient = await seeding.within(SomeoneOf(domain))
             if self.recipient_granted:
