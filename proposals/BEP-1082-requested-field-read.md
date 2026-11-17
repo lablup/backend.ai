@@ -42,6 +42,7 @@ An entity declares the columns it is queried by in one `{Entity}QuerySpec` in `m
 |---|---|---|
 | `own` | `QueryColumn` (replaces `SearchableField`) | Requested fields, conditions, orders, `to_data` |
 | `nested` | `NestedQueryColumn` (replaces `NestedSearchableField`) | To-many and to-one conditions |
+| `linked` | membership and usage id conditions whose FK sits on the other entity | Conditions; READ check on the other entity |
 | `aggregate` | Group items and aggregate value items wrapping a `QueryColumn` of `own` | groupBy, aggregate values (BEP-1080) |
 
 | `QueryColumn` | Meaning |

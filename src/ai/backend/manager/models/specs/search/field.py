@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy.orm import InstrumentedAttribute
@@ -57,4 +57,26 @@ class NestedSearchableField[TFields, C: ToManyCorrelation | ToOneCorrelation]:
     """Fields of another table, reached from this entity through ``correlation``."""
 
     fields: TFields
+    correlation: C
+
+
+@dataclass(frozen=True)
+class QueryColumn[V, F: FieldConditions | None, O: SearchOrder | None](SearchableField[V, F, O]):
+    """A ``SearchableField`` that knows the attribute name it is declared under."""
+
+    _name: str = field(init=False, repr=False, compare=False)
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        object.__setattr__(self, "_name", name)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+
+@dataclass(frozen=True)
+class NestedQueryColumn[TColumns, C: ToManyCorrelation | ToOneCorrelation]:
+    """Columns of another table, reached from this entity through ``correlation``."""
+
+    columns: TColumns
     correlation: C
