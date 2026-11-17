@@ -33,6 +33,7 @@ class PartialRecord:
     _record_fields: ClassVar[tuple[str, ...]] = ()
     _selectable_fields: ClassVar[frozenset[str]] = frozenset()
 
+    @override
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         fields = list(cls._record_fields)
