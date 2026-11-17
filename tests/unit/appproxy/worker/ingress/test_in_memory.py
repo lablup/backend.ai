@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Iterator
 from dataclasses import dataclass
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -47,20 +46,6 @@ class _ApplyCase:
     applied_revision: int
     read_after: float
     read_revision: int
-
-
-@dataclass(frozen=True)
-class _InvalidationDuringFillCase:
-    invalidated_key: IngressFrontendKey
-    expected_held_keys: list[IngressFrontendKey]
-
-
-@dataclass(frozen=True)
-class _FillWithTheReadHeldOpen:
-    state: InMemoryIngressState
-    read_ingress: AsyncMock
-    read_started: asyncio.Event
-    release_read: asyncio.Event
 
 
 @pytest.fixture
@@ -133,24 +118,6 @@ def negative_caching_state(clock: Mock, stored_ingress: Ingress) -> InMemoryIngr
     state._ingresses[STORED_KEY] = stored_ingress
     state._missing_keys[OTHER_KEY] = True
     return state
-
-
-@pytest.fixture
-def fill_with_the_read_held_open(stored_ingress: Ingress) -> _FillWithTheReadHeldOpen:
-    read_started = asyncio.Event()
-    release_read = asyncio.Event()
-
-    async def read_stored_ingress_once_released() -> Ingress:
-        read_started.set()
-        await release_read.wait()
-        return stored_ingress
-
-    return _FillWithTheReadHeldOpen(
-        state=InMemoryIngressState(),
-        read_ingress=AsyncMock(side_effect=read_stored_ingress_once_released),
-        read_started=read_started,
-        release_read=release_read,
-    )
 
 
 class TestInMemoryIngressState:
@@ -293,43 +260,3 @@ class TestInMemoryIngressState:
     ) -> None:
         await state.remember_missing(OTHER_KEY)
         assert await state.get(OTHER_KEY) is None
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _InvalidationDuringFillCase(invalidated_key=STORED_KEY, expected_held_keys=[]),
-            _InvalidationDuringFillCase(invalidated_key=OTHER_KEY, expected_held_keys=[STORED_KEY]),
-        ],
-        ids=lambda case: case.invalidated_key,
-    )
-    async def test_fill_keeps_what_it_read_unless_its_key_is_invalidated_during_the_read(
-        self,
-        case: _InvalidationDuringFillCase,
-        fill_with_the_read_held_open: _FillWithTheReadHeldOpen,
-    ) -> None:
-        situation = fill_with_the_read_held_open
-        fill = asyncio.create_task(situation.state.fill(STORED_KEY, situation.read_ingress))
-        await situation.read_started.wait()
-        invalidation = asyncio.create_task(situation.state.invalidate([case.invalidated_key]))
-        await asyncio.sleep(0)
-        situation.release_read.set()
-        await asyncio.gather(fill, invalidation)
-
-        held_ingresses = await situation.state.get_all()
-        assert [
-            held_ingress.frontend.key() for held_ingress in held_ingresses
-        ] == case.expected_held_keys
-
-    async def test_concurrent_fills_of_a_key_read_once(
-        self, fill_with_the_read_held_open: _FillWithTheReadHeldOpen
-    ) -> None:
-        situation = fill_with_the_read_held_open
-        fills = [
-            asyncio.create_task(situation.state.fill(STORED_KEY, situation.read_ingress))
-            for _ in range(2)
-        ]
-        await situation.read_started.wait()
-        situation.release_read.set()
-        await asyncio.gather(*fills)
-
-        assert situation.read_ingress.await_count == 1

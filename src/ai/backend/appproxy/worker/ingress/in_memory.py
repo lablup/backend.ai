@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 import math
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from time import monotonic
 from typing import override
-from weakref import WeakValueDictionary
 
 from cachetools import TTLCache
 
@@ -24,7 +22,6 @@ class InMemoryIngressState(IngressReader, IngressWriter):
     _ingresses: TTLCache[IngressFrontendKey, Ingress]
     # get raises IngressNotFoundError for these keys so the layered read skips the later layers.
     _missing_keys: TTLCache[IngressFrontendKey, bool]
-    _fill_locks: WeakValueDictionary[IngressFrontendKey, asyncio.Lock]
 
     def __init__(self, ttl: float | None = None, negative_ttl: float | None = None) -> None:
         self._negative_ttl = negative_ttl
@@ -36,7 +33,6 @@ class InMemoryIngressState(IngressReader, IngressWriter):
             ttl=negative_ttl if negative_ttl is not None else math.inf,
             timer=monotonic,
         )
-        self._fill_locks = WeakValueDictionary()
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
@@ -74,43 +70,13 @@ class InMemoryIngressState(IngressReader, IngressWriter):
         self._missing_keys[frontend_key] = True
 
     async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
-        """Unlike remove, an invalidated key is read from the later layers again.
-
-        A fill of the key in progress finishes first, so what it stores is dropped too.
-        """
+        """Unlike remove, an invalidated key is read from the later layers again."""
         for frontend_key in frontend_keys:
-            async with self._fill_lock(frontend_key):
-                self._ingresses.pop(frontend_key, None)
-                self._missing_keys.pop(frontend_key, None)
-
-    async def fill(
-        self,
-        frontend_key: IngressFrontendKey,
-        read_ingress: Callable[[], Awaitable[Ingress | None]],
-    ) -> Ingress | None:
-        """Stores what read_ingress returns unless the key is held already.
-
-        The read and the store hold the key's lock, which invalidate also takes.
-        """
-        async with self._fill_lock(frontend_key):
-            # A fill that held the lock before may have stored the key already.
-            held_ingress = await self.get(frontend_key)
-            if held_ingress is not None:
-                return held_ingress
-            ingress = await read_ingress()
-            if ingress is not None:
-                await self.apply([ingress])
-            return ingress
+            self._ingresses.pop(frontend_key, None)
+            self._missing_keys.pop(frontend_key, None)
 
     @override
     async def replace_all(self, ingresses: Sequence[Ingress]) -> None:
         self._ingresses.clear()
         self._ingresses.update({ingress.frontend.key(): ingress for ingress in ingresses})
         self._missing_keys.clear()
-
-    def _fill_lock(self, frontend_key: IngressFrontendKey) -> asyncio.Lock:
-        lock = self._fill_locks.get(frontend_key)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._fill_locks[frontend_key] = lock
-        return lock
