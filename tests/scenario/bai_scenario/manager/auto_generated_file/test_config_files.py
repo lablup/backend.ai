@@ -159,7 +159,10 @@ class SomeoneWithTheirOwnConfig(Given[Any, AUserAndTheirOwnConfig]):
         owner = await seeding.within(SomeoneOf(domain))
         for one in self.files:
             file = await seeding.creating_from(
-                TestSeedConfigFileOf(path=one.path, perm=CONFIG_PERMISSION), owner
+                TestSeedConfigFileOf(
+                    lambda user: UserID(user.id), path=one.path, perm=CONFIG_PERMISSION
+                ),
+                owner,
             )
             await seeding.adding(
                 TestSeedConfigFileRevisionOf(
