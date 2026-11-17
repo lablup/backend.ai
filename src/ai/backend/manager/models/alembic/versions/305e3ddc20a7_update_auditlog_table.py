@@ -73,8 +73,8 @@ def upgrade() -> None:
                 action_id=NULL_UUID,
             )
         )
-    except Exception:
-        logger.exception("Error updating audit_logs.action_id")
+    except Exception as e:
+        logger.error(f"Error updating audit_logs.action_id: {e}")
         raise
 
     op.alter_column("audit_logs", "action_id", nullable=False)
@@ -88,8 +88,8 @@ def downgrade() -> None:
             .where(AuditLogRowInDowngrade.duration.is_(None))
             .values(duration=timedelta(0))
         )
-    except Exception:
-        logger.exception("Error updating audit_logs.duration")
+    except Exception as e:
+        logger.error(f"Error updating audit_logs.duration: {e}")
         raise
 
     op.alter_column("audit_logs", "duration", nullable=False)

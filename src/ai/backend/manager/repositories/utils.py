@@ -29,7 +29,7 @@ def suppress_with_log(
         yield
     except tuple(exceptions) as e:
         if log_level >= logging.ERROR:
-            log.exception("exception suppressed", failure_reason=message, exc_info=e)
+            log.exception("exception suppressed", failure_reason=message)
         elif log_level >= logging.WARNING:
             log.warning("exception suppressed", failure_reason=message, exc_info=e)
         else:

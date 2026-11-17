@@ -230,6 +230,8 @@ split-on-trailing-comma = true
 [tool.ruff.lint.per-file-ignores]
 # unset.py defines UNSET and Unset from pydantic MISSING
 "src/ai/backend/common/tristate/unset.py" = ["TID251"]
+# released migration cannot be edited in place
+"src/ai/backend/manager/models/alembic/versions/305e3ddc20a7_update_auditlog_table.py" = ["TRY400", "TRY401"]
 # decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
 "src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
 # schema.py defines GQL schema roots (Query, Mutation, Subscription) using @strawberry.type
