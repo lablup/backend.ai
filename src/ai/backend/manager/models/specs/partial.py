@@ -32,6 +32,8 @@ def selectable() -> Any:
 class PartialRecord:
     _record_fields: ClassVar[tuple[str, ...]] = ()
     _selectable_fields: ClassVar[frozenset[str]] = frozenset()
+    _declared_fields: ClassVar[frozenset[str]] = frozenset()
+    _required_fields: ClassVar[frozenset[str]] = frozenset()
 
     @override
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -51,23 +53,21 @@ class PartialRecord:
                 fields.append(name)
         cls._record_fields = tuple(fields)
         cls._selectable_fields = frozenset(selectables)
+        cls._declared_fields = frozenset(fields)
+        cls._required_fields = cls._declared_fields - cls._selectable_fields
 
     def __init__(self, **values: Any) -> None:
         cls = type(self)
-        undeclared = values.keys() - set(cls._record_fields)
-        if undeclared:
+        names = values.keys()
+        if not names <= cls._declared_fields:
             raise InvalidPartialRecordError(
-                f"{cls.__name__}: undeclared fields {sorted(undeclared)}"
+                f"{cls.__name__}: undeclared fields {sorted(names - cls._declared_fields)}"
             )
-        missing = [
-            name
-            for name in cls._record_fields
-            if name not in values and name not in cls._selectable_fields
-        ]
-        if missing:
-            raise InvalidPartialRecordError(f"{cls.__name__}: missing required fields {missing}")
-        for name, value in values.items():
-            object.__setattr__(self, name, value)
+        if not cls._required_fields <= names:
+            raise InvalidPartialRecordError(
+                f"{cls.__name__}: missing required fields {sorted(cls._required_fields - names)}"
+            )
+        self.__dict__.update(values)
 
     def __getattr__(self, name: str) -> Any:
         if name in type(self)._selectable_fields:
