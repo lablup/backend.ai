@@ -103,16 +103,16 @@ Resource presets have only `own` in `ResourcePresetSearchableFields` (`ResourceP
 
 - Performance: the SELECT of resource preset GQL search and get shrinks to the id and the requested columns
 - Compatibility: REST v2, DataLoaders and services keep using the existing Data
-- Renaming: the old names are replaced at once with no alias; search behavior and SQL stay the same
+- Renaming: entities move per domain after the pilots; search behavior and SQL stay the same
 
 ## Implementation Order
 
-1. Renaming: `SearchableFields` to `QuerySpec`, items to `QueryColumn`
-2. Aggregate declarations: `AggregateFields` to `QuerySpec.aggregate`
-3. Result spec: `QueryColumn.name`, `{Entity}PartialData`
-4. Searchers and queriers: take `fields`, SELECT only the id and the requested columns
-5. GQL requested fields: the resolver selection reaches the adapter, searcher and querier
-6. Resource presets: `adminResourcePresetsV2`, `adminResourcePresetV2` read only requested fields
+1. Base types: add `QuerySpec` and `QueryColumn` alongside the existing declarations
+2. Result spec, searchers, queriers: `{Entity}PartialData`, SELECT only requested columns
+3. Aggregate declarations: Aggregators use the groupBy items of `QuerySpec.aggregate`
+4. GQL requested fields: the resolver selection reaches the adapter, searcher and querier
+5. Pilots: move resource presets and sessions, verify partial reads and aggregates
+6. Bulk replacement: move the other entities per domain, then remove `SearchableFields`
 7. Cleanup: remove `read` and `to_data` once every read returns `{Entity}PartialData`
 
 ## References

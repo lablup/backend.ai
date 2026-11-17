@@ -94,16 +94,16 @@ GQL resolver 는 `info` 의 selection 에서 node 의 최상위 필드를 읽어
 
 - 성능: 자원 프리셋 GQL search, get 의 SELECT 가 id 와 요청한 필드의 column 으로 줄어듭니다
 - 호환성: REST v2, DataLoader, service 는 기존 Data 를 그대로 사용합니다
-- 이름 대체: 옛 이름을 남기지 않고 한 번에 변경하며 search 동작과 SQL 은 같습니다
+- 이름 대체: 파일럿 뒤 도메인 단위로 옮기며 search 동작과 SQL 은 같습니다
 
 ## 구현 순서
 
-1. 이름 대체: `SearchableFields` 를 `QuerySpec`, 항목을 `QueryColumn` 으로
-2. 집계 선언 대체: `AggregateFields` 를 `QuerySpec.aggregate` 로
-3. 결과 spec: `QueryColumn.name`, `{Entity}PartialData`
-4. searcher, querier 적용: `fields` 를 받아 id 와 요청한 필드의 column 만 SELECT
-5. GQL 요청 필드 연결: GQL resolver 의 selection 이 adapter, searcher, querier 까지 전달
-6. 자원 프리셋 적용: `adminResourcePresetsV2`, `adminResourcePresetV2` 가 요청한 필드만 조회
+1. 기반 타입: `QuerySpec`, `QueryColumn` 을 기존 선언과 나란히 추가
+2. 결과 spec 과 searcher, querier: `{Entity}PartialData`, 요청한 column 만 SELECT
+3. 집계 선언: Aggregator 가 `QuerySpec.aggregate` 의 groupBy 항목 사용
+4. GQL 요청 필드 연결: GQL resolver 의 selection 이 adapter, searcher, querier 까지 전달
+5. 파일럿: 자원 프리셋, 세션을 옮기고 partial 조회와 aggregate 확인
+6. 일괄 대체: 나머지 엔티티를 도메인 단위로 옮긴 뒤 `SearchableFields` 제거
 7. 정리: 모든 조회가 `{Entity}PartialData` 로 옮겨진 뒤 `read`, `to_data` 제거
 
 ## 참고
