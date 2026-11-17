@@ -149,6 +149,7 @@ class UpdateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
         description=(
             "Number of scheduling retries before a pending session is skipped."
             " Omit to leave unchanged; null clears."
+            f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
 
@@ -160,6 +161,7 @@ class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
         default=UNSET,
         description=(
             "Session types that may be created in the resource group. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
     pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
@@ -167,21 +169,29 @@ class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
         description=(
             "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
             " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
     config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
         default=UNSET,
-        description="The ``config`` section of the scheduler options. Omit to leave unchanged.",
+        description=(
+            "The ``config`` section of the scheduler options. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     agent_selection_strategy: AgentSelectionStrategy | None | Unset = Field(
         default=UNSET,
-        description="How agents are chosen for a session's kernels. Omit to leave unchanged.",
+        description=(
+            "How agents are chosen for a session's kernels. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     allow_fractional_resource_fragmentation: bool | None | Unset = Field(
         default=UNSET,
         description=(
             "Whether an agent may start a kernel that fragments a fractional resource request."
             " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
     route_cleanup_target_statuses: list[RouteHealthStatus] | None | Unset = Field(
@@ -189,6 +199,7 @@ class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
         description=(
             "Route health statuses whose routes are cleaned up automatically."
             " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
 
@@ -260,7 +271,10 @@ class UpdateResourceGroupInput(BaseRequestModel):
     )
     scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
         default=UNSET,
-        description="Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+        description=(
+            "Scheduler options. Omit to leave unchanged; omitted keys are kept."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
@@ -454,7 +468,10 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     )
     scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
         default=UNSET,
-        description="Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+        description=(
+            "Scheduler options. Omit to leave unchanged; omitted keys are kept."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
