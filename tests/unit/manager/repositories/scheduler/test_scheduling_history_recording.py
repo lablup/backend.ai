@@ -882,6 +882,116 @@ class TestEnqueueSessionSchedulingHistory:
                 await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
             ) is None
 
+    async def test_enqueue_records_every_declared_dependency(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+    ) -> None:
+        """Several dependencies the caller declares become one row each."""
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
+        dependency_ids = [SessionID(uuid.uuid4()), SessionID(uuid.uuid4())]
+        for dependency_id in dependency_ids:
+            await db_source.enqueue_session_from_spec(
+                self._spec(
+                    session_id=dependency_id,
+                    domain=test_domain,
+                    resource_group_id=resource_group_id,
+                    resource_group_name=test_scaling_group_name,
+                    project_id=test_group_id,
+                    user_uuid=test_user_uuid,
+                    access_key=test_access_key,
+                    image_id=test_image_id,
+                )
+            )
+
+        session_id = SessionID(uuid.uuid4())
+        await db_source.enqueue_session_from_spec(
+            self._spec(
+                session_id=session_id,
+                domain=test_domain,
+                resource_group_id=resource_group_id,
+                resource_group_name=test_scaling_group_name,
+                project_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                image_id=test_image_id,
+                dependencies=tuple(dependency_ids),
+            )
+        )
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            depends_on = await db_sess.scalars(
+                sa.select(SessionDependencyRow.depends_on).where(
+                    SessionDependencyRow.session_id == session_id
+                )
+            )
+            assert set(depends_on) == set(dependency_ids)
+
+    async def test_enqueue_refuses_an_unknown_dependency_among_known_ones(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+    ) -> None:
+        """One unknown dependency next to a known one leaves nothing behind."""
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
+        known_id = SessionID(uuid.uuid4())
+        await db_source.enqueue_session_from_spec(
+            self._spec(
+                session_id=known_id,
+                domain=test_domain,
+                resource_group_id=resource_group_id,
+                resource_group_name=test_scaling_group_name,
+                project_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                image_id=test_image_id,
+            )
+        )
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            domain=test_domain,
+            resource_group_id=resource_group_id,
+            resource_group_name=test_scaling_group_name,
+            project_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            image_id=test_image_id,
+            dependencies=(known_id, SessionID(uuid.uuid4())),
+        )
+
+        with pytest.raises(InvalidAPIParameters):
+            await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            assert (
+                await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
+            ) is None
+
     async def test_enqueue_refuses_an_unregistered_image(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
