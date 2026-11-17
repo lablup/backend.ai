@@ -439,14 +439,6 @@ class DeploymentRepository:
         await self._db_source.set_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
-    async def fetch_designated_agents_by_deployment_ids(
-        self,
-        deployment_ids: set[DeploymentID],
-    ) -> Mapping[DeploymentID, list[AgentUUID]]:
-        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
-        return await self._db_source.fetch_designated_agents_by_deployment_ids(deployment_ids)
-
-    @deployment_repository_resilience.apply()
     async def fetch_designated_agent_ids_by_deployment_ids(
         self,
         deployment_ids: set[DeploymentID],

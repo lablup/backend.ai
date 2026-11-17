@@ -2865,27 +2865,6 @@ class DeploymentDBSource:
                     ],
                 )
 
-    async def fetch_designated_agents_by_deployment_ids(
-        self,
-        deployment_ids: set[DeploymentID],
-    ) -> Mapping[DeploymentID, list[AgentUUID]]:
-        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
-        if not deployment_ids:
-            return {}
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(
-                DeploymentDesignatedAgentRow.endpoint_id,
-                DeploymentDesignatedAgentRow.agent_uuid,
-            ).where(DeploymentDesignatedAgentRow.endpoint_id.in_(deployment_ids))
-            result = await db_sess.execute(query)
-            agents_by_deployment: dict[DeploymentID, list[AgentUUID]] = {
-                deployment_id: [] for deployment_id in deployment_ids
-            }
-            for endpoint_id, agent_uuid in result:
-                agents_by_deployment[endpoint_id].append(agent_uuid)
-            return agents_by_deployment
-
     async def fetch_designated_agent_ids_by_deployment_ids(
         self,
         deployment_ids: set[DeploymentID],
