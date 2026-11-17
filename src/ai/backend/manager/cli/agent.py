@@ -88,7 +88,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
                 # pprint(result)
         except TimeoutError:
-            log.error("timed out while reading the response from the agent", agent_id=agent_id)
+            log.exception("timed out while reading the response from the agent", agent_id=agent_id)
         except Exception:
             log.exception("failed to read the response from the agent", agent_id=agent_id)
         finally:

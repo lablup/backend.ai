@@ -473,7 +473,7 @@ class RedisConsumer(AbstractConsumer):
             try:
                 await self._client.make_consumer_group(stream_key, self._group_name)
             except Exception as internal_exception:
-                log.error(
+                log.exception(
                     "consumer group creation failed",
                     exc_info=internal_exception,
                     group_name=self._group_name,

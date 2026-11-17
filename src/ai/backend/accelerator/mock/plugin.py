@@ -162,7 +162,7 @@ class MockPlugin(AbstractComputePlugin):
             try:
                 self._mode = AllocationModes(mode)
             except ValueError:
-                log.error(
+                log.exception(
                     "accelerator disabled: invalid allocation mode",
                     plugin_name=self.key,
                     allocation_mode=str(mode),
@@ -203,7 +203,7 @@ class MockPlugin(AbstractComputePlugin):
                 stdout, _ = await proc.communicate()
                 lines = stdout.decode().splitlines()
             except FileNotFoundError:
-                log.error(
+                log.exception(
                     "accelerator disabled: docker version command failed", plugin_name=self.key
                 )
                 self.enabled = False

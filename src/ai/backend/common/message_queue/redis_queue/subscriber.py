@@ -141,7 +141,7 @@ class RedisSubscriber(AbstractSubscriber):
             except Exception as e:
                 failure_count += 1
                 if failure_count == _ERROR_FAILURE_COUNT:
-                    log.error(
+                    log.exception(
                         "broadcast read keeps failing", exc_info=e, attempt_count=failure_count
                     )
                 elif failure_count == 1:

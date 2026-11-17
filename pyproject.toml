@@ -103,6 +103,8 @@ select = [
     "F",      # pyflakes: detects unused imports, undefined names, and other logical errors
     "I",      # isort: enforces consistent import ordering
     "T10",    # flake8-debugger: prevents debugger statements (pdb, breakpoint) in production code
+    "TRY400", # tryceratops: use logging.exception instead of logging.error inside except
+    "TRY401", # tryceratops: do not repeat the exception object in logging.exception
     "FA",     # flake8-future-annotations: enforces `from __future__ import annotations`
     "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
     "EXE",    # flake8-executable: validates shebang and file permissions consistency
