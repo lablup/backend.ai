@@ -4,6 +4,7 @@
 
 이 패키지는 엔티티마다 손으로 작성하던 condition 함수와 order 메서드(field 와 operation 마다 하나)를
 field 마다 하나의 선언으로 대체한다. filter, order, 권한(field cap)이 모두 같은 field 목록을 읽는다.
+선언은 엔티티마다 `{Entity}QuerySpec` 이고 항목은 `QueryColumn`, `NestedQueryColumn` 이다.
 
 ## field 마다 선언하면 누락을 검사할 수 있다
 

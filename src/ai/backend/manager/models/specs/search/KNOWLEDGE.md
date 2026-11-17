@@ -36,6 +36,7 @@ status: stable
 Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 This package replaces the condition functions and order methods written by hand per entity, one per field and operation, with one declaration per field. Filters, orders and permissions (field caps) all read the same list of fields.
+The declaration is one `{Entity}QuerySpec` per entity, with the items `QueryColumn` and `NestedQueryColumn`.
 
 ## Declaring per field makes omissions checkable
 
