@@ -63,7 +63,10 @@ class CreateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
     num_retries_to_skip: int | None = Field(
         default=None,
         ge=0,
-        description="Number of scheduling retries before a pending session is skipped.",
+        description=(
+            "Number of scheduling retries before a pending session is skipped. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
@@ -76,30 +79,44 @@ class CreateResourceGroupSchedulerOptionsInput(BaseRequestModel):
             SessionTypes.BATCH,
             SessionTypes.INFERENCE,
         ],
-        description="Session types that may be created in the resource group.",
+        description=(
+            "Session types that may be created in the resource group. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     pending_timeout: float = Field(
         default=0.0,
         ge=0.0,
-        description="Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout). "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     config: CreateResourceGroupSchedulerOptionsConfigInput | None = Field(
         default=None,
-        description="The ``config`` section of the scheduler options.",
+        description=(
+            f"The ``config`` section of the scheduler options. Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     agent_selection_strategy: AgentSelectionStrategy = Field(
         default=AgentSelectionStrategy.DISPERSED,
-        description="How agents are chosen for a session's kernels.",
+        description=(
+            f"How agents are chosen for a session's kernels. Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     allow_fractional_resource_fragmentation: bool = Field(
         default=True,
         description=(
-            "Whether an agent may start a kernel that fragments a fractional resource request."
+            "Whether an agent may start a kernel that fragments a fractional resource request. "
+            f"Added in {NEXT_RELEASE_VERSION}."
         ),
     )
     route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
         default_factory=lambda: [RouteHealthStatus.UNHEALTHY],
-        description="Route health statuses whose routes are cleaned up automatically.",
+        description=(
+            "Route health statuses whose routes are cleaned up automatically. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
@@ -143,7 +160,9 @@ class CreateResourceGroupInput(BaseRequestModel):
     )
     scheduler_options: CreateResourceGroupSchedulerOptionsInput | None = Field(
         default=None,
-        description="Scheduler options. Omit to use the defaults.",
+        description=(
+            f"Scheduler options. Omit to use the defaults. Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
     @field_validator("name", mode="before")
