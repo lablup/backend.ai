@@ -5,12 +5,12 @@ from typing import Any
 
 import pytest
 
-from ai.backend.manager.errors.partial_record import (
+from ai.backend.common.data.partial import PartialRecord, selectable
+from ai.backend.common.errors.partial_record import (
     FrozenPartialRecordError,
     InvalidPartialRecordError,
     NotSelectedError,
 )
-from ai.backend.manager.models.specs.partial import PartialRecord, selectable
 
 
 class _Group(PartialRecord):

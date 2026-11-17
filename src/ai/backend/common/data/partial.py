@@ -11,7 +11,7 @@ import inspect
 from collections.abc import Mapping
 from typing import Any, ClassVar, dataclass_transform, final, override
 
-from ai.backend.manager.errors.partial_record import (
+from ai.backend.common.errors.partial_record import (
     FrozenPartialRecordError,
     InvalidPartialRecordError,
     NotSelectedError,

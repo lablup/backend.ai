@@ -1,4 +1,4 @@
-"""Errors of `PartialRecord` (`models/specs/partial.py`). Each one is a code defect."""
+"""Errors of `PartialRecord` (`common/data/partial.py`). Each one is a code defect."""
 
 from __future__ import annotations
 
