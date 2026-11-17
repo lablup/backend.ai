@@ -130,7 +130,7 @@ class InvalidDeploymentStrategy(FieldError, web.HTTPBadRequest):
         )
 
 
-class RouteSessionNotFound(EntityError):
+class RouteSessionNotFound(EntityError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/route-session-not-found"
     error_title = "No session associated with route."
 
@@ -139,7 +139,7 @@ class RouteSessionNotFound(EntityError):
         return EntityErrorCode(SessionEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class RouteSessionTerminated(EntityError):
+class RouteSessionTerminated(EntityError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/route-session-terminated"
     error_title = "Route session is in terminal state."
 
