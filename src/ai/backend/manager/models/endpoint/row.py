@@ -236,17 +236,17 @@ class EndpointRow(Base):
         default=DeploymentOptions,
     )
 
-    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Read only by gql_legacy (endpoint.py).
     # Delete it together with the gql_legacy cleanup.
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Read only by gql_legacy (endpoint.py).
     # Delete it together with the gql_legacy cleanup.
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
-    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Read only by gql_legacy (endpoint.py).
     # Delete it together with the gql_legacy cleanup.
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
@@ -257,8 +257,8 @@ class EndpointRow(Base):
     # The primary replica group's current revision. Filled only where the query passes
     # with_expression(current_revision_id_subquery()); None otherwise.
     current_revision_id: Mapped[DeploymentRevisionID | None] = query_expression()
-    # current_revision_row and deploying_revision_row are read only by gql_legacy (endpoint.py,
-    # through to_data). Delete them together with the gql_legacy cleanup.
+    # current_revision_row and deploying_revision_row are read only by gql_legacy
+    # (endpoint.py). Delete them together with the gql_legacy cleanup.
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         secondary="replica_groups",
