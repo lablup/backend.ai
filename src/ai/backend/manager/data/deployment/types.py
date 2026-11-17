@@ -392,6 +392,7 @@ class DeploymentMetadata:
     # the revision preset default (if any) and ultimately the system default.
     revision_history_limit: int | None = None
     tag: str | None = None
+    destroyed_at: datetime | None = None
 
 
 @dataclass
