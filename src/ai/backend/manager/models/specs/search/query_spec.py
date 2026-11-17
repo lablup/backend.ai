@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from collections.abc import Mapping
+from typing import Any, ClassVar
+
+from ai.backend.manager.models.specs.search.field import QueryColumn
 
 
 class QueryOwnSection:
     """The entity's own columns, each a ``QueryColumn``."""
+
+    def columns(self) -> Mapping[str, QueryColumn[Any, Any, Any]]:
+        """Declared columns by ``name``, in declaration order (base classes first)."""
+        declared: dict[str, QueryColumn[Any, Any, Any]] = {}
+        for klass in reversed(type(self).__mro__):
+            for value in vars(klass).values():
+                if isinstance(value, QueryColumn):
+                    declared[value.name] = value
+        return declared
 
 
 class QueryNestedSection:

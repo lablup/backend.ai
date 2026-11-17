@@ -108,3 +108,33 @@ class GraphQLFieldNotSelected(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class RequestedFieldNotDeclared(BackendAIError, web.HTTPInternalServerError):
+    """A requested data field has no column in the entity's ``QuerySpec.own``."""
+
+    error_type = "https://api.backend.ai/probs/requested-field-not-declared"
+    error_title = "The requested field has no column to read it from."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class InvalidResolverReads(BackendAIError, web.HTTPInternalServerError):
+    """A GQL resolver field declares ``reads`` that is not a plain field of its type."""
+
+    error_type = "https://api.backend.ai/probs/invalid-resolver-reads"
+    error_title = "A GQL resolver field declares an invalid read."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

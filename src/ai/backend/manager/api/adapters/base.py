@@ -21,6 +21,9 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     build_orders,
     build_pagination,
 )
+from ai.backend.manager.api.adapter_options.requested_fields.requested_fields import (
+    RequestedFields,
+)
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -29,7 +32,8 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.search.query_spec import QueryOwnSection
+from ai.backend.manager.models.specs.searcher import PartialSearcher, Searcher
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 
@@ -240,4 +244,41 @@ class BaseAdapter(BaseFilterAdapter):
             pagination=querier.pagination,
             conditions=querier.conditions,
             orders=querier.orders,
+        )
+
+    def _build_partial_searcher[TSearcher: PartialSearcher[Any, Any]](
+        self,
+        searcher_class: type[TSearcher],
+        own: QueryOwnSection,
+        requested: RequestedFields | None,
+        conditions: list[QueryCondition],
+        orders: list[QueryOrder],
+        pagination_spec: PaginationSpec,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> TSearcher:
+        """:meth:`_build_searcher` for a :class:`PartialSearcher`.
+
+        ``fields`` holds the columns of ``own`` that ``requested`` names; ``None`` reads every field.
+        """
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=pagination_spec,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+        return searcher_class(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
+            fields=requested.columns(own) if requested is not None else None,
         )

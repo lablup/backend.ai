@@ -46,6 +46,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
 )
+from ai.backend.manager.api.gql.requested_fields import ResolverReads
 
 __all__ = (
     "BackendAIGQLMeta",
@@ -329,14 +330,19 @@ def gql_resolver(
     description: str,
     name: str | None = None,
     deprecation_reason: str | None = None,
+    reads: Sequence[object] = (),
 ) -> Callable[[_ResolverFn], _ResolverFn]:
-    """Resolver form of ``gql_field``."""
+    """Resolver form of ``gql_field``.
+
+    ``reads`` names the plain fields of the same type the resolver reads (``ResolverReads``).
+    """
     return cast(
         Callable[[_ResolverFn], _ResolverFn],
         strawberry.field(
             description=description,
             name=name,
             deprecation_reason=deprecation_reason,
+            metadata=ResolverReads(reads).as_metadata() if reads else None,
         ),
     )
 
@@ -346,14 +352,16 @@ def gql_added_resolver(
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
+    reads: Sequence[object] = (),
 ) -> Callable[[_ResolverFn], _ResolverFn]:
-    """Resolver form of ``gql_added_field``."""
+    """Resolver form of ``gql_added_field``. ``reads`` is as in ``gql_resolver``."""
     return cast(
         Callable[[_ResolverFn], _ResolverFn],
         strawberry.field(
             description=_build_description(meta),
             name=name,
             deprecation_reason=deprecation_reason,
+            metadata=ResolverReads(reads).as_metadata() if reads else None,
         ),
     )
 
