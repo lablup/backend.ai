@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -27,15 +28,41 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    MountPermission,
+    ResourceSlot,
+    SessionId,
+)
 from ai.backend.manager.data.deployment.types import (
+    ClusterConfigData,
+    DeploymentInfo,
+    DeploymentMetadata,
+    DeploymentNetworkData,
+    DeploymentOptions,
+    DeploymentState,
+    ExecutionData,
+    ModelMountConfigData,
+    ModelRevisionData,
+    ModelRuntimeConfigData,
+    PresetAttributionData,
+    ReplicaData,
+    ResourceConfigData,
     RouteData,
     RouteHealthStatus,
     RouteStatus,
@@ -44,6 +71,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
+from ai.backend.manager.data.session.creation import DeploymentContext, UserContext
+from ai.backend.manager.data.session.draft import SchedulingTargetDraft, SessionSpecDraft
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 
@@ -239,6 +269,123 @@ class TestProvisionRoutes:
         mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
             deployment,
             revision_id=explicit_revision_id,
+        )
+
+
+class TestProvisionRoutesSchedulingTarget:
+    """The route session is placed by the deployment's designated agents and policy."""
+
+    @pytest.fixture
+    def strict_deployment(self, provisioning_route: RouteData) -> DeploymentInfo:
+        return DeploymentInfo(
+            id=provisioning_route.deployment_id,
+            metadata=DeploymentMetadata(
+                name="deployment",
+                domain="default",
+                project=uuid4(),
+                resource_group="default",
+                created_user=uuid4(),
+                session_owner=uuid4(),
+                created_at=None,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=1, desired_replica_count=1),
+            network=DeploymentNetworkData(
+                open_to_public=False,
+                access_token_ids=None,
+                url=None,
+                preferred_domain_name=None,
+            ),
+            options=DeploymentOptions(agent_selection_policy=AgentSelectionPolicy.STRICT),
+        )
+
+    @pytest.fixture
+    def revision(self, provisioning_route: RouteData) -> ModelRevisionData:
+        return ModelRevisionData(
+            id=provisioning_route.revision_id,
+            deployment_id=provisioning_route.deployment_id,
+            revision_number=1,
+            created_at=datetime(2026, 10, 21, tzinfo=UTC),
+            image_id=ImageID(uuid4()),
+            cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=1),
+            resource_config=ResourceConfigData(
+                resource_group_name="default",
+                resource_slot=ResourceSlot(),
+            ),
+            model_runtime_config=ModelRuntimeConfigData(
+                runtime_variant_id=RuntimeVariantID(uuid4())
+            ),
+            execution=ExecutionData(startup_command=None, bootstrap_script=None, callback_url=None),
+            model_mount_config=ModelMountConfigData(
+                vfolder_id=VFolderUUID(uuid4()),
+                mount_destination="/models",
+                definition_path="model-definition.yaml",
+                extra_mounts=[],
+                model_mount_perm=MountPermission.READ_ONLY,
+                subpath=None,
+            ),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
+        )
+
+    @pytest.fixture
+    def context(self) -> DeploymentContext:
+        context = MagicMock(spec=DeploymentContext)
+        context.session_owner = UserContext(
+            uuid=uuid4(),
+            access_key=AccessKey("AKIATEST"),
+            role="user",
+            sudo_session_enabled=False,
+        )
+        context.domain_id = DomainID(uuid4())
+        context.group_id = uuid4()
+        context.resource_group_id = ResourceGroupID(uuid4())
+        context.resolved_presets = None
+        return cast(DeploymentContext, context)
+
+    @pytest.fixture
+    def designated_agents(self) -> list[AgentId]:
+        return [AgentId("i-agent-a"), AgentId("i-agent-b")]
+
+    @pytest.fixture
+    def repo_serving_the_deployment(
+        self,
+        mock_deployment_repo: AsyncMock,
+        strict_deployment: DeploymentInfo,
+        revision: ModelRevisionData,
+        context: DeploymentContext,
+        designated_agents: list[AgentId],
+    ) -> AsyncMock:
+        mock_deployment_repo.get_deployments_by_ids.return_value = [strict_deployment]
+        mock_deployment_repo.fetch_route_session_group_ids.return_value = {}
+        mock_deployment_repo.fetch_designated_agent_ids_by_deployment_ids.return_value = {
+            strict_deployment.id: designated_agents
+        }
+        mock_deployment_repo.fetch_deployment_context.return_value = context
+        mock_deployment_repo.get_revision.return_value = revision
+        return mock_deployment_repo
+
+    async def test_the_session_draft_carries_the_designated_agents_and_the_policy(
+        self,
+        route_executor: RouteExecutor,
+        repo_serving_the_deployment: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        provisioning_route: RouteData,
+        designated_agents: list[AgentId],
+    ) -> None:
+        with RouteRecorderContext.scope("test", entity_ids=[provisioning_route.route_id]):
+            result = await route_executor.provision_routes([provisioning_route])
+
+        assert len(result.successes) == 1
+        draft: SessionSpecDraft = (
+            mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        )
+        assert draft.resource_spec.resource.options.scheduling_target == SchedulingTargetDraft(
+            designated_agents=tuple(designated_agents),
+            agent_selection_policy=AgentSelectionPolicy.STRICT,
         )
 
 

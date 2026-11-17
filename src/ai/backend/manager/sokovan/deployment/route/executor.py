@@ -31,7 +31,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -128,6 +128,12 @@ class RouteExecutor:
                 session_group_map = await self._deployment_repo.fetch_route_session_group_ids({
                     route.route_id for route in routes
                 })
+            with RouteRecorderContext.shared_step("load_designated_agents"):
+                designated_agent_map = (
+                    await self._deployment_repo.fetch_designated_agent_ids_by_deployment_ids(
+                        deployment_ids
+                    )
+                )
 
         route_session_ids: dict[UUID, SessionId] = {}
         successes: list[RouteData] = []
@@ -138,7 +144,7 @@ class RouteExecutor:
             with with_log_context(route_id=route.route_id, deployment_id=route.deployment_id):
                 try:
                     session_id = await self._provision_route(
-                        route, deployment_map, session_group_map
+                        route, deployment_map, session_group_map, designated_agent_map
                     )
                     if session_id is not None:
                         route_session_ids[route.route_id] = session_id
@@ -1137,6 +1143,7 @@ class RouteExecutor:
         route: RouteData,
         deployment_map: Mapping[DeploymentID, DeploymentInfo],
         session_group_map: Mapping[ReplicaID, SessionGroupID],
+        designated_agent_map: Mapping[DeploymentID, list[AgentId]],
     ) -> SessionId | None:
         """Provision a single route by creating a session.
 
@@ -1176,6 +1183,7 @@ class RouteExecutor:
                     route_id=route.route_id,
                     target_revision=target_revision,
                     session_group_id=session_group_map.get(route.route_id),
+                    designated_agents=designated_agent_map[route.deployment_id],
                 )
                 return await self._scheduling_controller.enqueue_session_from_draft(draft)
 

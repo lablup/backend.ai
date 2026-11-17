@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -11,14 +12,43 @@ from ai.backend.common.config import (
     ModelDefinition,
     ModelServiceConfig,
 )
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import MountPermission
-from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    MountPermission,
+    ResourceSlot,
+)
+from ai.backend.manager.data.deployment.types import (
+    ClusterConfigData,
+    DeploymentInfo,
+    DeploymentMetadata,
+    DeploymentNetworkData,
+    DeploymentOptions,
+    DeploymentState,
+    ExecutionData,
+    ModelMountConfigData,
+    ModelRevisionData,
+    ModelRuntimeConfigData,
+    PresetAttributionData,
+    ReplicaData,
+    ResourceConfigData,
+)
 from ai.backend.manager.data.session.creation import (
     DeploymentContext,
     ResolvedPresetValues,
+    UserContext,
 )
-from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft
+from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft, SchedulingTargetDraft
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
     DeploymentSessionDraftBuilder,
@@ -198,3 +228,127 @@ class TestResolveMounts:
             self._revision(MountPermission.READ_ONLY)
         )
         assert mounts[0].mount_perm == MountPermission.READ_ONLY
+
+
+class TestSchedulingTarget:
+    """The route session is placed by the deployment's designated agents and policy."""
+
+    @pytest.fixture
+    def revision(self) -> ModelRevisionData:
+        return ModelRevisionData(
+            id=DeploymentRevisionID(uuid4()),
+            deployment_id=DeploymentID(uuid4()),
+            revision_number=1,
+            created_at=datetime(2026, 10, 21, tzinfo=UTC),
+            image_id=ImageID(uuid4()),
+            cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=1),
+            resource_config=ResourceConfigData(
+                resource_group_name="default",
+                resource_slot=ResourceSlot(),
+            ),
+            model_runtime_config=ModelRuntimeConfigData(
+                runtime_variant_id=RuntimeVariantID(uuid4())
+            ),
+            execution=ExecutionData(startup_command=None, bootstrap_script=None, callback_url=None),
+            model_mount_config=ModelMountConfigData(
+                vfolder_id=VFolderUUID(uuid4()),
+                mount_destination="/models",
+                definition_path="model-definition.yaml",
+                extra_mounts=[],
+                model_mount_perm=MountPermission.READ_ONLY,
+                subpath=None,
+            ),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
+        )
+
+    @pytest.fixture
+    def context(self) -> DeploymentContext:
+        context = MagicMock(spec=DeploymentContext)
+        context.session_owner = UserContext(
+            uuid=uuid4(),
+            access_key=AccessKey("AKIATEST"),
+            role="user",
+            sudo_session_enabled=False,
+        )
+        context.domain_id = DomainID(uuid4())
+        context.group_id = uuid4()
+        context.resource_group_id = ResourceGroupID(uuid4())
+        context.resolved_presets = None
+        return cast(DeploymentContext, context)
+
+    @staticmethod
+    def _deployment(policy: AgentSelectionPolicy) -> DeploymentInfo:
+        return DeploymentInfo(
+            id=DeploymentID(uuid4()),
+            metadata=DeploymentMetadata(
+                name="deployment",
+                domain="default",
+                project=uuid4(),
+                resource_group="default",
+                created_user=uuid4(),
+                session_owner=uuid4(),
+                created_at=None,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=1, desired_replica_count=1),
+            network=DeploymentNetworkData(
+                open_to_public=False,
+                access_token_ids=None,
+                url=None,
+                preferred_domain_name=None,
+            ),
+            options=DeploymentOptions(agent_selection_policy=policy),
+        )
+
+    def _scheduling_target(
+        self,
+        deployment: DeploymentInfo,
+        designated_agents: list[AgentId],
+        revision: ModelRevisionData,
+        context: DeploymentContext,
+    ) -> SchedulingTargetDraft | None:
+        draft = DeploymentSessionDraftBuilder.build(
+            deployment_info=deployment,
+            context=context,
+            route_id=uuid4(),
+            target_revision=revision,
+            session_group_id=None,
+            designated_agents=designated_agents,
+        )
+        return draft.resource_spec.resource.options.scheduling_target
+
+    @pytest.mark.parametrize(
+        "policy",
+        [AgentSelectionPolicy.STRICT, AgentSelectionPolicy.PREFERRED],
+        ids=["strict", "preferred"],
+    )
+    def test_carries_the_designated_agents_and_the_policy(
+        self,
+        revision: ModelRevisionData,
+        context: DeploymentContext,
+        policy: AgentSelectionPolicy,
+    ) -> None:
+        agents = [AgentId("i-agent-a"), AgentId("i-agent-b")]
+
+        target = self._scheduling_target(self._deployment(policy), agents, revision, context)
+
+        assert target == SchedulingTargetDraft(
+            designated_agents=tuple(agents), agent_selection_policy=policy
+        )
+
+    def test_a_deployment_without_designation_leaves_the_agents_open(
+        self,
+        revision: ModelRevisionData,
+        context: DeploymentContext,
+    ) -> None:
+        deployment = self._deployment(AgentSelectionPolicy.PREFERRED)
+
+        target = self._scheduling_target(deployment, [], revision, context)
+
+        assert target == SchedulingTargetDraft(
+            designated_agents=(), agent_selection_policy=AgentSelectionPolicy.PREFERRED
+        )
