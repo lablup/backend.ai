@@ -7,6 +7,8 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Iterable, Mapping, Sequence
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -61,14 +63,8 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
         )
 
 
-<<<<<<< HEAD
-class NoAvailableAgentError(AgentSelectionError):
-    """Raised when no agents can satisfy a kernel-group's resource requirement.
-=======
 class NoAvailableAgentError(AgentSelectionError, web.HTTPServiceUnavailable):
-    """Raised inside a stateful filter's recorder step when no candidates
-    survive it.
->>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
+    """Raised when no agents can satisfy a kernel-group's resource requirement.
 
     The constructor accepts the structured inputs that describe *which*
     kernels failed and *why* each candidate agent was rejected, and composes
@@ -93,42 +89,11 @@ class NoAvailableAgentError(AgentSelectionError, web.HTTPServiceUnavailable):
         agent_errors: Mapping[AgentId, TrackerCompatibilityError],
         designated_agent_ids: Sequence[AgentId] | None = None,
     ) -> None:
-<<<<<<< HEAD
         self._kernel_ids = kernel_ids
         self._required_architecture = required_architecture
         self._requested_slots = requested_slots
         self._agent_errors = agent_errors
         self._designated_agent_ids = designated_agent_ids
-=======
-        self.filter_name = filter_name
-        self.missing_slots = missing_slots
-        self.missing_containers = missing_containers
-        super().__init__(f"no agents passed the '{filter_name}' filter")
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.SCHEDULE,
-            error_detail=ErrorDetail.UNAVAILABLE,
-        )
-
-
-class BatchAgentSelectionFailedError(AgentSelectionError, web.HTTPServiceUnavailable):
-    """The batch wrapper's rendering of computed placement failures.
-
-    Carries the structured ``failures`` and composes the human-readable
-    message used as the session's scheduling-failure reason.
-    """
-
-    error_type = "https://api.backend.ai/probs/batch-agent-selection-failed"
-    error_title = "Some kernels could not be placed on any agent."
-
-    failures: Sequence[PlacementFailure]
-
-    def __init__(self, failures: Sequence[PlacementFailure]) -> None:
-        self.failures = failures
->>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
         super().__init__(self._build_message())
 
     def error_code(self) -> ErrorCode:

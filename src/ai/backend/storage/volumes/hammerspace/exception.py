@@ -1,11 +1,5 @@
 from aiohttp import web
 
-<<<<<<< HEAD
-=======
-from aiohttp import web
-
-from ai.backend.common.clients.storage_backends.hammerspace.exceptions import HammerspaceError
->>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,15 +9,11 @@ from ai.backend.common.exception import (
 )
 
 
-<<<<<<< HEAD
 class HammerspaceError(BackendAIError):
     """Base error for Hammerspace-related errors."""
 
 
-class ConfigurationError(HammerspaceError):
-=======
 class ConfigurationError(HammerspaceError, web.HTTPInternalServerError):
->>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
     error_type = "https://api.backend.ai/probs/hammerspace-invalid-configuration"
     error_title = "Hammerspace configuration is invalid."
 

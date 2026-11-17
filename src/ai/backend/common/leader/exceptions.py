@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-=======
-from typing import override
-
 from aiohttp import web
 
->>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
