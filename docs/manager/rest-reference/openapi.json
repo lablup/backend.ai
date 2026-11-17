@@ -25241,7 +25241,7 @@
               }
             ],
             "default": null,
-            "description": "Number of scheduling retries before a pending session is skipped.",
+            "description": "Number of scheduling retries before a pending session is skipped. Added in 26.10.0.",
             "title": "Num Retries To Skip"
           }
         },
@@ -25252,7 +25252,7 @@
         "description": "Input for a new resource group's scheduler options.",
         "properties": {
           "allowed_session_types": {
-            "description": "Session types that may be created in the resource group.",
+            "description": "Session types that may be created in the resource group. Added in 26.10.0.",
             "items": {
               "$ref": "#/components/schemas/SessionTypes"
             },
@@ -25261,7 +25261,7 @@
           },
           "pending_timeout": {
             "default": 0.0,
-            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout). Added in 26.10.0.",
             "minimum": 0.0,
             "title": "Pending Timeout",
             "type": "number"
@@ -25276,21 +25276,21 @@
               }
             ],
             "default": null,
-            "description": "The ``config`` section of the scheduler options."
+            "description": "The ``config`` section of the scheduler options. Added in 26.10.0."
           },
           "agent_selection_strategy": {
             "$ref": "#/components/schemas/AgentSelectionStrategy",
             "default": "dispersed",
-            "description": "How agents are chosen for a session's kernels."
+            "description": "How agents are chosen for a session's kernels. Added in 26.10.0."
           },
           "allow_fractional_resource_fragmentation": {
             "default": true,
-            "description": "Whether an agent may start a kernel that fragments a fractional resource request.",
+            "description": "Whether an agent may start a kernel that fragments a fractional resource request. Added in 26.10.0.",
             "title": "Allow Fractional Resource Fragmentation",
             "type": "boolean"
           },
           "route_cleanup_target_statuses": {
-            "description": "Route health statuses whose routes are cleaned up automatically.",
+            "description": "Route health statuses whose routes are cleaned up automatically. Added in 26.10.0.",
             "items": {
               "$ref": "#/components/schemas/RouteHealthStatus"
             },
@@ -25427,7 +25427,7 @@
               }
             ],
             "default": null,
-            "description": "Scheduler options. Omit to use the defaults."
+            "description": "Scheduler options. Omit to use the defaults. Added in 26.10.0."
           }
         },
         "required": [
