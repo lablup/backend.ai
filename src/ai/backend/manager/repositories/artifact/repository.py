@@ -134,6 +134,12 @@ class ArtifactRepository:
         return await self._db_source.update_artifact_revision_status(artifact_revision_id, status)
 
     @artifact_repository_resilience.apply()
+    async def mark_artifact_revision_pulling(self, artifact_revision_id: uuid.UUID) -> None:
+        """Raises ArtifactRevisionNotFoundError if the revision does not exist and
+        ArtifactRevisionImportInProgressError if it is already being imported."""
+        await self._db_source.mark_artifact_revision_pulling(artifact_revision_id)
+
+    @artifact_repository_resilience.apply()
     async def update_artifact_revision_remote_status(
         self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
     ) -> uuid.UUID:

@@ -52,6 +52,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
     ArtifactImportBadRequestError,
+    ArtifactRevisionImportInProgressError,
     RemoteReservoirArtifactImportError,
 )
 from ai.backend.manager.errors.artifact_registry import (
@@ -396,6 +397,11 @@ class ArtifactRevisionService:
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(
                 action.artifact_revision_id
             )
+            if revision_data.status in ArtifactStatus.import_in_progress():
+                raise ArtifactRevisionImportInProgressError(
+                    f"Artifact revision {revision_data.id} is already being imported"
+                )
+
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
             reservoir_config = self._config_provider.config.reservoir
@@ -452,8 +458,8 @@ class ArtifactRevisionService:
                             result=revision_data, task_id=None
                         )
 
-                    await self._artifact_repository.update_artifact_revision_status(
-                        action.artifact_revision_id, ArtifactStatus.PULLING
+                    await self._artifact_repository.mark_artifact_revision_pulling(
+                        action.artifact_revision_id
                     )
 
                     vfolder_target: VFolderStorageTarget | None = None
@@ -560,8 +566,8 @@ class ArtifactRevisionService:
                                         f"Last status: {remote_progress.status}"
                                     )
 
-                        await self._artifact_repository.update_artifact_revision_status(
-                            action.artifact_revision_id, ArtifactStatus.PULLING
+                        await self._artifact_repository.mark_artifact_revision_pulling(
+                            action.artifact_revision_id
                         )
 
                         vfolder_target: VFolderStorageTarget | None = None
@@ -602,6 +608,9 @@ class ArtifactRevisionService:
                 )
             )
 
+        except ArtifactRevisionImportInProgressError:
+            # The revision belongs to the import already running; it must not be marked FAILED.
+            raise
         except Exception as e:
             await self._artifact_repository.update_artifact_revision_status(
                 action.artifact_revision_id, ArtifactStatus.FAILED

@@ -45,6 +45,18 @@ class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ArtifactRevisionImportInProgressError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/artifact-revision-import-in-progress"
+    error_title = "Artifact Revision Import In Progress"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Bad Request"
