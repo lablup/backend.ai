@@ -219,7 +219,7 @@ class DeploymentExecutor:
                 await self._build_endpoint_item(dep.deployment_info, rev)
                 for dep, rev, _ in group_entries
             ]
-        except BaseException as exc:
+        except Exception as exc:
             log.error("endpoint item build failed", proxy_address=addr, exc_info=exc)
             for deployment, _, _ in group_entries:
                 failures.append(
@@ -237,7 +237,7 @@ class DeploymentExecutor:
             response = await client.create_endpoints_bulk(
                 BulkCreateEndpointRequest(endpoints=items)
             )
-        except BaseException as exc:
+        except Exception as exc:
             log.warning("bulk endpoint creation failed", proxy_address=addr, exc_info=exc)
             for deployment, _, _ in group_entries:
                 failures.append(
@@ -255,7 +255,7 @@ class DeploymentExecutor:
             dep_id = deployment.deployment_info.id
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
-            except BaseException as exc:
+            except Exception as exc:
                 log.error("endpoint URL not persisted", deployment_id=dep_id, exc_info=exc)
                 failures.append(
                     DeploymentExecutionError(
@@ -427,7 +427,7 @@ class DeploymentExecutor:
         )
         try:
             response = await client.delete_endpoints_bulk(request)
-        except BaseException as exc:
+        except Exception as exc:
             log.warning("bulk endpoint deletion failed", proxy_address=addr, exc_info=exc)
             for deployment in group:
                 errors.append(
