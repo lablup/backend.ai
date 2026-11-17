@@ -286,6 +286,8 @@ class FstabEntry:
         self.d = d
         self.p = p
 
+    __hash__ = None
+
     @override
     def __eq__(self, o: Any) -> bool:
         return str(self) == str(o)

@@ -63,6 +63,7 @@ async def _negotiate_api_version(
                     "The server API version is higher than the client. "
                     "Please upgrade the client package.",
                     category=APIVersionWarning,
+                    stacklevel=2,
                 )
             if server_version < MIN_API_VERSION:
                 warnings.warn(
@@ -71,6 +72,7 @@ async def _negotiate_api_version(
                     " the server or downgrade/reinstall the client SDK with the same"
                     " major.minor release of the server.",
                     category=APIVersionWarning,
+                    stacklevel=2,
                 )
             return min(server_version, client_version)
     except (TimeoutError, aiohttp.ClientError):

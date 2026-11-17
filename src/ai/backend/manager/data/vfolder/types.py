@@ -30,10 +30,7 @@ from ai.backend.manager.errors.resource import DataTransformationFailed
 def verify_vfolder_name(folder: str) -> bool:
     if folder in RESERVED_VFOLDERS:
         return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True
+    return all(not pattern.match(folder) for pattern in RESERVED_VFOLDER_PATTERNS)
 
 
 _MOUNT_BASE: Final = PurePosixPath("/home/work")

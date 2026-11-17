@@ -420,6 +420,8 @@ class PlatformTagSet(Mapping[str, str]):
     def __len__(self) -> int:
         return len(self._data)
 
+    __hash__ = None
+
     @override
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, (set, frozenset)):

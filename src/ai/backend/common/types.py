@@ -919,6 +919,8 @@ class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     def __str__(self) -> str:
         return str(self._address)
 
+    __hash__ = None
+
     @override
     def __eq__(self, other: object) -> bool:
         if other is self:
@@ -1189,6 +1191,8 @@ class ResourceSlot(UserDict[str, Decimal]):
 
     def __neg__(self) -> ResourceSlot:
         return type(self)({k: -v for k, v in self.data.items()})
+
+    __hash__ = None
 
     @override
     def __eq__(self, other: object) -> bool:

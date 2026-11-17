@@ -102,6 +102,8 @@ class HealthStatus(BackendAISchema):
         """
         self.last_heartbeat = time.time()
 
+    __hash__ = None
+
     @override
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, HealthStatus):

@@ -122,8 +122,6 @@ def zero_if_none(val: int | None) -> int:
     return 0 if val is None else val
 
 
-T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
-T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
