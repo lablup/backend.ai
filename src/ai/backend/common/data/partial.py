@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Mapping
-from typing import Any, ClassVar, dataclass_transform, final, override
+from typing import TYPE_CHECKING, Any, ClassVar, dataclass_transform, final, override
 
 from ai.backend.common.errors.partial_record import (
     FrozenPartialRecordError,
@@ -69,10 +69,13 @@ class PartialRecord:
             )
         self.__dict__.update(values)
 
-    def __getattr__(self, name: str) -> Any:
-        if name in type(self)._selectable_fields:
-            raise NotSelectedError(f"{type(self).__name__}.{name} was not selected")
-        raise AttributeError(name)
+    if not TYPE_CHECKING:
+        # Hidden from type checkers so that an undeclared name stays an error.
+
+        def __getattr__(self, name: str) -> Any:
+            if name in type(self)._selectable_fields:
+                raise NotSelectedError(f"{type(self).__name__}.{name} was not selected")
+            raise AttributeError(name)
 
     @override
     def __setattr__(self, name: str, value: Any) -> None:
