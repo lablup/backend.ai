@@ -130,9 +130,20 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
+<<<<<<< HEAD
 from ai.backend.manager.services.vfolder.actions.lookup import (
     LookupVFolderAction,
     LookupVFolderActionResult,
+=======
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_restore_vfolders import (
+    PartialBulkRestoreVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders import (
+    PartialBulkUpdateVFoldersAction,
+>>>>>>> d21a38f5 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
 )
 from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions import (
     SearchStorageHostPermissionsAction,
@@ -279,20 +290,6 @@ class VFolderService:
                 )
             )
         return PartialBulkResult(items=items)
-
-    async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
-        """Resolve one vfolder name into its id.
-
-        No access checking — the session-create path that still accepts names in
-        ``creation_config["mounts"]`` validates the resolved ids downstream.
-        """
-        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names([
-            action.vfolder_name
-        ])
-        vfolder_id = name_to_id.get(action.vfolder_name)
-        if vfolder_id is None:
-            raise VFolderNotFound(extra_data=[action.vfolder_name])
-        return LookupVFolderActionResult(vfolder_uuid=VFolderUUID(vfolder_id))
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         """Create the vfolder the action's insert spec describes.
