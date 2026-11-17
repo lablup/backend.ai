@@ -14,6 +14,8 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
 )
 from ai.backend.appproxy.coordinator.models.worker import Worker, pick_worker
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 
 
 class FakeResult:
@@ -72,8 +74,8 @@ class TestPickWorker:
     def session_config(self) -> SessionConfig:
         return SessionConfig(
             id=None,
-            user_uuid=uuid.uuid4(),
-            project_id=uuid.uuid4(),
+            user_uuid=UserID(uuid.uuid4()),
+            project_id=ProjectID(uuid.uuid4()),
             access_key=None,
             domain_name="default",
         )

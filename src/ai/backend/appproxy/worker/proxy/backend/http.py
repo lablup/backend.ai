@@ -5,8 +5,9 @@ import logging
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from functools import partial
-from typing import Any, Final, override
+from typing import Final, override
 
 import aiohttp
 from aiohttp import ClientConnectorError, web
@@ -24,18 +25,20 @@ from ai.backend.appproxy.common.defs import (
     X_RSTUDIO_REQUEST_HEADER,
 )
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
-from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.appproxy.worker.types import Circuit
+from ai.backend.appproxy.worker.config import ProxyWorkerConfig
+from ai.backend.appproxy.worker.types import (
+    WorkerMetricRegistry,
+)
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
     tcp_client_session_factory,
 )
 from ai.backend.common.cron import LocalCron
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressTarget
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressTarget
 from ai.backend.logging.structured import StructuredLogger
 
-from .base import BaseBackend, HttpRequest
+from .base import BaseBackend, BaseBackendArgs, HttpRequest
 from .last_access_marker import LastAccessMarkerTask
 from .pool import RoutePool
 
@@ -63,6 +66,12 @@ _FORWARDING_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
 ])
 
 
+@dataclass(frozen=True)
+class HTTPBackendArgs(BaseBackendArgs):
+    worker_config: ProxyWorkerConfig
+    metrics: WorkerMetricRegistry
+
+
 class HTTPBackend(BaseBackend):
     """HTTP proxy backend that keeps the targets of its Ingress backend in a health-checked pool.
 
@@ -73,47 +82,51 @@ class HTTPBackend(BaseBackend):
     failure threshold (the background TCP probe complements this).
     """
 
+    _worker_config: ProxyWorkerConfig
+    _metrics: WorkerMetricRegistry
     _pool: RoutePool
+    _client_pool: ClientPool
 
-    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._pool = RoutePool(Circuit.ingress_backend_of_routes(routes))
+    def __init__(self, args: HTTPBackendArgs) -> None:
+        super().__init__(args)
+        self._worker_config = args.worker_config
+        self._metrics = args.metrics
+        self._pool = RoutePool(args.ingress.backend)
         client_timeout = aiohttp.ClientTimeout(
             total=None,
             connect=10.0,
             sock_connect=10.0,
             sock_read=None,
         )
-        worker_config = self.root_context.local_config.proxy_worker
-        self.client_pool = ClientPool(
+        self._client_pool = ClientPool(
             partial(
                 tcp_client_session_factory,
                 timeout=client_timeout,
                 auto_decompress=False,  # transparently pass the response body
             ),
-            cleanup_interval_seconds=worker_config.client_pool_cleanup_interval,
-            keep_inflight_sessions=worker_config.client_pool_keep_inflight_sessions,
+            cleanup_interval_seconds=self._worker_config.client_pool_cleanup_interval,
+            keep_inflight_sessions=self._worker_config.client_pool_keep_inflight_sessions,
         )
 
     @override
-    async def update_routes(self, routes: list[RouteInfo]) -> None:
-        await self._pool.update(Circuit.ingress_backend_of_routes(routes))
+    async def update_ingress(self, ingress: Ingress) -> None:
+        await super().update_ingress(ingress)
+        await self._pool.update(ingress.backend)
 
     @override
     async def close(self) -> None:
         await self._pool.close()
-        await self.client_pool.close()
+        await self._client_pool.close()
 
     def get_x_forwarded_proto(self, request: web.Request) -> str:
-        worker_config = self.root_context.local_config.proxy_worker
-        use_tls = worker_config.tls_advertised or worker_config.tls_listen
+        use_tls = self._worker_config.tls_advertised or self._worker_config.tls_listen
         configured_proto = "https" if use_tls else "http"
-        if worker_config.trusted_proxies:
+        if self._worker_config.trusted_proxies:
             return request.headers.get(X_FORWARDED_PROTO_HEADER) or configured_proto
         return configured_proto
 
     def get_x_forwarded_host(self, request: web.Request) -> str | None:
-        if self.root_context.local_config.proxy_worker.trusted_proxies:
+        if self._worker_config.trusted_proxies:
             return request.headers.get(X_FORWARDED_HOST_HEADER) or request.headers.get(HOST_HEADER)
         return request.headers.get(HOST_HEADER)
 
@@ -121,14 +134,14 @@ class HTTPBackend(BaseBackend):
     async def request_http(
         self, target: IngressTarget, request: HttpRequest
     ) -> AsyncIterator[aiohttp.ClientResponse]:
-        metrics = self.root_context.metrics
+        metrics = self._metrics
         remote = f"{target.host}:{target.port}"
         metrics.proxy.observe_upstream_http_request(remote=remote, total_bytes_size=0)
         client_key = ClientKey(
             endpoint=f"http://{target.host}:{target.port}",
             domain=str(target.id),
         )
-        client_session = self.client_pool.load_client_session(client_key)
+        client_session = self._client_pool.load_client_session(client_key)
         async with client_session.request(
             request.method,
             request.path,
@@ -151,7 +164,7 @@ class HTTPBackend(BaseBackend):
             endpoint=f"http://{target.host}:{target.port}",
             domain=str(target.id),
         )
-        client_session = self.client_pool.load_client_session(client_key)
+        client_session = self._client_pool.load_client_session(client_key)
         log.trace("connecting to {}", URL(client_key.endpoint).with_path(request.path))
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
             yield ws
@@ -178,14 +191,16 @@ class HTTPBackend(BaseBackend):
         for key, value in frontend_request.headers.items():
             if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
                 backend_rqst_hdrs.add(key, value)
+        # TODO: Read the app from the ingress once an ingress carries it.
+        serves_rstudio = self._circuit is not None and self._circuit.app == "rstudio"
         # overwrite proxy-related headers
         backend_rqst_hdrs[X_FORWARDED_PROTO_HEADER] = protocol
-        if self.circuit.app == "rstudio":
+        if serves_rstudio:
             backend_rqst_hdrs[X_RSTUDIO_PROTO_HEADER] = protocol
         if host:
             backend_rqst_hdrs[FORWARDED_HEADER] = f"host={host};proto={protocol}"
             backend_rqst_hdrs[X_FORWARDED_HOST_HEADER] = host
-            if self.circuit.app == "rstudio":
+            if serves_rstudio:
                 backend_rqst_hdrs[X_RSTUDIO_REQUEST_HEADER] = (
                     f"{protocol}://{host}{frontend_request.path or ''}"
                 )
@@ -275,7 +290,7 @@ class HTTPBackend(BaseBackend):
             raise
 
     async def proxy_ws(self, request: web.Request) -> web.WebSocketResponse:
-        metrics = self.root_context.metrics
+        metrics = self._metrics
         stop_event = asyncio.Event()
         total_bytes = 0
 

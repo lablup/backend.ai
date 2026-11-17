@@ -5,7 +5,7 @@ import pkgutil
 
 import ai.backend.common.data.entity as entity_package
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.errors.permission import InvalidRoleSeed
+from ai.backend.manager.errors.role import InvalidRoleSeed
 
 
 def _subclasses[T: type](base: T) -> list[T]:

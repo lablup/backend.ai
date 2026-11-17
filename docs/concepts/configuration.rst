@@ -24,4 +24,5 @@ The search paths are: the current working directory, ``~/.config/backend.ai``, a
 .. seealso::
 
    `The sample configurations in our source repository <https://github.com/lablup/backend.ai/tree/main/configs>`_.
-   Inside each component directory, ``sample.toml`` contains the full configuration schema and descriptions.
+   Inside each component directory, ``sample.toml.j2`` is a template that contains the full configuration schema and descriptions.
+   Fill its template arguments with ``backend.ai <component> config render`` to write a configuration file.

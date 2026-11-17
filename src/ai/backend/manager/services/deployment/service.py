@@ -25,7 +25,11 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkFieldOpsResult,
+    ScopedBatchOpsResult,
+)
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
@@ -155,6 +159,12 @@ from ai.backend.manager.services.deployment.actions.route.update_route_traffic_s
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
+from ai.backend.manager.services.deployment.actions.scoped_search import (
+    ScopedSearchDeploymentsAction,
+)
+from ai.backend.manager.services.deployment.actions.search_deployments import (
+    GlobalSearchDeploymentsAction,
+)
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
     GlobalSearchLegacyDeploymentsAction,
     GlobalSearchLegacyDeploymentsActionResult,
@@ -183,8 +193,8 @@ def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
 def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
     """Convert DeploymentInfo to the modern (v2 / GraphQL) ModelDeploymentData.
 
-    Uses the revision *ids* only — the modern read path does not load the full
-    revision rows. Note: some fields default as DeploymentInfo lacks the data.
+    Uses the revision *ids* only. Note: some fields default as DeploymentInfo lacks
+    the data.
     """
     return ModelDeploymentData(
         id=info.id,
@@ -496,6 +506,30 @@ class DeploymentService:
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
         return DestroyDeploymentActionResult(
             success=success, data=_convert_deployment_info_to_data(deployment_info)
+        )
+
+    async def global_search_deployments(
+        self, action: GlobalSearchDeploymentsAction
+    ) -> BatchOpsResult[ModelDeploymentData]:
+        """Page through every deployment, each with its policy."""
+        result = await self._deployment_repository.global_search_deployments(action.searcher)
+        return BatchOpsResult[ModelDeploymentData](
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search_deployments(
+        self, action: ScopedSearchDeploymentsAction
+    ) -> ScopedBatchOpsResult[ModelDeploymentData]:
+        """Page through the deployments the named scopes reach, each with its policy."""
+        result = await self._deployment_repository.scoped_search_deployments(action.searcher)
+        return ScopedBatchOpsResult[ModelDeploymentData](
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def search_legacy_deployments(

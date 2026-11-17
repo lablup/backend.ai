@@ -11,9 +11,12 @@ import pytest_mock
 from ai.backend.appproxy.common.types import AppMode, FrontendMode, ProxyProtocol
 from ai.backend.appproxy.worker.proxy.frontend.h2.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InteractiveAppInfo, PortFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, IngressFrontendKey
 
+_WORKER_AUTHORITY = "worker-1"
 _LISTEN_PORT = 10200
 _API_PORT = 20000
+_LISTEN_PORT_FRONTEND_KEY = IngressFrontendKey(f"port-{_LISTEN_PORT}")
 _USER_ID = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
 
 
@@ -21,7 +24,7 @@ _USER_ID = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
 class _StoredCircuitCase:
     open_to_public: bool
     allowed_client_ips: str | None
-    expected_registered_ports: list[int]
+    expected_frontend_keys: list[IngressFrontendKey]
 
 
 @pytest.fixture
@@ -31,7 +34,7 @@ def root_context() -> MagicMock:
     return root_ctx
 
 
-class TestRegisterCircuit:
+class TestRegisterIngress:
     @pytest.fixture
     def h2_frontend(
         self, root_context: MagicMock, mocker: pytest_mock.MockerFixture
@@ -78,7 +81,7 @@ class TestRegisterCircuit:
                 _StoredCircuitCase(
                     open_to_public=True,
                     allowed_client_ips=None,
-                    expected_registered_ports=[_LISTEN_PORT],
+                    expected_frontend_keys=[_LISTEN_PORT_FRONTEND_KEY],
                 ),
                 id="public_without_allowlist_is_registered",
             ),
@@ -86,7 +89,7 @@ class TestRegisterCircuit:
                 _StoredCircuitCase(
                     open_to_public=False,
                     allowed_client_ips=None,
-                    expected_registered_ports=[],
+                    expected_frontend_keys=[],
                 ),
                 id="private_is_skipped",
             ),
@@ -94,15 +97,17 @@ class TestRegisterCircuit:
                 _StoredCircuitCase(
                     open_to_public=True,
                     allowed_client_ips="10.0.0.0/8",
-                    expected_registered_ports=[],
+                    expected_frontend_keys=[],
                 ),
                 id="public_with_allowlist_is_skipped",
             ),
         ],
     )
-    async def test_registered_ports(
+    async def test_registered_frontend_keys(
         self, case: _StoredCircuitCase, h2_frontend: PortFrontend, stored_circuit: Circuit
     ) -> None:
-        await h2_frontend.register_circuit(stored_circuit, [])
+        await h2_frontend.register_ingress(
+            stored_circuit.to_ingress(IngressAuthority(_WORKER_AUTHORITY)), stored_circuit
+        )
 
-        assert list(h2_frontend.backends) == case.expected_registered_ports
+        assert list(h2_frontend.backends) == case.expected_frontend_keys

@@ -16,6 +16,7 @@ from ai.backend.manager.data.artifact.types import ArtifactStatus as DataStatus
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.artifact import (
     ArtifactRevisionDeletionBadRequestError,
+    ArtifactRevisionImportInProgressError,
     ArtifactRevisionNotVerified,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -632,6 +633,54 @@ class ImportingWithoutReservoirConfiguredIsRefused(
 
 
 @dataclass(frozen=True)
+class ImportingARevisionBeingPulledIsRefused(
+    Scenario[
+        TestSeedingSession,
+        AnArtifactWithRevisionsAndACaller,
+        ArtifactAdapter,
+        tuple[ArtifactRevisionNode, UUID | None],
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "importing-a-revision-being-pulled-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "가져오는 중인 리비전을 다시 가져오려 하면, 이미 가져오는 중이라는 것으로 거부됩니다",
+            english=(
+                "when a revision that is being pulled is imported again, it is rejected as an "
+                "import already in progress"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
+        return AnArtifactWithRevisionsAndSomeone(
+            role=UserRole.USER,
+            granted=(Permission.READ, Permission.CREATE),
+            revisions=(("1.0", DataStatus.PULLING),),
+        )
+
+    @override
+    def when(
+        self,
+    ) -> When[
+        AnArtifactWithRevisionsAndACaller,
+        ArtifactAdapter,
+        tuple[ArtifactRevisionNode, UUID | None],
+    ]:
+        return Importing()
+
+    @override
+    def then(
+        self,
+    ) -> Then[AnArtifactWithRevisionsAndACaller, tuple[ArtifactRevisionNode, UUID | None]]:
+        return TheCallIsRefused(ArtifactRevisionImportInProgressError)
+
+
+@dataclass(frozen=True)
 class AUserGrantedReadButNotCreateMayNotImport(
     Scenario[
         TestSeedingSession,
@@ -790,6 +839,7 @@ SCENARIOS: list[Scenario[TestSeedingSession, Any, ArtifactAdapter, Any]] = [
     CleaningUpARevisionStillBeingScannedIsRefused(),
     AUserGrantedReadButNotSoftDeleteMayNotCleanUp(),
     ImportingWithoutReservoirConfiguredIsRefused(),
+    ImportingARevisionBeingPulledIsRefused(),
     AUserGrantedReadButNotCreateMayNotImport(),
     DelegatingTheImportWithoutReservoirConfiguredIsRefused(),
     AUserGrantedNothingMayNotDelegateAnImport(),

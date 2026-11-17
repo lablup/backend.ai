@@ -43,7 +43,7 @@ class RoutePool:
     Selection picks a target group by weight among the groups with a healthy target, then a
     healthy target of that group evenly. TCP connect probes run in the background and flip
     targets between healthy and unhealthy; a target that stays unreachable for
-    ``recovery_timeout`` is evicted.
+    ``recovery_timeout`` is evicted. A target group of weight 0 is neither selected nor probed.
 
     :meth:`update` applies a new Ingress backend:
 
@@ -166,6 +166,7 @@ class RoutePool:
         return [
             target
             for target_group in ingress_backend.target_groups
+            if target_group.weight > 0
             for target in target_group.targets
         ]
 

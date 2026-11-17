@@ -11,11 +11,7 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
     WiredProcessor,
 )
-from ai.backend.manager.actions.types import (
-    ActionBacking,
-    ActionGate,
-    ActionKind,
-)
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import (

@@ -21,7 +21,8 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.actions.types import ActionKind, OperationStatus
+from ai.backend.manager.actions.spec import ActionKind
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission

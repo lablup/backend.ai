@@ -161,7 +161,6 @@ update_user_by_id 와 bulk_update_users 는 같은 기준으로 `status` 를 나
 | 개인 프로젝트의 자원 정책 | 코드가 고정한 이름 `"default"` | `models/project/creators.py:66-67` |
 | 개인 프로젝트 이름 | 사용자 이름. 겹치면 `-2` 부터 `-999`, 그래도 겹치면 사용자 id | `repositories/ops/v2/user/write.py:175-199` |
 | access key, secret key | 생성한다. secret 은 키 provider 풀로 암호화한다 | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py` |
-| default SSH keypair | 사용자와 같은 트랜잭션에서 생성한다. 비밀키는 키 provider 풀로 암호화한다 | `repositories/auth/keypair_secrets.py`, `repositories/ops/v2/user/write.py` |
 | 기본 액세스 키의 활성, 관리자 표시 | 사용자 상태가 ACTIVE 인지, 역할이 SUPERADMIN 이나 ADMIN 인지 | `write.py:106-107` |
 | 비밀번호 해시 설정 | manager 설정 `auth.password_hash_*` | `adapter.py:491-496` |
 | 도메인 id | 이름으로 조회한다 | `adapter.py:217-220` |

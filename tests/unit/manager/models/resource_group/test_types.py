@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
@@ -186,7 +187,7 @@ class TestScalingGroupOptsDefaults:
         assert opts.agent_selector_config == {}
         assert opts.enforce_spreading_endpoint_replica is False
         assert opts.allow_fractional_resource_fragmentation is True
-        assert opts.route_cleanup_target_statuses == ["unhealthy"]
+        assert opts.route_cleanup_target_statuses == [RouteHealthStatus.UNHEALTHY]
 
     def test_frozen_model_raises_on_mutation(self) -> None:
         opts = ResourceGroupOpts()
@@ -212,7 +213,7 @@ class TestScalingGroupOptsRoundtrip:
             agent_selector_config={"max_agents": 2},
             enforce_spreading_endpoint_replica=True,
             allow_fractional_resource_fragmentation=False,
-            route_cleanup_target_statuses=["unhealthy", "degraded"],
+            route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY, RouteHealthStatus.DEGRADED],
         )
         dumped = original.model_dump(mode="json")
         restored = ResourceGroupOpts.model_validate(dumped)
@@ -335,7 +336,7 @@ class TestScalingGroupOptsBackwardCompatibility:
         assert opts.agent_selector_config == {}
         assert opts.enforce_spreading_endpoint_replica is False
         assert opts.allow_fractional_resource_fragmentation is True
-        assert opts.route_cleanup_target_statuses == ["unhealthy"]
+        assert opts.route_cleanup_target_statuses == [RouteHealthStatus.UNHEALTHY]
 
     def test_partial_legacy_data(self) -> None:
         """Legacy JSON with only some fields sets defaults for missing ones."""
@@ -351,6 +352,12 @@ class TestScalingGroupOptsBackwardCompatibility:
         assert opts.agent_selection_strategy == AgentSelectionStrategy.DISPERSED
         assert opts.enforce_spreading_endpoint_replica is False
         assert opts.allow_fractional_resource_fragmentation is True
+
+    def test_stored_route_cleanup_status_naming_no_status_is_dropped(self) -> None:
+        opts = ResourceGroupOpts.model_validate({
+            "route_cleanup_target_statuses": ["unhealthy", "terminated"],
+        })
+        assert opts.route_cleanup_target_statuses == [RouteHealthStatus.UNHEALTHY]
 
 
 class TestPreemptionConfig:

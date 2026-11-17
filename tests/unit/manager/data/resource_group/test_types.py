@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.data.resource_group.types import ResourceGroupSchedulerOptions
 
@@ -18,7 +19,7 @@ class TestScalingGroupSchedulerOptions:
             agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
             agent_selector_config={"selector_key": "selector_value"},
             allow_fractional_resource_fragmentation=False,
-            route_cleanup_target_statuses=["terminated", "cancelled"],
+            route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY, RouteHealthStatus.DEGRADED],
         )
 
         result = options.to_json()
@@ -29,7 +30,7 @@ class TestScalingGroupSchedulerOptions:
         assert result["agent_selection_strategy"] == "dispersed"
         assert result["agent_selector_config"] == {"selector_key": "selector_value"}
         assert result["allow_fractional_resource_fragmentation"] is False
-        assert result["route_cleanup_target_statuses"] == ["terminated", "cancelled"]
+        assert result["route_cleanup_target_statuses"] == ["unhealthy", "degraded"]
 
     def test_to_json_handles_empty_collections(self) -> None:
         """Test to_json handles empty lists and dicts."""
@@ -59,7 +60,7 @@ class TestScalingGroupSchedulerOptions:
             agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
             agent_selector_config={"nested": {"key": "value"}},
             allow_fractional_resource_fragmentation=True,
-            route_cleanup_target_statuses=["error"],
+            route_cleanup_target_statuses=[RouteHealthStatus.HEALTHY],
         )
 
         result = options.to_json()

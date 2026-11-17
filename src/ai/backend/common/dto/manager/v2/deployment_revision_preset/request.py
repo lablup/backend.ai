@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.common import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput,
     PresetValueInput,
+    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
@@ -101,6 +102,13 @@ class PresetModelServiceConfigInput(BaseRequestModel):
     )
     health_check: PresetModelHealthCheckInput | None = Field(
         default=None, description="Health check configuration for the model service."
+    )
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit to inherit it; the default is `${{ }}` and `{ }`."
+        ),
     )
 
 
@@ -222,6 +230,13 @@ class UpdatePresetModelServiceConfigInput(BaseRequestModel):
     shell: str | None | Unset = Field(default=UNSET)
     port: Annotated[int, Field(gt=1)] | None | Unset = Field(default=UNSET)
     health_check: UpdatePresetModelHealthCheckInput | None | Unset = Field(default=UNSET)
+    interpolation: ServiceArgumentInterpolationInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit or null to keep the current value."
+        ),
+    )
 
 
 class UpdatePresetModelConfigInput(BaseRequestModel):
