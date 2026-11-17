@@ -60,21 +60,6 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-<<<<<<< HEAD
-from ai.backend.manager.services.vfolder.actions.lookup import (
-    LookupVFolderAction,
-    LookupVFolderActionResult,
-=======
-from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
-    PartialBulkDeleteVFoldersAction,
-)
-from ai.backend.manager.services.vfolder.actions.partial_bulk_restore_vfolders import (
-    PartialBulkRestoreVFoldersAction,
-)
-from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders import (
-    PartialBulkUpdateVFoldersAction,
->>>>>>> d21a38f5 (fix(BA-9022): resolve a session mount given by name within the folders the session owner reaches (#16981))
-)
 from ai.backend.manager.services.vfolder.actions.scoped_search import (
     ScopedSearchVFoldersAction,
 )
