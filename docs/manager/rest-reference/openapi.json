@@ -25615,7 +25615,7 @@
                 "type": "null"
               }
             ],
-            "description": "Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+            "description": "Scheduler options. Omit to leave unchanged; omitted keys are kept. Added in 26.10.0.",
             "title": "Scheduler Options"
           }
         },
@@ -25635,7 +25635,7 @@
                 "type": "null"
               }
             ],
-            "description": "Number of scheduling retries before a pending session is skipped. Omit to leave unchanged; null clears.",
+            "description": "Number of scheduling retries before a pending session is skipped. Omit to leave unchanged; null clears. Added in 26.10.0.",
             "title": "Num Retries To Skip"
           }
         },
@@ -25657,7 +25657,7 @@
                 "type": "null"
               }
             ],
-            "description": "Session types that may be created in the resource group. Omit to leave unchanged.",
+            "description": "Session types that may be created in the resource group. Omit to leave unchanged. Added in 26.10.0.",
             "title": "Allowed Session Types"
           },
           "pending_timeout": {
@@ -25670,7 +25670,7 @@
                 "type": "null"
               }
             ],
-            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.",
+            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged. Added in 26.10.0.",
             "title": "Pending Timeout"
           },
           "config": {
@@ -25682,7 +25682,7 @@
                 "type": "null"
               }
             ],
-            "description": "The ``config`` section of the scheduler options. Omit to leave unchanged.",
+            "description": "The ``config`` section of the scheduler options. Omit to leave unchanged. Added in 26.10.0.",
             "title": "Config"
           },
           "agent_selection_strategy": {
@@ -25694,7 +25694,7 @@
                 "type": "null"
               }
             ],
-            "description": "How agents are chosen for a session's kernels. Omit to leave unchanged.",
+            "description": "How agents are chosen for a session's kernels. Omit to leave unchanged. Added in 26.10.0.",
             "title": "Agent Selection Strategy"
           },
           "allow_fractional_resource_fragmentation": {
@@ -25706,7 +25706,7 @@
                 "type": "null"
               }
             ],
-            "description": "Whether an agent may start a kernel that fragments a fractional resource request. Omit to leave unchanged.",
+            "description": "Whether an agent may start a kernel that fragments a fractional resource request. Omit to leave unchanged. Added in 26.10.0.",
             "title": "Allow Fractional Resource Fragmentation"
           },
           "route_cleanup_target_statuses": {
@@ -25721,7 +25721,7 @@
                 "type": "null"
               }
             ],
-            "description": "Route health statuses whose routes are cleaned up automatically. Omit to leave unchanged.",
+            "description": "Route health statuses whose routes are cleaned up automatically. Omit to leave unchanged. Added in 26.10.0.",
             "title": "Route Cleanup Target Statuses"
           }
         },
@@ -25995,7 +25995,7 @@
                 "type": "null"
               }
             ],
-            "description": "Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+            "description": "Scheduler options. Omit to leave unchanged; omitted keys are kept. Added in 26.10.0.",
             "title": "Scheduler Options"
           }
         },
