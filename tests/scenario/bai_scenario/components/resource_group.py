@@ -199,7 +199,7 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
-    num_retries_to_skip: int | None = None
+    holds_non_default_scheduler_opts: bool = False
     reports_a_slot: bool = False
 
     @override
@@ -236,7 +236,7 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
                 description=self.description,
                 is_active=self.is_active,
                 is_default=self.is_default,
-                num_retries_to_skip=self.num_retries_to_skip,
+                holds_non_default_scheduler_opts=self.holds_non_default_scheduler_opts,
             )
         )
         slot_name = ""

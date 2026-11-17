@@ -657,7 +657,7 @@ class TheSuperadminClearsTheRetriesToSkip(
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(role=UserRole.SUPERADMIN, num_retries_to_skip=3)
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN, holds_non_default_scheduler_opts=True)
 
     @override
     def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
