@@ -21,8 +21,8 @@ from ai.backend.manager.data.session_group.types import (
 from ai.backend.manager.errors.session_group import SessionGroupInUseForUpdate
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
@@ -62,7 +62,7 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
+                condition=SessionGroupQuerySpec.linked.replica_groups.not_exists(),
                 error=SessionGroupInUseForUpdate(
                     f"Session group {self.session_group_id} cannot be updated while a replica group uses it"
                 ),
@@ -83,7 +83,7 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:
-        return SessionGroupSearchableFields.own.to_data(row)
+        return SessionGroupQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -134,4 +134,4 @@ class SessionGroupRetentionUpdater(DataBatchUpdater[SessionGroupRow, SessionGrou
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:
-        return SessionGroupSearchableFields.own.to_data(row)
+        return SessionGroupQuerySpec.own.to_data(row)

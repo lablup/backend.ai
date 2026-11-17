@@ -38,9 +38,9 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentTarget
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher, DeploymentSearcher
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.image.row import ImageRow
@@ -393,7 +393,7 @@ class TestSearchLegacyEndpoints:
             DeploymentInfoSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    DeploymentSearchableFields.own.entity_id.filter.equals(
+                    DeploymentQuerySpec.own.entity_id.filter.equals(
                         UUIDEqualMatchSpec(value=endpoint_id, negated=False)
                     )
                 ],
@@ -494,7 +494,7 @@ class TestSearchDeploymentsWithLastHistory:
             searcher=DeploymentInfoSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    DeploymentSearchableFields.own.entity_id.filter.equals(
+                    DeploymentQuerySpec.own.entity_id.filter.equals(
                         UUIDEqualMatchSpec(value=seeded.endpoint_id, negated=False)
                     )
                 ],

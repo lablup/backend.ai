@@ -22,9 +22,9 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.scopes import ResourceGroupAgentTarget
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
@@ -96,7 +96,7 @@ class AgentDBSource:
             )
             if agent_row is None:
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
-            return AgentSearchableFields.own.to_data(agent_row)
+            return AgentQuerySpec.own.to_data(agent_row)
 
     async def _heartbeat_update_data(
         self, session: AsyncSession, row: AgentRow

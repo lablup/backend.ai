@@ -13,8 +13,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ModelDeploymentAutoScalingRuleData,
 )
+from ai.backend.manager.models.endpoint.query_spec import AutoScalingRuleQuerySpec
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow
-from ai.backend.manager.models.endpoint.searchable_fields import AutoScalingRuleSearchableFields
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.testutils.scenario_steps import Says
@@ -56,7 +56,7 @@ class _AutoScalingRuleCreator(
 
     @override
     def to_data(self, row: EndpointAutoScalingRuleRow) -> ModelDeploymentAutoScalingRuleData:
-        return AutoScalingRuleSearchableFields.own.to_data(row)
+        return AutoScalingRuleQuerySpec.own.to_data(row)
 
 
 @dataclass(frozen=True)

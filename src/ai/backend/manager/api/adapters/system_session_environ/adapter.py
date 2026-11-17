@@ -67,15 +67,15 @@ from ai.backend.manager.models.system_session_environ.creators import (
 from ai.backend.manager.models.system_session_environ.purgers import (
     SystemSessionEnvironPurger,
 )
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
+)
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.system_session_environ.scopes import (
     DomainSystemSessionEnvironTarget,
     ProjectSystemSessionEnvironTarget,
     PublicSystemSessionEnvironTarget,
     SystemSessionEnvironTarget,
-)
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
 )
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
@@ -118,7 +118,7 @@ from ai.backend.manager.types import OptionalState
 __all__ = ("SystemSessionEnvironAdapter",)
 
 _SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC = PaginationSpec(
-    forward_order=SystemSessionEnvironSearchableFields.own.key.order.apply(ascending=True),
+    forward_order=SystemSessionEnvironQuerySpec.own.key.order.apply(ascending=True),
     cursor_column=SystemSessionEnvironRow.id,
 )
 
@@ -234,7 +234,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
                     target_row=SystemSessionEnvironRow,
                     target_column=SystemSessionEnvironRow.id,
                     target_id=environ_id,
-                    converter=SystemSessionEnvironSearchableFields.own,
+                    converter=SystemSessionEnvironQuerySpec.own,
                 )
             )
         )
@@ -252,7 +252,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
                     target_row=SystemSessionEnvironRow,
                     target_column=SystemSessionEnvironRow.id,
                     target_id=environ_id,
-                    converter=SystemSessionEnvironSearchableFields.own,
+                    converter=SystemSessionEnvironQuerySpec.own,
                 )
             )
         )
@@ -298,7 +298,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         return targets
 
     def _convert_filter(self, filter: SystemSessionEnvironFilter) -> list[QueryCondition]:
-        fields = SystemSessionEnvironSearchableFields.own
+        fields = SystemSessionEnvironQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.key, fields.key.filter),
@@ -370,7 +370,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         return [self._convert_order(order) for order in orders]
 
     def _convert_order(self, order: SystemSessionEnvironOrder) -> QueryOrder:
-        fields = SystemSessionEnvironSearchableFields.own
+        fields = SystemSessionEnvironQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case SystemSessionEnvironOrderField.KEY:

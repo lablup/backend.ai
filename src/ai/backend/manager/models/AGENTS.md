@@ -12,7 +12,7 @@ The single-file shorthand (`models/{domain}.py`) is legacy: do not add new ones.
 Domains migrated to the v2 specs add them next to `row.py`: `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
 reads, `scopes.py` for the scopes that filter the row.
-What a search can filter and order by is declared in `searchable_fields.py`; see
+What a search can filter and order by is declared in `query_spec.py`; see
 `models/specs/search/AGENTS.md`. A scope inherits `ScopeTarget` (`models/scopes.py`), names
 the scope the operation is authorized against in `scope_id()`, and is named
 `{scope entity}{target entity}Target` (`DomainVFolderTarget`). Where several targets reach

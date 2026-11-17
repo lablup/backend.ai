@@ -55,10 +55,10 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
-from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerAssignmentSearchableFields,
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerAssignmentQuerySpec,
 )
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -90,9 +90,7 @@ from ai.backend.manager.services.rbac.processors import RbacProcessors
 @lru_cache(maxsize=1)
 def _get_idle_checker_assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=IdleCheckerAssignmentSearchableFields.own.created_at.order.apply(
-            ascending=False
-        ),
+        forward_order=IdleCheckerAssignmentQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=IdleCheckerBindingRow.id,
     )
 
@@ -273,7 +271,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, f: IdleCheckerAssignmentFilter) -> list[QueryCondition]:
-        fields = IdleCheckerAssignmentSearchableFields.own
+        fields = IdleCheckerAssignmentQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
             *self.apply_uuid_filter(f.idle_checker_id, fields.idle_checker_id.filter),
@@ -325,7 +323,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(orders: list[IdleCheckerAssignmentOrder]) -> list[QueryOrder]:
-        fields = IdleCheckerAssignmentSearchableFields.own
+        fields = IdleCheckerAssignmentQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC

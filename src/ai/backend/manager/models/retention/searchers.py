@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.retention.types import RetentionPolicyData
-from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.retention.searchable_fields import (
-    RetentionPolicySearchableFields,
+from ai.backend.manager.models.retention.query_spec import (
+    RetentionPolicyQuerySpec,
 )
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +23,4 @@ class RetentionPolicySearcher(Searcher[RetentionPolicyRow, RetentionPolicyData])
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return RetentionPolicySearchableFields.own.to_data(row)
+        return RetentionPolicyQuerySpec.own.to_data(row)

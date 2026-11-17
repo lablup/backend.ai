@@ -48,13 +48,13 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.model_card.query_spec import ModelCardQuerySpec
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import DomainModelCardTarget
-from ai.backend.manager.models.model_card.searchable_fields import ModelCardSearchableFields
 from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import DomainProjectTarget, ProjectTarget
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -92,7 +92,7 @@ _BACKWARD_PAGE_IN_REVERSE = pytest.mark.xfail(
 )
 
 _PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=ProjectQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=ProjectRow.id,
 )
 _PAGE_SIZE = 2
@@ -447,7 +447,7 @@ def _cards_used_by(actors: Actors, vfolder_id: VFolderUUID) -> ScopedSearchModel
     return ScopedSearchModelCardsAction(
         searcher=ScopedSearcher(
             scopes=[DomainModelCardTarget(domain_id=actors.domain_id)],
-            used_by=[ModelCardSearchableFields.linked.usage.vfolders.uses(vfolder_id)],
+            used_by=[ModelCardQuerySpec.linked.usage.vfolders.uses(vfolder_id)],
             searcher=ModelCardSearcher(pagination=OffsetPagination(limit=100)),
         )
     )

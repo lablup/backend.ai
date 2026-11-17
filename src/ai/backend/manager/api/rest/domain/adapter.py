@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.domain.updaters import DomainUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -88,7 +88,7 @@ class DomainAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter_req: DomainFilter) -> list[QueryCondition]:
         """Convert domain filter to list of query conditions."""
-        fields = DomainSearchableFields.own
+        fields = DomainQuerySpec.own
         return [
             *self.apply_string_filter(filter_req.name, fields.name.filter),
             *self.apply_bool_filter(filter_req.is_active, fields.is_active.filter),
@@ -96,7 +96,7 @@ class DomainAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: DomainOrder) -> QueryOrder:
         """Convert domain order specification to query order."""
-        fields = DomainSearchableFields.own
+        fields = DomainQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == DomainOrderField.NAME:

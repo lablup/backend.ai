@@ -5,10 +5,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.soft_delete import RestoreUpdater, SoftDeleteUpdater
 
 
@@ -22,13 +22,13 @@ def _updaters(
             target_row=RolePresetRow,
             target_column=RolePresetRow.id,
             target_id=preset_id,
-            converter=RolePresetSearchableFields.own,
+            converter=RolePresetQuerySpec.own,
         ),
         RestoreUpdater(
             target_row=RolePresetRow,
             target_column=RolePresetRow.id,
             target_id=preset_id,
-            converter=RolePresetSearchableFields.own,
+            converter=RolePresetQuerySpec.own,
         ),
     )
 

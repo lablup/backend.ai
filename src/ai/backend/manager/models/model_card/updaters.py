@@ -8,10 +8,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
-from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.searchable_fields import (
-    ModelCardSearchableFields,
+from ai.backend.manager.models.model_card.query_spec import (
+    ModelCardQuerySpec,
 )
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -81,4 +81,4 @@ class ModelCardUpdater(DataUpdater[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return ModelCardSearchableFields.own.to_data(row)
+        return ModelCardQuerySpec.own.to_data(row)

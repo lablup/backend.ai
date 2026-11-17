@@ -181,8 +181,8 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
-    PermissionSearchableFields,
+from ai.backend.manager.models.rbac_models.permission.query_spec import (
+    PermissionQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
@@ -190,13 +190,13 @@ from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.deprecated_search import (
     DeprecatedRoleConditions,
 )
+from ai.backend.manager.models.rbac_models.role.query_spec import (
+    RoleQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import (
     HeldRoleTarget,
     RoleTarget,
-)
-from ai.backend.manager.models.rbac_models.role.searchable_fields import (
-    RoleSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import (
@@ -207,14 +207,14 @@ from ai.backend.manager.models.rbac_models.role.updaters import (
 from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
     DeprecatedRoleAssignmentConditions,
 )
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
     RoleAssignmentTarget,
     RoleRoleAssignmentTarget,
     UserRoleAssignmentTarget,
-)
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
@@ -222,7 +222,7 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
@@ -314,7 +314,7 @@ from ai.backend.manager.types import OptionalState, TriState
 @lru_cache(maxsize=1)
 def _permission_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=PermissionSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=PermissionQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=PermissionRow.id,
     )
 
@@ -322,7 +322,7 @@ def _permission_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _role_gql_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RoleSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=RoleQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RoleRow.id,
     )
 
@@ -330,7 +330,7 @@ def _role_gql_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=False),
+        forward_order=RoleAssignmentQuerySpec.own.granted_at.order.apply(ascending=False),
         cursor_column=UserRoleRow.id,
     )
 
@@ -465,7 +465,7 @@ class RBACAdapter(BaseAdapter):
         searcher = RoleAssignmentSearcher(
             pagination=NoPagination(),
             conditions=[
-                RoleAssignmentSearchableFields.own.id.filter.in_(
+                RoleAssignmentQuerySpec.own.id.filter.in_(
                     UUIDInMatchSpec(values=assignment_ids, negated=False)
                 )
             ],
@@ -1194,7 +1194,7 @@ class RBACAdapter(BaseAdapter):
         """The uses narrowing the roles read."""
         if usage is None or usage.uses is None:
             return []
-        linked = RoleSearchableFields.linked.usage
+        linked = RoleQuerySpec.linked.usage
         return [
             linked.role_presets.uses(RolePresetID(preset_id))
             for preset_id in usage.uses.role_preset or ()
@@ -1218,7 +1218,7 @@ class RBACAdapter(BaseAdapter):
         return applied
 
     def _convert_permission_filter(self, f: PermissionFilterDTO) -> list[QueryCondition]:
-        fields = PermissionSearchableFields.own
+        fields = PermissionQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.field_id, fields.id.filter),
             *self.apply_uuid_filter(f.role_id, fields.role_id.filter),
@@ -1248,7 +1248,7 @@ class RBACAdapter(BaseAdapter):
         return conditions
 
     def _convert_permission_orders(self, orders: list[PermissionOrderByDTO]) -> list[QueryOrder]:
-        fields = PermissionSearchableFields.own
+        fields = PermissionQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
@@ -1261,7 +1261,7 @@ class RBACAdapter(BaseAdapter):
         return result
 
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
-        fields = RoleSearchableFields.own
+        fields = RoleQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
@@ -1271,12 +1271,12 @@ class RBACAdapter(BaseAdapter):
             *self._convert_mapped_scope_nested_filter(f.mapped_scope),
             *self.apply_to_many_filter(
                 f.permissions,
-                RoleSearchableFields.nested.permissions.correlation,
+                RoleQuerySpec.nested.permissions.correlation,
                 self._convert_permission_filter,
             ),
             *self.apply_to_many_filter(
                 f.labels,
-                RoleSearchableFields.nested.labels.correlation,
+                RoleQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
         ]
@@ -1339,7 +1339,7 @@ class RBACAdapter(BaseAdapter):
         if f is None:
             return []
         row_conditions = self.apply_uuid_filter(
-            f.user_id, RoleAssignmentSearchableFields.own.user_id.filter
+            f.user_id, RoleAssignmentQuerySpec.own.user_id.filter
         )
         conditions: list[QueryCondition] = []
         if row_conditions:
@@ -1368,7 +1368,7 @@ class RBACAdapter(BaseAdapter):
         """The scope a role is registered in sits in the role's own two columns."""
         if f is None:
             return []
-        fields = RoleSearchableFields.own
+        fields = RoleQuerySpec.own
         conditions = [
             *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
             *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
@@ -1392,7 +1392,7 @@ class RBACAdapter(BaseAdapter):
         return conditions
 
     def _convert_role_orders_gql(self, orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
-        fields = RoleSearchableFields.own
+        fields = RoleQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
@@ -1406,7 +1406,7 @@ class RBACAdapter(BaseAdapter):
 
     def _convert_role_nested_filter(self, f: RoleNestedFilterDTO) -> list[QueryCondition]:
         """Deprecated. Every condition lands in one EXISTS over the assignment's role."""
-        fields = RoleSearchableFields.own
+        fields = RoleQuerySpec.own
         row_conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self._convert_role_source_filter(f.source, fields.source.filter),
@@ -1439,7 +1439,7 @@ class RBACAdapter(BaseAdapter):
         self, f: PermissionNestedFilterDTO
     ) -> list[QueryCondition]:
         """Deprecated. Every condition lands in one EXISTS over one permission entry."""
-        fields = PermissionSearchableFields.own
+        fields = PermissionQuerySpec.own
         row_conditions = [
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *(
@@ -1474,8 +1474,8 @@ class RBACAdapter(BaseAdapter):
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
         """The searcher joins the assignment row to its user, so the user's columns
         carry plain conditions rather than a subquery."""
-        fields = RoleAssignmentSearchableFields.own
-        user_fields = UserSearchableFields.own
+        fields = RoleAssignmentQuerySpec.own
+        user_fields = UserQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.role_id, fields.role_id.filter),
             *(self._convert_role_nested_filter(f.role) if f.role is not None else []),
@@ -1508,8 +1508,8 @@ class RBACAdapter(BaseAdapter):
     def _convert_assignment_orders(
         self, orders: list[RoleAssignmentOrderByDTO]
     ) -> list[QueryOrder]:
-        fields = RoleAssignmentSearchableFields.own
-        user_fields = UserSearchableFields.own
+        fields = RoleAssignmentQuerySpec.own
+        user_fields = UserQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC

@@ -43,8 +43,8 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.row import DomainRow, domains
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
@@ -272,7 +272,7 @@ class TestDomainRepository:
         async with db_with_default_resource_policies.begin_session() as session:
             domain_row = await session.get(DomainRow, domain_data["name"])
             assert domain_row is not None
-            yield DomainSearchableFields.own.to_data(domain_row)
+            yield DomainQuerySpec.own.to_data(domain_row)
 
     @pytest.fixture
     def user_info(self) -> UserInfo:

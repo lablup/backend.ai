@@ -9,10 +9,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.searchable_fields import (
-    ModelCardSearchableFields,
+from ai.backend.manager.models.model_card.query_spec import (
+    ModelCardQuerySpec,
 )
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -37,7 +37,7 @@ class ModelCardQuerier(DataQuerier[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return ModelCardSearchableFields.own.to_data(row)
+        return ModelCardQuerySpec.own.to_data(row)
 
 
 class BulkModelCardQuerier(BulkEntityQuerier[ModelCardRow, ModelCardData]):
@@ -53,4 +53,4 @@ class BulkModelCardQuerier(BulkEntityQuerier[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return ModelCardSearchableFields.own.to_data(row)
+        return ModelCardQuerySpec.own.to_data(row)

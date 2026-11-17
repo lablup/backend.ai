@@ -12,8 +12,8 @@ from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
-    PermissionSearchableFields,
+from ai.backend.manager.models.rbac_models.permission.query_spec import (
+    PermissionQuerySpec,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -56,4 +56,4 @@ class RolePermissionUpdater(DataUpdater[PermissionRow, PermissionData]):
 
     @override
     def to_data(self, row: PermissionRow) -> PermissionData:
-        return PermissionSearchableFields.own.to_data(row)
+        return PermissionQuerySpec.own.to_data(row)

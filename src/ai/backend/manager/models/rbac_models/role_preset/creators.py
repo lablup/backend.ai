@@ -9,10 +9,10 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.role_preset import RolePresetCreateConflict
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -62,4 +62,4 @@ class RolePresetCreator(
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)

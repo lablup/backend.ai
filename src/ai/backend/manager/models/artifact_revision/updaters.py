@@ -11,10 +11,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.manager.data.artifact.types import ArtifactRemoteStatus, ArtifactRevisionData
-from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.models.artifact_revision.searchable_fields import (
-    ArtifactRevisionSearchableFields,
+from ai.backend.manager.models.artifact_revision.query_spec import (
+    ArtifactRevisionQuerySpec,
 )
+from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 
@@ -70,4 +70,4 @@ class ArtifactRevisionScanUpdater(DataUpdater[ArtifactRevisionRow, ArtifactRevis
 
     @override
     def to_data(self, row: ArtifactRevisionRow) -> ArtifactRevisionData:
-        return ArtifactRevisionSearchableFields.own.to_data(row)
+        return ArtifactRevisionQuerySpec.own.to_data(row)

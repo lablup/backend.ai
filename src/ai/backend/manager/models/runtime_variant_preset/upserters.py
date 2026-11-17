@@ -14,10 +14,10 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
-    RuntimeVariantPresetSearchableFields,
+from ai.backend.manager.models.runtime_variant_preset.query_spec import (
+    RuntimeVariantPresetQuerySpec,
 )
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
@@ -94,4 +94,4 @@ class RuntimeVariantPresetUpserter(
 
     @override
     def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
-        return RuntimeVariantPresetSearchableFields.own.to_data(row)
+        return RuntimeVariantPresetQuerySpec.own.to_data(row)

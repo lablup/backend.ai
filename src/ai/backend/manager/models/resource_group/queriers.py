@@ -7,10 +7,10 @@ from typing import Any, override
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
 )
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -27,4 +27,4 @@ class BulkResourceGroupQuerier(BulkEntityQuerier[ResourceGroupRow, ResourceGroup
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return ResourceGroupSearchableFields.own.to_data(row)
+        return ResourceGroupQuerySpec.own.to_data(row)

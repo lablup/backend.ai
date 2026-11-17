@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.kernel_group.types import KernelGroupResourceSlotData
-from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
-from ai.backend.manager.models.kernel_group_resource_slot.searchable_fields import (
-    KernelGroupResourceSlotSearchableFields,
+from ai.backend.manager.models.kernel_group_resource_slot.query_spec import (
+    KernelGroupResourceSlotQuerySpec,
 )
+from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -25,4 +25,4 @@ class KernelGroupResourceSlotSearcher(
 
     @override
     def to_data(self, row: KernelGroupResourceSlotRow) -> KernelGroupResourceSlotData:
-        return KernelGroupResourceSlotSearchableFields.own.to_data(row)
+        return KernelGroupResourceSlotQuerySpec.own.to_data(row)

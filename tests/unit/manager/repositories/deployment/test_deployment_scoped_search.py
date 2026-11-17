@@ -34,12 +34,12 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.scopes import (
     ProjectDeploymentTarget,
     UserDeploymentTarget,
 )
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -437,9 +437,7 @@ class TestDeploymentScopedSearch:
         searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        used_by = DeploymentSearchableFields.linked.usage.resource_groups.uses(
-            test_data.resource_group_id
-        )
+        used_by = DeploymentQuerySpec.linked.usage.resource_groups.uses(test_data.resource_group_id)
         result = await repository.scoped_search(
             ScopedSearcher(
                 scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
@@ -456,7 +454,7 @@ class TestDeploymentScopedSearch:
         searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        used_by = DeploymentSearchableFields.linked.usage.resource_groups.uses(
+        used_by = DeploymentQuerySpec.linked.usage.resource_groups.uses(
             ResourceGroupID(uuid.uuid4())
         )
         result = await repository.scoped_search(
@@ -481,7 +479,7 @@ class TestDeploymentScopedSearch:
                 searcher=DeploymentSearcher(
                     pagination=OffsetPagination(limit=10, offset=0),
                     conditions=[
-                        DeploymentSearchableFields.own.desired_replicas.filter.equals(1),
+                        DeploymentQuerySpec.own.desired_replicas.filter.equals(1),
                     ],
                 ),
             )

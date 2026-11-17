@@ -40,8 +40,8 @@ from ai.backend.manager.metrics.scheduler import (
 )
 from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
@@ -224,7 +224,7 @@ class SessionLauncher:
             sessions,
             SystemSessionEnvironSearcher(
                 pagination=NoPagination(),
-                conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+                conditions=[SystemSessionEnvironQuerySpec.own.deleted_at.filter.is_null()],
             ),
         )
 

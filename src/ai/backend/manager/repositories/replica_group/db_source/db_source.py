@@ -34,10 +34,10 @@ from ai.backend.manager.models.replica_group.searchers import (
     ReplicaGroupSearcher,
 )
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
-from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.searchable_fields import (
-    ReplicaGroupHistorySearchableFields,
+from ai.backend.manager.models.replica_group_history.query_spec import (
+    ReplicaGroupHistoryQuerySpec,
 )
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
@@ -391,10 +391,10 @@ class ReplicaGroupDBSource:
             owner_id=transition.deployment_id,
             history_creator=creator,
             match_conditions=[
-                ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.in_(
+                ReplicaGroupHistoryQuerySpec.own.replica_group_id.filter.in_(
                     UUIDInMatchSpec(values=[creator.replica_group_id], negated=False)
                 ),
-                ReplicaGroupHistorySearchableFields.own.category.filter.equals(creator.category),
+                ReplicaGroupHistoryQuerySpec.own.category.filter.equals(creator.category),
             ],
             status_updater=transition.status_updater,
         )

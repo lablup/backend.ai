@@ -60,12 +60,12 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
+from ai.backend.manager.models.prometheus_query_preset.query_spec import (
+    PrometheusQueryPresetQuerySpec,
+)
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.scopes import (
     PublicPrometheusQueryPresetTarget,
-)
-from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
-    PrometheusQueryPresetSearchableFields,
 )
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
@@ -116,7 +116,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[
-                PrometheusQueryPresetSearchableFields.own.id.filter.in_(
+                PrometheusQueryPresetQuerySpec.own.id.filter.in_(
                     UUIDInMatchSpec(values=list(ids), negated=False)
                 )
             ],
@@ -300,9 +300,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         )
 
     _PAGINATION_SPEC = PaginationSpec(
-        forward_order=PrometheusQueryPresetSearchableFields.own.created_at.order.apply(
-            ascending=False
-        ),
+        forward_order=PrometheusQueryPresetQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=PrometheusQueryPresetRow.id,
     )
 
@@ -331,7 +329,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter: QueryDefinitionFilter) -> list[QueryCondition]:
-        fields = PrometheusQueryPresetSearchableFields.own
+        fields = PrometheusQueryPresetQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_uuid_filter(filter.category_id, fields.category_id.filter),
@@ -360,7 +358,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[QueryDefinitionOrder]) -> list[QueryOrder]:
-        fields = PrometheusQueryPresetSearchableFields.own
+        fields = PrometheusQueryPresetQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC

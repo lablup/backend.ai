@@ -54,9 +54,9 @@ from ai.backend.manager.models.resource_policy.row import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.scopes import ProjectSessionTarget
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -401,9 +401,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """Only the session whose kernel sits on the agent comes back."""
-        used_by = SessionSearchableFields.linked.usage.agents.uses(
-            AgentUUID(test_data["agent_uuid"])
-        )
+        used_by = SessionQuerySpec.linked.usage.agents.uses(AgentUUID(test_data["agent_uuid"]))
         assert await self._used_by_ids(db_with_cleanup, used_by) == {test_data["session_a1_id"]}
 
     async def test_uses_another_agent_returns_none(
@@ -411,7 +409,7 @@ class TestSessionSearchInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        used_by = SessionSearchableFields.linked.usage.agents.uses(AgentUUID(uuid.uuid4()))
+        used_by = SessionQuerySpec.linked.usage.agents.uses(AgentUUID(uuid.uuid4()))
         assert await self._used_by_ids(db_with_cleanup, used_by) == set()
 
     async def test_uses_resource_group_narrows_to_the_sessions_it_runs(
@@ -420,7 +418,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
         test_scaling_group_id: ResourceGroupID,
     ) -> None:
-        used_by = SessionSearchableFields.linked.usage.resource_groups.uses(test_scaling_group_id)
+        used_by = SessionQuerySpec.linked.usage.resource_groups.uses(test_scaling_group_id)
         assert await self._used_by_ids(db_with_cleanup, used_by) == {
             test_data["session_a1_id"],
             test_data["session_a2_id"],
@@ -432,9 +430,7 @@ class TestSessionSearchInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        used_by = SessionSearchableFields.linked.usage.resource_groups.uses(
-            ResourceGroupID(uuid.uuid4())
-        )
+        used_by = SessionQuerySpec.linked.usage.resource_groups.uses(ResourceGroupID(uuid.uuid4()))
         assert await self._used_by_ids(db_with_cleanup, used_by) == set()
 
     @pytest.fixture
@@ -475,7 +471,7 @@ class TestSessionSearchInProject:
         mounted_vfolder_id: VFolderUUID,
     ) -> None:
         """A terminated session keeps its mount and comes back with the running one."""
-        used_by = SessionSearchableFields.linked.usage.vfolders.uses(mounted_vfolder_id)
+        used_by = SessionQuerySpec.linked.usage.vfolders.uses(mounted_vfolder_id)
         assert await self._used_by_ids(db_with_cleanup, used_by) == {
             test_data["session_a1_id"],
             test_data["session_b1_id"],
@@ -486,7 +482,7 @@ class TestSessionSearchInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         mounted_vfolder_id: VFolderUUID,
     ) -> None:
-        used_by = SessionSearchableFields.linked.usage.vfolders.uses(VFolderUUID(uuid.uuid4()))
+        used_by = SessionQuerySpec.linked.usage.vfolders.uses(VFolderUUID(uuid.uuid4()))
         assert await self._used_by_ids(db_with_cleanup, used_by) == set()
 
     async def test_uses_vfolder_leaves_out_a_session_outside_the_scope(
@@ -496,7 +492,7 @@ class TestSessionSearchInProject:
         mounted_vfolder_id: VFolderUUID,
     ) -> None:
         scope = ProjectSessionTarget(project_id=test_data["project_a_id"])
-        used_by = SessionSearchableFields.linked.usage.vfolders.uses(mounted_vfolder_id)
+        used_by = SessionQuerySpec.linked.usage.vfolders.uses(mounted_vfolder_id)
         async with db_with_cleanup.begin_readonly_session() as sess:
             rows = await sess.scalars(
                 sa.select(SessionRow.id).where(scope.to_condition()(), used_by.condition())

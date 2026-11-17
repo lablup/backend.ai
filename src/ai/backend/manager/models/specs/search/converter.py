@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 class RowDataConverter[TRow, TData](ABC):
     """Builds the data type from a row, reading each value through a declared field.
 
-    Every data field comes from a ``SearchableField`` of the same name, so a data field
+    Every data field comes from a ``QueryColumn`` of the same name, so a data field
     cannot be added without declaring how it is read, filtered and ordered.
     """
 

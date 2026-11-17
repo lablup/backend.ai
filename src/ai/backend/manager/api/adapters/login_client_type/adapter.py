@@ -45,11 +45,11 @@ from ai.backend.manager.models.login_client_type.creators import LoginClientType
 from ai.backend.manager.models.login_client_type.deprecated_search import (
     DeprecatedLoginClientTypeDescriptionConditions,
 )
+from ai.backend.manager.models.login_client_type.query_spec import (
+    LoginClientTypeQuerySpec,
+)
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.login_client_type.scopes import PublicLoginClientTypeTarget
-from ai.backend.manager.models.login_client_type.searchable_fields import (
-    LoginClientTypeSearchableFields,
-)
 from ai.backend.manager.models.login_client_type.searchers import LoginClientTypeSearcher
 from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
@@ -83,7 +83,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=LoginClientTypeSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=LoginClientTypeQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=LoginClientTypeRow.id,
     )
 
@@ -110,7 +110,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     def _convert_orders(self, orders: list[LoginClientTypeOrder]) -> list[QueryOrder]:
-        fields = LoginClientTypeSearchableFields.own
+        fields = LoginClientTypeQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
@@ -274,7 +274,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
-        fields = LoginClientTypeSearchableFields.own
+        fields = LoginClientTypeQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),

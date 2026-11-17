@@ -12,10 +12,10 @@ from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetData,
     PrometheusQueryPresetListResult,
 )
-from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
-from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
-    PrometheusQueryPresetSearchableFields,
+from ai.backend.manager.models.prometheus_query_preset.query_spec import (
+    PrometheusQueryPresetQuerySpec,
 )
+from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
@@ -46,7 +46,7 @@ class PrometheusQueryPresetDBSource:
                 raise PrometheusQueryPresetNotFound(
                     f"Prometheus query preset {preset_id} not found"
                 )
-            return PrometheusQueryPresetSearchableFields.own.to_data(row)
+            return PrometheusQueryPresetQuerySpec.own.to_data(row)
 
     async def search(
         self,

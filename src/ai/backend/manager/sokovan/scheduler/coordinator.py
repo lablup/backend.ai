@@ -43,11 +43,11 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
@@ -582,7 +582,7 @@ class ScheduleCoordinator:
         # Build querier with kernel conditions
         target_kernel_statuses = handler.target_kernel_statuses()
 
-        fields = KernelSearchableFields.own
+        fields = KernelQuerySpec.own
         searcher = KernelSearcher(
             pagination=NoPagination(),
             conditions=[
@@ -752,8 +752,8 @@ class ScheduleCoordinator:
         ``ALL`` and ``NOT_ANY`` also require a kernel to exist: a session with none
         satisfies neither.
         """
-        kernels = SessionSearchableFields.nested.kernels
-        status = kernels.fields.status.filter.in_(spec.target_kernel_statuses)
+        kernels = SessionQuerySpec.nested.kernels
+        status = kernels.columns.status.filter.in_(spec.target_kernel_statuses)
         match spec.kernel_match_type:
             case KernelMatchType.ALL:
                 return [kernels.correlation.every([status]), kernels.correlation.exists()]
@@ -780,7 +780,7 @@ class ScheduleCoordinator:
             schedule_type: Type of scheduling operation
             resource_group_id: The id of the resource group to process
         """
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         searcher = SessionInfoSearcher(
             pagination=NoPagination(),
             conditions=[
@@ -938,7 +938,7 @@ class ScheduleCoordinator:
         searcher = SessionInfoSearcher(
             pagination=NoPagination(),
             conditions=[
-                SessionSearchableFields.own.id.filter.in_(
+                SessionQuerySpec.own.id.filter.in_(
                     UUIDInMatchSpec(values=session_ids, negated=False)
                 )
             ],

@@ -9,10 +9,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.object_storage.searchable_fields import (
-    ObjectStorageSearchableFields,
+from ai.backend.manager.models.object_storage.query_spec import (
+    ObjectStorageQuerySpec,
 )
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -35,7 +35,7 @@ class ObjectStorageQuerier(DataQuerier[ObjectStorageRow, ObjectStorageData]):
 
     @override
     def to_data(self, row: ObjectStorageRow) -> ObjectStorageData:
-        return ObjectStorageSearchableFields.own.to_data(row)
+        return ObjectStorageQuerySpec.own.to_data(row)
 
 
 class BulkObjectStorageQuerier(BulkEntityQuerier[ObjectStorageRow, ObjectStorageData]):
@@ -51,4 +51,4 @@ class BulkObjectStorageQuerier(BulkEntityQuerier[ObjectStorageRow, ObjectStorage
 
     @override
     def to_data(self, row: ObjectStorageRow) -> ObjectStorageData:
-        return ObjectStorageSearchableFields.own.to_data(row)
+        return ObjectStorageQuerySpec.own.to_data(row)

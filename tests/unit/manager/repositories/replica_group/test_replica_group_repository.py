@@ -47,10 +47,10 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.replica_group.searchable_fields import (
-    ReplicaGroupSearchableFields,
+from ai.backend.manager.models.replica_group.query_spec import (
+    ReplicaGroupQuerySpec,
 )
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import (
     ReplicaGroupDeployUpdater,
     ReplicaGroupLifecycleUpdater,
@@ -468,7 +468,7 @@ class TestReplicaGroupRepository:
     ) -> None:
         rolling_group_id, _ = two_group_ids
         conditions = [
-            ReplicaGroupSearchableFields.own.lifecycle.filter.in_([ReplicaGroupLifecycle.ROLLING])
+            ReplicaGroupQuerySpec.own.lifecycle.filter.in_([ReplicaGroupLifecycle.ROLLING])
         ]
 
         result = await replica_group_repository.search_deploy_scheduling_views(conditions)
@@ -484,9 +484,7 @@ class TestReplicaGroupRepository:
     ) -> None:
         resource_group_id, _ = two_group_ids
         conditions = [
-            ReplicaGroupSearchableFields.own.scaling_status.filter.in_([
-                ReplicaGroupScalingStatus.SCALING
-            ])
+            ReplicaGroupQuerySpec.own.scaling_status.filter.in_([ReplicaGroupScalingStatus.SCALING])
         ]
 
         result = await replica_group_repository.search_scaling_scheduling_views(conditions)
@@ -520,7 +518,7 @@ class TestReplicaGroupRepository:
         assert result.updated_group_ids == {first_id, second_id}
 
         conditions = [
-            ReplicaGroupSearchableFields.own.field_id.filter.in_(
+            ReplicaGroupQuerySpec.own.field_id.filter.in_(
                 UUIDInMatchSpec(values=[first_id, second_id], negated=False)
             )
         ]
@@ -587,7 +585,7 @@ class TestReplicaGroupRepository:
             await db_sess.commit()
 
         conditions = [
-            ReplicaGroupSearchableFields.own.field_id.filter.in_(
+            ReplicaGroupQuerySpec.own.field_id.filter.in_(
                 UUIDInMatchSpec(values=[group_id], negated=False)
             )
         ]
@@ -629,7 +627,7 @@ class TestReplicaGroupRepository:
         assert result.updated_group_ids == {first_id, second_id}
 
         conditions = [
-            ReplicaGroupSearchableFields.own.field_id.filter.in_(
+            ReplicaGroupQuerySpec.own.field_id.filter.in_(
                 UUIDInMatchSpec(values=[first_id, second_id], negated=False)
             )
         ]

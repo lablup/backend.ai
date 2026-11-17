@@ -50,12 +50,12 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.runtime_variant_preset.creators import (
     RuntimeVariantPresetCreator,
 )
+from ai.backend.manager.models.runtime_variant_preset.query_spec import (
+    RuntimeVariantPresetQuerySpec,
+)
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.runtime_variant_preset.scopes import (
     PublicRuntimeVariantPresetTarget,
-)
-from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
-    RuntimeVariantPresetSearchableFields,
 )
 from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
@@ -94,9 +94,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RuntimeVariantPresetSearchableFields.own.created_at.order.apply(
-            ascending=False
-        ),
+        forward_order=RuntimeVariantPresetQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RuntimeVariantPresetRow.id,
     )
 
@@ -166,7 +164,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         searcher = RuntimeVariantPresetSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[
-                RuntimeVariantPresetSearchableFields.own.id.filter.in_(
+                RuntimeVariantPresetQuerySpec.own.id.filter.in_(
                     UUIDInMatchSpec(values=list(ids), negated=False)
                 )
             ],
@@ -279,7 +277,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter_: RuntimeVariantPresetFilter) -> list[QueryCondition]:
-        fields = RuntimeVariantPresetSearchableFields.own
+        fields = RuntimeVariantPresetQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter_.runtime_variant_id, fields.runtime_variant_id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
@@ -306,7 +304,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[RuntimeVariantPresetOrder]) -> list[QueryOrder]:
-        fields = RuntimeVariantPresetSearchableFields.own
+        fields = RuntimeVariantPresetQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction.value == "ASC"

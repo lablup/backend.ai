@@ -14,17 +14,17 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
+from ai.backend.manager.models.resource_slot.query_spec import (
+    AgentResourceQuerySpec,
+    ResourceAllocationQuerySpec,
+    ResourceSlotTypeQuerySpec,
+    RevisionResourceSlotQuerySpec,
+)
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    AgentResourceSearchableFields,
-    ResourceAllocationSearchableFields,
-    ResourceSlotTypeSearchableFields,
-    RevisionResourceSlotSearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -37,7 +37,7 @@ class ResourceSlotTypeSearcher(Searcher[ResourceSlotTypeRow, ResourceSlotTypeDat
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return ResourceSlotTypeSearchableFields.own.to_data(row)
+        return ResourceSlotTypeQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -55,7 +55,7 @@ class AgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData]):
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
-        return AgentResourceSearchableFields.own.to_data(row)
+        return AgentResourceQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -68,7 +68,7 @@ class UnrankedAgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
-        return AgentResourceSearchableFields.own.to_data(row)
+        return AgentResourceQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -81,7 +81,7 @@ class ResourceAllocationSearcher(Searcher[ResourceAllocationRow, ResourceAllocat
 
     @override
     def to_data(self, row: ResourceAllocationRow) -> ResourceAllocationData:
-        return ResourceAllocationSearchableFields.own.to_data(row)
+        return ResourceAllocationQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -106,4 +106,4 @@ class RevisionResourceSlotSearcher(
 
     @override
     def to_data(self, row: DeploymentRevisionResourceSlotRow) -> RevisionResourceSlotData:
-        return RevisionResourceSlotSearchableFields.own.to_data(row)
+        return RevisionResourceSlotQuerySpec.own.to_data(row)

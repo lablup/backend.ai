@@ -86,17 +86,17 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
     RolePermissionPresetCreator,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.query_spec import (
+    RolePermissionPresetQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.rbac_models.role_permission_preset.searchable_fields import (
-    RolePermissionPresetSearchableFields,
-)
 from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePermissionPresetSearcher,
     RolePresetSearcher,
@@ -145,14 +145,14 @@ from ai.backend.manager.types import OptionalState
 
 def _role_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RolePresetSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=RolePresetQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RolePresetRow.id,
     )
 
 
 def _role_permission_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RolePermissionPresetSearchableFields.own.id.order.apply(ascending=False),
+        forward_order=RolePermissionPresetQuerySpec.own.id.order.apply(ascending=False),
         cursor_column=RolePermissionPresetRow.id,
     )
 
@@ -228,7 +228,7 @@ class RolePresetAdapter(BaseAdapter):
         """The uses the request named, each of which the caller must be able to read."""
         if usage is None or usage.used_by is None:
             return []
-        linked = RolePresetSearchableFields.linked.usage
+        linked = RolePresetQuerySpec.linked.usage
         return [linked.roles.used_by(RoleID(entity_id)) for entity_id in usage.used_by.role or ()]
 
     async def search(self, input: SearchRolePresetsInput) -> SearchRolePresetsPayload:
@@ -241,7 +241,7 @@ class RolePresetAdapter(BaseAdapter):
         if input.filter is None or (
             input.filter.deleted_at is None and input.filter.deleted is None
         ):
-            base_conditions.append(RolePresetSearchableFields.own.deleted_at.filter.is_null())
+            base_conditions.append(RolePresetQuerySpec.own.deleted_at.filter.is_null())
         searcher = self._build_searcher(
             RolePresetSearcher,
             conditions=[*base_conditions, *conditions],
@@ -283,7 +283,7 @@ class RolePresetAdapter(BaseAdapter):
                     target_row=RolePresetRow,
                     target_column=RolePresetRow.id,
                     target_id=role_preset_id,
-                    converter=RolePresetSearchableFields.own,
+                    converter=RolePresetQuerySpec.own,
                 )
             )
         )
@@ -297,7 +297,7 @@ class RolePresetAdapter(BaseAdapter):
                     target_row=RolePresetRow,
                     target_column=RolePresetRow.id,
                     target_id=role_preset_id,
-                    converter=RolePresetSearchableFields.own,
+                    converter=RolePresetQuerySpec.own,
                 )
             )
         )
@@ -530,7 +530,7 @@ class RolePresetAdapter(BaseAdapter):
         ]
 
     def _convert_filter(self, filter_: RolePresetFilter) -> list[QueryCondition]:
-        fields = RolePresetSearchableFields.own
+        fields = RolePresetQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter_.id, fields.id.filter),
             *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
@@ -544,12 +544,12 @@ class RolePresetAdapter(BaseAdapter):
             *self.apply_nullable_datetime_filter(filter_.deleted_at, fields.deleted_at.filter),
             *self.apply_to_many_filter(
                 filter_.permissions,
-                RolePresetSearchableFields.nested.permissions.correlation,
+                RolePresetQuerySpec.nested.permissions.correlation,
                 self._convert_permission_filter,
             ),
             *self.apply_to_many_filter(
                 filter_.labels,
-                RolePresetSearchableFields.nested.labels.correlation,
+                RolePresetQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
         ]
@@ -574,11 +574,11 @@ class RolePresetAdapter(BaseAdapter):
     def _deleted_conditions(self, deleted: bool | None) -> list[QueryCondition]:
         if deleted is None:
             return []
-        conditions = RolePresetSearchableFields.own.deleted_at.filter
+        conditions = RolePresetQuerySpec.own.deleted_at.filter
         return [conditions.is_not_null() if deleted else conditions.is_null()]
 
     def _convert_orders(self, orders: list[RolePresetOrder]) -> list[QueryOrder]:
-        fields = RolePresetSearchableFields.own
+        fields = RolePresetQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
@@ -598,7 +598,7 @@ class RolePresetAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         # ``role_preset_id`` is intentionally ignored here: the parent preset scope
         # is enforced as a base condition by the caller, so it cannot be widened.
-        fields = RolePermissionPresetSearchableFields.own
+        fields = RolePermissionPresetQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter_.field_id, fields.id.filter),
             *self.apply_string_filter(filter_.entity_type, fields.entity_type.filter),
@@ -629,7 +629,7 @@ class RolePresetAdapter(BaseAdapter):
         """Each operation the caller set, on the entry's one permission bit."""
         if bit_filter is None:
             return []
-        conditions = RolePermissionPresetSearchableFields.own.permission.filter
+        conditions = RolePermissionPresetQuerySpec.own.permission.filter
         applied: list[QueryCondition] = []
         if bit_filter.equals is not None:
             applied.append(conditions.equals(bit_filter.equals.to_permission()))
@@ -644,7 +644,7 @@ class RolePresetAdapter(BaseAdapter):
     def _convert_permission_orders(
         self, orders: list[RolePermissionPresetOrder]
     ) -> list[QueryOrder]:
-        fields = RolePermissionPresetSearchableFields.own
+        fields = RolePermissionPresetQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC

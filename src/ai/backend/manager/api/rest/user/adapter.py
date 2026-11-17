@@ -26,7 +26,7 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -147,7 +147,7 @@ class UserAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, f: UserFilter) -> list[QueryCondition]:
         """Convert user filter to query conditions."""
-        fields = UserSearchableFields.own
+        fields = UserQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
             *self.apply_string_filter(f.email, fields.email.filter),
@@ -163,7 +163,7 @@ class UserAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: UserOrder) -> QueryOrder:
         """Convert user order specification to query order."""
-        fields = UserSearchableFields.own
+        fields = UserQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserOrderField.CREATED_AT:

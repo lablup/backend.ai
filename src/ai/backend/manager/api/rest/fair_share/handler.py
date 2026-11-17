@@ -74,8 +74,8 @@ from ai.backend.manager.models.fair_share.scopes import (
     ProjectFairShareTarget,
     UserFairShareTarget,
 )
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_usage_history.scopes import (
@@ -946,9 +946,7 @@ class FairShareAPIHandler:
                     used_by=(),
                     searcher=ResourceGroupSearcher(
                         pagination=NoPagination(),
-                        conditions=[
-                            ResourceGroupSearchableFields.own.name.filter.equals(name_spec)
-                        ],
+                        conditions=[ResourceGroupQuerySpec.own.name.filter.equals(name_spec)],
                     ),
                 )
             )

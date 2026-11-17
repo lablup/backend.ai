@@ -30,10 +30,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.reconciler.types import LastHistory
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.searchable_fields import (
-    ReplicaGroupHistorySearchableFields,
+from ai.backend.manager.models.replica_group_history.query_spec import (
+    ReplicaGroupHistoryQuerySpec,
 )
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 from ai.backend.manager.views.replica_group import (
@@ -107,11 +107,11 @@ class ReplicaGroupQueryOps(V2OpsBase):
         query = (
             sa.select(ReplicaGroupHistoryRow)
             .where(
-                ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.in_(
+                ReplicaGroupHistoryQuerySpec.own.replica_group_id.filter.in_(
                     UUIDInMatchSpec(values=list(group_ids), negated=False)
                 )()
             )
-            .where(ReplicaGroupHistorySearchableFields.own.category.filter.equals(category)())
+            .where(ReplicaGroupHistoryQuerySpec.own.category.filter.equals(category)())
             .order_by(
                 ReplicaGroupHistoryRow.replica_group_id,
                 ReplicaGroupHistoryRow.created_at.desc(),

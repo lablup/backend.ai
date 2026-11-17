@@ -5,10 +5,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
-from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
-from ai.backend.manager.models.bootstrap_script.searchable_fields import (
-    BootstrapScriptSearchableFields,
+from ai.backend.manager.models.bootstrap_script.query_spec import (
+    BootstrapScriptQuerySpec,
 )
+from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
 from ai.backend.manager.models.specs.querier import BulkFieldQuerier, FieldQuerier
 
 
@@ -30,7 +30,7 @@ class BootstrapScriptQuerier(FieldQuerier[BootstrapScriptRow, BootstrapScriptDat
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
-        return BootstrapScriptSearchableFields.own.to_data(row)
+        return BootstrapScriptQuerySpec.own.to_data(row)
 
 
 class BulkBootstrapScriptQuerier(BulkFieldQuerier[BootstrapScriptRow, BootstrapScriptData]):
@@ -44,4 +44,4 @@ class BulkBootstrapScriptQuerier(BulkFieldQuerier[BootstrapScriptRow, BootstrapS
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
-        return BootstrapScriptSearchableFields.own.to_data(row)
+        return BootstrapScriptQuerySpec.own.to_data(row)

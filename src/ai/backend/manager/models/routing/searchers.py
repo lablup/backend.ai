@@ -9,8 +9,8 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.deployment.types import ModelReplicaData, RouteData, RouteInfo
 from ai.backend.manager.data.model_serving.types import RoutingData
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -24,7 +24,7 @@ class ModelReplicaSearcher(Searcher[RoutingRow, ModelReplicaData]):
 
     @override
     def to_data(self, row: RoutingRow) -> ModelReplicaData:
-        return ReplicaSearchableFields.own.to_data(row)
+        return ReplicaQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -37,7 +37,7 @@ class RouteInfoSearcher(Searcher[RoutingRow, RouteInfo]):
 
     @override
     def to_data(self, row: RoutingRow) -> RouteInfo:
-        return ReplicaSearchableFields.own.to_route_info(row)
+        return ReplicaQuerySpec.own.to_route_info(row)
 
 
 @dataclass
@@ -50,7 +50,7 @@ class RouteDataSearcher(Searcher[RoutingRow, RouteData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RouteData:
-        return ReplicaSearchableFields.own.to_route_data(row)
+        return ReplicaQuerySpec.own.to_route_data(row)
 
 
 @dataclass
@@ -63,4 +63,4 @@ class RoutingDataSearcher(Searcher[RoutingRow, RoutingData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RoutingData:
-        return ReplicaSearchableFields.own.to_routing_data(row)
+        return ReplicaQuerySpec.own.to_routing_data(row)

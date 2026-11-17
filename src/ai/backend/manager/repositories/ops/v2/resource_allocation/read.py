@@ -40,10 +40,10 @@ from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    KeyPairResourcePolicySearchableFields,
+from ai.backend.manager.models.resource_policy.query_spec import (
+    KeyPairResourcePolicyQuerySpec,
 )
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -269,7 +269,7 @@ class ResourceAllocationReadOps(V2ReadOps):
             raise KeyPairNotFound(f"User {user_id} holds no default keypair")
         return _DefaultKeypair(
             access_key=AccessKey(row.access_key),
-            resource_policy=KeyPairResourcePolicySearchableFields.own.to_data(
+            resource_policy=KeyPairResourcePolicyQuerySpec.own.to_data(
                 row.KeyPairResourcePolicyRow
             ),
         )

@@ -20,9 +20,9 @@ from ai.backend.manager.models.specs.searcher import (
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 from .shelf_fields import (
-    BoxSearchableFields,
+    BoxQuerySpec,
     ShelfSearcher,
-    SpecSearchableFields,
+    SpecQuerySpec,
     VisibleShelfTarget,
     ZoneShelfTarget,
 )
@@ -117,8 +117,8 @@ def negate(condition: QueryCondition) -> QueryCondition:
 
 def spec_graded(grade: str) -> QueryCondition:
     """A condition on one box: the spec that box points at carries ``grade``."""
-    return BoxSearchableFields.nested.spec.correlation.has([
-        SpecSearchableFields.own.grade.filter.equals(
+    return BoxQuerySpec.nested.spec.correlation.has([
+        SpecQuerySpec.own.grade.filter.equals(
             StringMatchSpec(value=grade, case_insensitive=False, negated=False)
         )
     ])

@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.kernel_group.types import KernelGroupEnvironData
-from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
-from ai.backend.manager.models.kernel_group_environ.searchable_fields import (
-    KernelGroupEnvironSearchableFields,
+from ai.backend.manager.models.kernel_group_environ.query_spec import (
+    KernelGroupEnvironQuerySpec,
 )
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +23,4 @@ class KernelGroupEnvironSearcher(Searcher[KernelGroupEnvironRow, KernelGroupEnvi
 
     @override
     def to_data(self, row: KernelGroupEnvironRow) -> KernelGroupEnvironData:
-        return KernelGroupEnvironSearchableFields.own.to_data(row)
+        return KernelGroupEnvironQuerySpec.own.to_data(row)

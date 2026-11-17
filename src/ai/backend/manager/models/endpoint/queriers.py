@@ -13,15 +13,15 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
 )
+from ai.backend.manager.models.endpoint.query_spec import (
+    AutoScalingRuleQuerySpec,
+    DeploymentAccessTokenQuerySpec,
+    DeploymentQuerySpec,
+)
 from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
-)
-from ai.backend.manager.models.endpoint.searchable_fields import (
-    AutoScalingRuleSearchableFields,
-    DeploymentAccessTokenSearchableFields,
-    DeploymentSearchableFields,
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
@@ -48,7 +48,7 @@ class DeploymentAccessTokenQuerier(FieldQuerier[EndpointTokenRow, ModelDeploymen
 
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
-        return DeploymentAccessTokenSearchableFields.own.to_data(row)
+        return DeploymentAccessTokenQuerySpec.own.to_data(row)
 
 
 class BulkDeploymentQuerier(BulkEntityQuerier[EndpointRow, ModelDeploymentData]):
@@ -64,7 +64,7 @@ class BulkDeploymentQuerier(BulkEntityQuerier[EndpointRow, ModelDeploymentData])
 
     @override
     def to_data(self, row: EndpointRow) -> ModelDeploymentData:
-        return DeploymentSearchableFields.own.to_data(row)
+        return DeploymentQuerySpec.own.to_data(row)
 
 
 class BulkAutoScalingRuleQuerier(
@@ -82,7 +82,7 @@ class BulkAutoScalingRuleQuerier(
 
     @override
     def to_data(self, row: EndpointAutoScalingRuleRow) -> ModelDeploymentAutoScalingRuleData:
-        return AutoScalingRuleSearchableFields.own.to_data(row)
+        return AutoScalingRuleQuerySpec.own.to_data(row)
 
 
 class BulkDeploymentAccessTokenQuerier(
@@ -100,4 +100,4 @@ class BulkDeploymentAccessTokenQuerier(
 
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
-        return DeploymentAccessTokenSearchableFields.own.to_data(row)
+        return DeploymentAccessTokenQuerySpec.own.to_data(row)

@@ -24,8 +24,8 @@ from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 if TYPE_CHECKING:
     from ai.backend.common.auth.password import PasswordInfo
@@ -137,4 +137,4 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return UserSearchableFields.own.to_data(row)
+        return UserQuerySpec.own.to_data(row)

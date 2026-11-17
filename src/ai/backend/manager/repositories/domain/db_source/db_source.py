@@ -8,8 +8,8 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -38,7 +38,7 @@ class DomainDBSource:
             row = await db_sess.scalar(query)
             if row is None:
                 raise DomainNotFound(f"Domain '{domain_name}' not found")
-            return DomainSearchableFields.own.to_data(row)
+            return DomainQuerySpec.own.to_data(row)
 
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:

@@ -39,8 +39,8 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
-from ai.backend.manager.models.object_storage.searchable_fields import (
-    ObjectStorageSearchableFields,
+from ai.backend.manager.models.object_storage.query_spec import (
+    ObjectStorageQuerySpec,
 )
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
@@ -112,7 +112,7 @@ class ObjectStorageAdapter(BaseAdapter):
         return ObjectStorageSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: ObjectStorageFilter) -> list[QueryCondition]:
-        fields = ObjectStorageSearchableFields.own
+        fields = ObjectStorageQuerySpec.own
         return [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.host, fields.host.filter),
@@ -121,7 +121,7 @@ class ObjectStorageAdapter(BaseAdapter):
     @staticmethod
     def _convert_orders(orders: list[ObjectStorageOrder]) -> list[QueryOrder]:
         """``created_at`` has no column on the table, so it orders by nothing."""
-        fields = ObjectStorageSearchableFields.own
+        fields = ObjectStorageQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC

@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
@@ -75,4 +75,4 @@ class DomainUpserter(CreatedInGlobal[DomainRow], EntityUpserter[DomainRow, Domai
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return DomainSearchableFields.own.to_data(row)
+        return DomainQuerySpec.own.to_data(row)

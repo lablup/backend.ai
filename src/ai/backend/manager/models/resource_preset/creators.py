@@ -13,10 +13,10 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.resource_preset.searchable_fields import (
-    ResourcePresetSearchableFields,
+from ai.backend.manager.models.resource_preset.query_spec import (
+    ResourcePresetQuerySpec,
 )
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -74,4 +74,4 @@ class ResourcePresetCreator(EntityCreator[ResourcePresetRow, ResourcePresetData]
 
     @override
     def to_data(self, row: ResourcePresetRow) -> ResourcePresetData:
-        return ResourcePresetSearchableFields.own.to_data(row)
+        return ResourcePresetQuerySpec.own.to_data(row)

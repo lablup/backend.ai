@@ -6,11 +6,11 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.container_registry.types import DomainContainerRegistryRelationData
+from ai.backend.manager.models.domain_container_registry_relation.query_spec import (
+    DomainContainerRegistryRelationQuerySpec,
+)
 from ai.backend.manager.models.domain_container_registry_relation.row import (
     DomainContainerRegistryRelationRow,
-)
-from ai.backend.manager.models.domain_container_registry_relation.searchable_fields import (
-    DomainContainerRegistryRelationSearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -29,4 +29,4 @@ class DomainContainerRegistryRelationSearcher(
     def to_data(
         self, row: DomainContainerRegistryRelationRow
     ) -> DomainContainerRegistryRelationData:
-        return DomainContainerRegistryRelationSearchableFields.own.to_data(row)
+        return DomainContainerRegistryRelationQuerySpec.own.to_data(row)

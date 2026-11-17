@@ -30,10 +30,10 @@ from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
 from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger
-from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.retention.searchable_fields import (
-    RetentionPolicySearchableFields,
+from ai.backend.manager.models.retention.query_spec import (
+    RetentionPolicyQuerySpec,
 )
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -65,7 +65,7 @@ from ai.backend.manager.types import OptionalState
 
 def _retention_policy_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RetentionPolicySearchableFields.own.category.order.apply(ascending=True),
+        forward_order=RetentionPolicyQuerySpec.own.category.order.apply(ascending=True),
         cursor_column=RetentionPolicyRow.id,
     )
 
@@ -205,7 +205,7 @@ class RetentionPolicyAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter_: RetentionPolicyFilter) -> list[QueryCondition]:
-        fields = RetentionPolicySearchableFields.own
+        fields = RetentionPolicyQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_bool_filter(filter_.enabled, fields.enabled.filter),
             *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
@@ -215,7 +215,7 @@ class RetentionPolicyAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[RetentionPolicyOrder]) -> list[QueryOrder]:
-        fields = RetentionPolicySearchableFields.own
+        fields = RetentionPolicyQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction.value == "ASC"

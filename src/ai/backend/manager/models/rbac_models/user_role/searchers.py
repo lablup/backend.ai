@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.permission.role import AssignedUserData
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.user.row import UserRow
 
@@ -28,4 +28,4 @@ class RoleAssignmentSearcher(Searcher[UserRoleRow, AssignedUserData]):
 
     @override
     def to_data(self, row: UserRoleRow) -> AssignedUserData:
-        return RoleAssignmentSearchableFields.own.to_data(row)
+        return RoleAssignmentQuerySpec.own.to_data(row)

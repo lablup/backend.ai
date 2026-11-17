@@ -9,8 +9,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.models.entity_share.query_spec import EntityShareQuerySpec
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.entity_share.searchable_fields import EntityShareSearchableFields
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -32,7 +32,7 @@ class EntityShareQuerier(DataQuerier[EntityShareRow, EntityShareData]):
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return EntityShareSearchableFields.own.to_data(row)
+        return EntityShareQuerySpec.own.to_data(row)
 
 
 class BulkEntityShareQuerier(BulkEntityQuerier[EntityShareRow, EntityShareData]):
@@ -48,4 +48,4 @@ class BulkEntityShareQuerier(BulkEntityQuerier[EntityShareRow, EntityShareData])
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return EntityShareSearchableFields.own.to_data(row)
+        return EntityShareQuerySpec.own.to_data(row)

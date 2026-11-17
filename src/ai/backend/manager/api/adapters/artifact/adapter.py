@@ -76,18 +76,18 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.data.artifact.types import (
     DelegateeTarget as ServiceDelegateeTarget,
 )
+from ai.backend.manager.models.artifact.query_spec import ArtifactQuerySpec
 from ai.backend.manager.models.artifact.row import ArtifactRow
-from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
 from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
 from ai.backend.manager.models.artifact.updaters import (
     ArtifactRestoreUpdater,
     ArtifactSoftDeleteUpdater,
     ArtifactUpdater,
 )
-from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.models.artifact_revision.searchable_fields import (
-    ArtifactRevisionSearchableFields,
+from ai.backend.manager.models.artifact_revision.query_spec import (
+    ArtifactRevisionQuerySpec,
 )
+from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -160,7 +160,7 @@ from ai.backend.manager.types import OptionalState, TriState
 @lru_cache(maxsize=1)
 def _get_artifact_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ArtifactSearchableFields.own.id.order.apply(ascending=False),
+        forward_order=ArtifactQuerySpec.own.id.order.apply(ascending=False),
         cursor_column=ArtifactRow.id,
     )
 
@@ -168,7 +168,7 @@ def _get_artifact_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_artifact_revision_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ArtifactRevisionSearchableFields.own.field_id.order.apply(ascending=False),
+        forward_order=ArtifactRevisionQuerySpec.own.field_id.order.apply(ascending=False),
         cursor_column=ArtifactRevisionRow.id,
     )
 
@@ -607,7 +607,7 @@ class ArtifactAdapter(BaseAdapter):
         filter: ArtifactGQLFilterInputDTO,
     ) -> list[QueryCondition]:
         """Convert a GQL-facing ArtifactGQLFilterInputDTO to query conditions."""
-        fields = ArtifactSearchableFields.own
+        fields = ArtifactQuerySpec.own
         conditions: list[QueryCondition] = []
 
         if filter.type:
@@ -660,7 +660,7 @@ class ArtifactAdapter(BaseAdapter):
         filter: ArtifactRevisionGQLFilterInputDTO,
     ) -> list[QueryCondition]:
         """Convert a GQL-facing ArtifactRevisionGQLFilterInputDTO to query conditions."""
-        fields = ArtifactRevisionSearchableFields.own
+        fields = ArtifactRevisionQuerySpec.own
         conditions: list[QueryCondition] = []
 
         if filter.status is not None:
@@ -703,7 +703,7 @@ class ArtifactAdapter(BaseAdapter):
             statuses.append(DataArtifactStatus(sf.equals.value))
         if not statuses:
             return []
-        return [ArtifactRevisionSearchableFields.own.status.filter.in_(statuses)]
+        return [ArtifactRevisionQuerySpec.own.status.filter.in_(statuses)]
 
     @staticmethod
     def _convert_revision_remote_status_filter(
@@ -716,14 +716,14 @@ class ArtifactAdapter(BaseAdapter):
             remote_statuses.append(DataArtifactRemoteStatus(rsf.equals.value))
         if not remote_statuses:
             return []
-        return [ArtifactRevisionSearchableFields.own.remote_status.filter.in_(remote_statuses)]
+        return [ArtifactRevisionQuerySpec.own.remote_status.filter.in_(remote_statuses)]
 
     @staticmethod
     def _convert_gql_revision_orders(
         orders: list[ArtifactRevisionGQLOrderByInputDTO],
     ) -> list[QueryOrder]:
         """Convert GQL revision order DTOs to query orders."""
-        fields = ArtifactRevisionSearchableFields.own
+        fields = ArtifactRevisionQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
@@ -743,7 +743,7 @@ class ArtifactAdapter(BaseAdapter):
         return result
 
     def _convert_filter(self, filter: ArtifactFilter) -> list[QueryCondition]:
-        fields = ArtifactSearchableFields.own
+        fields = ArtifactQuerySpec.own
         conditions: list[QueryCondition] = list(
             self.apply_string_filter(filter.name, fields.name.filter)
         )
@@ -756,7 +756,7 @@ class ArtifactAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_type_filter(tf: ArtifactTypeFilter) -> list[QueryCondition]:
-        conditions_of = ArtifactSearchableFields.own.type.filter
+        conditions_of = ArtifactQuerySpec.own.type.filter
         conditions: list[QueryCondition] = []
         if tf.equals is not None:
             conditions.append(conditions_of.equals(DataArtifactType(tf.equals)))
@@ -772,7 +772,7 @@ class ArtifactAdapter(BaseAdapter):
     def _convert_availability_filter(
         af: ArtifactAvailabilityFilter,
     ) -> list[QueryCondition]:
-        conditions_of = ArtifactSearchableFields.own.availability.filter
+        conditions_of = ArtifactQuerySpec.own.availability.filter
         conditions: list[QueryCondition] = []
         if af.equals is not None:
             conditions.append(conditions_of.equals(DataArtifactAvailability(af.equals)))
@@ -794,7 +794,7 @@ class ArtifactAdapter(BaseAdapter):
         orders: list[tuple[ArtifactOrderField, bool]],
     ) -> list[QueryOrder]:
         """``SIZE`` belongs to the revisions, not the artifact, so it orders by nothing."""
-        fields = ArtifactSearchableFields.own
+        fields = ArtifactQuerySpec.own
         result: list[QueryOrder] = []
         for field, ascending in orders:
             match field:

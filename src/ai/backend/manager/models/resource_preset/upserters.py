@@ -14,10 +14,10 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.resource_preset.searchable_fields import (
-    ResourcePresetSearchableFields,
+from ai.backend.manager.models.resource_preset.query_spec import (
+    ResourcePresetQuerySpec,
 )
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 
@@ -88,4 +88,4 @@ class ResourcePresetUpserter(EntityUpserter[ResourcePresetRow, ResourcePresetDat
 
     @override
     def to_data(self, row: ResourcePresetRow) -> ResourcePresetData:
-        return ResourcePresetSearchableFields.own.to_data(row)
+        return ResourcePresetQuerySpec.own.to_data(row)

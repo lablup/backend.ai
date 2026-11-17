@@ -16,10 +16,10 @@ from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 from ai.backend.manager.models.system_session_environ.creators import (
     SystemSessionEnvironCreator,
 )
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRow, TestSeedRowFrom
 
@@ -117,5 +117,5 @@ class TestSeedDeletedSystemSessionEnviron(
             target_row=SystemSessionEnvironRow,
             target_column=SystemSessionEnvironRow.id,
             target_id=SystemSessionEnvironID(source.id),
-            converter=SystemSessionEnvironSearchableFields.own,
+            converter=SystemSessionEnvironQuerySpec.own,
         )

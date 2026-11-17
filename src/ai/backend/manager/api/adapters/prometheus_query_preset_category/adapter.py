@@ -41,14 +41,14 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreator,
 )
+from ai.backend.manager.models.prometheus_query_preset_category.query_spec import (
+    PrometheusQueryPresetCategoryQuerySpec,
+)
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.scopes import (
     PublicPrometheusQueryPresetCategoryTarget,
-)
-from ai.backend.manager.models.prometheus_query_preset_category.searchable_fields import (
-    PrometheusQueryPresetCategorySearchableFields,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.searchers import (
     PrometheusQueryPresetCategorySearcher,
@@ -189,7 +189,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         )
 
     _PAGINATION_SPEC = PaginationSpec(
-        forward_order=PrometheusQueryPresetCategorySearchableFields.own.created_at.order.apply(
+        forward_order=PrometheusQueryPresetCategoryQuerySpec.own.created_at.order.apply(
             ascending=False
         ),
         cursor_column=PrometheusQueryPresetCategoryRow.id,
@@ -213,7 +213,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter: CategoryFilter) -> list[QueryCondition]:
-        fields = PrometheusQueryPresetCategorySearchableFields.own
+        fields = PrometheusQueryPresetCategoryQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.name, fields.name.filter),
         ]
@@ -238,7 +238,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[CategoryOrder]) -> list[QueryOrder]:
-        fields = PrometheusQueryPresetCategorySearchableFields.own
+        fields = PrometheusQueryPresetCategoryQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC

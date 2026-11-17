@@ -11,10 +11,10 @@ from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_policy.searchable_fields import (
-    DeploymentPolicySearchableFields,
+from ai.backend.manager.models.deployment_policy.query_spec import (
+    DeploymentPolicyQuerySpec,
 )
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -51,4 +51,4 @@ class DeploymentPolicyCreator(
 
     @override
     def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:
-        return DeploymentPolicySearchableFields.own.to_data(row)
+        return DeploymentPolicyQuerySpec.own.to_data(row)

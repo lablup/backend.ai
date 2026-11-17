@@ -16,10 +16,10 @@ from ai.backend.manager.data.vfolder.types import VFolderMountPolicyData
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import FieldUpserter
-from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow
-from ai.backend.manager.models.vfolder.searchable_fields import (
-    VFolderMountPolicySearchableFields,
+from ai.backend.manager.models.vfolder.query_spec import (
+    VFolderMountPolicyQuerySpec,
 )
+from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow
 
 __all__ = ("VFolderUserMountPolicyUpserter",)
 
@@ -68,4 +68,4 @@ class VFolderUserMountPolicyUpserter(
 
     @override
     def to_data(self, row: VFolderUserMountPolicyRow) -> VFolderMountPolicyData:
-        return VFolderMountPolicySearchableFields.own.to_data(row)
+        return VFolderMountPolicyQuerySpec.own.to_data(row)

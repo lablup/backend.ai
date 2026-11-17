@@ -83,10 +83,10 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
-from ai.backend.manager.models.runtime_variant.scopes import PublicRuntimeVariantTarget
-from ai.backend.manager.models.runtime_variant.searchable_fields import (
-    RuntimeVariantSearchableFields,
+from ai.backend.manager.models.runtime_variant.query_spec import (
+    RuntimeVariantQuerySpec,
 )
+from ai.backend.manager.models.runtime_variant.scopes import PublicRuntimeVariantTarget
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
@@ -245,7 +245,7 @@ class ServiceHandler:
         searcher = RuntimeVariantSearcher(
             pagination=OffsetPagination(limit=1),
             conditions=[
-                RuntimeVariantSearchableFields.own.id.filter.in_(
+                RuntimeVariantQuerySpec.own.id.filter.in_(
                     UUIDInMatchSpec(values=[runtime_variant_id], negated=False)
                 )
             ],

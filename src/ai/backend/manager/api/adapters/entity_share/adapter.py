@@ -39,15 +39,15 @@ from ai.backend.manager.data.entity_share.types import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
+from ai.backend.manager.models.entity_share.query_spec import (
+    EntityShareQuerySpec,
+)
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.scopes import (
     EntityShareTarget,
     OwningEntityShareTarget,
     RecipientProjectEntityShareTarget,
     RecipientUserEntityShareTarget,
-)
-from ai.backend.manager.models.entity_share.searchable_fields import (
-    EntityShareSearchableFields,
 )
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
@@ -73,7 +73,7 @@ __all__ = ("EntityShareAdapter",)
 
 def _entity_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=EntityShareSearchableFields.own.created_at.order.apply(ascending=True),
+        forward_order=EntityShareQuerySpec.own.created_at.order.apply(ascending=True),
         cursor_column=EntityShareRow.id,
     )
 
@@ -191,7 +191,7 @@ class EntityShareAdapter(BaseAdapter):
             targets,
             extra_conditions=(
                 [
-                    EntityShareSearchableFields.own.sharer_user_id.filter.in_(
+                    EntityShareQuerySpec.own.sharer_user_id.filter.in_(
                         UUIDInMatchSpec(values=sharers, negated=False)
                     )
                 ]
@@ -300,7 +300,7 @@ class EntityShareAdapter(BaseAdapter):
         return [dto for dto in PermissionBitDTO if cap & Permission[dto.name]]
 
     def _convert_filter(self, filter: EntityShareFilter) -> list[QueryCondition]:
-        fields = EntityShareSearchableFields.own
+        fields = EntityShareQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_uuid_filter(filter.target_entity_id, fields.target_entity_id.filter),
@@ -321,7 +321,7 @@ class EntityShareAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: Sequence[EntityShareOrderBy]) -> list[QueryOrder]:
-        fields = EntityShareSearchableFields.own
+        fields = EntityShareQuerySpec.own
         converted: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction is OrderDirection.ASC

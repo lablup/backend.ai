@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.object_storage.searchable_fields import (
-    ObjectStorageSearchableFields,
+from ai.backend.manager.models.object_storage.query_spec import (
+    ObjectStorageQuerySpec,
 )
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +23,4 @@ class ObjectStorageSearcher(Searcher[ObjectStorageRow, ObjectStorageData]):
 
     @override
     def to_data(self, row: ObjectStorageRow) -> ObjectStorageData:
-        return ObjectStorageSearchableFields.own.to_data(row)
+        return ObjectStorageQuerySpec.own.to_data(row)

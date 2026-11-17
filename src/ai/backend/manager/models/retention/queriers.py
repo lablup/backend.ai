@@ -9,10 +9,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionPolicyData
-from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.retention.searchable_fields import (
-    RetentionPolicySearchableFields,
+from ai.backend.manager.models.retention.query_spec import (
+    RetentionPolicyQuerySpec,
 )
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -35,7 +35,7 @@ class RetentionPolicyQuerier(DataQuerier[RetentionPolicyRow, RetentionPolicyData
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return RetentionPolicySearchableFields.own.to_data(row)
+        return RetentionPolicyQuerySpec.own.to_data(row)
 
 
 class BulkRetentionPolicyQuerier(BulkEntityQuerier[RetentionPolicyRow, RetentionPolicyData]):
@@ -51,4 +51,4 @@ class BulkRetentionPolicyQuerier(BulkEntityQuerier[RetentionPolicyRow, Retention
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return RetentionPolicySearchableFields.own.to_data(row)
+        return RetentionPolicyQuerySpec.own.to_data(row)

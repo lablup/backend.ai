@@ -71,32 +71,32 @@ from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.deployment_revision.searchable_fields import (
-    ModelRevisionSearchableFields,
+from ai.backend.manager.models.deployment_revision.query_spec import (
+    ModelRevisionQuerySpec,
 )
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder.row import VFolderRow, vfolders
@@ -205,7 +205,7 @@ class ModelServingRepository:
         """
         List endpoints owned by a specific user with optional name filter.
         """
-        fields = DeploymentSearchableFields.own
+        fields = DeploymentQuerySpec.own
         conditions = [
             fields.session_owner.filter.equals(
                 UUIDEqualMatchSpec(value=session_owner_id, negated=False)
@@ -300,7 +300,7 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        replica_fields = ReplicaSearchableFields.own
+        replica_fields = ReplicaQuerySpec.own
         async with self._v2_ops.read_ops() as r:
             result = await r.search_in_global(
                 RoutingDataSearcher(
@@ -450,7 +450,7 @@ class ModelServingRepository:
         datas = await self._read_endpoint_datas(
             r,
             [
-                DeploymentSearchableFields.own.entity_id.filter.equals(
+                DeploymentQuerySpec.own.entity_id.filter.equals(
                     UUIDEqualMatchSpec(value=endpoint_id, negated=False)
                 )
             ],
@@ -503,7 +503,7 @@ class ModelServingRepository:
             ModelRevisionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    ModelRevisionSearchableFields.own.field_id.filter.in_(
+                    ModelRevisionQuerySpec.own.field_id.filter.in_(
                         UUIDInMatchSpec(values=revision_ids, negated=False)
                     )
                 ],
@@ -540,7 +540,7 @@ class ModelServingRepository:
             ImageSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    ImageSearchableFields.own.id.filter.in_(
+                    ImageQuerySpec.own.id.filter.in_(
                         UUIDInMatchSpec(values=image_ids, negated=False)
                     )
                 ],
@@ -565,7 +565,7 @@ class ModelServingRepository:
             UserSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    UserSearchableFields.own.uuid.filter.in_(
+                    UserQuerySpec.own.uuid.filter.in_(
                         UUIDInMatchSpec(values=user_ids, negated=False)
                     )
                 ],
@@ -589,7 +589,7 @@ class ModelServingRepository:
             RoutingDataSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    ReplicaSearchableFields.own.deployment_id.filter.in_(
+                    ReplicaQuerySpec.own.deployment_id.filter.in_(
                         UUIDInMatchSpec(values=deployment_ids, negated=False)
                     )
                 ],
@@ -778,7 +778,7 @@ class ModelServingRepository:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
                 raise ImageNotFound(f"Image {image_id} not found")
-            return ImageSearchableFields.own.to_data(image_row)
+            return ImageQuerySpec.own.to_data(image_row)
 
     @model_serving_repository_resilience.apply()
     async def modify_endpoint_fields(
@@ -882,8 +882,8 @@ class ModelServingRepository:
         Base conditions (session_owner, lifecycle_stage) are applied as security constraints.
         Additional filter/pagination conditions come from the searcher.
         """
-        deployment_fields = DeploymentSearchableFields.own
-        replica_fields = ReplicaSearchableFields.own
+        deployment_fields = DeploymentQuerySpec.own
+        replica_fields = ReplicaQuerySpec.own
         bounded = replace(
             searcher,
             conditions=[
@@ -924,7 +924,7 @@ class ModelServingRepository:
                 revision_searcher = ModelRevisionSearcher(
                     pagination=NoPagination(),
                     conditions=[
-                        ModelRevisionSearchableFields.own.field_id.filter.in_(
+                        ModelRevisionQuerySpec.own.field_id.filter.in_(
                             UUIDInMatchSpec(values=current_revision_ids, negated=False)
                         )
                     ],

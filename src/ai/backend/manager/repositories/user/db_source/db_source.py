@@ -69,8 +69,8 @@ from ai.backend.manager.models.bootstrap_script.upserters import (
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
 )
-from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
-    BootstrapScriptRevisionSearchableFields,
+from ai.backend.manager.models.bootstrap_script_revision.query_spec import (
+    BootstrapScriptRevisionQuerySpec,
 )
 from ai.backend.manager.models.bootstrap_script_revision.searchers import (
     DefaultBootstrapScriptRevisionSearcher,
@@ -85,11 +85,11 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
     keypairs,
 )
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.project.updaters import PersonalProjectSoftDeleteUpdater
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -99,11 +99,11 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     SessionRow,
 )
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
@@ -116,8 +116,8 @@ from ai.backend.manager.models.user.purgers import (
     UserSessionGroupPurger,
     UserVFolderAutoMountPurger,
 )
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -204,7 +204,7 @@ class UserDBSource:
     async def _current_default_revision(
         self, ops: V2ReadOps, user_id: UserID
     ) -> BootstrapScriptRevisionData | None:
-        revision = BootstrapScriptRevisionSearchableFields.own
+        revision = BootstrapScriptRevisionQuerySpec.own
         result = await ops.search_in_global(
             DefaultBootstrapScriptRevisionSearcher(
                 user_id=user_id,
@@ -221,7 +221,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
-            return UserSearchableFields.own.to_data(user_row)
+            return UserQuerySpec.own.to_data(user_row)
 
     async def get_by_email_validated(
         self,
@@ -233,7 +233,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return UserSearchableFields.own.to_data(user_row)
+            return UserQuerySpec.own.to_data(user_row)
 
     async def _default_keypair_resource_policy(self, session: SASession) -> str:
         """The name of the policy a keypair gets when nothing else names one."""
@@ -459,7 +459,7 @@ class UserDBSource:
             deleted_user = result.scalars().one_or_none()
             if deleted_user is None:
                 await self._raise_missing_or_purging(await session.connection(), user_uuid)
-            return UserSearchableFields.own.to_data(deleted_user)
+            return UserQuerySpec.own.to_data(deleted_user)
 
     async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
         """Restore a soft-deleted user by UUID, setting status back to ACTIVE.
@@ -537,7 +537,7 @@ class UserDBSource:
 
     async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionEntityData]:
         """Retrieve active sessions for a user."""
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         async with self._v2_ops.read_ops() as r:
             result = await r.search_in_global(
                 SessionSearcher(
@@ -1128,7 +1128,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {keypair_id} not found")
-            return KeyPairSearchableFields.own.to_data(kp_row)
+            return KeyPairQuerySpec.own.to_data(kp_row)
 
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:
         """Admin retrieves a single keypair by access key."""
@@ -1142,4 +1142,4 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return KeyPairSearchableFields.own.to_data(kp_row)
+            return KeyPairQuerySpec.own.to_data(kp_row)

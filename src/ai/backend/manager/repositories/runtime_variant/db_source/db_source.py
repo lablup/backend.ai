@@ -10,10 +10,10 @@ import sqlalchemy as sa
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
-from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant.searchable_fields import (
-    RuntimeVariantSearchableFields,
+from ai.backend.manager.models.runtime_variant.query_spec import (
+    RuntimeVariantQuerySpec,
 )
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -31,7 +31,7 @@ class RuntimeVariantDBSource:
             row = (await session.execute(stmt)).scalar_one_or_none()
             if row is None:
                 raise RuntimeVariantNotFound()
-            return RuntimeVariantSearchableFields.own.to_data(row)
+            return RuntimeVariantQuerySpec.own.to_data(row)
 
     async def get_by_name(self, name: str) -> RuntimeVariantData:
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -39,4 +39,4 @@ class RuntimeVariantDBSource:
             row = (await session.execute(stmt)).scalar_one_or_none()
             if row is None:
                 raise RuntimeVariantNotFound()
-            return RuntimeVariantSearchableFields.own.to_data(row)
+            return RuntimeVariantQuerySpec.own.to_data(row)

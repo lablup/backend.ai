@@ -22,10 +22,10 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
@@ -89,7 +89,7 @@ class ContainerRegistryCreator(EntityCreator[ContainerRegistryRow, ContainerRegi
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return ContainerRegistrySearchableFields.own.to_data(row)
+        return ContainerRegistryQuerySpec.own.to_data(row)
 
 
 @dataclass

@@ -57,10 +57,10 @@ from ai.backend.manager.errors.service import (
     RoutingNotFound,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.agent.repository import AgentRepository
@@ -458,7 +458,7 @@ class DeploymentService:
             AgentSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    AgentSearchableFields.own.uuid.filter.in_(
+                    AgentQuerySpec.own.uuid.filter.in_(
                         UUIDInMatchSpec(values=list(agent_uuids), negated=False)
                     ),
                 ],
@@ -663,7 +663,7 @@ class DeploymentService:
         active_searcher = DeploymentIDSearcher(
             pagination=NoPagination(),
             conditions=[
-                DeploymentSearchableFields.own.lifecycle_stage.filter.in_(
+                DeploymentQuerySpec.own.lifecycle_stage.filter.in_(
                     EndpointLifecycle.active_states()
                 ),
             ],

@@ -34,8 +34,8 @@ from ai.backend.manager.models.specs.purger import (
     FieldBatchPurger,
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
 
@@ -192,4 +192,4 @@ class UserPurger(EntityPurger[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return UserSearchableFields.own.to_data(row)
+        return UserQuerySpec.own.to_data(row)

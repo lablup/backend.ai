@@ -4,10 +4,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
-from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
-from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
-    VFolderAutoMountSearchableFields,
+from ai.backend.manager.models.vfolder_auto_mount.query_spec import (
+    VFolderAutoMountQuerySpec,
 )
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
 
 class BulkVFolderAutoMountQuerier(BulkEntityQuerier[VFolderAutoMountRow, VFolderAutoMountData]):
@@ -23,4 +23,4 @@ class BulkVFolderAutoMountQuerier(BulkEntityQuerier[VFolderAutoMountRow, VFolder
 
     @override
     def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountData:
-        return VFolderAutoMountSearchableFields.own.to_data(row)
+        return VFolderAutoMountQuerySpec.own.to_data(row)

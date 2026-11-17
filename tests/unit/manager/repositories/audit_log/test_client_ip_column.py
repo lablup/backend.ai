@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.manager.actions.spec import ActionKind
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.models.audit_log.query_spec import AuditLogQuerySpec
 from ai.backend.manager.models.audit_log.row import AuditLogRow
-from ai.backend.manager.models.audit_log.searchable_fields import AuditLogSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
@@ -66,7 +66,7 @@ class TestAuditLogClientIP:
         async with db.begin_readonly_session() as db_sess:
             row = await db_sess.get(AuditLogRow, row_id)
             assert row is not None
-            return AuditLogSearchableFields.own.to_data(row).client_ip
+            return AuditLogQuerySpec.own.to_data(row).client_ip
 
     async def _stored_value_equals(
         self, db: ExtendedAsyncSAEngine, row_id: AuditLogID, client_ip: str

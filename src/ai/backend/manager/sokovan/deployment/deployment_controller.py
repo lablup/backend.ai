@@ -67,7 +67,7 @@ from ai.backend.manager.models.endpoint.creators import (
     DeploymentReplicaFields,
 )
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaUpdater
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
@@ -826,7 +826,7 @@ class DeploymentController:
         searcher = RouteInfoSearcher(
             pagination=OffsetPagination(limit=1),
             conditions=[
-                ReplicaSearchableFields.own.field_id.filter.in_(
+                ReplicaQuerySpec.own.field_id.filter.in_(
                     UUIDInMatchSpec(values=[route_id], negated=False)
                 )
             ],

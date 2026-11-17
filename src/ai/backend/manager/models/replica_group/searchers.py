@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.deployment.types import ReplicaGroupData
-from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.replica_group.searchable_fields import (
-    ReplicaGroupSearchableFields,
+from ai.backend.manager.models.replica_group.query_spec import (
+    ReplicaGroupQuerySpec,
 )
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
@@ -27,7 +27,7 @@ class ReplicaGroupSearcher(Searcher[ReplicaGroupRow, ReplicaGroupData]):
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return ReplicaGroupSearchableFields.own.to_data(row)
+        return ReplicaGroupQuerySpec.own.to_data(row)
 
 
 @dataclass

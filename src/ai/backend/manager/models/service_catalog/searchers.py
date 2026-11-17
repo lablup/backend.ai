@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
-from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.models.service_catalog.searchable_fields import (
-    ServiceCatalogSearchableFields,
+from ai.backend.manager.models.service_catalog.query_spec import (
+    ServiceCatalogQuerySpec,
 )
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -25,4 +25,4 @@ class ServiceCatalogSearcher(Searcher[ServiceCatalogRow, ServiceCatalogData]):
 
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
-        return ServiceCatalogSearchableFields.own.to_data(row)
+        return ServiceCatalogQuerySpec.own.to_data(row)

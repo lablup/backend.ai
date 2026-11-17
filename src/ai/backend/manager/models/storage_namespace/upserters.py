@@ -10,10 +10,10 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
-from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
-from ai.backend.manager.models.storage_namespace.searchable_fields import (
-    StorageNamespaceSearchableFields,
+from ai.backend.manager.models.storage_namespace.query_spec import (
+    StorageNamespaceQuerySpec,
 )
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 __all__ = ("StorageNamespaceUpserter",)
 
@@ -56,4 +56,4 @@ class StorageNamespaceUpserter(
 
     @override
     def to_data(self, row: StorageNamespaceRow) -> StorageNamespaceData:
-        return StorageNamespaceSearchableFields.own.to_data(row)
+        return StorageNamespaceQuerySpec.own.to_data(row)

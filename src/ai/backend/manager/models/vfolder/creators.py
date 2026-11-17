@@ -39,12 +39,12 @@ from ai.backend.manager.models.specs.creator import (
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.vfolder.query_spec import (
+    VFolderQuerySpec,
+)
 from ai.backend.manager.models.vfolder.row import (
     VFOLDER_NAME_IN_PROJECT_INDEX,
     VFolderRow,
-)
-from ai.backend.manager.models.vfolder.searchable_fields import (
-    VFolderSearchableFields,
 )
 
 
@@ -191,7 +191,7 @@ class VFolderBaseCreator(GuardedEntityCreator[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return VFolderSearchableFields.own.to_data(row)
+        return VFolderQuerySpec.own.to_data(row)
 
 
 @dataclass(kw_only=True)

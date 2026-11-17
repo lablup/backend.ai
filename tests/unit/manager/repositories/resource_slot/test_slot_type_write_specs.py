@@ -46,6 +46,9 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
+from ai.backend.manager.models.resource_slot.query_spec import (
+    ResourceSlotTypeQuerySpec,
+)
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,
@@ -53,9 +56,6 @@ from ai.backend.manager.models.resource_slot.row import (
     PresetResourceSlotRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    ResourceSlotTypeSearchableFields,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
@@ -146,7 +146,7 @@ async def existing_slot_type(
         )
         db_sess.add(row)
         await db_sess.flush()
-        return ResourceSlotTypeSearchableFields.own.to_data(row)
+        return ResourceSlotTypeQuerySpec.own.to_data(row)
 
 
 def _creator(

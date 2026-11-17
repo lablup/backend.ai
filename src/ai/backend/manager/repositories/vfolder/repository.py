@@ -122,13 +122,13 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderQuerier,
     VFolderUserMountPolicyQuerier,
 )
+from ai.backend.manager.models.vfolder.query_spec import VFolderQuerySpec
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
@@ -255,7 +255,7 @@ class VfolderRepository:
         if not ids:
             return []
         async with self._db.begin_readonly_session() as session:
-            id_in = VFolderSearchableFields.own.id.filter.in_(
+            id_in = VFolderQuerySpec.own.id.filter.in_(
                 UUIDInMatchSpec(values=list(ids), negated=False)
             )
             query = sa.select(VFolderRow).where(id_in())

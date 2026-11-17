@@ -18,10 +18,10 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.creators import RANK_GAP
-from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
-    DeploymentPresetSearchableFields,
+from ai.backend.manager.models.deployment_revision_preset.query_spec import (
+    DeploymentPresetQuerySpec,
 )
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
@@ -117,7 +117,7 @@ class DeploymentPresetUpserter(
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return DeploymentPresetSearchableFields.own.to_data(row)
+        return DeploymentPresetQuerySpec.own.to_data(row)
 
 
 @dataclass

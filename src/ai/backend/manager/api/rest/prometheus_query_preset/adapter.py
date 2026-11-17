@@ -24,8 +24,8 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
 )
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
-    PrometheusQueryPresetSearchableFields,
+from ai.backend.manager.models.prometheus_query_preset.query_spec import (
+    PrometheusQueryPresetQuerySpec,
 )
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
@@ -95,12 +95,12 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter_req: QueryDefinitionFilter) -> list[QueryCondition]:
         """Convert query definition filter to list of query conditions."""
-        fields = PrometheusQueryPresetSearchableFields.own
+        fields = PrometheusQueryPresetQuerySpec.own
         return self.apply_string_filter(filter_req.name, fields.name.filter)
 
     def _convert_order(self, order: QueryDefinitionOrder) -> QueryOrder:
         """Convert query definition order specification to query order."""
-        fields = PrometheusQueryPresetSearchableFields.own
+        fields = PrometheusQueryPresetQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         if order.field == QueryDefinitionOrderField.NAME:
             return fields.name.order.apply(ascending)

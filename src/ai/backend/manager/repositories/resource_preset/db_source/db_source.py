@@ -52,10 +52,10 @@ from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyR
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
 from ai.backend.manager.models.resource_preset.queriers import ResourcePresetQuerier
-from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.resource_preset.searchable_fields import (
-    ResourcePresetSearchableFields,
+from ai.backend.manager.models.resource_preset.query_spec import (
+    ResourcePresetQuerySpec,
 )
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.updaters import (
     ResourcePresetResourceGroupUpdater,
     ResourcePresetUpdater,
@@ -125,7 +125,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_id(session, preset_id)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            return ResourcePresetSearchableFields.own.to_data(preset_row)
+            return ResourcePresetQuerySpec.own.to_data(preset_row)
 
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
@@ -136,7 +136,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_name(session, name)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            return ResourcePresetSearchableFields.own.to_data(preset_row)
+            return ResourcePresetQuerySpec.own.to_data(preset_row)
 
     async def get_preset_by_id_or_name(
         self, preset_id: UUID | None, name: str | None
@@ -148,7 +148,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            return ResourcePresetSearchableFields.own.to_data(preset_row)
+            return ResourcePresetQuerySpec.own.to_data(preset_row)
 
     async def _get_preset_by_id_or_name(
         self, db_sess: SASession, preset_id: UUID | None, name: str | None
@@ -246,7 +246,7 @@ class ResourcePresetDBSource:
 
             presets = []
             async for row in await session.stream_scalars(query):
-                presets.append(ResourcePresetSearchableFields.own.to_data(row))
+                presets.append(ResourcePresetQuerySpec.own.to_data(row))
 
         return presets
 

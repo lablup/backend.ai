@@ -4,7 +4,7 @@ A filter or an order on another entity's column cannot ask whether the caller ma
 read that row, and a to-many aggregate reruns its subquery for every outer row.
 Both are banned by `models/specs/search/AGENTS.md`. What is here shipped before the
 rule, is marked deprecated in the schema, and is removed in the next release. Nothing
-new goes here; the declarations are in `searchable_fields.py`.
+new goes here; the declarations are in `query_spec.py`.
 """
 
 from __future__ import annotations

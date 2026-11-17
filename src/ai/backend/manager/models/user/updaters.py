@@ -18,8 +18,8 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -75,13 +75,11 @@ class UserUpdater(GuardedDataUpdater[UserRow, UserData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=UserSearchableFields.own.status.filter.not_in(
-                    UserStatus.purge_in_progress()
-                ),
+                condition=UserQuerySpec.own.status.filter.not_in(UserStatus.purge_in_progress()),
                 error=UserPurgeInProgress(f"User is being purged: {self.user_id}"),
             ),
             GuardCheck(
-                condition=UserSearchableFields.own.status.filter.not_equals(UserStatus.DELETED),
+                condition=UserQuerySpec.own.status.filter.not_equals(UserStatus.DELETED),
                 error=UserDeleted(f"User is deleted: {self.user_id}"),
             ),
         )
@@ -126,7 +124,7 @@ class UserUpdater(GuardedDataUpdater[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return UserSearchableFields.own.to_data(row)
+        return UserQuerySpec.own.to_data(row)
 
     @property
     def group_ids_value(self) -> list[str] | None:

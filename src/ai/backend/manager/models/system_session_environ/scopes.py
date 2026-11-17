@@ -21,10 +21,10 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
@@ -50,7 +50,7 @@ class PublicSystemSessionEnvironTarget(SystemSessionEnvironTarget):
 
     @override
     def to_condition(self) -> QueryCondition:
-        return SystemSessionEnvironSearchableFields.own.scope_type.filter.equals(
+        return SystemSessionEnvironQuerySpec.own.scope_type.filter.equals(
             SystemSessionEnvironScopeType.PUBLIC
         )
 
@@ -74,7 +74,7 @@ class DomainSystemSessionEnvironTarget(SystemSessionEnvironTarget):
     @override
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
-        bound_to_domain = SystemSessionEnvironSearchableFields.own.scope_type.filter.equals(
+        bound_to_domain = SystemSessionEnvironQuerySpec.own.scope_type.filter.equals(
             SystemSessionEnvironScopeType.DOMAIN
         )
 
@@ -151,7 +151,7 @@ class SessionSystemSessionEnvironScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        fields = SystemSessionEnvironSearchableFields.own
+        fields = SystemSessionEnvironQuerySpec.own
 
         def bound_to_scope(
             scope_type: SystemSessionEnvironScopeType, scope_id: UUID

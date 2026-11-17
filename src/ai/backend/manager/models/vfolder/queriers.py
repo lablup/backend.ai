@@ -16,11 +16,11 @@ from ai.backend.manager.models.specs.querier import (
     DataQuerier,
     OwnedFieldQuerier,
 )
-from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
-from ai.backend.manager.models.vfolder.searchable_fields import (
-    VFolderMountPolicySearchableFields,
-    VFolderSearchableFields,
+from ai.backend.manager.models.vfolder.query_spec import (
+    VFolderMountPolicyQuerySpec,
+    VFolderQuerySpec,
 )
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 
 
 @dataclass
@@ -43,7 +43,7 @@ class VFolderQuerier(DataQuerier[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return VFolderSearchableFields.own.to_data(row)
+        return VFolderQuerySpec.own.to_data(row)
 
 
 class BulkVFolderQuerier(BulkEntityQuerier[VFolderRow, VFolderData]):
@@ -59,7 +59,7 @@ class BulkVFolderQuerier(BulkEntityQuerier[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return VFolderSearchableFields.own.to_data(row)
+        return VFolderQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -82,4 +82,4 @@ class VFolderUserMountPolicyQuerier(
 
     @override
     def to_data(self, row: VFolderUserMountPolicyRow) -> VFolderMountPolicyData:
-        return VFolderMountPolicySearchableFields.own.to_data(row)
+        return VFolderMountPolicyQuerySpec.own.to_data(row)

@@ -17,13 +17,13 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.models.notification.query_spec import (
+    NotificationChannelQuerySpec,
+    NotificationRuleQuerySpec,
+)
 from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
-)
-from ai.backend.manager.models.notification.searchable_fields import (
-    NotificationChannelSearchableFields,
-    NotificationRuleSearchableFields,
 )
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -51,7 +51,7 @@ class NotificationChannelPurger(EntityPurger[NotificationChannelRow, Notificatio
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return NotificationChannelSearchableFields.own.to_data(row)
+        return NotificationChannelQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -76,4 +76,4 @@ class NotificationRulePurger(EntityPurger[NotificationRuleRow, NotificationRuleD
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return NotificationRuleSearchableFields.own.to_data(row)
+        return NotificationRuleQuerySpec.own.to_data(row)

@@ -12,8 +12,8 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.utils import sql_json_merge
@@ -59,7 +59,7 @@ class SessionUpdater(DataUpdater[SessionRow, SessionEntityData]):
 
     @override
     def to_data(self, row: SessionRow) -> SessionEntityData:
-        return SessionSearchableFields.own.to_data(row)
+        return SessionQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -83,7 +83,7 @@ class SessionStatusBatchUpdater(DataBatchUpdater[SessionRow, SessionEntityData])
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         conditions = [fields.id.filter.in_(UUIDInMatchSpec(values=self.session_ids, negated=False))]
         if self.except_statuses:
             conditions.append(fields.status.filter.not_in(self.except_statuses))
@@ -120,4 +120,4 @@ class SessionStatusBatchUpdater(DataBatchUpdater[SessionRow, SessionEntityData])
 
     @override
     def to_data(self, row: SessionRow) -> SessionEntityData:
-        return SessionSearchableFields.own.to_data(row)
+        return SessionQuerySpec.own.to_data(row)

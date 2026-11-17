@@ -48,7 +48,7 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -696,7 +696,7 @@ class RouteExecutor:
 
         # Caller composes the filter so the conditions stay explicit at
         # the call site instead of hiding behind a flag-laden helper.
-        replica_fields = ReplicaSearchableFields.own
+        replica_fields = ReplicaQuerySpec.own
         route_searcher = RouteInfoSearcher(
             pagination=NoPagination(),
             conditions=[

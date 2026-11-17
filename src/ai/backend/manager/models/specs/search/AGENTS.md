@@ -6,17 +6,17 @@ Declares what an entity search can filter and order by. A declaration holds SQL 
 
 ## Shape of an entity declaration
 
-- Each entity has one entry class `{Entity}SearchableFields` in `models/{entity}/searchable_fields.py`.
-- The entry has three attributes. The classes behind them are private (`_{Entity}OwnFields`, ...) and are reached only through the entry.
+- Each entity has one entry class `{Entity}QuerySpec` in `models/{entity}/query_spec.py`.
+- The entry has three attributes. The classes behind them are private (`_{Entity}OwnColumns`, ...) and are reached only through the entry.
 
 | Attribute | Holds | Permission |
 |---|---|---|
-| `own` | The entity's own columns as `SearchableField(column, filter, order)`. Implements `RowDataConverter` to build data from a row | The entity's field cap |
-| `nested` | Rows of other tables the entity owns (labels, mount policies, dangling fields), readable under the entity's own permission. `NestedSearchableField(<other entry>.own, correlation)` | The entity's field cap (`labels.key`) |
+| `own` | The entity's own columns as `QueryColumn(column, filter, order)`. Implements `RowDataConverter` to build data from a row | The entity's field cap |
+| `nested` | Rows of other tables the entity owns (labels, mount policies, dangling fields), readable under the entity's own permission. `NestedQueryColumn(<other entry>.own, correlation)` | The entity's field cap (`labels.key`) |
 | `linked` | Connections to other entities (`MembershipConditions`, `UsageConditions`) | Scopes, the other entity's permission |
 
-- Every data field has a `SearchableField` of the same name, and `to_data` reads every value through `self.<name>.read(row)`. The data constructor requires every field, so a missing declaration fails mypy.
-- Row classes carry no `to_data` or similar method. Callers use `{Entity}SearchableFields.own.to_data(row)`.
+- Every data field has a `QueryColumn` of the same name, and `to_data` reads every value through `self.<name>.read(row)`. The data constructor requires every field, so a missing declaration fails mypy.
+- Row classes carry no `to_data` or similar method. Callers use `{Entity}QuerySpec.own.to_data(row)`.
 - Fill every filter and order slot unless `Slots left empty` says otherwise.
 - The filter DTO and the order-field enum decide what the API exposes. A declaration states only what is possible.
 - Attribute names match the filter DTO field, the data field and the field cap path.
@@ -184,7 +184,7 @@ Depth follows the permission axis, not the foreign keys.
   SUPERADMIN gate applies, so the named entities are not checked.
 - What the search carries is one list either way: `ScopedSearcher.used_by` and
   `GlobalSearcher.used_by` take both directions' conditions, and one condition is a `UsedBy`.
-- The agent has no `searchable_fields.py` yet, so `used_by.sessions` cannot be declared on it.
+- The agent has no `query_spec.py` yet, so `used_by.sessions` cannot be declared on it.
   Fill it in when the agent moves onto the v2 declarations.
 
 ## Scopes a search accepts

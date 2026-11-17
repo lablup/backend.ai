@@ -29,11 +29,11 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.models.rbac_models.role.searchable_fields import (
-    RoleSearchableFields,
+from ai.backend.manager.models.rbac_models.role.query_spec import (
+    RoleQuerySpec,
 )
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -122,7 +122,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> AssignedUserData:
         result = await self._db_source.assign_role(data)
-        return RoleAssignmentSearchableFields.own.to_data(result)
+        return RoleAssignmentQuerySpec.own.to_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -146,13 +146,13 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> RoleData | None:
         result = await self._db_source.get_role(role_id)
-        return RoleSearchableFields.own.to_data(result) if result else None
+        return RoleQuerySpec.own.to_data(result) if result else None
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
         """Get role with all permission details (without users)."""
         result = await self._db_source.get_role_with_permissions(role_id)
-        return RoleSearchableFields.own.to_detail_data(result)
+        return RoleQuerySpec.own.to_detail_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def search_role_assignments_in_global(

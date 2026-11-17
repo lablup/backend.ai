@@ -14,10 +14,10 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
-from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
-from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
-    BootstrapScriptRevisionSearchableFields,
+from ai.backend.manager.models.bootstrap_script_revision.query_spec import (
+    BootstrapScriptRevisionQuerySpec,
 )
+from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.specs.creator import GuardedDanglingFieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
@@ -67,4 +67,4 @@ class BootstrapScriptRevisionCreator(
 
     @override
     def to_data(self, row: BootstrapScriptRevisionRow) -> BootstrapScriptRevisionData:
-        return BootstrapScriptRevisionSearchableFields.own.to_data(row)
+        return BootstrapScriptRevisionQuerySpec.own.to_data(row)

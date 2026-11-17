@@ -20,12 +20,12 @@ from ai.backend.manager.data.resource_slot.types import (
     ReconciliationResult,
     ResourceOccupancy,
 )
+from ai.backend.manager.models.resource_slot.query_spec import (
+    AgentResourceQuerySpec,
+)
 from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    AgentResourceSearchableFields,
 )
 from ai.backend.manager.repositories.resource_slot.db_source.db_source import ResourceSlotDBSource
 
@@ -78,7 +78,7 @@ class ResourceSlotRepository:
     async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceData:
         """Get a single slot row for one agent+slot combination."""
         row = await self._db_source.get_agent_resource_by_slot(agent_id, slot_name)
-        return AgentResourceSearchableFields.own.to_data(row)
+        return AgentResourceQuerySpec.own.to_data(row)
 
     # ==================== resource_allocations ====================
 

@@ -28,8 +28,8 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -271,7 +271,7 @@ class AgentRepository:
             # and fills them itself.
             return [
                 AgentDetailData(
-                    agent=AgentSearchableFields.own.to_data(agent_row),
+                    agent=AgentQuerySpec.own.to_data(agent_row),
                     resources=agent_row.resources_by_rank(),
                     permissions=[],
                 )

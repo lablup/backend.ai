@@ -62,8 +62,8 @@ from ai.backend.manager.models.resource_policy.row import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.session.row import SessionRow
@@ -393,7 +393,7 @@ class TestFetchRouteConnectionInfos:
             route_searcher=RouteInfoSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    ReplicaSearchableFields.own.deployment_id.filter.in_(
+                    ReplicaQuerySpec.own.deployment_id.filter.in_(
                         UUIDInMatchSpec(values=[place.endpoint_id], negated=False)
                     )
                 ],

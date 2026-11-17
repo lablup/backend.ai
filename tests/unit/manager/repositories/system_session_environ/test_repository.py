@@ -27,10 +27,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
 )
@@ -153,7 +153,7 @@ def repository(
 def live_row_searcher() -> SystemSessionEnvironSearcher:
     return SystemSessionEnvironSearcher(
         pagination=NoPagination(),
-        conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+        conditions=[SystemSessionEnvironQuerySpec.own.deleted_at.filter.is_null()],
     )
 
 

@@ -32,8 +32,8 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
-    PermissionSearchableFields,
+from ai.backend.manager.models.rbac_models.permission.query_spec import (
+    PermissionQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -158,7 +158,7 @@ def _processor(harness: OpsHarness) -> Any:
 def _spec() -> PaginationSpec:
     """The spec the role permission search of the RBAC adapter pages with."""
     return PaginationSpec(
-        forward_order=PermissionSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=PermissionQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=PermissionRow.id,
     )
 

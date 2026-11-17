@@ -71,15 +71,15 @@ from ai.backend.manager.models.fair_share.deprecated_search import (
     DeprecatedProjectFairShareFields,
     DeprecatedUserFairShareFields,
 )
-from ai.backend.manager.models.fair_share.searchable_fields import (
-    DomainFairShareSearchableFields,
-    ProjectFairShareSearchableFields,
-    UserFairShareSearchableFields,
+from ai.backend.manager.models.fair_share.query_spec import (
+    DomainFairShareQuerySpec,
+    ProjectFairShareQuerySpec,
+    UserFairShareQuerySpec,
 )
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    DomainUsageBucketSearchableFields,
-    ProjectUsageBucketSearchableFields,
-    UserUsageBucketSearchableFields,
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    DomainUsageBucketQuerySpec,
+    ProjectUsageBucketQuerySpec,
+    UserUsageBucketQuerySpec,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -119,13 +119,13 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, DomainFairShareQuerySpec.own.resource_group.filter
             )
         )
 
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, DomainFairShareSearchableFields.own.domain_name.filter
+                filter.domain_name, DomainFairShareQuerySpec.own.domain_name.filter
             )
         )
 
@@ -137,11 +137,11 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
-                return DomainFairShareSearchableFields.own.domain_name.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.domain_name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -173,7 +173,7 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, DomainFairShareQuerySpec.own.resource_group.filter
             )
         )
 
@@ -191,11 +191,11 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
                 return DeprecatedDomainFairShareFields.name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -252,19 +252,19 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, ProjectFairShareQuerySpec.own.resource_group.filter
             )
         )
 
         conditions.extend(
             self.apply_uuid_filter(
-                filter.project_id, ProjectFairShareSearchableFields.own.project_id.filter
+                filter.project_id, ProjectFairShareQuerySpec.own.project_id.filter
             )
         )
 
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, ProjectFairShareSearchableFields.own.domain_name.filter
+                filter.domain_name, ProjectFairShareQuerySpec.own.domain_name.filter
             )
         )
 
@@ -276,9 +276,9 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -309,7 +309,7 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, ProjectFairShareQuerySpec.own.resource_group.filter
             )
         )
 
@@ -331,9 +331,9 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -383,25 +383,21 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, UserFairShareQuerySpec.own.resource_group.filter
             )
         )
 
         conditions.extend(
-            self.apply_uuid_filter(
-                filter.user_uuid, UserFairShareSearchableFields.own.user_uuid.filter
-            )
+            self.apply_uuid_filter(filter.user_uuid, UserFairShareQuerySpec.own.user_uuid.filter)
         )
 
         conditions.extend(
-            self.apply_uuid_filter(
-                filter.project_id, UserFairShareSearchableFields.own.project_id.filter
-            )
+            self.apply_uuid_filter(filter.project_id, UserFairShareQuerySpec.own.project_id.filter)
         )
 
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, UserFairShareSearchableFields.own.domain_name.filter
+                filter.domain_name, UserFairShareQuerySpec.own.domain_name.filter
             )
         )
 
@@ -413,9 +409,9 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return UserFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return UserFairShareQuerySpec.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -446,7 +442,7 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, UserFairShareQuerySpec.own.resource_group.filter
             )
         )
 
@@ -476,9 +472,9 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return UserFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return UserFairShareQuerySpec.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -537,13 +533,13 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, DomainUsageBucketSearchableFields.own.resource_group.filter
+                filter.resource_group, DomainUsageBucketQuerySpec.own.resource_group.filter
             )
         )
 
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, DomainUsageBucketSearchableFields.own.domain_name.filter
+                filter.domain_name, DomainUsageBucketQuerySpec.own.domain_name.filter
             )
         )
 
@@ -555,7 +551,7 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case DomainUsageBucketOrderField.PERIOD_START:
-                return DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending)
+                return DomainUsageBucketQuerySpec.own.period_start.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -611,13 +607,13 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, ProjectUsageBucketSearchableFields.own.resource_group.filter
+                filter.resource_group, ProjectUsageBucketQuerySpec.own.resource_group.filter
             )
         )
 
         conditions.extend(
             self.apply_uuid_filter(
-                filter.project_id, ProjectUsageBucketSearchableFields.own.project_id.filter
+                filter.project_id, ProjectUsageBucketQuerySpec.own.project_id.filter
             )
         )
 
@@ -629,7 +625,7 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case ProjectUsageBucketOrderField.PERIOD_START:
-                return ProjectUsageBucketSearchableFields.own.period_start.order.apply(ascending)
+                return ProjectUsageBucketQuerySpec.own.period_start.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -686,19 +682,17 @@ class FairShareAdapter(BaseFilterAdapter):
 
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, UserUsageBucketSearchableFields.own.resource_group.filter
+                filter.resource_group, UserUsageBucketQuerySpec.own.resource_group.filter
             )
         )
 
         conditions.extend(
-            self.apply_uuid_filter(
-                filter.user_uuid, UserUsageBucketSearchableFields.own.user_uuid.filter
-            )
+            self.apply_uuid_filter(filter.user_uuid, UserUsageBucketQuerySpec.own.user_uuid.filter)
         )
 
         conditions.extend(
             self.apply_uuid_filter(
-                filter.project_id, UserUsageBucketSearchableFields.own.project_id.filter
+                filter.project_id, UserUsageBucketQuerySpec.own.project_id.filter
             )
         )
 
@@ -710,7 +704,7 @@ class FairShareAdapter(BaseFilterAdapter):
 
         match order.field:
             case UserUsageBucketOrderField.PERIOD_START:
-                return UserUsageBucketSearchableFields.own.period_start.order.apply(ascending)
+                return UserUsageBucketQuerySpec.own.period_start.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 

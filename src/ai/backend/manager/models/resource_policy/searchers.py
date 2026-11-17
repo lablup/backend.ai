@@ -12,15 +12,15 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.models.resource_policy.query_spec import (
+    KeyPairResourcePolicyQuerySpec,
+    ProjectResourcePolicyQuerySpec,
+    UserResourcePolicyQuerySpec,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    KeyPairResourcePolicySearchableFields,
-    ProjectResourcePolicySearchableFields,
-    UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -33,7 +33,7 @@ class KeyPairResourcePolicySearcher(Searcher[KeyPairResourcePolicyRow, KeyPairRe
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return KeyPairResourcePolicySearchableFields.own.to_data(row)
+        return KeyPairResourcePolicyQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -44,7 +44,7 @@ class ProjectResourcePolicySearcher(Searcher[ProjectResourcePolicyRow, ProjectRe
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return ProjectResourcePolicySearchableFields.own.to_data(row)
+        return ProjectResourcePolicyQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -55,4 +55,4 @@ class UserResourcePolicySearcher(Searcher[UserResourcePolicyRow, UserResourcePol
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return UserResourcePolicySearchableFields.own.to_data(row)
+        return UserResourcePolicyQuerySpec.own.to_data(row)

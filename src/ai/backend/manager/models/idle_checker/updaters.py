@@ -17,14 +17,14 @@ from ai.backend.manager.data.idle_checker.types import (
     SessionIdleCheckData,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerQuerySpec,
+    SessionIdleCheckQuerySpec,
+)
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
-)
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerSearchableFields,
-    SessionIdleCheckSearchableFields,
 )
 from ai.backend.manager.models.specs.relation import RelationLifecycleUpdater
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -79,7 +79,7 @@ class IdleCheckerUpdater(DataUpdater[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return IdleCheckerSearchableFields.own.to_data(row)
+        return IdleCheckerQuerySpec.own.to_data(row)
 
 
 class IdleCheckerAssignmentSwitch(
@@ -145,7 +145,7 @@ class SessionIdleCheckBatchUpdater(DataBatchUpdater[SessionIdleCheckRow, Session
 
     @override
     def to_data(self, row: SessionIdleCheckRow) -> SessionIdleCheckData:
-        return SessionIdleCheckSearchableFields.own.to_data(row)
+        return SessionIdleCheckQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -160,7 +160,7 @@ class SessionIdleCheckPhaseBatchUpdater(SessionIdleCheckBatchUpdater):
     def conditions(self) -> list[QueryCondition]:
         return [
             self._pairs_condition(self.pairs),
-            SessionIdleCheckSearchableFields.own.last_status.filter.equals(self.from_phase),
+            SessionIdleCheckQuerySpec.own.last_status.filter.equals(self.from_phase),
         ]
 
     @override
@@ -180,7 +180,7 @@ class SessionIdleCheckJudgmentBatchUpdater(SessionIdleCheckBatchUpdater):
             self._pairs_condition([
                 (judgment.session_id, judgment.checker_id) for judgment in self.judgments
             ]),
-            SessionIdleCheckSearchableFields.own.last_status.filter.in_((
+            SessionIdleCheckQuerySpec.own.last_status.filter.in_((
                 IdleCheckPhase.READY_TO_CHECK,
                 IdleCheckPhase.ACTIVE,
                 IdleCheckPhase.IDLE,

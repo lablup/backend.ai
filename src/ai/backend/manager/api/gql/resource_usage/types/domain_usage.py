@@ -37,8 +37,8 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    ProjectUsageBucketSearchableFields,
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    ProjectUsageBucketQuerySpec,
 )
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
@@ -139,13 +139,13 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
 
         payload = await info.context.adapters.resource_usage.gql_search_project_unscoped(
             base_conditions=[
-                ProjectUsageBucketSearchableFields.own.domain_name.filter.equals(
+                ProjectUsageBucketQuerySpec.own.domain_name.filter.equals(
                     StringMatchSpec(self.domain_name, case_insensitive=False, negated=False)
                 ),
-                ProjectUsageBucketSearchableFields.own.resource_group.filter.equals(
+                ProjectUsageBucketQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(self.resource_group_name, case_insensitive=False, negated=False)
                 ),
-                ProjectUsageBucketSearchableFields.own.period_start.filter.equals(
+                ProjectUsageBucketQuerySpec.own.period_start.filter.equals(
                     self.metadata.period_start
                 ),
             ],

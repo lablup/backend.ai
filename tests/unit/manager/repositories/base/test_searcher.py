@@ -22,10 +22,10 @@ from ai.backend.manager.data.role_preset.types import (
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -263,7 +263,7 @@ class RolePresetSearcher(Searcher[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 class TestPassThroughDomainWiring:

@@ -25,7 +25,7 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.models.artifact.creators import ArtifactCreator
-from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
+from ai.backend.manager.models.artifact.query_spec import ArtifactQuerySpec
 from ai.backend.manager.models.artifact.searchers import (
     ArtifactSearcher,
     ArtifactWithRevisionsSearcher,
@@ -36,8 +36,8 @@ from ai.backend.manager.models.artifact.updaters import (
     ArtifactUpdater,
 )
 from ai.backend.manager.models.artifact_revision.creators import ArtifactRevisionCreator
-from ai.backend.manager.models.artifact_revision.searchable_fields import (
-    ArtifactRevisionSearchableFields,
+from ai.backend.manager.models.artifact_revision.query_spec import (
+    ArtifactRevisionQuerySpec,
 )
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.artifact_revision.updaters import ArtifactRevisionScanUpdater
@@ -288,10 +288,10 @@ class ArtifactRepository:
             ArtifactSearcher(
                 pagination=OffsetPagination(limit=1),
                 conditions=[
-                    ArtifactSearchableFields.own.name.filter.equals(
+                    ArtifactQuerySpec.own.name.filter.equals(
                         StringMatchSpec(name, case_insensitive=False, negated=False)
                     ),
-                    ArtifactSearchableFields.own.registry_id.filter.equals(
+                    ArtifactQuerySpec.own.registry_id.filter.equals(
                         UUIDEqualMatchSpec(value=registry_id, negated=False)
                     ),
                 ],
@@ -306,10 +306,10 @@ class ArtifactRepository:
             ArtifactRevisionSearcher(
                 pagination=OffsetPagination(limit=1),
                 conditions=[
-                    ArtifactRevisionSearchableFields.own.artifact_id.filter.equals(
+                    ArtifactRevisionQuerySpec.own.artifact_id.filter.equals(
                         UUIDEqualMatchSpec(value=artifact_id, negated=False)
                     ),
-                    ArtifactRevisionSearchableFields.own.version.filter.equals(
+                    ArtifactRevisionQuerySpec.own.version.filter.equals(
                         StringMatchSpec(version, case_insensitive=False, negated=False)
                     ),
                 ],

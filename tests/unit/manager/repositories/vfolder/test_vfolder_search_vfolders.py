@@ -34,8 +34,8 @@ from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.query_spec import VFolderQuerySpec
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -389,7 +389,7 @@ class TestVfolderSearchVfolders:
             )
 
         result = await ops_repository.global_search(
-            _global_searcher([VFolderSearchableFields.linked.usage.model_cards.used_by(card_id)])
+            _global_searcher([VFolderQuerySpec.linked.usage.model_cards.used_by(card_id)])
         )
 
         assert [item.id for item in result.items] == [test_data["vfolder_a1_id"]]

@@ -3,20 +3,20 @@ name: search-field-declarations
 type: design-rationale
 description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why a condition naming an entity the caller cannot read refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters, which scopes a search accepts, why usage is one bundle with used_by and uses as its two directions, why public is a scope rather than a login-only processor, the two kinds of membership in public, why global reads keep the action shape
 scope: src/ai/backend/manager/models/specs/search
-keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, secret_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, uses, usage direction, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by, PublicImageTarget, CreatedInPublic, is_global, public scope, global scope, search scope table]
+keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, secret_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, QueryColumn, NestedQueryColumn, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, uses, usage direction, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by, PublicImageTarget, CreatedInPublic, is_global, public scope, global scope, search scope table]
 sources:
   - src/ai/backend/manager/models/specs/search
   - src/ai/backend/manager/models/specs/conditions
   - src/ai/backend/manager/models/specs/orders
   - src/ai/backend/manager/repositories/base/filter_adapter.py
-  - src/ai/backend/manager/models/vfolder/searchable_fields.py
+  - src/ai/backend/manager/models/vfolder/query_spec.py
   - src/ai/backend/manager/models/session/row.py
   - src/ai/backend/manager/models/endpoint/row.py
   - src/ai/backend/manager/models/deployment_revision/row.py
   - src/ai/backend/manager/models/user/row.py
   - src/ai/backend/manager/models/routing/row.py
   - src/ai/backend/manager/api/gql_legacy/endpoint.py
-  - src/ai/backend/manager/models/entity_label/searchable_fields.py
+  - src/ai/backend/manager/models/entity_label/query_spec.py
   - src/ai/backend/manager/models/scopes.py
   - src/ai/backend/manager/models/specs/searcher.py
   - src/ai/backend/manager/actions/v2/scope/validator/rbac.py

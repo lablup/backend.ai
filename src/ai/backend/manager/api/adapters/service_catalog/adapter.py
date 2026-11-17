@@ -33,10 +33,10 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.models.service_catalog.searchable_fields import (
-    ServiceCatalogSearchableFields,
+from ai.backend.manager.models.service_catalog.query_spec import (
+    ServiceCatalogQuerySpec,
 )
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.service_catalog.actions.bulk_get import (
@@ -51,7 +51,7 @@ from ai.backend.manager.services.service_catalog.processors import ServiceCatalo
 @lru_cache(maxsize=1)
 def _get_service_catalog_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ServiceCatalogSearchableFields.own.registered_at.order.apply(ascending=False),
+        forward_order=ServiceCatalogQuerySpec.own.registered_at.order.apply(ascending=False),
         cursor_column=ServiceCatalogRow.id,
     )
 
@@ -129,7 +129,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         if filter.status is not None:
             conditions.extend(self._convert_status_filter(filter.status))
         conditions.extend(
-            self.apply_uuid_filter(filter.entity_id, ServiceCatalogSearchableFields.own.id.filter)
+            self.apply_uuid_filter(filter.entity_id, ServiceCatalogQuerySpec.own.id.filter)
         )
         if filter.AND:
             for sub in filter.AND:
@@ -150,7 +150,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
-        conditions = ServiceCatalogSearchableFields.own.service_group.filter
+        conditions = ServiceCatalogQuerySpec.own.service_group.filter
         return self.convert_string_filter(
             sf,
             contains_factory=conditions.contains,
@@ -162,7 +162,7 @@ class ServiceCatalogAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_status_filter(sf: ServiceCatalogStatusFilter) -> list[QueryCondition]:
-        conditions_of = ServiceCatalogSearchableFields.own.status.filter
+        conditions_of = ServiceCatalogQuerySpec.own.status.filter
         conditions: list[QueryCondition] = []
         if sf.equals is not None:
             conditions.append(conditions_of.equals(sf.equals))
@@ -176,7 +176,7 @@ class ServiceCatalogAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(order: list[ServiceCatalogOrder]) -> list[QueryOrder]:
-        fields = ServiceCatalogSearchableFields.own
+        fields = ServiceCatalogQuerySpec.own
         result: list[QueryOrder] = []
         for o in order:
             ascending = o.direction != OrderDirection.DESC

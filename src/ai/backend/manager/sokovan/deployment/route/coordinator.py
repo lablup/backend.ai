@@ -28,7 +28,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
@@ -237,7 +237,7 @@ class RouteCoordinator:
 
             # Build filter conditions from handler target statuses
             target = handler.target_statuses()
-            fields = ReplicaSearchableFields.own
+            fields = ReplicaQuerySpec.own
             conditions: list[QueryCondition] = []
             if target.lifecycle is not None:
                 conditions.append(fields.status.filter.in_(target.lifecycle))
@@ -284,7 +284,7 @@ class RouteCoordinator:
           Without this, warming-up routes have no one writing to Valkey
           and time out after `initial_delay`.
         """
-        replica_fields = ReplicaSearchableFields.own
+        replica_fields = ReplicaQuerySpec.own
         try:
             routes = await self._deployment_repository.search_route_datas(
                 searcher=RouteDataSearcher(

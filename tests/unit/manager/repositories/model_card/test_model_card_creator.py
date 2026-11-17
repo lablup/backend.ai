@@ -31,11 +31,11 @@ from ai.backend.manager.models.model_card.creators import (
     ModelCardCreator,
     ModelCardResourceRequirementCreator,
 )
+from ai.backend.manager.models.model_card.query_spec import (
+    ModelCardResourceRequirementQuerySpec,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import UserModelCardTarget
-from ai.backend.manager.models.model_card.searchable_fields import (
-    ModelCardResourceRequirementSearchableFields,
-)
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -448,7 +448,7 @@ class TestModelCardCreatorResourceRequirements:
                 .scalars()
                 .all()
             )
-        return [ModelCardResourceRequirementSearchableFields.own.to_data(row) for row in rows]
+        return [ModelCardResourceRequirementQuerySpec.own.to_data(row) for row in rows]
 
     async def test_resource_requirements_persisted_in_db(
         self,

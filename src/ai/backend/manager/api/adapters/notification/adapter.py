@@ -85,11 +85,11 @@ from ai.backend.manager.models.notification.creators import (
     NotificationChannelCreator,
     NotificationRuleCreator,
 )
-from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.models.notification.searchable_fields import (
-    NotificationChannelSearchableFields,
-    NotificationRuleSearchableFields,
+from ai.backend.manager.models.notification.query_spec import (
+    NotificationChannelQuerySpec,
+    NotificationRuleQuerySpec,
 )
+from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.searchers import (
     NotificationChannelSearcher,
     NotificationRuleSearcher,
@@ -160,16 +160,14 @@ def _spec_input_to_domain(spec: NotificationChannelSpecInputDTO) -> WebhookSpec 
 
 def _channel_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=NotificationChannelSearchableFields.own.created_at.order.apply(
-            ascending=False
-        ),
+        forward_order=NotificationChannelQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=NotificationChannelRow.id,
     )
 
 
 def _rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=NotificationRuleSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=NotificationRuleQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=NotificationRuleRow.id,
     )
 
@@ -565,7 +563,7 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_channel_filter(f: NotificationChannelFilter) -> list[QueryCondition]:
         """Convert NotificationChannelFilter DTO to QueryCondition list."""
-        fields = NotificationChannelSearchableFields.own
+        fields = NotificationChannelQuerySpec.own
         conditions: list[QueryCondition] = []
 
         if f.name:
@@ -639,7 +637,7 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_channel_orders(orders: list[NotificationChannelOrder]) -> list[QueryOrder]:
         """Convert NotificationChannelOrder DTO list to QueryOrder list."""
-        fields = NotificationChannelSearchableFields.own
+        fields = NotificationChannelQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
@@ -657,7 +655,7 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_rule_filter(f: NotificationRuleFilter) -> list[QueryCondition]:
         """Convert NotificationRuleFilter DTO to QueryCondition list."""
-        fields = NotificationRuleSearchableFields.own
+        fields = NotificationRuleQuerySpec.own
         conditions: list[QueryCondition] = []
 
         if f.name:
@@ -727,7 +725,7 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_rule_orders(orders: list[NotificationRuleOrder]) -> list[QueryOrder]:
         """Convert NotificationRuleOrder DTO list to QueryOrder list."""
-        fields = NotificationRuleSearchableFields.own
+        fields = NotificationRuleQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC

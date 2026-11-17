@@ -20,10 +20,10 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.replica_group.searchable_fields import (
-    ReplicaGroupSearchableFields,
+from ai.backend.manager.models.replica_group.query_spec import (
+    ReplicaGroupQuerySpec,
 )
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -71,7 +71,7 @@ class ReplicaGroupDeployUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData]):
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return ReplicaGroupSearchableFields.own.to_data(row)
+        return ReplicaGroupQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -113,7 +113,7 @@ class ReplicaGroupScalingUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData])
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return ReplicaGroupSearchableFields.own.to_data(row)
+        return ReplicaGroupQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -163,7 +163,7 @@ class ReplicaGroupLifecycleUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return ReplicaGroupSearchableFields.own.to_data(row)
+        return ReplicaGroupQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -207,4 +207,4 @@ class ReplicaGroupRevisionSwapUpdater(DataBatchUpdater[ReplicaGroupRow, ReplicaG
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return ReplicaGroupSearchableFields.own.to_data(row)
+        return ReplicaGroupQuerySpec.own.to_data(row)

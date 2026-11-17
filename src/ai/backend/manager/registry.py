@@ -129,8 +129,8 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.models.agent.row import AgentRow, agents
-from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
-    BootstrapScriptRevisionSearchableFields,
+from ai.backend.manager.models.bootstrap_script_revision.query_spec import (
+    BootstrapScriptRevisionQuerySpec,
 )
 from ai.backend.manager.models.bootstrap_script_revision.searchers import (
     DefaultBootstrapScriptRevisionSearcher,
@@ -142,22 +142,22 @@ from ai.backend.manager.models.image.searchers import (
     ImageSearcher,
     ReferenceImageSearcher,
 )
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
 from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import (
     PRIVATE_SESSION_TYPES,
     SessionRow,
     handle_session_exception,
 )
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.row import UserRow
@@ -362,7 +362,7 @@ class AgentRegistry:
         r: V2ReadOps, session_name: str, access_key: AccessKey
     ) -> SessionEntityData | None:
         """The live session of ``access_key`` named ``session_name``, if there is one."""
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         named = [
             fields.name.filter.equals(
                 StringMatchSpec(session_name, case_insensitive=False, negated=False)
@@ -595,7 +595,7 @@ class AgentRegistry:
                         KernelSearcher(
                             pagination=NoPagination(),
                             conditions=[
-                                KernelSearchableFields.own.cluster_role.filter.equals(
+                                KernelQuerySpec.own.cluster_role.filter.equals(
                                     StringMatchSpec(
                                         value=DEFAULT_ROLE, case_insensitive=False, negated=False
                                     )
@@ -686,7 +686,7 @@ class AgentRegistry:
             if not user_row:
                 raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
         if not bootstrap_script:
-            revision = BootstrapScriptRevisionSearchableFields.own
+            revision = BootstrapScriptRevisionQuerySpec.own
             async with self._ops_provider.read_ops() as r:
                 revisions = await r.search_in_global(
                     DefaultBootstrapScriptRevisionSearcher(

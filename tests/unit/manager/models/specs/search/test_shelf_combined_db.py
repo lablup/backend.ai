@@ -10,19 +10,19 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .shelf_fields import (
-    BoxSearchableFields,
-    ShelfSearchableFields,
-    SpecSearchableFields,
+    BoxQuerySpec,
+    ShelfQuerySpec,
+    SpecQuerySpec,
 )
 from .shelf_fixtures import Seeded
 from .shelf_rows import BoxRow, BoxState, CategoryRow, ShelfKind, SpecRow
 from .shelf_search import ShelfSearches, ids, ordered_ids, spec_graded
 
-OWN = ShelfSearchableFields.own
-BOXES = ShelfSearchableFields.nested.boxes
-CATEGORY = ShelfSearchableFields.nested.category
-CARTS = ShelfSearchableFields.linked.usage.carts
-BOX = BoxSearchableFields.own
+OWN = ShelfQuerySpec.own
+BOXES = ShelfQuerySpec.nested.boxes
+CATEGORY = ShelfQuerySpec.nested.category
+CARTS = ShelfQuerySpec.linked.usage.carts
+BOX = BoxQuerySpec.own
 
 
 class TestCombinedSearch:
@@ -105,11 +105,11 @@ class TestCombinedSearch:
             box_row = (
                 await sess.scalars(sa.select(BoxRow).where(BoxRow.id == seeded.boxes["B3"]))
             ).one()
-            box = BoxSearchableFields.own.to_data(box_row)
+            box = BoxQuerySpec.own.to_data(box_row)
             spec_row = (
                 await sess.scalars(sa.select(SpecRow).where(SpecRow.id == seeded.specs["P3"]))
             ).one()
-            spec = SpecSearchableFields.own.to_data(spec_row)
+            spec = SpecQuerySpec.own.to_data(spec_row)
 
         assert (box.shelf_id, box.label, box.size, box.state, box.spec_id) == (
             expected.id,

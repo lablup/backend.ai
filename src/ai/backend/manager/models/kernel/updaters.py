@@ -10,8 +10,8 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import KernelId
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 
@@ -33,7 +33,7 @@ class KernelSessionNameBatchUpdater(DataBatchUpdater[KernelRow, KernelId]):
     @override
     def conditions(self) -> list[QueryCondition]:
         return [
-            KernelSearchableFields.own.session_id.filter.equals(
+            KernelQuerySpec.own.session_id.filter.equals(
                 UUIDEqualMatchSpec(value=self.session_id, negated=False)
             )
         ]

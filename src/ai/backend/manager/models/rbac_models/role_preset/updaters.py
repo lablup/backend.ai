@@ -20,10 +20,10 @@ from ai.backend.manager.errors.role_preset import (
     RolePresetOwnerAssignNotAllowed,
     RolePresetUpdateConflict,
 )
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -93,4 +93,4 @@ class RolePresetUpdater(GuardedDataUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)

@@ -11,16 +11,16 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.errors.repository import EmptyMatchConditionError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from .shelf_fields import BoxSearchableFields, ShelfSearchableFields
+from .shelf_fields import BoxQuerySpec, ShelfQuerySpec
 from .shelf_fixtures import Seeded
 from .shelf_rows import BoxRow, BoxState
 from .shelf_search import ShelfSearches, ids, negate, spec_graded
 
-BOXES = ShelfSearchableFields.nested.boxes
-CATEGORY = ShelfSearchableFields.nested.category
-BOX = BoxSearchableFields.own
-SPEC = BoxSearchableFields.nested.spec
-ITEMS = BoxSearchableFields.nested.items
+BOXES = ShelfQuerySpec.nested.boxes
+CATEGORY = ShelfQuerySpec.nested.category
+BOX = BoxQuerySpec.own
+SPEC = BoxQuerySpec.nested.spec
+ITEMS = BoxQuerySpec.nested.items
 
 
 class TestOneLevelNesting:
@@ -104,7 +104,7 @@ class TestToOneNesting:
         result = await searches.in_global(
             conditions=[
                 CATEGORY.correlation.has([
-                    CATEGORY.fields.title.filter.contains(
+                    CATEGORY.columns.title.filter.contains(
                         StringMatchSpec(value="Prim", case_insensitive=False, negated=False)
                     )
                 ])
@@ -132,7 +132,7 @@ class TestToOneNesting:
             conditions=[
                 negate(
                     CATEGORY.correlation.has([
-                        CATEGORY.fields.title.filter.contains(
+                        CATEGORY.columns.title.filter.contains(
                             StringMatchSpec(value="Prim", case_insensitive=False, negated=False)
                         )
                     ])
@@ -206,7 +206,7 @@ class TestTwoLevelNesting:
         result = await searches.in_global(
             conditions=[
                 BOXES.correlation.some([
-                    ITEMS.correlation.some([ITEMS.fields.qty.filter.greater_than(1)])
+                    ITEMS.correlation.some([ITEMS.columns.qty.filter.greater_than(1)])
                 ])
             ]
         )

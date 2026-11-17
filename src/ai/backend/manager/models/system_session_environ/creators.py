@@ -33,10 +33,10 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.creator import GuardedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 
 __all__ = ("SystemSessionEnvironCreator",)
 
@@ -126,4 +126,4 @@ class SystemSessionEnvironCreator(
 
     @override
     def to_data(self, row: SystemSessionEnvironRow) -> SystemSessionEnvironData:
-        return SystemSessionEnvironSearchableFields.own.to_data(row)
+        return SystemSessionEnvironQuerySpec.own.to_data(row)

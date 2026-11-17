@@ -6,11 +6,11 @@ import sqlalchemy as sa
 from ai.backend.manager.data.container_registry.types import (
     AssociationContainerRegistriesGroupsData,
 )
+from ai.backend.manager.models.association_container_registries_groups.query_spec import (
+    AssociationContainerRegistriesGroupsQuerySpec,
+)
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
-)
-from ai.backend.manager.models.association_container_registries_groups.searchable_fields import (
-    AssociationContainerRegistriesGroupsSearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -27,4 +27,4 @@ class AssociationContainerRegistriesGroupsSearcher(
     def to_data(
         self, row: AssociationContainerRegistriesGroupsRow
     ) -> AssociationContainerRegistriesGroupsData:
-        return AssociationContainerRegistriesGroupsSearchableFields.own.to_data(row)
+        return AssociationContainerRegistriesGroupsQuerySpec.own.to_data(row)

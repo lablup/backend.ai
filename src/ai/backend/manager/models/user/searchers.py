@@ -9,8 +9,8 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 
 @dataclass
@@ -21,4 +21,4 @@ class UserSearcher(Searcher[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return UserSearchableFields.own.to_data(row)
+        return UserQuerySpec.own.to_data(row)

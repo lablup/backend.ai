@@ -20,8 +20,8 @@ from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -127,4 +127,4 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return ProjectSearchableFields.own.to_data(row)
+        return ProjectQuerySpec.own.to_data(row)

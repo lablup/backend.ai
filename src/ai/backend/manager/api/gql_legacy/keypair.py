@@ -22,7 +22,7 @@ from ai.backend.manager.models.keypair.row import (
     keypairs,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.query_spec import SSHKeypairQuerySpec
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 
@@ -566,7 +566,7 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
                 user_ids=[UserID(owner.entity_id())],
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=1),
-                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                    conditions=[SSHKeypairQuerySpec.own.is_default.filter.equals(True)],
                 ),
             )
         )

@@ -25,10 +25,10 @@ from ai.backend.manager.models.base import (
     CurvePublicKeyColumn,
     EnumType,
 )
-from ai.backend.manager.models.resource_slot.row import AgentResourceRow
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    AgentResourceSearchableFields,
+from ai.backend.manager.models.resource_slot.query_spec import (
+    AgentResourceQuerySpec,
 )
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -108,7 +108,7 @@ class AgentRow(Base):
 
     def resources_by_rank(self) -> list[AgentResourceData]:
         return [
-            AgentResourceSearchableFields.own.to_data(resource_row)
+            AgentResourceQuerySpec.own.to_data(resource_row)
             for resource_row in self._resource_rows_by_rank()
         ]
 

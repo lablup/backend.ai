@@ -51,6 +51,7 @@ from ai.backend.manager.models.project.purgers import (
     ProjectVFolderAutoMountPurger,
     SessionsByIdsPurger,
 )
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import (
     ProjectRow,
     groups,
@@ -59,7 +60,6 @@ from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
     UserProjectTarget,
 )
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
@@ -478,7 +478,7 @@ class ProjectDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ProjectNotFound(f"Project {project_id} not found")
-            return ProjectSearchableFields.own.to_data(row)
+            return ProjectQuerySpec.own.to_data(row)
 
     async def project_id_by_name_in_domain(
         self, domain_name: str, project_name: str

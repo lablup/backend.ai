@@ -7,11 +7,11 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
-from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
+from ai.backend.manager.models.image.query_spec import (
+    ImageAliasQuerySpec,
+    ImageQuerySpec,
 )
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
@@ -39,7 +39,7 @@ class ImageQuerier(DataQuerier[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return ImageSearchableFields.own.to_data(row)
+        return ImageQuerySpec.own.to_data(row)
 
 
 class BulkImageQuerier(BulkEntityQuerier[ImageRow, ImageData]):
@@ -55,7 +55,7 @@ class BulkImageQuerier(BulkEntityQuerier[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return ImageSearchableFields.own.to_data(row)
+        return ImageQuerySpec.own.to_data(row)
 
 
 class BulkImageAliasQuerier(BulkFieldQuerier[ImageAliasRow, ImageAliasData]):
@@ -71,4 +71,4 @@ class BulkImageAliasQuerier(BulkFieldQuerier[ImageAliasRow, ImageAliasData]):
 
     @override
     def to_data(self, row: ImageAliasRow) -> ImageAliasData:
-        return ImageAliasSearchableFields.own.to_data(row)
+        return ImageAliasQuerySpec.own.to_data(row)

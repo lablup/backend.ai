@@ -19,15 +19,15 @@ from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.replica_group_history.searchable_fields import (
-    ReplicaGroupHistorySearchableFields,
+from ai.backend.manager.models.replica_group_history.query_spec import (
+    ReplicaGroupHistoryQuerySpec,
 )
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.scheduling_history.searchable_fields import (
-    DeploymentHistorySearchableFields,
-    KernelSchedulingHistorySearchableFields,
-    RouteHistorySearchableFields,
-    SessionSchedulingHistorySearchableFields,
+from ai.backend.manager.models.scheduling_history.query_spec import (
+    DeploymentHistoryQuerySpec,
+    KernelSchedulingHistoryQuerySpec,
+    RouteHistoryQuerySpec,
+    SessionSchedulingHistoryQuerySpec,
 )
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.session.row import SessionRow
@@ -60,7 +60,7 @@ class SessionSchedulingHistoryTarget(ScopeTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for SessionSchedulingHistoryRow."""
-        return SessionSchedulingHistorySearchableFields.own.session_id.filter.equals(
+        return SessionSchedulingHistoryQuerySpec.own.session_id.filter.equals(
             UUIDEqualMatchSpec(value=self.session_id, negated=False)
         )
 
@@ -101,7 +101,7 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for KernelSchedulingHistoryRow."""
-        return KernelSchedulingHistorySearchableFields.own.kernel_id.filter.equals(
+        return KernelSchedulingHistoryQuerySpec.own.kernel_id.filter.equals(
             UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
         )
 
@@ -135,7 +135,7 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for KernelSchedulingHistoryRow."""
-        return KernelSchedulingHistorySearchableFields.own.session_id.filter.equals(
+        return KernelSchedulingHistoryQuerySpec.own.session_id.filter.equals(
             UUIDEqualMatchSpec(value=self.session_id, negated=False)
         )
 
@@ -169,7 +169,7 @@ class DeploymentHistoryTarget(ScopeTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for DeploymentHistoryRow."""
-        return DeploymentHistorySearchableFields.own.deployment_id.filter.equals(
+        return DeploymentHistoryQuerySpec.own.deployment_id.filter.equals(
             UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
         )
 
@@ -204,7 +204,7 @@ class DeploymentReplicaGroupHistoryTarget(ScopeTarget):
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for ReplicaGroupHistoryRow."""
 
-        return ReplicaGroupHistorySearchableFields.own.deployment_id.filter.equals(
+        return ReplicaGroupHistoryQuerySpec.own.deployment_id.filter.equals(
             UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
         )
 
@@ -242,7 +242,7 @@ class RouteHistoryTarget(ScopeTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for RouteHistoryRow."""
-        return RouteHistorySearchableFields.own.route_id.filter.equals(
+        return RouteHistoryQuerySpec.own.route_id.filter.equals(
             UUIDEqualMatchSpec(value=self.route_id, negated=False)
         )
 

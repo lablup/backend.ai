@@ -36,16 +36,16 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    DomainUsageBucketQuerySpec,
+    KernelUsageRecordQuerySpec,
+)
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
-)
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    DomainUsageBucketSearchableFields,
-    KernelUsageRecordSearchableFields,
 )
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
@@ -398,11 +398,11 @@ class TestResourceUsageHistoryRepository:
         searcher = KernelUsageRecordSearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                KernelUsageRecordSearchableFields.own.kernel_id.filter.equals(
+                KernelUsageRecordQuerySpec.own.kernel_id.filter.equals(
                     UUIDEqualMatchSpec(value=kernel_id, negated=False)
                 )
             ],
-            orders=[KernelUsageRecordSearchableFields.own.period_start.order.apply(True)],
+            orders=[KernelUsageRecordQuerySpec.own.period_start.order.apply(True)],
         )
         result = await resource_usage_history_repository.search_kernel_usage_records(searcher)
 
@@ -447,17 +447,13 @@ class TestResourceUsageHistoryRepository:
         searcher = DomainUsageBucketSearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                DomainUsageBucketSearchableFields.own.resource_group.filter.equals(
+                DomainUsageBucketQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(test_scaling_group, case_insensitive=False, negated=False)
                 ),
-                DomainUsageBucketSearchableFields.own.period_start.filter.on_or_after(
-                    lookback_start
-                ),
-                DomainUsageBucketSearchableFields.own.period_start.filter.on_or_before(
-                    lookback_end
-                ),
+                DomainUsageBucketQuerySpec.own.period_start.filter.on_or_after(lookback_start),
+                DomainUsageBucketQuerySpec.own.period_start.filter.on_or_before(lookback_end),
             ],
-            orders=[DomainUsageBucketSearchableFields.own.period_start.order.apply(True)],
+            orders=[DomainUsageBucketQuerySpec.own.period_start.order.apply(True)],
         )
         result = await resource_usage_history_repository.search_domain_usage_buckets(searcher)
 

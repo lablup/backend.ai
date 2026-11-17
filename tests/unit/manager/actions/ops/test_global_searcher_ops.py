@@ -37,14 +37,14 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.searchers import RolePresetSearcher
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -74,7 +74,7 @@ _BACKWARD_PAGE_REVERSED = pytest.mark.xfail(
 )
 
 _PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=ProjectQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=ProjectRow.id,
 )
 _PAGE_SIZE = 2
@@ -283,7 +283,7 @@ class TestScope:
         await _grant_global(
             preset_db, actors.user_id(Actor.GRANTED), RolePresetEntityType(), Permission.READ
         )
-        uses: list[UsedBy] = [RolePresetSearchableFields.linked.usage.roles.used_by(role_id)]
+        uses: list[UsedBy] = [RolePresetQuerySpec.linked.usage.roles.used_by(role_id)]
         action = SearchRolePresetsAction(
             searcher=GlobalSearcher(
                 used_by=uses, searcher=RolePresetSearcher(pagination=OffsetPagination(limit=10))

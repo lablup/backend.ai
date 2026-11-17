@@ -44,13 +44,13 @@ from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, Ord
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
     get_permission_ctx,
     groups,
 )
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.updaters import (
     ProjectRestoreUpdater,
     ProjectSoftDeleteUpdater,
@@ -305,7 +305,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             group_row = (await db_session.scalars(query)).first()
         if group_row is None:
             raise GroupNotFound(f"Group not found: {group_id}")
-        return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
+        return cls.from_data(ProjectQuerySpec.own.to_data(group_row))
 
     @classmethod
     async def get_connection(
@@ -369,9 +369,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 group_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
-                result = [
-                    cls.from_data(ProjectSearchableFields.own.to_data(row)) for row in group_rows
-                ]
+                result = [cls.from_data(ProjectQuerySpec.own.to_data(row)) for row in group_rows]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -499,7 +497,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             return [
                 obj
                 for row in await session.scalars(query)
-                if (obj := cls.from_dto(ProjectSearchableFields.own.to_data(row))) is not None
+                if (obj := cls.from_dto(ProjectQuerySpec.own.to_data(row))) is not None
             ]
 
     @classmethod
@@ -518,7 +516,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly_session() as session:
             objects = {
-                row.id: cls.from_dto(ProjectSearchableFields.own.to_data(row))
+                row.id: cls.from_dto(ProjectQuerySpec.own.to_data(row))
                 for row in await session.scalars(query)
             }
             return [objects.get(ProjectID(id)) for id in group_ids]
@@ -540,7 +538,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         async with graph_ctx.db.begin_readonly_session() as session:
             objects: dict[str, list[Group | None]] = {name: [] for name in group_names}
             for row in await session.scalars(query):
-                objects[row.name].append(cls.from_dto(ProjectSearchableFields.own.to_data(row)))
+                objects[row.name].append(cls.from_dto(ProjectQuerySpec.own.to_data(row)))
             return [objects[name] for name in group_names]
 
     @classmethod
@@ -571,7 +569,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         async with graph_ctx.db.begin_readonly_session() as session:
             objects: dict[uuid.UUID, list[Group | None]] = {id: [] for id in user_ids}
             for row, user_id in (await session.execute(query)).tuples():
-                objects[user_id].append(cls.from_dto(ProjectSearchableFields.own.to_data(row)))
+                objects[user_id].append(cls.from_dto(ProjectQuerySpec.own.to_data(row)))
             return [objects[id] for id in user_ids]
 
     @classmethod
@@ -587,7 +585,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             return [
                 obj
                 for row in await session.scalars(query)
-                if (obj := cls.from_dto(ProjectSearchableFields.own.to_data(row))) is not None
+                if (obj := cls.from_dto(ProjectQuerySpec.own.to_data(row))) is not None
             ]
 
 

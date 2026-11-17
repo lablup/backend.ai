@@ -15,10 +15,10 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
-from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.resource_preset.searchable_fields import (
-    ResourcePresetSearchableFields,
+from ai.backend.manager.models.resource_preset.query_spec import (
+    ResourcePresetQuerySpec,
 )
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -96,7 +96,7 @@ class TestResourcePresetRepository:
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test successful preset creation"""
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
         mock_db_source.create_preset = AsyncMock(return_value=preset_data)
 
         result = await resource_preset_repository.create_preset_validated(sample_preset_creator)
@@ -129,7 +129,7 @@ class TestResourcePresetRepository:
     ) -> None:
         """Test successful preset retrieval by ID"""
         preset_id = sample_preset_row.id
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
 
         mock_db_source.get_preset_by_id = AsyncMock(return_value=preset_data)
 
@@ -160,7 +160,7 @@ class TestResourcePresetRepository:
     ) -> None:
         """Test successful preset retrieval by name"""
         preset_name = "test-preset"
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
 
         mock_db_source.get_preset_by_name = AsyncMock(return_value=preset_data)
 
@@ -191,7 +191,7 @@ class TestResourcePresetRepository:
     ) -> None:
         """Test preset retrieval by ID when both ID and name provided"""
         preset_id = sample_preset_row.id
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
 
         # Mock db_source
         mock_db_source.get_preset_by_id_or_name = AsyncMock(return_value=preset_data)
@@ -209,7 +209,7 @@ class TestResourcePresetRepository:
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test preset retrieval by name only"""
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
 
         # Mock db_source
         mock_db_source.get_preset_by_id_or_name = AsyncMock(return_value=preset_data)
@@ -242,7 +242,7 @@ class TestResourcePresetRepository:
     ) -> None:
         """Test successful preset modification"""
         preset_id = sample_preset_row.id
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
         updater = ResourcePresetUpdater(
             preset_id=ResourcePresetID(preset_id),
             name=OptionalState.update("modified-preset"),
@@ -300,7 +300,7 @@ class TestResourcePresetRepository:
     ) -> None:
         """Test successful preset deletion by ID"""
         preset_id = sample_preset_row.id
-        preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
+        preset_data = ResourcePresetQuerySpec.own.to_data(sample_preset_row)
 
         # Mock delete operation
         mock_db_source.delete_preset = AsyncMock(return_value=preset_data)

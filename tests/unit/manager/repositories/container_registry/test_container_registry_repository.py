@@ -40,10 +40,10 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
@@ -271,7 +271,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.commit()
             await session.refresh(registry)  # Ensure all attributes are loaded
-            return ContainerRegistrySearchableFields.own.to_data(registry)
+            return ContainerRegistryQuerySpec.own.to_data(registry)
 
     @pytest.fixture
     async def test_registry_with_custom_props(
@@ -296,7 +296,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.commit()
             await session.refresh(registry)  # Ensure all attributes are loaded
-            return ContainerRegistrySearchableFields.own.to_data(registry)
+            return ContainerRegistryQuerySpec.own.to_data(registry)
 
     @pytest.fixture
     async def sample_registry(
@@ -317,7 +317,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.commit()
             await session.refresh(registry)
-            return ContainerRegistrySearchableFields.own.to_data(registry)
+            return ContainerRegistryQuerySpec.own.to_data(registry)
 
     async def test_get_by_registry_and_project_success(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
@@ -369,8 +369,8 @@ class TestContainerRegistryRepository:
             await session.refresh(registry1)
             await session.refresh(registry2)
             return _TwoRegistries(
-                registry1=ContainerRegistrySearchableFields.own.to_data(registry1),
-                registry2=ContainerRegistrySearchableFields.own.to_data(registry2),
+                registry1=ContainerRegistryQuerySpec.own.to_data(registry1),
+                registry2=ContainerRegistryQuerySpec.own.to_data(registry2),
             )
 
     async def test_get_by_registry_name(
@@ -417,8 +417,8 @@ class TestContainerRegistryRepository:
             await session.refresh(registry1)
             await session.refresh(registry2)
             return _TwoRegistries(
-                registry1=ContainerRegistrySearchableFields.own.to_data(registry1),
-                registry2=ContainerRegistrySearchableFields.own.to_data(registry2),
+                registry1=ContainerRegistryQuerySpec.own.to_data(registry1),
+                registry2=ContainerRegistryQuerySpec.own.to_data(registry2),
             )
 
     async def test_get_all(
@@ -611,7 +611,7 @@ class TestContainerRegistryRepository:
             await session.commit()
             await session.refresh(registry)
             return _RegistryWithImages(
-                registry=ContainerRegistrySearchableFields.own.to_data(registry),
+                registry=ContainerRegistryQuerySpec.own.to_data(registry),
                 image_ids=[image1.id, image2.id],
             )
 
@@ -712,9 +712,9 @@ class TestContainerRegistryRepository:
             await session.refresh(registry2)
 
             return _TwoRegistriesWithImages(
-                registry1=ContainerRegistrySearchableFields.own.to_data(registry1),
+                registry1=ContainerRegistryQuerySpec.own.to_data(registry1),
                 image1_id=image1.id,
-                registry2=ContainerRegistrySearchableFields.own.to_data(registry2),
+                registry2=ContainerRegistryQuerySpec.own.to_data(registry2),
                 image2_id=image2.id,
             )
 
@@ -788,7 +788,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.commit()
             await session.refresh(registry)
-            return ContainerRegistrySearchableFields.own.to_data(registry)
+            return ContainerRegistryQuerySpec.own.to_data(registry)
 
     async def test_modify_registry_success(
         self,
@@ -879,7 +879,7 @@ class TestContainerRegistryRepository:
             await session.commit()
             await session.refresh(registry)
             return self._RegistryWithAvailableGroups(
-                registry=ContainerRegistrySearchableFields.own.to_data(registry),
+                registry=ContainerRegistryQuerySpec.own.to_data(registry),
                 group_ids=sample_groups,
             )
 
@@ -981,7 +981,7 @@ class TestContainerRegistryRepository:
             await session.commit()
             await session.refresh(registry)
             return _RegistryWithGroups(
-                registry=ContainerRegistrySearchableFields.own.to_data(registry),
+                registry=ContainerRegistryQuerySpec.own.to_data(registry),
                 group_ids=group_ids,
             )
 
@@ -1103,7 +1103,7 @@ class TestContainerRegistryRepository:
             await session.commit()
             await session.refresh(registry)
             return self._RegistryWithPartialGroups(
-                registry=ContainerRegistrySearchableFields.own.to_data(registry),
+                registry=ContainerRegistryQuerySpec.own.to_data(registry),
                 all_group_ids=group_ids,
                 initially_associated_group_ids=group_ids[:2],
                 available_group_ids=group_ids[2:],
@@ -1646,7 +1646,7 @@ class TestSearchContainerRegistries:
                 )
                 session.add(row)
                 await session.flush()
-                registries.append(ContainerRegistrySearchableFields.own.to_data(row))
+                registries.append(ContainerRegistryQuerySpec.own.to_data(row))
             await session.commit()
         return registries
 

@@ -11,10 +11,10 @@ from ai.backend.common.data.entity.runtime_variant import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
-from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant.searchable_fields import (
-    RuntimeVariantSearchableFields,
+from ai.backend.manager.models.runtime_variant.query_spec import (
+    RuntimeVariantQuerySpec,
 )
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -52,4 +52,4 @@ class RuntimeVariantCreator(
 
     @override
     def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
-        return RuntimeVariantSearchableFields.own.to_data(row)
+        return RuntimeVariantQuerySpec.own.to_data(row)

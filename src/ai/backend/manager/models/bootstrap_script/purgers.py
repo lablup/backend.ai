@@ -13,12 +13,12 @@ from ai.backend.manager.data.bootstrap_script.types import (
     UserDefaultBootstrapScriptData,
 )
 from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptPurgeForbidden
+from ai.backend.manager.models.bootstrap_script.query_spec import (
+    BootstrapScriptQuerySpec,
+)
 from ai.backend.manager.models.bootstrap_script.row import (
     BootstrapScriptRow,
     UserDefaultBootstrapScriptRow,
-)
-from ai.backend.manager.models.bootstrap_script.searchable_fields import (
-    BootstrapScriptSearchableFields,
 )
 from ai.backend.manager.models.specs.purger import FieldBatchPurger, GuardedFieldPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
@@ -41,7 +41,7 @@ class UserDefaultBootstrapScriptPurger(
 
     @override
     def to_data(self, row: UserDefaultBootstrapScriptRow) -> UserDefaultBootstrapScriptData:
-        return BootstrapScriptSearchableFields.user_default.to_data(row)
+        return BootstrapScriptQuerySpec.user_default.to_data(row)
 
 
 class BootstrapScriptPurger(
@@ -60,7 +60,7 @@ class BootstrapScriptPurger(
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
-        return BootstrapScriptSearchableFields.own.to_data(row)
+        return BootstrapScriptQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -100,4 +100,4 @@ class NonDefaultBootstrapScriptPurger(GuardedFieldPurger[BootstrapScriptRow, Boo
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
-        return BootstrapScriptSearchableFields.own.to_data(row)
+        return BootstrapScriptQuerySpec.own.to_data(row)

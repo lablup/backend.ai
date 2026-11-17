@@ -10,10 +10,10 @@ from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
-from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
-from ai.backend.manager.models.huggingface_registry.searchable_fields import (
-    HuggingFaceRegistrySearchableFields,
+from ai.backend.manager.models.huggingface_registry.query_spec import (
+    HuggingFaceRegistryQuerySpec,
 )
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -35,7 +35,7 @@ class HuggingFaceDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
-            return HuggingFaceRegistrySearchableFields.own.to_data(row)
+            return HuggingFaceRegistryQuerySpec.own.to_data(row)
 
     async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -55,7 +55,7 @@ class HuggingFaceDBSource:
                 raise ArtifactRegistryNotFoundError(
                     f"HuggingFace registry not found for registry {name}"
                 )
-            return HuggingFaceRegistrySearchableFields.own.to_data(row.huggingface_registries)
+            return HuggingFaceRegistryQuerySpec.own.to_data(row.huggingface_registries)
 
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
@@ -77,7 +77,7 @@ class HuggingFaceDBSource:
                 raise ArtifactRegistryNotFoundError(
                     f"HuggingFace registry not found for artifact {artifact_id}"
                 )
-            return HuggingFaceRegistrySearchableFields.own.to_data(row.huggingface_registry)
+            return HuggingFaceRegistryQuerySpec.own.to_data(row.huggingface_registry)
 
     async def get_registries_by_ids(
         self, registry_ids: list[uuid.UUID]
@@ -92,7 +92,7 @@ class HuggingFaceDBSource:
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
             rows = result.scalars().all()
-            return [HuggingFaceRegistrySearchableFields.own.to_data(row) for row in rows]
+            return [HuggingFaceRegistryQuerySpec.own.to_data(row) for row in rows]
 
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
         """
@@ -104,4 +104,4 @@ class HuggingFaceDBSource:
             )
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [HuggingFaceRegistrySearchableFields.own.to_data(row) for row in rows]
+            return [HuggingFaceRegistryQuerySpec.own.to_data(row) for row in rows]

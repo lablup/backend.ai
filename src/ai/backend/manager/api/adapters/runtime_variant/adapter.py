@@ -41,11 +41,11 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
+from ai.backend.manager.models.runtime_variant.query_spec import (
+    RuntimeVariantQuerySpec,
+)
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant.scopes import PublicRuntimeVariantTarget
-from ai.backend.manager.models.runtime_variant.searchable_fields import (
-    RuntimeVariantSearchableFields,
-)
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
 from ai.backend.manager.models.specs.search.usage import UsedBy
@@ -75,7 +75,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _runtime_variant_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RuntimeVariantSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=RuntimeVariantQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RuntimeVariantRow.id,
     )
 
@@ -258,14 +258,14 @@ class RuntimeVariantAdapter(BaseAdapter):
         """The uses the request named, each of which the caller must be able to read."""
         if usage is None or usage.used_by is None:
             return []
-        linked = RuntimeVariantSearchableFields.linked.usage
+        linked = RuntimeVariantQuerySpec.linked.usage
         return [
             linked.deployments.used_by(DeploymentID(entity_id))
             for entity_id in usage.used_by.deployment or ()
         ]
 
     def _convert_filter(self, filter_: RuntimeVariantFilter) -> list[QueryCondition]:
-        fields = RuntimeVariantSearchableFields.own
+        fields = RuntimeVariantQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
@@ -289,7 +289,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[RuntimeVariantOrder]) -> list[QueryOrder]:
-        fields = RuntimeVariantSearchableFields.own
+        fields = RuntimeVariantQuerySpec.own
         result = []
         for order in orders:
             ascending = order.direction.value == "ASC"

@@ -20,8 +20,8 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.rbac_models.role.searchable_fields import (
-    RoleSearchableFields,
+from ai.backend.manager.models.rbac_models.role.query_spec import (
+    RoleQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.role.updaters import RoleUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -79,7 +79,7 @@ class RoleAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: RoleFilter) -> list[QueryCondition]:
         """Convert role filter to list of query conditions."""
-        fields = RoleSearchableFields.own
+        fields = RoleQuerySpec.own
         conditions = [*self.apply_string_filter(filter.name, fields.name.filter)]
         if filter.sources:
             conditions.append(fields.source.filter.in_(filter.sources))
@@ -89,7 +89,7 @@ class RoleAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: RoleOrder) -> QueryOrder:
         """Convert role order specification to query order."""
-        fields = RoleSearchableFields.own
+        fields = RoleQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == RoleOrderField.NAME:

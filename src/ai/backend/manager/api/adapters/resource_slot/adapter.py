@@ -70,17 +70,17 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
+from ai.backend.manager.models.resource_slot.query_spec import (
+    AgentResourceQuerySpec,
+    ResourceAllocationQuerySpec,
+    ResourceSlotTypeQuerySpec,
+)
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.scopes import PublicResourceSlotTypeTarget
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    AgentResourceSearchableFields,
-    ResourceAllocationSearchableFields,
-    ResourceSlotTypeSearchableFields,
-)
 from ai.backend.manager.models.resource_slot.searchers import (
     AgentResourceSearcher,
     ResourceAllocationSearcher,
@@ -140,7 +140,7 @@ from ai.backend.manager.types import OptionalState
 @lru_cache(maxsize=1)
 def _get_slot_type_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourceSlotTypeSearchableFields.own.slot_name.order.apply(ascending=True),
+        forward_order=ResourceSlotTypeQuerySpec.own.slot_name.order.apply(ascending=True),
         cursor_column=ResourceSlotTypeRow.uuid,
     )
 
@@ -148,7 +148,7 @@ def _get_slot_type_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_agent_resource_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AgentResourceSearchableFields.own.slot_name.order.apply(ascending=True),
+        forward_order=AgentResourceQuerySpec.own.slot_name.order.apply(ascending=True),
         cursor_column=AgentResourceRow.id,
     )
 
@@ -156,7 +156,7 @@ def _get_agent_resource_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_resource_allocation_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourceAllocationSearchableFields.own.slot_name.order.apply(ascending=True),
+        forward_order=ResourceAllocationQuerySpec.own.slot_name.order.apply(ascending=True),
         cursor_column=ResourceAllocationRow.id,
     )
 
@@ -231,7 +231,7 @@ class ResourceSlotAdapter(BaseAdapter):
         )
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
-        fields = ResourceSlotTypeSearchableFields.own
+        fields = ResourceSlotTypeQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
@@ -257,7 +257,7 @@ class ResourceSlotAdapter(BaseAdapter):
         return conditions
 
     def _convert_slot_type_orders(self, orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
-        fields = ResourceSlotTypeSearchableFields.own
+        fields = ResourceSlotTypeQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
@@ -480,7 +480,7 @@ class ResourceSlotAdapter(BaseAdapter):
         )
 
     def _convert_agent_resource_filter(self, filter: AgentResourceFilter) -> list[QueryCondition]:
-        fields = AgentResourceSearchableFields.own
+        fields = AgentResourceQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_string_filter(filter.agent_id, fields.agent_id.filter),
@@ -508,7 +508,7 @@ class ResourceSlotAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_agent_resource_orders(orders: list[AgentResourceOrder]) -> list[QueryOrder]:
-        fields = AgentResourceSearchableFields.own
+        fields = AgentResourceQuerySpec.own
         converted: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
@@ -602,7 +602,7 @@ class ResourceSlotAdapter(BaseAdapter):
     def _convert_resource_allocation_filter(
         self, filter: ResourceAllocationFilter
     ) -> list[QueryCondition]:
-        fields = ResourceAllocationSearchableFields.own
+        fields = ResourceAllocationQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
@@ -630,7 +630,7 @@ class ResourceSlotAdapter(BaseAdapter):
     def _convert_resource_allocation_orders(
         orders: list[ResourceAllocationOrder],
     ) -> list[QueryOrder]:
-        fields = ResourceAllocationSearchableFields.own
+        fields = ResourceAllocationQuerySpec.own
         converted: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC

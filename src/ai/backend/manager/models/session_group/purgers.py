@@ -12,8 +12,8 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.session_group import SessionGroupInUse
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
 
@@ -45,7 +45,7 @@ class SessionGroupPurger(GuardedEntityPurger[SessionGroupRow, SessionGroupData])
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
+                condition=SessionGroupQuerySpec.linked.replica_groups.not_exists(),
                 error=SessionGroupInUse(
                     f"Session group {self.session_group_id} cannot be purged while a replica group uses it"
                 ),
@@ -58,4 +58,4 @@ class SessionGroupPurger(GuardedEntityPurger[SessionGroupRow, SessionGroupData])
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:
-        return SessionGroupSearchableFields.own.to_data(row)
+        return SessionGroupQuerySpec.own.to_data(row)

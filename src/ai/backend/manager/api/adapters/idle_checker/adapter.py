@@ -59,10 +59,10 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerSearchableFields,
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerQuerySpec,
 )
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -80,7 +80,7 @@ from ai.backend.manager.types import OptionalState, TriState
 @lru_cache(maxsize=1)
 def _get_idle_checker_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=IdleCheckerSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=IdleCheckerQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=IdleCheckerRow.id,
     )
 
@@ -307,7 +307,7 @@ class IdleCheckerAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter_: IdleCheckerFilter) -> list[QueryCondition]:
-        fields = IdleCheckerSearchableFields.own
+        fields = IdleCheckerQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_datetime_filter(filter_.created_at, fields.created_at.filter),
@@ -347,7 +347,7 @@ class IdleCheckerAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(orders: list[IdleCheckerOrder]) -> list[QueryOrder]:
-        fields = IdleCheckerSearchableFields.own
+        fields = IdleCheckerQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC

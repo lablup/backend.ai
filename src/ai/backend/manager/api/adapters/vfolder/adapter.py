@@ -131,17 +131,17 @@ from ai.backend.manager.models.vfolder.creators import (
     ProjectVFolderCreator,
     VFolderBaseCreator,
 )
+from ai.backend.manager.models.vfolder.query_spec import VFolderQuerySpec
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import (
     DomainVFolderTarget,
     ProjectVFolderTarget,
     UserVFolderTarget,
 )
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
-from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
-    VFolderAutoMountSearchableFields,
+from ai.backend.manager.models.vfolder_auto_mount.query_spec import (
+    VFolderAutoMountQuerySpec,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -204,7 +204,7 @@ from ai.backend.manager.types import OptionalState
 _LEGACY_MAX_FILES = 1000
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=VFolderSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=VFolderQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=VFolderRow.id,
 )
 
@@ -431,7 +431,7 @@ class VFolderAdapter(BaseAdapter):
         if usage is None or usage.used_by is None:
             return []
         used_by = usage.used_by
-        linked = VFolderSearchableFields.linked.usage
+        linked = VFolderQuerySpec.linked.usage
         return [
             *(
                 linked.deployments.used_by(DeploymentID(entity_id))
@@ -975,7 +975,7 @@ class VFolderAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
-        fields = VFolderSearchableFields.own
+        fields = VFolderQuerySpec.own
         conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_string_filter(f.host, fields.host.filter),
@@ -986,12 +986,12 @@ class VFolderAdapter(BaseAdapter):
             *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_to_many_filter(
                 f.labels,
-                VFolderSearchableFields.nested.labels.correlation,
+                VFolderQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
             *self.apply_to_many_filter(
                 f.auto_mounts,
-                VFolderSearchableFields.nested.auto_mounts.correlation,
+                VFolderQuerySpec.nested.auto_mounts.correlation,
                 self._convert_vfolder_auto_mount_filter,
             ),
         ]
@@ -1014,7 +1014,7 @@ class VFolderAdapter(BaseAdapter):
         return conditions
 
     def _convert_vfolder_auto_mount_filter(self, f: VFolderAutoMountFilter) -> list[QueryCondition]:
-        fields = VFolderAutoMountSearchableFields.own
+        fields = VFolderAutoMountQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_enum_filter(f.scope_type, fields.scope_type.filter),
@@ -1048,7 +1048,7 @@ class VFolderAdapter(BaseAdapter):
         return [self._convert_vfolder_order(order) for order in orders]
 
     def _convert_vfolder_order(self, order: VFolderOrder) -> QueryOrder:
-        fields = VFolderSearchableFields.own
+        fields = VFolderQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case VFolderOrderField.NAME:

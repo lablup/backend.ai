@@ -20,10 +20,10 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
 )
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -121,4 +121,4 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return ResourceGroupSearchableFields.own.to_data(row)
+        return ResourceGroupQuerySpec.own.to_data(row)

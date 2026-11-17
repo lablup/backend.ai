@@ -9,10 +9,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
-from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
-from ai.backend.manager.models.client_ip_masking.searchable_fields import (
-    ClientIPMaskingPolicySearchableFields,
+from ai.backend.manager.models.client_ip_masking.query_spec import (
+    ClientIPMaskingPolicyQuerySpec,
 )
+from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
@@ -72,4 +72,4 @@ class ClientIPMaskingPolicyUpserter(
 
     @override
     def to_data(self, row: ClientIPMaskingPolicyRow) -> ClientIPMaskingPolicyData:
-        return ClientIPMaskingPolicySearchableFields.own.to_data(row)
+        return ClientIPMaskingPolicyQuerySpec.own.to_data(row)

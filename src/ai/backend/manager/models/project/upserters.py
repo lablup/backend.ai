@@ -18,8 +18,8 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermission
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
@@ -98,4 +98,4 @@ class ProjectUpserter(EntityUpserter[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return ProjectSearchableFields.own.to_data(row)
+        return ProjectQuerySpec.own.to_data(row)

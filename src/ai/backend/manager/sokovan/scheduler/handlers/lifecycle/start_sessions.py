@@ -14,7 +14,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -135,7 +135,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         searcher = SessionSearcher(
             pagination=NoPagination(),
             conditions=[
-                SessionSearchableFields.own.id.filter.in_(
+                SessionQuerySpec.own.id.filter.in_(
                     UUIDInMatchSpec(values=session_ids, negated=False)
                 )
             ],

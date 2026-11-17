@@ -4,7 +4,7 @@ An assignment row joins a user to a role, and a filter on the role it names, or 
 permission entries that role holds, cannot ask whether the caller may read them.
 `models/specs/search/AGENTS.md` bans both. What is here shipped before the rule, is
 marked deprecated in the schema, and is removed in the next release. Nothing new goes
-here; the declarations are in `searchable_fields.py`.
+here; the declarations are in `query_spec.py`.
 """
 
 from __future__ import annotations

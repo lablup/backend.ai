@@ -13,10 +13,10 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 
 __all__ = ("SystemSessionEnvironPurger",)
 
@@ -45,4 +45,4 @@ class SystemSessionEnvironPurger(EntityPurger[SystemSessionEnvironRow, SystemSes
 
     @override
     def to_data(self, row: SystemSessionEnvironRow) -> SystemSessionEnvironData:
-        return SystemSessionEnvironSearchableFields.own.to_data(row)
+        return SystemSessionEnvironQuerySpec.own.to_data(row)

@@ -96,16 +96,16 @@ from ai.backend.manager.models.model_card.deprecated_search import (
     ModelCardDeprecatedSearch,
 )
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
+from ai.backend.manager.models.model_card.query_spec import (
+    ModelCardQuerySpec,
+    ModelCardResourceRequirementQuerySpec,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import (
     DomainModelCardTarget,
     ModelCardTarget,
     ProjectModelCardTarget,
     UserModelCardTarget,
-)
-from ai.backend.manager.models.model_card.searchable_fields import (
-    ModelCardResourceRequirementSearchableFields,
-    ModelCardSearchableFields,
 )
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
@@ -177,7 +177,7 @@ def _build_policy_from_strategy_input(
 
 
 _MODEL_CARD_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ModelCardSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=ModelCardQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=ModelCardRow.id,
 )
 
@@ -244,7 +244,7 @@ class ModelCardAdapter(BaseAdapter):
         """The uses the request named."""
         if usage is None or usage.uses is None:
             return []
-        linked = ModelCardSearchableFields.linked.usage
+        linked = ModelCardQuerySpec.linked.usage
         return [
             linked.vfolders.uses(VFolderUUID(entity_id)) for entity_id in usage.uses.vfolder or ()
         ]
@@ -607,7 +607,7 @@ class ModelCardAdapter(BaseAdapter):
         return result.data
 
     def _convert_filter(self, f: ModelCardFilter) -> list[QueryCondition]:
-        fields = ModelCardSearchableFields.own
+        fields = ModelCardQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
@@ -628,7 +628,7 @@ class ModelCardAdapter(BaseAdapter):
             *self.apply_nullable_datetime_filter(f.updated_at, fields.updated_at.filter),
             *self.apply_to_many_filter(
                 f.min_resource,
-                ModelCardSearchableFields.nested.min_resource.correlation,
+                ModelCardQuerySpec.nested.min_resource.correlation,
                 self._convert_requirement_filter,
             ),
         ]
@@ -668,7 +668,7 @@ class ModelCardAdapter(BaseAdapter):
     def _convert_requirement_filter(
         self, f: ModelCardResourceRequirementFilter
     ) -> list[QueryCondition]:
-        fields = ModelCardResourceRequirementSearchableFields.own
+        fields = ModelCardResourceRequirementQuerySpec.own
         return [
             *self.apply_string_filter(f.slot_name, fields.slot_name.filter),
             *self.apply_decimal_filter(f.min_quantity, fields.min_quantity.filter),
@@ -678,7 +678,7 @@ class ModelCardAdapter(BaseAdapter):
         return [self._convert_order(order) for order in orders]
 
     def _convert_order(self, order: ModelCardOrder) -> QueryOrder:
-        fields = ModelCardSearchableFields.own
+        fields = ModelCardQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ModelCardOrderField.ENTITY_ID:

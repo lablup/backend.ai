@@ -45,14 +45,14 @@ from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 from ai.backend.manager.models.vfolder_auto_mount.creators import VFolderAutoMountCreator
+from ai.backend.manager.models.vfolder_auto_mount.query_spec import (
+    VFolderAutoMountQuerySpec,
+)
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 from ai.backend.manager.models.vfolder_auto_mount.scopes import (
     ProjectVFolderAutoMountTarget,
     UserVFolderAutoMountTarget,
     VFolderVFolderAutoMountTarget,
-)
-from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
-    VFolderAutoMountSearchableFields,
 )
 from ai.backend.manager.models.vfolder_auto_mount.searchers import VFolderAutoMountSearcher
 from ai.backend.manager.models.vfolder_auto_mount.updaters import VFolderAutoMountUpdater
@@ -77,7 +77,7 @@ from ai.backend.manager.types import OptionalState
 __all__ = ("VFolderAutoMountAdapter",)
 
 _VFOLDER_AUTO_MOUNT_PAGINATION_SPEC = PaginationSpec(
-    forward_order=VFolderAutoMountSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=VFolderAutoMountQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=VFolderAutoMountRow.id,
 )
 
@@ -182,7 +182,7 @@ class VFolderAutoMountAdapter(BaseAdapter):
                     target_row=VFolderAutoMountRow,
                     target_column=VFolderAutoMountRow.id,
                     target_id=VFolderAutoMountID(input.id),
-                    converter=VFolderAutoMountSearchableFields.own,
+                    converter=VFolderAutoMountQuerySpec.own,
                 )
             )
         )
@@ -192,14 +192,14 @@ class VFolderAutoMountAdapter(BaseAdapter):
         """The filter's conditions; auto-mounts marked deleted are left out unless the
         top-level filter names ``deleted_at``."""
         if filter is None:
-            return [VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null()]
+            return [VFolderAutoMountQuerySpec.own.deleted_at.filter.is_null()]
         conditions = self._convert_filter(filter)
         if filter.deleted_at is None:
-            conditions.append(VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null())
+            conditions.append(VFolderAutoMountQuerySpec.own.deleted_at.filter.is_null())
         return conditions
 
     def _convert_filter(self, filter: VFolderAutoMountFilter) -> list[QueryCondition]:
-        fields = VFolderAutoMountSearchableFields.own
+        fields = VFolderAutoMountQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_enum_filter(filter.scope_type, fields.scope_type.filter),
@@ -234,7 +234,7 @@ class VFolderAutoMountAdapter(BaseAdapter):
 
     def _convert_order(self, order: VFolderAutoMountOrder) -> QueryOrder:
         """The query order one requested order field names."""
-        fields = VFolderAutoMountSearchableFields.own
+        fields = VFolderAutoMountQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case VFolderAutoMountOrderField.MOUNT_DESTINATION:

@@ -8,8 +8,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 __all__ = ("SessionGroupSearcher",)
@@ -23,4 +23,4 @@ class SessionGroupSearcher(Searcher[SessionGroupRow, SessionGroupData]):
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:
-        return SessionGroupSearchableFields.own.to_data(row)
+        return SessionGroupQuerySpec.own.to_data(row)

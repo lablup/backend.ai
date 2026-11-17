@@ -42,10 +42,10 @@ from ai.backend.manager.errors.image import (
     HarborWebhookContainerRegistryRowNotFound,
 )
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 from ai.backend.manager.models.session.row import SessionRow
@@ -662,9 +662,7 @@ class TestRescanImages:
             )
             result = await container_registry_service.rescan_images(action)
 
-            assert result.registry == ContainerRegistrySearchableFields.own.to_data(
-                sample_registry_row
-            )
+            assert result.registry == ContainerRegistryQuerySpec.own.to_data(sample_registry_row)
             assert len(result.images) == 1
             assert result.images[0] == sample_image_data
             assert result.errors == []

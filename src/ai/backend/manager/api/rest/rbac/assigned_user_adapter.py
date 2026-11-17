@@ -17,12 +17,12 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.data.permission.role import AssignedUserData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("AssignedUserAdapter",)
@@ -61,14 +61,14 @@ class AssignedUserAdapter(BaseFilterAdapter):
     def _convert_filter(self, filter: AssignedUserFilter) -> list[QueryCondition]:
         """The searcher joins the assignment row to its user, so the user's columns
         carry plain conditions rather than a subquery."""
-        user_fields = UserSearchableFields.own
+        user_fields = UserQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.username, user_fields.username.filter),
             *self.apply_string_filter(filter.email, user_fields.email.filter),
         ]
         if filter.granted_by is not None:
             conditions.append(
-                RoleAssignmentSearchableFields.own.granted_by.filter.equals(
+                RoleAssignmentQuerySpec.own.granted_by.filter.equals(
                     UUIDEqualMatchSpec(value=filter.granted_by, negated=False)
                 )
             )
@@ -76,7 +76,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: AssignedUserOrder) -> QueryOrder:
         """Convert assigned user order specification to query order."""
-        user_fields = UserSearchableFields.own
+        user_fields = UserQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
@@ -85,7 +85,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
             case AssignedUserOrderField.EMAIL:
                 return user_fields.email.order.apply(ascending)
             case AssignedUserOrderField.GRANTED_AT:
-                return RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending)
+                return RoleAssignmentQuerySpec.own.granted_at.order.apply(ascending)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

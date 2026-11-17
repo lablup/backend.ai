@@ -10,11 +10,11 @@ import sqlalchemy as sa
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
+from ai.backend.manager.models.prometheus_query_preset_category.query_spec import (
+    PrometheusQueryPresetCategoryQuerySpec,
+)
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
-)
-from ai.backend.manager.models.prometheus_query_preset_category.searchable_fields import (
-    PrometheusQueryPresetCategorySearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -29,4 +29,4 @@ class PrometheusQueryPresetCategorySearcher(
 
     @override
     def to_data(self, row: PrometheusQueryPresetCategoryRow) -> PrometheusQueryPresetCategoryData:
-        return PrometheusQueryPresetCategorySearchableFields.own.to_data(row)
+        return PrometheusQueryPresetCategoryQuerySpec.own.to_data(row)

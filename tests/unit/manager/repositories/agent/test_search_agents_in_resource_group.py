@@ -17,8 +17,8 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
@@ -142,7 +142,7 @@ class TestSearchAgentsInResourceGroup:
             AgentSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    AgentSearchableFields.own.uuid.filter.in_(
+                    AgentQuerySpec.own.uuid.filter.in_(
                         UUIDInMatchSpec(values=[*inside_agents, *outside_agents], negated=False)
                     ),
                 ],

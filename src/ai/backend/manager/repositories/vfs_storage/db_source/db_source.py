@@ -9,10 +9,10 @@ from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
-from ai.backend.manager.models.vfs_storage.searchable_fields import (
-    VFSStorageSearchableFields,
+from ai.backend.manager.models.vfs_storage.query_spec import (
+    VFSStorageQuerySpec,
 )
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -37,7 +37,7 @@ class VFSStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with name {storage_name} not found.")
-            return VFSStorageSearchableFields.own.to_data(row)
+            return VFSStorageQuerySpec.own.to_data(row)
 
     async def get_by_id(self, storage_id: uuid.UUID) -> VFSStorageData:
         """
@@ -49,7 +49,7 @@ class VFSStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
-            return VFSStorageSearchableFields.own.to_data(row)
+            return VFSStorageQuerySpec.own.to_data(row)
 
     async def list_vfs_storages(self) -> list[VFSStorageData]:
         """
@@ -59,7 +59,7 @@ class VFSStorageDBSource:
             query = sa.select(VFSStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [VFSStorageSearchableFields.own.to_data(row) for row in rows]
+            return [VFSStorageQuerySpec.own.to_data(row) for row in rows]
 
     async def search(
         self,

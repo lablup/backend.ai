@@ -11,10 +11,10 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
-from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
-from ai.backend.manager.models.storage_namespace.searchable_fields import (
-    StorageNamespaceSearchableFields,
+from ai.backend.manager.models.storage_namespace.query_spec import (
+    StorageNamespaceQuerySpec,
 )
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
 @dataclass
@@ -41,4 +41,4 @@ class StorageNamespacePurger(EntityPurger[StorageNamespaceRow, StorageNamespaceD
 
     @override
     def to_data(self, row: StorageNamespaceRow) -> StorageNamespaceData:
-        return StorageNamespaceSearchableFields.own.to_data(row)
+        return StorageNamespaceQuerySpec.own.to_data(row)

@@ -12,8 +12,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.rbac_models.role.query_spec import RoleQuerySpec
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 
@@ -81,4 +81,4 @@ class RoleUpserter(EntityUpserter[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return RoleSearchableFields.own.to_data(row)
+        return RoleQuerySpec.own.to_data(row)

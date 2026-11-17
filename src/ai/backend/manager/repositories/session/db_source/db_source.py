@@ -48,21 +48,21 @@ from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ReferenceImageSearcher,
 )
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.kernel.updaters import KernelSessionNameBatchUpdater
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import (
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
 )
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import (
     SessionSearcher,
 )
@@ -70,8 +70,8 @@ from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
@@ -104,7 +104,7 @@ class SessionDBSource:
         except (ValueError, TypeError):
             pass
         session_name = session_name_or_id
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         async with self._ops_provider.read_ops() as r:
             result = await r.search_in_global(
                 SessionSearcher(
@@ -164,7 +164,7 @@ class SessionDBSource:
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return UserSearchableFields.own.to_data(user)
+            return UserQuerySpec.own.to_data(user)
 
     async def get_session_validated(
         self,
@@ -224,7 +224,7 @@ class SessionDBSource:
 
         An id match shuts out the name matches; up to 10 name matches come newest first.
         """
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         owned = fields.access_key.filter.equals(
             StringMatchSpec(owner_access_key, case_insensitive=False, negated=False)
         )
@@ -437,7 +437,7 @@ class SessionDBSource:
         session_name: str | None = None,
     ) -> SessionData:
         session_id = updater.session_id
-        session_fields = SessionSearchableFields.own
+        session_fields = SessionQuerySpec.own
         async with self._ops_provider.write_ops() as w:
             found = await w.search_in_global(
                 SessionSearcher(
@@ -508,7 +508,7 @@ class SessionDBSource:
                     KernelSearcher(
                         pagination=NoPagination(),
                         conditions=[
-                            KernelSearchableFields.own.cluster_role.filter.equals(
+                            KernelQuerySpec.own.cluster_role.filter.equals(
                                 StringMatchSpec(
                                     value=DEFAULT_ROLE, case_insensitive=False, negated=False
                                 )
@@ -655,7 +655,7 @@ class SessionDBSource:
         kernel's routing fields are read separately: a searcher answers with one
         entity's own columns.
         """
-        session_fields = SessionSearchableFields.own
+        session_fields = SessionQuerySpec.own
         async with self._ops_provider.read_ops() as r:
             sessions = (
                 await r.search_in_global(
@@ -681,7 +681,7 @@ class SessionDBSource:
                     KernelSearcher(
                         pagination=NoPagination(),
                         conditions=[
-                            KernelSearchableFields.own.cluster_role.filter.equals(
+                            KernelQuerySpec.own.cluster_role.filter.equals(
                                 StringMatchSpec(
                                     value=DEFAULT_ROLE, case_insensitive=False, negated=False
                                 )

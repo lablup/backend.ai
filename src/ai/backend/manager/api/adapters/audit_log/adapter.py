@@ -37,16 +37,16 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.audit_log.query_spec import (
+    AuditLogQuerySpec,
+    AuditLogScopeQuerySpec,
+)
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.audit_log.scopes import (
     AuditLogTarget,
     EntityAuditLogTarget,
     TriggeredByAuditLogTarget,
-)
-from ai.backend.manager.models.audit_log.searchable_fields import (
-    AuditLogScopeSearchableFields,
-    AuditLogSearchableFields,
 )
 from ai.backend.manager.models.audit_log.searchers import (
     AuditLogScopeSearcher,
@@ -73,12 +73,12 @@ from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogs
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 
 _AUDIT_LOG_PAGINATION_SPEC = PaginationSpec(
-    forward_order=AuditLogSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=AuditLogQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=AuditLogRow.id,
 )
 
 _AUDIT_LOG_SCOPE_PAGINATION_SPEC = PaginationSpec(
-    forward_order=AuditLogScopeSearchableFields.own.field_id.order.apply(ascending=True),
+    forward_order=AuditLogScopeQuerySpec.own.field_id.order.apply(ascending=True),
     cursor_column=AuditLogScopeRow.id,
 )
 
@@ -221,7 +221,7 @@ class AuditLogAdapter(BaseAdapter):
         return targets
 
     def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:
-        fields = AuditLogSearchableFields.own
+        fields = AuditLogQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_string_filter(f.entity_id, fields.entity_id_text.filter),
@@ -260,7 +260,7 @@ class AuditLogAdapter(BaseAdapter):
 
     @staticmethod
     def _apply_status_filter(s: AuditLogStatusFilter, conditions: list[QueryCondition]) -> None:
-        status = AuditLogSearchableFields.own.status.filter
+        status = AuditLogQuerySpec.own.status.filter
         if s.equals is not None:
             conditions.append(status.equals(status.to_value(s.equals)))
         if s.in_ is not None:
@@ -274,7 +274,7 @@ class AuditLogAdapter(BaseAdapter):
     def _apply_action_kind_filter(
         k: AuditLogActionKindFilter, conditions: list[QueryCondition]
     ) -> None:
-        action_kind = AuditLogSearchableFields.own.action_kind.filter
+        action_kind = AuditLogQuerySpec.own.action_kind.filter
         if k.equals is not None:
             conditions.append(action_kind.equals(action_kind.to_value(k.equals)))
         if k.in_ is not None:
@@ -288,7 +288,7 @@ class AuditLogAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(orders: list[AuditLogOrder]) -> list[QueryOrder]:
-        fields = AuditLogSearchableFields.own
+        fields = AuditLogQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
@@ -310,7 +310,7 @@ class AuditLogAdapter(BaseAdapter):
         return result
 
     def _convert_scope_filter(self, f: AuditLogScopeFilter) -> list[QueryCondition]:
-        fields = AuditLogScopeSearchableFields.own
+        fields = AuditLogScopeQuerySpec.own
         return [
             *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
             *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
@@ -319,7 +319,7 @@ class AuditLogAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_scope_orders(orders: list[AuditLogScopeOrder]) -> list[QueryOrder]:
-        fields = AuditLogScopeSearchableFields.own
+        fields = AuditLogScopeQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC

@@ -17,8 +17,8 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.replica_group.searchable_fields import (
-    ReplicaGroupSearchableFields,
+from ai.backend.manager.models.replica_group.query_spec import (
+    ReplicaGroupQuerySpec,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -99,7 +99,7 @@ class DeployingProvisionedHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         deployment_ids = [d.deployment_info.id for d in deployments]
         conditions = [
-            ReplicaGroupSearchableFields.own.deployment_id.filter.in_(
+            ReplicaGroupQuerySpec.own.deployment_id.filter.in_(
                 UUIDInMatchSpec(values=deployment_ids, negated=False)
             )
         ]

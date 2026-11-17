@@ -10,10 +10,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.object_storage.searchable_fields import (
-    ObjectStorageSearchableFields,
+from ai.backend.manager.models.object_storage.query_spec import (
+    ObjectStorageQuerySpec,
 )
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -60,4 +60,4 @@ class ObjectStorageUpdater(DataUpdater[ObjectStorageRow, ObjectStorageData]):
 
     @override
     def to_data(self, row: ObjectStorageRow) -> ObjectStorageData:
-        return ObjectStorageSearchableFields.own.to_data(row)
+        return ObjectStorageQuerySpec.own.to_data(row)

@@ -3,7 +3,7 @@
 A filter or an order on another entity's column cannot ask whether the caller may read
 that row, so `models/specs/search/AGENTS.md` bans it. What is here shipped before the
 rule, is marked deprecated in the schema, and is removed in the next release. Nothing
-new goes here; the declarations are in `searchable_fields.py`.
+new goes here; the declarations are in `query_spec.py`.
 
 Both reads use these. The read rooted at the fair share table reaches the other entity
 through an outer join; the read rooted at the domain, project or project member keeps
@@ -21,7 +21,7 @@ from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.field import QueryColumn
 from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
@@ -34,10 +34,10 @@ __all__ = (
 class DeprecatedDomainFairShareFields:
     """The domain columns a domain fair share read reaches."""
 
-    name = SearchableField(
+    name = QueryColumn(
         DomainRow.name, StringConditions(DomainRow.name), ColumnOrder(DomainRow.name)
     )
-    is_active = SearchableField(
+    is_active = QueryColumn(
         DomainRow.is_active, BoolConditions(DomainRow.is_active), ColumnOrder(DomainRow.is_active)
     )
 
@@ -45,16 +45,16 @@ class DeprecatedDomainFairShareFields:
 class DeprecatedProjectFairShareFields:
     """The project columns a project fair share read reaches."""
 
-    id = SearchableField(ProjectRow.id, UUIDConditions(ProjectRow.id), ColumnOrder(ProjectRow.id))
-    name = SearchableField(
+    id = QueryColumn(ProjectRow.id, UUIDConditions(ProjectRow.id), ColumnOrder(ProjectRow.id))
+    name = QueryColumn(
         ProjectRow.name, StringConditions(ProjectRow.name), ColumnOrder(ProjectRow.name)
     )
-    is_active = SearchableField(
+    is_active = QueryColumn(
         ProjectRow.is_active,
         BoolConditions(ProjectRow.is_active),
         ColumnOrder(ProjectRow.is_active),
     )
-    domain_name = SearchableField(
+    domain_name = QueryColumn(
         DomainRow.name, StringConditions(DomainRow.name), ColumnOrder(DomainRow.name)
     )
 
@@ -62,26 +62,26 @@ class DeprecatedProjectFairShareFields:
 class DeprecatedUserFairShareFields:
     """The user columns a user fair share read reaches."""
 
-    uuid = SearchableField(UserRow.uuid, UUIDConditions(UserRow.uuid), ColumnOrder(UserRow.uuid))
-    username = SearchableField(
+    uuid = QueryColumn(UserRow.uuid, UUIDConditions(UserRow.uuid), ColumnOrder(UserRow.uuid))
+    username = QueryColumn(
         UserRow.username,
         StringConditions(UserRow.username),
         ColumnOrder(UserRow.username),
     )
-    email = SearchableField(
+    email = QueryColumn(
         UserRow.email,
         StringConditions(UserRow.email),
         ColumnOrder(UserRow.email),
     )
-    status = SearchableField(
+    status = QueryColumn(
         UserRow.status, EnumConditions(UserRow.status, UserStatus), ColumnOrder(UserRow.status)
     )
-    domain_name = SearchableField(
+    domain_name = QueryColumn(
         DomainRow.name, StringConditions(DomainRow.name), ColumnOrder(DomainRow.name)
     )
-    membership_user_id = SearchableField(
+    membership_user_id = QueryColumn(
         UserRow.uuid, UUIDConditions(UserRow.uuid), ColumnOrder(UserRow.uuid)
     )
-    membership_project_id = SearchableField(
+    membership_project_id = QueryColumn(
         ProjectRow.id, UUIDConditions(ProjectRow.id), ColumnOrder(ProjectRow.id)
     )

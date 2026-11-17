@@ -12,11 +12,11 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
+from ai.backend.manager.models.rbac_models.role_permission_preset.query_spec import (
+    RolePermissionPresetQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
-)
-from ai.backend.manager.models.rbac_models.role_permission_preset.searchable_fields import (
-    RolePermissionPresetSearchableFields,
 )
 from ai.backend.manager.models.specs.purger import FieldBatchPurger, FieldPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -46,7 +46,7 @@ class RolePermissionPresetPurger(FieldPurger[RolePermissionPresetRow, RolePermis
 
     @override
     def to_data(self, row: RolePermissionPresetRow) -> RolePermissionPresetData:
-        return RolePermissionPresetSearchableFields.own.to_data(row)
+        return RolePermissionPresetQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -78,4 +78,4 @@ class RolePermissionPresetUngrantedPurger(
 
     @override
     def to_data(self, row: RolePermissionPresetRow) -> RolePermissionPresetData:
-        return RolePermissionPresetSearchableFields.own.to_data(row)
+        return RolePermissionPresetQuerySpec.own.to_data(row)

@@ -18,12 +18,12 @@ from ai.backend.manager.models.specs.purger import (
     FieldBatchPurger,
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
+from ai.backend.manager.models.vfolder.query_spec import (
+    VFolderQuerySpec,
+)
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
-)
-from ai.backend.manager.models.vfolder.searchable_fields import (
-    VFolderSearchableFields,
 )
 
 
@@ -57,7 +57,7 @@ class VFolderPurger(EntityPurger[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return VFolderSearchableFields.own.to_data(row)
+        return VFolderQuerySpec.own.to_data(row)
 
 
 @dataclass

@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.deployment.types import ModelRevisionData
-from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision.searchable_fields import (
-    ModelRevisionSearchableFields,
+from ai.backend.manager.models.deployment_revision.query_spec import (
+    ModelRevisionQuerySpec,
 )
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +23,4 @@ class ModelRevisionSearcher(Searcher[DeploymentRevisionRow, ModelRevisionData]):
 
     @override
     def to_data(self, row: DeploymentRevisionRow) -> ModelRevisionData:
-        return ModelRevisionSearchableFields.own.to_data(row)
+        return ModelRevisionQuerySpec.own.to_data(row)

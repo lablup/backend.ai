@@ -11,8 +11,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.models.specs.querier import OwnedFieldQuerier
+from ai.backend.manager.models.ssh_keypair.query_spec import SSHKeypairQuerySpec
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
-from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 
 __all__ = ("DefaultSSHKeypairQuerier",)
 
@@ -32,4 +32,4 @@ class DefaultSSHKeypairQuerier(OwnedFieldQuerier[UserID, SSHKeypairRow, SSHKeypa
 
     @override
     def to_data(self, row: SSHKeypairRow) -> SSHKeypairData:
-        return SSHKeypairSearchableFields.own.to_data(row)
+        return SSHKeypairQuerySpec.own.to_data(row)

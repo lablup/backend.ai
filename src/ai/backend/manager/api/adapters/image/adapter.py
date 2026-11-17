@@ -77,6 +77,10 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.models.image.query_spec import (
+    ImageAliasQuerySpec,
+    ImageQuerySpec,
+)
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import (
     ContainerRegistryImageTarget,
@@ -85,10 +89,6 @@ from ai.backend.manager.models.image.scopes import (
     ProjectImageTarget,
     PublicImageTarget,
     UserImageTarget,
-)
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
 )
 from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
 from ai.backend.manager.models.image.updaters import (
@@ -133,7 +133,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _get_image_pagination_spec() -> PaginationSpec:
     """Get pagination spec for Image queries."""
     return PaginationSpec(
-        forward_order=ImageSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ImageQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=ImageRow.id,
     )
 
@@ -142,7 +142,7 @@ def _get_image_pagination_spec() -> PaginationSpec:
 def _get_alias_pagination_spec() -> PaginationSpec:
     """Get pagination spec for ImageAlias queries."""
     return PaginationSpec(
-        forward_order=ImageAliasSearchableFields.own.alias.order.apply(ascending=True),
+        forward_order=ImageAliasQuerySpec.own.alias.order.apply(ascending=True),
         cursor_column=ImageAliasRow.id,
     )
 
@@ -238,7 +238,7 @@ class ImageAdapter(BaseAdapter):
         if usage is None or usage.used_by is None:
             return []
         used_by = usage.used_by
-        linked = ImageSearchableFields.linked.usage
+        linked = ImageQuerySpec.linked.usage
         return [
             *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
             *(
@@ -478,8 +478,8 @@ class ImageAdapter(BaseAdapter):
     # ------------------------------------------------------------------ querier builders
 
     def _convert_filter(self, filter: ImageFilterInputDTO) -> list[QueryCondition]:
-        fields = ImageSearchableFields.own
-        alias_fields = ImageAliasSearchableFields.own
+        fields = ImageQuerySpec.own
+        alias_fields = ImageAliasQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
@@ -502,7 +502,7 @@ class ImageAdapter(BaseAdapter):
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
             *self.apply_to_many_filter(
                 filter.labels,
-                ImageSearchableFields.nested.labels.correlation,
+                ImageQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
         ]
@@ -511,9 +511,7 @@ class ImageAdapter(BaseAdapter):
                 filter.alias.alias, alias_fields.alias.filter
             )
             if alias_conditions:
-                conditions.append(
-                    ImageSearchableFields.nested.aliases.correlation.some(alias_conditions)
-                )
+                conditions.append(ImageQuerySpec.nested.aliases.correlation.some(alias_conditions))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -537,7 +535,7 @@ class ImageAdapter(BaseAdapter):
         return conditions
 
     def _convert_alias_filter(self, filter: ImageAliasFilterInputDTO) -> list[QueryCondition]:
-        fields = ImageAliasSearchableFields.own
+        fields = ImageAliasQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.alias, fields.alias.filter),
             *self.apply_uuid_filter(filter.image_id, fields.image_id.filter),
@@ -569,7 +567,7 @@ class ImageAdapter(BaseAdapter):
         return [self._convert_order(order) for order in orders]
 
     def _convert_order(self, order: ImageOrderByInputDTO) -> QueryOrder:
-        fields = ImageSearchableFields.own
+        fields = ImageQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ImageOrderField.NAME:
@@ -611,7 +609,7 @@ class ImageAdapter(BaseAdapter):
         return [self._convert_alias_order(order) for order in orders]
 
     def _convert_alias_order(self, order: ImageAliasOrderByInputDTO) -> QueryOrder:
-        fields = ImageAliasSearchableFields.own
+        fields = ImageAliasQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ImageAliasOrderField.ALIAS:

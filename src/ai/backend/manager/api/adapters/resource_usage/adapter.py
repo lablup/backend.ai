@@ -58,6 +58,11 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    DomainUsageBucketQuerySpec,
+    ProjectUsageBucketQuerySpec,
+    UserUsageBucketQuerySpec,
+)
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -67,11 +72,6 @@ from ai.backend.manager.models.resource_usage_history.scopes import (
     DomainUsageBucketTarget,
     ProjectUsageBucketTarget,
     UserUsageBucketTarget,
-)
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    DomainUsageBucketSearchableFields,
-    ProjectUsageBucketSearchableFields,
-    UserUsageBucketSearchableFields,
 )
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
@@ -106,17 +106,17 @@ from ai.backend.manager.services.resource_usage.processors import ResourceUsageP
 DEFAULT_PAGINATION_LIMIT = 20
 
 _DOMAIN_USAGE_BUCKET_PAGINATION_SPEC = PaginationSpec(
-    forward_order=DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending=False),
+    forward_order=DomainUsageBucketQuerySpec.own.period_start.order.apply(ascending=False),
     cursor_column=DomainUsageBucketRow.id,
 )
 
 _PROJECT_USAGE_BUCKET_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectUsageBucketSearchableFields.own.period_start.order.apply(ascending=False),
+    forward_order=ProjectUsageBucketQuerySpec.own.period_start.order.apply(ascending=False),
     cursor_column=ProjectUsageBucketRow.id,
 )
 
 _USER_USAGE_BUCKET_PAGINATION_SPEC = PaginationSpec(
-    forward_order=UserUsageBucketSearchableFields.own.period_start.order.apply(ascending=False),
+    forward_order=UserUsageBucketQuerySpec.own.period_start.order.apply(ascending=False),
     cursor_column=UserUsageBucketRow.id,
 )
 
@@ -147,17 +147,17 @@ class ResourceUsageAdapter(BaseAdapter):
         conditions = []
         if input.domain_name is not None:
             conditions.append(
-                DomainUsageBucketSearchableFields.own.domain_name.filter.equals(
+                DomainUsageBucketQuerySpec.own.domain_name.filter.equals(
                     StringMatchSpec(input.domain_name, case_insensitive=False, negated=False)
                 )
             )
         if input.resource_group is not None:
             conditions.append(
-                DomainUsageBucketSearchableFields.own.resource_group.filter.equals(
+                DomainUsageBucketQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(input.resource_group, case_insensitive=False, negated=False)
                 )
             )
-        orders = [DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending=False)]
+        orders = [DomainUsageBucketQuerySpec.own.period_start.order.apply(ascending=False)]
         action_result = await self._resource_usage.global_search_domain_usage_buckets.run(
             GlobalSearchDomainUsageBucketsAction(
                 searcher=GlobalSearcher(
@@ -189,23 +189,23 @@ class ResourceUsageAdapter(BaseAdapter):
         conditions = []
         if input.domain_name is not None:
             conditions.append(
-                ProjectUsageBucketSearchableFields.own.domain_name.filter.equals(
+                ProjectUsageBucketQuerySpec.own.domain_name.filter.equals(
                     StringMatchSpec(input.domain_name, case_insensitive=False, negated=False)
                 )
             )
         if input.resource_group is not None:
             conditions.append(
-                ProjectUsageBucketSearchableFields.own.resource_group.filter.equals(
+                ProjectUsageBucketQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(input.resource_group, case_insensitive=False, negated=False)
                 )
             )
         if input.project_id is not None:
             conditions.append(
-                ProjectUsageBucketSearchableFields.own.project_id.filter.equals(
+                ProjectUsageBucketQuerySpec.own.project_id.filter.equals(
                     UUIDEqualMatchSpec(value=input.project_id, negated=False)
                 )
             )
-        orders = [ProjectUsageBucketSearchableFields.own.period_start.order.apply(ascending=False)]
+        orders = [ProjectUsageBucketQuerySpec.own.period_start.order.apply(ascending=False)]
         action_result = await self._resource_usage.global_search_project_usage_buckets.run(
             GlobalSearchProjectUsageBucketsAction(
                 searcher=GlobalSearcher(
@@ -237,29 +237,29 @@ class ResourceUsageAdapter(BaseAdapter):
         conditions = []
         if input.domain_name is not None:
             conditions.append(
-                UserUsageBucketSearchableFields.own.domain_name.filter.equals(
+                UserUsageBucketQuerySpec.own.domain_name.filter.equals(
                     StringMatchSpec(input.domain_name, case_insensitive=False, negated=False)
                 )
             )
         if input.resource_group is not None:
             conditions.append(
-                UserUsageBucketSearchableFields.own.resource_group.filter.equals(
+                UserUsageBucketQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(input.resource_group, case_insensitive=False, negated=False)
                 )
             )
         if input.project_id is not None:
             conditions.append(
-                UserUsageBucketSearchableFields.own.project_id.filter.equals(
+                UserUsageBucketQuerySpec.own.project_id.filter.equals(
                     UUIDEqualMatchSpec(value=input.project_id, negated=False)
                 )
             )
         if input.user_uuid is not None:
             conditions.append(
-                UserUsageBucketSearchableFields.own.user_uuid.filter.equals(
+                UserUsageBucketQuerySpec.own.user_uuid.filter.equals(
                     UUIDEqualMatchSpec(value=input.user_uuid, negated=False)
                 )
             )
-        orders = [UserUsageBucketSearchableFields.own.period_start.order.apply(ascending=False)]
+        orders = [UserUsageBucketQuerySpec.own.period_start.order.apply(ascending=False)]
         action_result = await self._resource_usage.global_search_user_usage_buckets.run(
             GlobalSearchUserUsageBucketsAction(
                 searcher=GlobalSearcher(
@@ -292,9 +292,7 @@ class ResourceUsageAdapter(BaseAdapter):
         resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
-            orders=[
-                DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending=False)
-            ],
+            orders=[DomainUsageBucketQuerySpec.own.period_start.order.apply(ascending=False)],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action_result = await self._resource_usage.search_domain_usage_buckets.run(
@@ -330,9 +328,7 @@ class ResourceUsageAdapter(BaseAdapter):
         resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
-            orders=[
-                ProjectUsageBucketSearchableFields.own.period_start.order.apply(ascending=False)
-            ],
+            orders=[ProjectUsageBucketQuerySpec.own.period_start.order.apply(ascending=False)],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action_result = await self._resource_usage.search_project_usage_buckets.run(
@@ -369,7 +365,7 @@ class ResourceUsageAdapter(BaseAdapter):
         resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
-            orders=[UserUsageBucketSearchableFields.own.period_start.order.apply(ascending=False)],
+            orders=[UserUsageBucketQuerySpec.own.period_start.order.apply(ascending=False)],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action_result = await self._resource_usage.search_user_usage_buckets.run(
@@ -792,14 +788,14 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_string_filter(
                     filter_req.resource_group,
-                    DomainUsageBucketSearchableFields.own.resource_group.filter,
+                    DomainUsageBucketQuerySpec.own.resource_group.filter,
                 )
             )
 
         if filter_req.domain_name is not None:
             conditions.extend(
                 self.apply_string_filter(
-                    filter_req.domain_name, DomainUsageBucketSearchableFields.own.domain_name.filter
+                    filter_req.domain_name, DomainUsageBucketQuerySpec.own.domain_name.filter
                 )
             )
 
@@ -807,21 +803,21 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_date_filter(
                     filter_req.period_start,
-                    DomainUsageBucketSearchableFields.own.period_start.filter,
+                    DomainUsageBucketQuerySpec.own.period_start.filter,
                 )
             )
 
         if filter_req.period_end is not None:
             conditions.extend(
                 self.apply_date_filter(
-                    filter_req.period_end, DomainUsageBucketSearchableFields.own.period_end.filter
+                    filter_req.period_end, DomainUsageBucketQuerySpec.own.period_end.filter
                 )
             )
 
         if filter_req.field_id is not None:
             conditions.extend(
                 self.apply_uuid_filter(
-                    filter_req.field_id, DomainUsageBucketSearchableFields.own.id.filter
+                    filter_req.field_id, DomainUsageBucketQuerySpec.own.id.filter
                 )
             )
 
@@ -854,9 +850,7 @@ class ResourceUsageAdapter(BaseAdapter):
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             if order.field == UsageBucketOrderField.PERIOD_START:
-                result.append(
-                    DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending)
-                )
+                result.append(DomainUsageBucketQuerySpec.own.period_start.order.apply(ascending))
         return result
 
     def _convert_project_filter(
@@ -869,14 +863,14 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_string_filter(
                     filter_req.resource_group,
-                    ProjectUsageBucketSearchableFields.own.resource_group.filter,
+                    ProjectUsageBucketQuerySpec.own.resource_group.filter,
                 )
             )
 
         if filter_req.project_id is not None:
             conditions.extend(
                 self.apply_uuid_filter(
-                    filter_req.project_id, ProjectUsageBucketSearchableFields.own.project_id.filter
+                    filter_req.project_id, ProjectUsageBucketQuerySpec.own.project_id.filter
                 )
             )
 
@@ -884,7 +878,7 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_string_filter(
                     filter_req.domain_name,
-                    ProjectUsageBucketSearchableFields.own.domain_name.filter,
+                    ProjectUsageBucketQuerySpec.own.domain_name.filter,
                 )
             )
 
@@ -892,21 +886,21 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_date_filter(
                     filter_req.period_start,
-                    ProjectUsageBucketSearchableFields.own.period_start.filter,
+                    ProjectUsageBucketQuerySpec.own.period_start.filter,
                 )
             )
 
         if filter_req.period_end is not None:
             conditions.extend(
                 self.apply_date_filter(
-                    filter_req.period_end, ProjectUsageBucketSearchableFields.own.period_end.filter
+                    filter_req.period_end, ProjectUsageBucketQuerySpec.own.period_end.filter
                 )
             )
 
         if filter_req.field_id is not None:
             conditions.extend(
                 self.apply_uuid_filter(
-                    filter_req.field_id, ProjectUsageBucketSearchableFields.own.id.filter
+                    filter_req.field_id, ProjectUsageBucketQuerySpec.own.id.filter
                 )
             )
 
@@ -939,9 +933,7 @@ class ResourceUsageAdapter(BaseAdapter):
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             if order.field == UsageBucketOrderField.PERIOD_START:
-                result.append(
-                    ProjectUsageBucketSearchableFields.own.period_start.order.apply(ascending)
-                )
+                result.append(ProjectUsageBucketQuerySpec.own.period_start.order.apply(ascending))
         return result
 
     def _convert_user_filter(
@@ -954,50 +946,48 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_string_filter(
                     filter_req.resource_group,
-                    UserUsageBucketSearchableFields.own.resource_group.filter,
+                    UserUsageBucketQuerySpec.own.resource_group.filter,
                 )
             )
 
         if filter_req.user_uuid is not None:
             conditions.extend(
                 self.apply_uuid_filter(
-                    filter_req.user_uuid, UserUsageBucketSearchableFields.own.user_uuid.filter
+                    filter_req.user_uuid, UserUsageBucketQuerySpec.own.user_uuid.filter
                 )
             )
 
         if filter_req.project_id is not None:
             conditions.extend(
                 self.apply_uuid_filter(
-                    filter_req.project_id, UserUsageBucketSearchableFields.own.project_id.filter
+                    filter_req.project_id, UserUsageBucketQuerySpec.own.project_id.filter
                 )
             )
 
         if filter_req.domain_name is not None:
             conditions.extend(
                 self.apply_string_filter(
-                    filter_req.domain_name, UserUsageBucketSearchableFields.own.domain_name.filter
+                    filter_req.domain_name, UserUsageBucketQuerySpec.own.domain_name.filter
                 )
             )
 
         if filter_req.period_start is not None:
             conditions.extend(
                 self.apply_date_filter(
-                    filter_req.period_start, UserUsageBucketSearchableFields.own.period_start.filter
+                    filter_req.period_start, UserUsageBucketQuerySpec.own.period_start.filter
                 )
             )
 
         if filter_req.period_end is not None:
             conditions.extend(
                 self.apply_date_filter(
-                    filter_req.period_end, UserUsageBucketSearchableFields.own.period_end.filter
+                    filter_req.period_end, UserUsageBucketQuerySpec.own.period_end.filter
                 )
             )
 
         if filter_req.field_id is not None:
             conditions.extend(
-                self.apply_uuid_filter(
-                    filter_req.field_id, UserUsageBucketSearchableFields.own.id.filter
-                )
+                self.apply_uuid_filter(filter_req.field_id, UserUsageBucketQuerySpec.own.id.filter)
             )
 
         if filter_req.AND:
@@ -1029,9 +1019,7 @@ class ResourceUsageAdapter(BaseAdapter):
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             if order.field == UsageBucketOrderField.PERIOD_START:
-                result.append(
-                    UserUsageBucketSearchableFields.own.period_start.order.apply(ascending)
-                )
+                result.append(UserUsageBucketQuerySpec.own.period_start.order.apply(ascending))
         return result
 
     @staticmethod

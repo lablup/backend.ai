@@ -58,13 +58,13 @@ from ai.backend.manager.errors.auth import (
 )
 from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT, KeyPairRow
+from ai.backend.manager.models.resource_policy.query_spec import (
+    KeyPairResourcePolicyQuerySpec,
+    UserResourcePolicyQuerySpec,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    KeyPairResourcePolicySearchableFields,
-    UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.user.row import UserRow, UserStatus
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -695,7 +695,7 @@ async def _query_auth_context(
                 sudo_session_enabled=user_row.sudo_session_enabled,
                 allowed_client_ip=user_row.allowed_client_ip,
                 rate_limit=default_rate_limit,
-                resource_policy=UserResourcePolicySearchableFields.own.to_data(user_policy_row),
+                resource_policy=UserResourcePolicyQuerySpec.own.to_data(user_policy_row),
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),
@@ -705,9 +705,7 @@ async def _query_auth_context(
                     )
                 ),
                 is_admin=bool(keypair_row.is_admin),
-                resource_policy=KeyPairResourcePolicySearchableFields.own.to_data(
-                    keypair_policy_row
-                ),
+                resource_policy=KeyPairResourcePolicyQuerySpec.own.to_data(keypair_policy_row),
             ),
         )
 

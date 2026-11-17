@@ -58,11 +58,11 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
+)
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.scopes import DomainContainerRegistryTarget
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
-)
 from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -105,7 +105,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _pagination_spec() -> PaginationSpec:
     """How a page of registries is cut, in either mode. The order runs by id."""
     return PaginationSpec(
-        forward_order=ContainerRegistrySearchableFields.own.id.order.apply(ascending=False),
+        forward_order=ContainerRegistryQuerySpec.own.id.order.apply(ascending=False),
         cursor_column=ContainerRegistryRow.id,
     )
 
@@ -399,7 +399,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter: ContainerRegistryFilter) -> list[QueryCondition]:
-        fields = ContainerRegistrySearchableFields.own
+        fields = ContainerRegistryQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.registry_name, fields.registry_name.filter),
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
@@ -428,7 +428,7 @@ class ContainerRegistryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_type_filter(tf: ContainerRegistryTypeFilter) -> list[QueryCondition]:
-        conditions = ContainerRegistrySearchableFields.own.type.filter
+        conditions = ContainerRegistryQuerySpec.own.type.filter
         result: list[QueryCondition] = []
         if tf.equals is not None:
             result.append(conditions.equals(tf.equals))
@@ -442,7 +442,7 @@ class ContainerRegistryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(order: list[ContainerRegistryOrder]) -> list[QueryOrder]:
-        fields = ContainerRegistrySearchableFields.own
+        fields = ContainerRegistryQuerySpec.own
         columns = {
             ContainerRegistryOrderField.REGISTRY_NAME: fields.registry_name.order,
             ContainerRegistryOrderField.URL: fields.url.order,

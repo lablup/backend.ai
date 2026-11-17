@@ -28,12 +28,12 @@ from ai.backend.manager.errors.artifact import (
     ArtifactRevisionNotVerified,
     ArtifactRevisionUpdateError,
 )
+from ai.backend.manager.models.artifact.query_spec import ArtifactQuerySpec
 from ai.backend.manager.models.artifact.row import ArtifactRow
-from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
-from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.models.artifact_revision.searchable_fields import (
-    ArtifactRevisionSearchableFields,
+from ai.backend.manager.models.artifact_revision.query_spec import (
+    ArtifactRevisionQuerySpec,
 )
+from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages.row import (
     AssociationArtifactsStorageRow,
 )
@@ -56,7 +56,7 @@ class ArtifactDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
-            return ArtifactSearchableFields.own.to_data(row)
+            return ArtifactQuerySpec.own.to_data(row)
 
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -70,7 +70,7 @@ class ArtifactDBSource:
                 raise ArtifactNotFoundError(
                     f"Artifact with model ID {model_id} not found under registry {registry_id}"
                 )
-            return ArtifactSearchableFields.own.to_data(row)
+            return ArtifactQuerySpec.own.to_data(row)
 
     async def get_artifact_revision(
         self, artifact_id: uuid.UUID, revision: str
@@ -87,7 +87,7 @@ class ArtifactDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
-            return ArtifactRevisionSearchableFields.own.to_data(row)
+            return ArtifactRevisionQuerySpec.own.to_data(row)
 
     async def associate_artifact_with_storage(
         self,
@@ -200,7 +200,7 @@ class ArtifactDBSource:
             if updated_row is None:
                 raise ArtifactRevisionUpdateError()
 
-            return ArtifactRevisionSearchableFields.own.to_data(updated_row)
+            return ArtifactRevisionQuerySpec.own.to_data(updated_row)
 
     async def reject_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
@@ -223,7 +223,7 @@ class ArtifactDBSource:
             if updated_row is None:
                 raise ArtifactRevisionUpdateError()
 
-            return ArtifactRevisionSearchableFields.own.to_data(updated_row)
+            return ArtifactRevisionQuerySpec.own.to_data(updated_row)
 
     async def reset_artifact_revision_status(self, revision_id: uuid.UUID) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
@@ -301,7 +301,7 @@ class ArtifactDBSource:
                 sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
             )
             rows = list(result.scalars().all())
-            return [ArtifactSearchableFields.own.to_data(row) for row in rows]
+            return [ArtifactQuerySpec.own.to_data(row) for row in rows]
 
     async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
@@ -322,7 +322,7 @@ class ArtifactDBSource:
                 sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
             )
             rows = list(result.scalars().all())
-            return [ArtifactSearchableFields.own.to_data(row) for row in rows]
+            return [ArtifactQuerySpec.own.to_data(row) for row in rows]
 
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int

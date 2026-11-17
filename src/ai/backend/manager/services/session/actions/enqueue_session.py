@@ -19,7 +19,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole
@@ -149,14 +149,14 @@ class EnqueueSessionAction(SessionScopeAction):
             pagination=NoPagination(),
             conditions=[
                 *conditions,
-                SessionGroupSearchableFields.linked.replica_groups.exists(),
+                SessionGroupQuerySpec.linked.replica_groups.exists(),
             ],
         )
 
     def _owned_session_group_conditions(self, owner_user_id: UserID) -> list[QueryCondition] | None:
         if self.session_group_id is None:
             return None
-        fields = SessionGroupSearchableFields.own
+        fields = SessionGroupQuerySpec.own
         return [
             fields.id.filter.equals(UUIDEqualMatchSpec(value=self.session_group_id, negated=False)),
             fields.owner_user_id.filter.equals(

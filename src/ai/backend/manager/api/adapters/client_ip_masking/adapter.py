@@ -38,10 +38,10 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
-from ai.backend.manager.models.client_ip_masking.searchable_fields import (
-    ClientIPMaskingPolicySearchableFields,
+from ai.backend.manager.models.client_ip_masking.query_spec import (
+    ClientIPMaskingPolicyQuerySpec,
 )
+from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.client_ip_masking.searchers import ClientIPMaskingPolicySearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.client_ip_masking.actions.bulk_get import (
@@ -64,9 +64,7 @@ from ai.backend.manager.services.client_ip_masking.processors import ClientIPMas
 
 def _pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ClientIPMaskingPolicySearchableFields.own.target_type.order.apply(
-            ascending=True
-        ),
+        forward_order=ClientIPMaskingPolicyQuerySpec.own.target_type.order.apply(ascending=True),
         cursor_column=ClientIPMaskingPolicyRow.id,
     )
 
@@ -171,7 +169,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, f: ClientIPMaskingPolicyFilter) -> list[QueryCondition]:
-        fields = ClientIPMaskingPolicySearchableFields.own
+        fields = ClientIPMaskingPolicyQuerySpec.own
         conditions: list[QueryCondition] = [*self.apply_uuid_filter(f.entity_id, fields.id.filter)]
         if f.target_type is not None:
             conditions.append(
@@ -183,7 +181,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(orders: list[ClientIPMaskingPolicyOrder]) -> list[QueryOrder]:
-        fields = ClientIPMaskingPolicySearchableFields.own
+        fields = ClientIPMaskingPolicyQuerySpec.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC

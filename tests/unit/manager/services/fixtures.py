@@ -6,15 +6,15 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
+)
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.image.query_spec import (
+    ImageAliasQuerySpec,
+    ImageQuerySpec,
 )
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
-)
 
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
@@ -31,7 +31,7 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
     extra=None,
 )
 
-CONTAINER_REGISTRY_FIXTURE_DATA = ContainerRegistrySearchableFields.own.to_data(
+CONTAINER_REGISTRY_FIXTURE_DATA = ContainerRegistryQuerySpec.own.to_data(
     CONTAINER_REGISTRY_ROW_FIXTURE
 )
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
@@ -60,7 +60,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
 IMAGE_ROW_FIXTURE.id = ImageID(uuid.uuid4())
 IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC)
 
-IMAGE_FIXTURE_DATA = ImageSearchableFields.own.to_data(IMAGE_ROW_FIXTURE)
+IMAGE_FIXTURE_DATA = ImageQuerySpec.own.to_data(IMAGE_ROW_FIXTURE)
 
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(
@@ -77,6 +77,6 @@ IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
     image_id=IMAGE_ROW_FIXTURE.id,
 )
 
-IMAGE_ALIAS_DATA = ImageAliasSearchableFields.own.to_data(IMAGE_ALIAS_ROW_FIXTURE)
+IMAGE_ALIAS_DATA = ImageAliasQuerySpec.own.to_data(IMAGE_ALIAS_ROW_FIXTURE)
 IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id

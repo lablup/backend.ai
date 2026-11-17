@@ -7,10 +7,10 @@ from typing import Any, override
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
-from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
-from ai.backend.manager.models.client_ip_masking.searchable_fields import (
-    ClientIPMaskingPolicySearchableFields,
+from ai.backend.manager.models.client_ip_masking.query_spec import (
+    ClientIPMaskingPolicyQuerySpec,
 )
+from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -29,4 +29,4 @@ class BulkClientIPMaskingPolicyQuerier(
 
     @override
     def to_data(self, row: ClientIPMaskingPolicyRow) -> ClientIPMaskingPolicyData:
-        return ClientIPMaskingPolicySearchableFields.own.to_data(row)
+        return ClientIPMaskingPolicyQuerySpec.own.to_data(row)

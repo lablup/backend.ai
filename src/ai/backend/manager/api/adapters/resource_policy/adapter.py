@@ -94,7 +94,7 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.resource_policy.creators import (
     KeyPairResourcePolicyCreator,
     ProjectResourcePolicyCreator,
@@ -102,6 +102,11 @@ from ai.backend.manager.models.resource_policy.creators import (
 )
 from ai.backend.manager.models.resource_policy.deprecated_search import (
     DeprecatedKeyPairResourcePolicyConditions,
+)
+from ai.backend.manager.models.resource_policy.query_spec import (
+    KeyPairResourcePolicyQuerySpec,
+    ProjectResourcePolicyQuerySpec,
+    UserResourcePolicyQuerySpec,
 )
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -112,11 +117,6 @@ from ai.backend.manager.models.resource_policy.scopes import (
     ProjectResourcePolicyTarget,
     UserKeypairResourcePolicyTarget,
     UserResourcePolicyTarget,
-)
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    KeyPairResourcePolicySearchableFields,
-    ProjectResourcePolicySearchableFields,
-    UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
@@ -237,17 +237,17 @@ from ai.backend.manager.services.user_resource_policy.processors import UserReso
 from ai.backend.manager.types import OptionalState, TriState
 
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeyPairResourcePolicySearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=KeyPairResourcePolicyQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=KeyPairResourcePolicyRow.uuid,
 )
 
 _USER_RP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=UserResourcePolicySearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=UserResourcePolicyQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=UserResourcePolicyRow.uuid,
 )
 
 _PROJECT_RP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectResourcePolicySearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=ProjectResourcePolicyQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=ProjectResourcePolicyRow.uuid,
 )
 
@@ -950,7 +950,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Filter converters ──
 
     def _convert_keypair_filter(self, filter: KeypairResourcePolicyFilter) -> list[QueryCondition]:
-        fields = KeyPairResourcePolicySearchableFields.own
+        fields = KeyPairResourcePolicyQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
@@ -998,15 +998,13 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> QueryCondition | None:
         """Deprecated. Every condition lands in one EXISTS over one keypair the policy
         applies to."""
-        conditions = self.apply_uuid_filter(
-            filter.user_id, KeyPairSearchableFields.own.user_id.filter
-        )
+        conditions = self.apply_uuid_filter(filter.user_id, KeyPairQuerySpec.own.user_id.filter)
         if not conditions:
             return None
         return DeprecatedKeyPairResourcePolicyConditions.exists_keypair_combined(conditions)
 
     def _convert_user_filter(self, filter: UserResourcePolicyFilter) -> list[QueryCondition]:
-        fields = UserResourcePolicySearchableFields.own
+        fields = UserResourcePolicyQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
@@ -1043,7 +1041,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         return conditions
 
     def _convert_project_filter(self, filter: ProjectResourcePolicyFilter) -> list[QueryCondition]:
-        fields = ProjectResourcePolicySearchableFields.own
+        fields = ProjectResourcePolicyQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
@@ -1097,35 +1095,29 @@ def _resolve_keypair_order(
     ascending = direction == OrderDirection.ASC
     match field:
         case KeypairResourcePolicyOrderField.NAME:
-            return KeyPairResourcePolicySearchableFields.own.name.order.apply(ascending)
+            return KeyPairResourcePolicyQuerySpec.own.name.order.apply(ascending)
         case KeypairResourcePolicyOrderField.CREATED_AT:
-            return KeyPairResourcePolicySearchableFields.own.created_at.order.apply(ascending)
+            return KeyPairResourcePolicyQuerySpec.own.created_at.order.apply(ascending)
         case KeypairResourcePolicyOrderField.MAX_SESSION_LIFETIME:
-            return KeyPairResourcePolicySearchableFields.own.max_session_lifetime.order.apply(
-                ascending
-            )
+            return KeyPairResourcePolicyQuerySpec.own.max_session_lifetime.order.apply(ascending)
         case KeypairResourcePolicyOrderField.MAX_CONCURRENT_SESSIONS:
-            return KeyPairResourcePolicySearchableFields.own.max_concurrent_sessions.order.apply(
-                ascending
-            )
+            return KeyPairResourcePolicyQuerySpec.own.max_concurrent_sessions.order.apply(ascending)
         case KeypairResourcePolicyOrderField.MAX_CONTAINERS_PER_SESSION:
-            return KeyPairResourcePolicySearchableFields.own.max_containers_per_session.order.apply(
+            return KeyPairResourcePolicyQuerySpec.own.max_containers_per_session.order.apply(
                 ascending
             )
         case KeypairResourcePolicyOrderField.IDLE_TIMEOUT:
-            return KeyPairResourcePolicySearchableFields.own.idle_timeout.order.apply(ascending)
+            return KeyPairResourcePolicyQuerySpec.own.idle_timeout.order.apply(ascending)
         case KeypairResourcePolicyOrderField.MAX_CONCURRENT_SFTP_SESSIONS:
-            return (
-                KeyPairResourcePolicySearchableFields.own.max_concurrent_sftp_sessions.order.apply(
-                    ascending
-                )
+            return KeyPairResourcePolicyQuerySpec.own.max_concurrent_sftp_sessions.order.apply(
+                ascending
             )
         case KeypairResourcePolicyOrderField.MAX_PENDING_SESSION_COUNT:
-            return KeyPairResourcePolicySearchableFields.own.max_pending_session_count.order.apply(
+            return KeyPairResourcePolicyQuerySpec.own.max_pending_session_count.order.apply(
                 ascending
             )
         case KeypairResourcePolicyOrderField.MAX_PRIORITY:
-            return KeyPairResourcePolicySearchableFields.own.max_priority.order.apply(ascending)
+            return KeyPairResourcePolicyQuerySpec.own.max_priority.order.apply(ascending)
 
 
 def _resolve_user_order(
@@ -1134,27 +1126,21 @@ def _resolve_user_order(
     ascending = direction == OrderDirection.ASC
     match field:
         case UserResourcePolicyOrderField.NAME:
-            return UserResourcePolicySearchableFields.own.name.order.apply(ascending)
+            return UserResourcePolicyQuerySpec.own.name.order.apply(ascending)
         case UserResourcePolicyOrderField.CREATED_AT:
-            return UserResourcePolicySearchableFields.own.created_at.order.apply(ascending)
+            return UserResourcePolicyQuerySpec.own.created_at.order.apply(ascending)
         case UserResourcePolicyOrderField.MAX_VFOLDER_COUNT:
-            return UserResourcePolicySearchableFields.own.max_vfolder_count.order.apply(ascending)
+            return UserResourcePolicyQuerySpec.own.max_vfolder_count.order.apply(ascending)
         case UserResourcePolicyOrderField.MAX_CONCURRENT_LOGINS:
-            return UserResourcePolicySearchableFields.own.max_concurrent_logins.order.apply(
-                ascending
-            )
+            return UserResourcePolicyQuerySpec.own.max_concurrent_logins.order.apply(ascending)
         case UserResourcePolicyOrderField.MAX_QUOTA_SCOPE_SIZE:
-            return UserResourcePolicySearchableFields.own.max_quota_scope_size.order.apply(
-                ascending
-            )
+            return UserResourcePolicyQuerySpec.own.max_quota_scope_size.order.apply(ascending)
         case UserResourcePolicyOrderField.MAX_SESSION_COUNT_PER_MODEL_SESSION:
-            return UserResourcePolicySearchableFields.own.max_session_count_per_model_session.order.apply(
+            return UserResourcePolicyQuerySpec.own.max_session_count_per_model_session.order.apply(
                 ascending
             )
         case UserResourcePolicyOrderField.MAX_CUSTOMIZED_IMAGE_COUNT:
-            return UserResourcePolicySearchableFields.own.max_customized_image_count.order.apply(
-                ascending
-            )
+            return UserResourcePolicyQuerySpec.own.max_customized_image_count.order.apply(ascending)
 
 
 def _resolve_project_order(
@@ -1163,18 +1149,12 @@ def _resolve_project_order(
     ascending = direction == OrderDirection.ASC
     match field:
         case ProjectResourcePolicyOrderField.NAME:
-            return ProjectResourcePolicySearchableFields.own.name.order.apply(ascending)
+            return ProjectResourcePolicyQuerySpec.own.name.order.apply(ascending)
         case ProjectResourcePolicyOrderField.CREATED_AT:
-            return ProjectResourcePolicySearchableFields.own.created_at.order.apply(ascending)
+            return ProjectResourcePolicyQuerySpec.own.created_at.order.apply(ascending)
         case ProjectResourcePolicyOrderField.MAX_VFOLDER_COUNT:
-            return ProjectResourcePolicySearchableFields.own.max_vfolder_count.order.apply(
-                ascending
-            )
+            return ProjectResourcePolicyQuerySpec.own.max_vfolder_count.order.apply(ascending)
         case ProjectResourcePolicyOrderField.MAX_QUOTA_SCOPE_SIZE:
-            return ProjectResourcePolicySearchableFields.own.max_quota_scope_size.order.apply(
-                ascending
-            )
+            return ProjectResourcePolicyQuerySpec.own.max_quota_scope_size.order.apply(ascending)
         case ProjectResourcePolicyOrderField.MAX_NETWORK_COUNT:
-            return ProjectResourcePolicySearchableFields.own.max_network_count.order.apply(
-                ascending
-            )
+            return ProjectResourcePolicyQuerySpec.own.max_network_count.order.apply(ascending)

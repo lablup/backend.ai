@@ -45,12 +45,12 @@ from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.lookups import ImageAliasOwnerLookup
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.queriers import ImageQuerier
+from ai.backend.manager.models.image.query_spec import (
+    ImageAliasQuerySpec,
+    ImageQuerySpec,
+)
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import ImageTarget
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
-)
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageAliasSearcher,
@@ -145,7 +145,7 @@ class ImageDBSource:
                 ImageAliasSearcher(
                     pagination=NoPagination(),
                     conditions=[
-                        ImageAliasSearchableFields.own.image_id.filter.in_(
+                        ImageAliasQuerySpec.own.image_id.filter.in_(
                             UUIDInMatchSpec(values=list(image_ids), negated=False)
                         )
                     ],
@@ -205,7 +205,7 @@ class ImageDBSource:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             image_row.status = ImageStatus.DELETED
             await session.flush()
-            return ImageSearchableFields.own.to_data(image_row)
+            return ImageQuerySpec.own.to_data(image_row)
 
     async def mark_image_alive_by_id(
         self,
@@ -220,7 +220,7 @@ class ImageDBSource:
             )
             image_row.status = ImageStatus.ALIVE
             await session.flush()
-            return ImageSearchableFields.own.to_data(image_row)
+            return ImageQuerySpec.own.to_data(image_row)
 
     async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
         """
@@ -350,7 +350,7 @@ class ImageDBSource:
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             image_row._resources = {}
-            return ImageSearchableFields.own.to_data(image_row)
+            return ImageQuerySpec.own.to_data(image_row)
 
     async def set_image_resource_limit_by_id(
         self,
@@ -373,7 +373,7 @@ class ImageDBSource:
                 resources[resource_limit.slot_name]["max"] = str(resource_limit.max_value)
 
             image_row._resources = resources
-            return ImageSearchableFields.own.to_data(image_row)
+            return ImageQuerySpec.own.to_data(image_row)
 
     async def remove_image_and_aliases(
         self,
@@ -399,9 +399,7 @@ class ImageDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ImageAliasRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                ImageAliasSearchableFields.own.to_data(row.ImageAliasRow) for row in result.rows
-            ]
+            items = [ImageAliasQuerySpec.own.to_data(row.ImageAliasRow) for row in result.rows]
             image_ids = [ImageID(row.ImageAliasRow.image_id) for row in result.rows]
             return ImageAliasListResult(
                 items=items,

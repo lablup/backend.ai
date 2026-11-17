@@ -13,14 +13,14 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.query_spec import (
+    DomainContainerRegistryRelationQuerySpec,
+)
 from ai.backend.manager.models.domain_container_registry_relation.row import (
     DomainContainerRegistryRelationRow,
 )
 from ai.backend.manager.models.domain_container_registry_relation.scopes import (
     DomainContainerRegistryRelationTarget,
-)
-from ai.backend.manager.models.domain_container_registry_relation.searchable_fields import (
-    DomainContainerRegistryRelationSearchableFields,
 )
 from ai.backend.manager.models.domain_container_registry_relation.searchers import (
     DomainContainerRegistryRelationSearcher,
@@ -114,7 +114,7 @@ class TestDomainContainerRegistryRelationSearch:
     async def test_scoped_search_is_narrowed_by_a_used_registry(
         self, repository: DomainRepository, relations: _Relations
     ) -> None:
-        usage = DomainContainerRegistryRelationSearchableFields.linked.usage
+        usage = DomainContainerRegistryRelationQuerySpec.linked.usage
         result = await repository.scoped_search_container_registry_relations(
             ScopedSearcher(
                 scopes=[DomainContainerRegistryRelationTarget(relations.both)],
@@ -130,7 +130,7 @@ class TestDomainContainerRegistryRelationSearch:
     async def test_global_search_reads_every_domain_of_a_used_registry(
         self, repository: DomainRepository, relations: _Relations
     ) -> None:
-        usage = DomainContainerRegistryRelationSearchableFields.linked.usage
+        usage = DomainContainerRegistryRelationQuerySpec.linked.usage
         result = await repository.global_search_container_registry_relations(
             GlobalSearcher(
                 used_by=[usage.container_registries.uses(relations.shared)],

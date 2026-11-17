@@ -32,15 +32,15 @@ from ai.backend.manager.errors.role import RoleAlreadyAssigned, RoleNotAssigned,
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
-    PermissionSearchableFields,
+from ai.backend.manager.models.rbac_models.permission.query_spec import (
+    PermissionQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
@@ -157,7 +157,7 @@ class PermissionDBSource:
                 raise RoleNotAssigned(
                     f"Role {data.role_id} is not assigned to user {data.user_id}."
                 )
-            revoked = RoleAssignmentSearchableFields.own.to_data(user_role_row)
+            revoked = RoleAssignmentQuerySpec.own.to_data(user_role_row)
             await db_session.delete(user_role_row)
             await db_session.flush()
 
@@ -209,7 +209,7 @@ class PermissionDBSource:
                     sa.select(PermissionRow).where(PermissionRow.role_id == role_id)
                 )
             ).all()
-        return [PermissionSearchableFields.own.to_data(row) for row in rows]
+        return [PermissionQuerySpec.own.to_data(row) for row in rows]
 
     async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
         async with self._db.begin_readonly_session_read_committed() as db_session:
@@ -295,7 +295,7 @@ class PermissionDBSource:
                 )
             ).all()
         return BulkRoleAssignmentResultData(
-            successes=[RoleAssignmentSearchableFields.own.to_data(row) for row in rows],
+            successes=[RoleAssignmentQuerySpec.own.to_data(row) for row in rows],
             failures=failures,
         )
 
@@ -319,7 +319,7 @@ class PermissionDBSource:
                             raise RoleNotAssigned(
                                 f"Role {data.role_id} is not assigned to user {user_id}."
                             )
-                        revoked = RoleAssignmentSearchableFields.own.to_data(user_role_row)
+                        revoked = RoleAssignmentQuerySpec.own.to_data(user_role_row)
                         await db_session.delete(user_role_row)
                         await db_session.flush()
                         successes.append(revoked)

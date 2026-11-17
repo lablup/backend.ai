@@ -14,12 +14,12 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.dto.manager.query import DateRangeFilter
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
-from .shelf_fields import ShelfSearchableFields
+from .shelf_fields import ShelfQuerySpec
 from .shelf_fixtures import DATES, TIMES, Seeded
 from .shelf_rows import ShelfKind
 from .shelf_search import ShelfSearches, ids
 
-OWN = ShelfSearchableFields.own
+OWN = ShelfQuerySpec.own
 
 
 def _match(value: str, *, case_insensitive: bool = False, negated: bool = False) -> StringMatchSpec:

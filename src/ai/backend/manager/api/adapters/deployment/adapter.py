@@ -244,17 +244,22 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_policy.searchable_fields import (
-    DeploymentPolicySearchableFields,
+from ai.backend.manager.models.deployment_policy.query_spec import (
+    DeploymentPolicyQuerySpec,
 )
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision.searchable_fields import (
-    ModelRevisionSearchableFields,
+from ai.backend.manager.models.deployment_revision.query_spec import (
+    ModelRevisionQuerySpec,
 )
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
+from ai.backend.manager.models.endpoint.query_spec import (
+    AutoScalingRuleQuerySpec,
+    DeploymentAccessTokenQuerySpec,
+    DeploymentQuerySpec,
+)
 from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -266,24 +271,19 @@ from ai.backend.manager.models.endpoint.scopes import (
     ProjectDeploymentTarget,
     UserDeploymentTarget,
 )
-from ai.backend.manager.models.endpoint.searchable_fields import (
-    AutoScalingRuleSearchableFields,
-    DeploymentAccessTokenSearchableFields,
-    DeploymentSearchableFields,
-)
 from ai.backend.manager.models.endpoint.searchers import (
     AutoScalingRuleSearcher,
     DeploymentAccessTokenSearcher,
     DeploymentSearcher,
 )
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    ResourceSlotTypeSearchableFields,
-    RevisionResourceSlotSearchableFields,
+from ai.backend.manager.models.resource_slot.query_spec import (
+    ResourceSlotTypeQuerySpec,
+    RevisionResourceSlotQuerySpec,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher, RouteInfoSearcher
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -488,7 +488,7 @@ def _model_definition_to_dto(
 @lru_cache(maxsize=1)
 def _get_deployment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=DeploymentQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=EndpointRow.id,
     )
 
@@ -503,7 +503,7 @@ def _get_deployment_policy_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_revision_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ModelRevisionSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ModelRevisionQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=DeploymentRevisionRow.id,
     )
 
@@ -511,7 +511,7 @@ def _get_revision_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ReplicaSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ReplicaQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RoutingRow.id,
     )
 
@@ -519,9 +519,7 @@ def _get_route_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_access_token_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentAccessTokenSearchableFields.own.created_at.order.apply(
-            ascending=False
-        ),
+        forward_order=DeploymentAccessTokenQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=EndpointTokenRow.id,
     )
 
@@ -529,7 +527,7 @@ def _get_access_token_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AutoScalingRuleSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=AutoScalingRuleQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=EndpointAutoScalingRuleRow.id,
     )
 
@@ -537,7 +535,7 @@ def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_replica_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ReplicaSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ReplicaQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RoutingRow.id,
     )
 
@@ -545,7 +543,7 @@ def _get_replica_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending=True),
+        forward_order=ResourceSlotTypeQuerySpec.own.rank.order.apply(ascending=True),
         cursor_column=DeploymentRevisionResourceSlotRow.id,
     )
 
@@ -776,7 +774,7 @@ class DeploymentAdapter(BaseAdapter):
         if usage is None or usage.uses is None:
             return []
         uses = usage.uses
-        linked = DeploymentSearchableFields.linked.usage
+        linked = DeploymentQuerySpec.linked.usage
         return [
             *(
                 linked.resource_groups.uses(ResourceGroupID(entity_id))
@@ -1762,8 +1760,8 @@ class DeploymentAdapter(BaseAdapter):
     # ------------------------------------------------------------------
 
     def _convert_deployment_filter(self, f: DeploymentFilter) -> list[QueryCondition]:
-        fields = DeploymentSearchableFields.own
-        nested = DeploymentSearchableFields.nested
+        fields = DeploymentQuerySpec.own
+        nested = DeploymentQuerySpec.nested
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_string_filter(f.tags, fields.tag.filter),
@@ -1810,7 +1808,7 @@ class DeploymentAdapter(BaseAdapter):
         """One deployment status covers several lifecycle stages, so it is not an enum filter."""
         if status is None:
             return []
-        stages = DeploymentSearchableFields.own.lifecycle_stage.filter
+        stages = DeploymentQuerySpec.own.lifecycle_stage.filter
         conditions: list[QueryCondition] = []
         if status.equals is not None:
             if matched := _status_to_lifecycles(status.equals):
@@ -1869,7 +1867,7 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_revision_filter(self, f: RevisionFilter) -> list[QueryCondition]:
-        fields = ModelRevisionSearchableFields.own
+        fields = ModelRevisionQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_int_filter(f.revision_number, fields.revision_number.filter),
             *self.apply_uuid_filter(f.image_id, fields.image.filter),
@@ -1925,7 +1923,7 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_route_filter(self, f: RouteFilter) -> list[QueryCondition]:
-        fields = ReplicaSearchableFields.own
+        fields = ReplicaQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
         ]
@@ -1972,7 +1970,7 @@ class DeploymentAdapter(BaseAdapter):
             f = input.filter
             if f.deployment_id is not None:
                 conditions.append(
-                    ReplicaSearchableFields.own.deployment_id.filter.equals(
+                    ReplicaQuerySpec.own.deployment_id.filter.equals(
                         UUIDEqualMatchSpec(value=f.deployment_id, negated=False)
                     )
                 )
@@ -1991,7 +1989,7 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_access_token_filter(self, f: AccessTokenFilter) -> list[QueryCondition]:
-        fields = DeploymentAccessTokenSearchableFields.own
+        fields = DeploymentAccessTokenQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_datetime_filter(f.expires_at, fields.expires_at.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
@@ -2016,7 +2014,7 @@ class DeploymentAdapter(BaseAdapter):
         return conditions
 
     def _convert_auto_scaling_rule_filter(self, f: AutoScalingRuleFilter) -> list[QueryCondition]:
-        fields = AutoScalingRuleSearchableFields.own
+        fields = AutoScalingRuleQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
             *self.apply_nullable_datetime_filter(
@@ -2060,7 +2058,7 @@ class DeploymentAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         if input.filter and input.filter.deployment_id is not None:
             conditions.append(
-                AutoScalingRuleSearchableFields.own.deployment_id.filter.equals(
+                AutoScalingRuleQuerySpec.own.deployment_id.filter.equals(
                     UUIDEqualMatchSpec(value=input.filter.deployment_id, negated=False)
                 )
             )
@@ -2085,7 +2083,7 @@ class DeploymentAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         if input.filter and input.filter.deployment_id is not None:
             conditions.append(
-                DeploymentPolicySearchableFields.own.endpoint.filter.equals(
+                DeploymentPolicyQuerySpec.own.endpoint.filter.equals(
                     UUIDEqualMatchSpec(value=input.filter.deployment_id, negated=False)
                 )
             )
@@ -2098,7 +2096,7 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_replica_filter(self, f: ReplicaFilter) -> list[QueryCondition]:
-        fields = ReplicaSearchableFields.own
+        fields = ReplicaQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_enum_filter(f.status, fields.status.filter),
             *self.apply_enum_filter(f.health_status, fields.health_status.filter),
@@ -2201,7 +2199,7 @@ class DeploymentAdapter(BaseAdapter):
         self,
         filter_: AllocatedResourceSlotFilter,
     ) -> list[QueryCondition]:
-        fields = RevisionResourceSlotSearchableFields.own
+        fields = RevisionResourceSlotQuerySpec.own
         conditions = [*self.apply_string_filter(filter_.slot_name, fields.slot_name.filter)]
         if filter_.AND:
             for sub in filter_.AND:
@@ -2225,7 +2223,7 @@ class DeploymentAdapter(BaseAdapter):
     def _convert_allocated_slot_orders(
         orders: list[AllocatedResourceSlotOrder],
     ) -> list[QueryOrder]:
-        fields = RevisionResourceSlotSearchableFields.own
+        fields = RevisionResourceSlotQuerySpec.own
         converted: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
@@ -2236,9 +2234,7 @@ class DeploymentAdapter(BaseAdapter):
                     converted.append(fields.quantity.order.apply(ascending))
                 case AllocatedResourceSlotOrderField.RANK:
                     # The searcher joins the slot catalog, so its own rank order applies.
-                    converted.append(
-                        ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending)
-                    )
+                    converted.append(ResourceSlotTypeQuerySpec.own.rank.order.apply(ascending))
                 case _:
                     assert_never(o.field)
         return converted
@@ -2259,7 +2255,7 @@ class DeploymentAdapter(BaseAdapter):
         return [self._convert_deployment_order(order) for order in orders]
 
     def _convert_deployment_order(self, order: DeploymentOrder) -> QueryOrder:
-        fields = DeploymentSearchableFields.own
+        fields = DeploymentQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DeploymentOrderField.NAME:
@@ -2295,7 +2291,7 @@ class DeploymentAdapter(BaseAdapter):
         return [self._convert_revision_order(order) for order in orders]
 
     def _convert_revision_order(self, order: RevisionOrder) -> QueryOrder:
-        fields = ModelRevisionSearchableFields.own
+        fields = ModelRevisionQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case RevisionOrderField.REVISION_NUMBER:
@@ -2307,8 +2303,8 @@ class DeploymentAdapter(BaseAdapter):
             case RevisionOrderField.CLUSTER_MODE:
                 return fields.cluster_mode.order.apply(ascending)
             case RevisionOrderField.RUNTIME_VARIANT_NAME:
-                variant = ModelRevisionSearchableFields.nested.runtime_variant
-                return variant.correlation.order(variant.fields.name.column).apply(ascending)
+                variant = ModelRevisionQuerySpec.nested.runtime_variant
+                return variant.correlation.order(variant.columns.name.column).apply(ascending)
             case RevisionOrderField.FIELD_ID:
                 return fields.field_id.order.apply(ascending)
             case RevisionOrderField.DEPLOYMENT_ID:
@@ -2334,7 +2330,7 @@ class DeploymentAdapter(BaseAdapter):
         return [self._convert_route_order(order) for order in orders]
 
     def _convert_route_order(self, order: RouteOrder) -> QueryOrder:
-        fields = ReplicaSearchableFields.own
+        fields = ReplicaQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case RouteOrderField.CREATED_AT:
@@ -2347,7 +2343,7 @@ class DeploymentAdapter(BaseAdapter):
                 assert_never(order.field)
 
     def _convert_access_token_order(self, order: AccessTokenOrder) -> QueryOrder:
-        fields = DeploymentAccessTokenSearchableFields.own
+        fields = DeploymentAccessTokenQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case AccessTokenOrderField.CREATED_AT:
@@ -2360,7 +2356,7 @@ class DeploymentAdapter(BaseAdapter):
                 assert_never(order.field)
 
     def _convert_auto_scaling_rule_order(self, order: AutoScalingRuleOrder) -> QueryOrder:
-        fields = AutoScalingRuleSearchableFields.own
+        fields = AutoScalingRuleQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case AutoScalingRuleOrderField.CREATED_AT:
@@ -2394,7 +2390,7 @@ class DeploymentAdapter(BaseAdapter):
         return [self._convert_replica_order(order) for order in orders]
 
     def _convert_replica_order(self, order: ReplicaOrder) -> QueryOrder:
-        fields = ReplicaSearchableFields.own
+        fields = ReplicaQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ReplicaOrderField.CREATED_AT:

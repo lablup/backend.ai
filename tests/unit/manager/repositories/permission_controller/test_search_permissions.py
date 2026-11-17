@@ -27,8 +27,8 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
-    PermissionSearchableFields,
+from ai.backend.manager.models.rbac_models.permission.query_spec import (
+    PermissionQuerySpec,
 )
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -132,7 +132,7 @@ class TestSearchPermissions:
     ) -> None:
         searcher = RolePermissionSearcher(
             conditions=[
-                PermissionSearchableFields.own.entity_type.filter.equals(
+                PermissionQuerySpec.own.entity_type.filter.equals(
                     StringMatchSpec(
                         value=str(VFolderEntityType()), case_insensitive=False, negated=False
                     )
@@ -155,7 +155,7 @@ class TestSearchPermissions:
     ) -> None:
         searcher = RolePermissionSearcher(
             conditions=[],
-            orders=[PermissionSearchableFields.own.entity_type.order.apply(ascending=True)],
+            orders=[PermissionQuerySpec.own.entity_type.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 

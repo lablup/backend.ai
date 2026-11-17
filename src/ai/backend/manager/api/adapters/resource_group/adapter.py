@@ -111,15 +111,15 @@ from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
+)
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.scopes import (
     DomainResourceGroupTarget,
     ProjectResourceGroupTarget,
     ResourceGroupTarget,
     UserResourceGroupTarget,
-)
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.types import NUM_RETRIES_TO_SKIP_CONFIG_KEY
@@ -228,7 +228,7 @@ def _slot_quantities_to_resource_slot_info(
 
 def _resource_group_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourceGroupSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ResourceGroupQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=ResourceGroupRow.id,
     )
 
@@ -333,7 +333,7 @@ class ResourceGroupAdapter(BaseAdapter):
         if usage is None or usage.used_by is None:
             return []
         used_by = usage.used_by
-        linked = ResourceGroupSearchableFields.linked.usage
+        linked = ResourceGroupQuerySpec.linked.usage
         return [
             *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
             *(
@@ -429,7 +429,7 @@ class ResourceGroupAdapter(BaseAdapter):
 
     def _convert_filter(self, filter_: ResourceGroupFilter) -> list[QueryCondition]:
         """Convert ResourceGroupFilter DTO to QueryConditions."""
-        fields = ResourceGroupSearchableFields.own
+        fields = ResourceGroupQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.description, fields.description.filter),
@@ -439,7 +439,7 @@ class ResourceGroupAdapter(BaseAdapter):
             *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
             *self.apply_to_many_filter(
                 filter_.labels,
-                ResourceGroupSearchableFields.nested.labels.correlation,
+                ResourceGroupQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
         ]
@@ -463,7 +463,7 @@ class ResourceGroupAdapter(BaseAdapter):
 
     def _convert_orders(self, orders: list[ResourceGroupOrder]) -> list[Any]:
         """Convert ResourceGroupOrder DTOs to QueryOrders."""
-        fields = ResourceGroupSearchableFields.own
+        fields = ResourceGroupQuerySpec.own
         result = []
         for order in orders:
             ascending = order.direction == ResourceGroupOrderDirection.ASC
@@ -1012,7 +1012,7 @@ class ResourceGroupAdapter(BaseAdapter):
                     used_by=(),
                     searcher=ResourceGroupSearcher(
                         pagination=NoPagination(),
-                        orders=[ResourceGroupSearchableFields.own.name.order.apply(ascending=True)],
+                        orders=[ResourceGroupQuerySpec.own.name.order.apply(ascending=True)],
                     ),
                 )
             )

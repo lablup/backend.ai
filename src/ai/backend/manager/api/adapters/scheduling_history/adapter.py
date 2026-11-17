@@ -82,16 +82,22 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.replica_group_history.deprecated_search import (
     DeprecatedReplicaGroupHistoryConditions,
 )
-from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.searchable_fields import (
-    ReplicaGroupHistorySearchableFields,
+from ai.backend.manager.models.replica_group_history.query_spec import (
+    ReplicaGroupHistoryQuerySpec,
 )
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.replica_group_history.searchers import ReplicaGroupHistorySearcher
 from ai.backend.manager.models.scheduling_history.deprecated_search import (
     DeprecatedDeploymentHistoryConditions,
     DeprecatedKernelSchedulingHistoryConditions,
     DeprecatedRouteHistoryConditions,
     DeprecatedSessionSchedulingHistoryConditions,
+)
+from ai.backend.manager.models.scheduling_history.query_spec import (
+    DeploymentHistoryQuerySpec,
+    KernelSchedulingHistoryQuerySpec,
+    RouteHistoryQuerySpec,
+    SessionSchedulingHistoryQuerySpec,
 )
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
@@ -105,12 +111,6 @@ from ai.backend.manager.models.scheduling_history.scopes import (
     RouteHistoryTarget,
     SessionKernelHistoryTarget,
     SessionSchedulingHistoryTarget,
-)
-from ai.backend.manager.models.scheduling_history.searchable_fields import (
-    DeploymentHistorySearchableFields,
-    KernelSchedulingHistorySearchableFields,
-    RouteHistorySearchableFields,
-    SessionSchedulingHistorySearchableFields,
 )
 from ai.backend.manager.models.scheduling_history.searchers import (
     DeploymentHistorySearcher,
@@ -176,31 +176,27 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_scope
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 
 _SESSION_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=SessionSchedulingHistorySearchableFields.own.created_at.order.apply(
-        ascending=False
-    ),
+    forward_order=SessionSchedulingHistoryQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=SessionSchedulingHistoryRow.id,
 )
 
 _KERNEL_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KernelSchedulingHistorySearchableFields.own.created_at.order.apply(
-        ascending=False
-    ),
+    forward_order=KernelSchedulingHistoryQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=KernelSchedulingHistoryRow.id,
 )
 
 _DEPLOYMENT_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=DeploymentHistorySearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=DeploymentHistoryQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=DeploymentHistoryRow.id,
 )
 
 _REPLICA_GROUP_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ReplicaGroupHistorySearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=ReplicaGroupHistoryQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=ReplicaGroupHistoryRow.id,
 )
 
 _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=RouteHistorySearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=RouteHistoryQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=RouteHistoryRow.id,
 )
 
@@ -347,7 +343,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     def _convert_session_filter(self, filter: SessionHistoryFilter) -> list[QueryCondition]:
-        fields = SessionSchedulingHistorySearchableFields.own
+        fields = SessionSchedulingHistoryQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.field_id, fields.id.filter),
@@ -383,7 +379,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_session_orders(order: list[SessionHistoryOrder]) -> list[QueryOrder]:
-        fields = SessionSchedulingHistorySearchableFields.own
+        fields = SessionSchedulingHistoryQuerySpec.own
         orders: list[QueryOrder] = []
         for o in order:
             ascending = o.direction == OrderDirection.ASC
@@ -446,7 +442,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             )
             session_id = SessionId(owner.entity_id())
             conditions.append(
-                KernelSchedulingHistorySearchableFields.own.kernel_id.filter.equals(
+                KernelSchedulingHistoryQuerySpec.own.kernel_id.filter.equals(
                     UUIDEqualMatchSpec(value=kernel_id, negated=False)
                 )
             )
@@ -485,7 +481,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     def _convert_kernel_filter(self, filter: KernelHistoryFilter) -> list[QueryCondition]:
-        fields = KernelSchedulingHistorySearchableFields.own
+        fields = KernelSchedulingHistoryQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.field_id, fields.id.filter),
@@ -522,7 +518,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_kernel_orders(order: list[KernelHistoryOrder]) -> list[QueryOrder]:
-        fields = KernelSchedulingHistorySearchableFields.own
+        fields = KernelSchedulingHistoryQuerySpec.own
         orders: list[QueryOrder] = []
         for o in order:
             ascending = o.direction == OrderDirection.ASC
@@ -602,7 +598,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     def _convert_deployment_filter(self, filter: DeploymentHistoryFilter) -> list[QueryCondition]:
-        fields = DeploymentHistorySearchableFields.own
+        fields = DeploymentHistoryQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.field_id, fields.id.filter),
@@ -638,7 +634,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_deployment_orders(order: list[DeploymentHistoryOrder]) -> list[QueryOrder]:
-        fields = DeploymentHistorySearchableFields.own
+        fields = DeploymentHistoryQuerySpec.own
         orders: list[QueryOrder] = []
         for o in order:
             ascending = o.direction == OrderDirection.ASC
@@ -722,7 +718,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _convert_replica_group_filter(
         self, filter: ReplicaGroupHistoryFilter
     ) -> list[QueryCondition]:
-        fields = ReplicaGroupHistorySearchableFields.own
+        fields = ReplicaGroupHistoryQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.field_id, fields.id.filter),
@@ -764,7 +760,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_replica_group_orders(order: list[ReplicaGroupHistoryOrder]) -> list[QueryOrder]:
-        fields = ReplicaGroupHistorySearchableFields.own
+        fields = ReplicaGroupHistoryQuerySpec.own
         orders: list[QueryOrder] = []
         for o in order:
             ascending = o.direction == OrderDirection.ASC
@@ -848,7 +844,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     def _convert_route_filter(self, filter: RouteHistoryFilter) -> list[QueryCondition]:
-        fields = RouteHistorySearchableFields.own
+        fields = RouteHistoryQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.field_id, fields.id.filter),
@@ -883,7 +879,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_route_orders(order: list[RouteHistoryOrder]) -> list[QueryOrder]:
-        fields = RouteHistorySearchableFields.own
+        fields = RouteHistoryQuerySpec.own
         orders: list[QueryOrder] = []
         for o in order:
             ascending = o.direction == OrderDirection.ASC

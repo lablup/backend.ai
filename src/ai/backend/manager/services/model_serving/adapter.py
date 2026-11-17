@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 if TYPE_CHECKING:
@@ -19,4 +19,4 @@ class ServiceSearchAdapter(BaseFilterAdapter):
 
     def convert_filter(self, filter: ServiceFilterModel) -> list[QueryCondition]:
         """Convert ServiceFilterModel to a list of query conditions."""
-        return self.apply_string_filter(filter.name, DeploymentSearchableFields.own.name.filter)
+        return self.apply_string_filter(filter.name, DeploymentQuerySpec.own.name.filter)

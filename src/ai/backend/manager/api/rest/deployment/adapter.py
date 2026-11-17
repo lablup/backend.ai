@@ -79,14 +79,14 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision.searchable_fields import (
-    ModelRevisionSearchableFields,
+from ai.backend.manager.models.deployment_revision.query_spec import (
+    ModelRevisionQuerySpec,
 )
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.routing.cursors import ReplicaCursor
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -180,7 +180,7 @@ class DeploymentAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: DeploymentFilter) -> list[QueryCondition]:
         """Convert deployment filter to list of query conditions."""
-        fields = DeploymentSearchableFields.own
+        fields = DeploymentQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.domain_name, fields.domain.filter),
@@ -195,7 +195,7 @@ class DeploymentAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: DeploymentOrder) -> QueryOrder:
         """Convert deployment order specification to query order."""
-        fields = DeploymentSearchableFields.own
+        fields = DeploymentQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DeploymentOrderField.NAME:
@@ -270,7 +270,7 @@ class RevisionAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: RevisionFilter) -> list[QueryCondition]:
         """Convert revision filter to list of query conditions."""
-        fields = ModelRevisionSearchableFields.own
+        fields = ModelRevisionQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_int_filter(filter.revision_number, fields.revision_number.filter),
         ]
@@ -284,7 +284,7 @@ class RevisionAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: RevisionOrder) -> QueryOrder:
         """Convert revision order specification to query order."""
-        fields = ModelRevisionSearchableFields.own
+        fields = ModelRevisionQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case RevisionOrderField.REVISION_NUMBER:
@@ -296,8 +296,8 @@ class RevisionAdapter(BaseFilterAdapter):
             case RevisionOrderField.CLUSTER_MODE:
                 return fields.cluster_mode.order.apply(ascending)
             case RevisionOrderField.RUNTIME_VARIANT:
-                variant = ModelRevisionSearchableFields.nested.runtime_variant
-                return variant.correlation.order(variant.fields.name.column).apply(ascending)
+                variant = ModelRevisionQuerySpec.nested.runtime_variant
+                return variant.correlation.order(variant.columns.name.column).apply(ascending)
             case _:
                 assert_never(order.field)
 
@@ -350,7 +350,7 @@ class RouteAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: RouteFilter) -> list[QueryCondition]:
         """Convert route filter to list of query conditions."""
-        fields = ReplicaSearchableFields.own
+        fields = ReplicaQuerySpec.own
         conditions: list[QueryCondition] = []
         if filter.deployment_id is not None:
             conditions.append(
@@ -372,7 +372,7 @@ class RouteAdapter(BaseFilterAdapter):
 
     def _convert_order(self, order: RouteOrder) -> QueryOrder:
         """Convert route order specification to query order."""
-        fields = ReplicaSearchableFields.own
+        fields = ReplicaQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case RouteOrderField.CREATED_AT:

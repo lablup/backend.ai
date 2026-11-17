@@ -65,8 +65,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
@@ -283,7 +283,7 @@ class RouteOrderBy(PydanticInputMixin[RouteOrderDTO]):
 @lru_cache(maxsize=1)
 def get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ReplicaSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ReplicaQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=RoutingRow.id,
     )
 

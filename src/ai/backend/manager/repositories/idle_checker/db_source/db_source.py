@@ -39,8 +39,8 @@ from ai.backend.manager.models.idle_checker.upserters import (
     SessionIdleCheckExcluder,
     SessionIdleCheckIncluder,
 )
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -144,7 +144,7 @@ class IdleCheckerDBSource:
             .where(
                 SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED,
                 SessionIdleCheckRow.expire_at.is_not(None),
-                SessionSearchableFields.own.status.filter.in_(session_statuses)(),
+                SessionQuerySpec.own.status.filter.in_(session_statuses)(),
             )
         )
         async with self._db.begin_readonly_session_read_committed() as db_sess:

@@ -17,15 +17,15 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.models.resource_policy.query_spec import (
+    KeyPairResourcePolicyQuerySpec,
+    ProjectResourcePolicyQuerySpec,
+    UserResourcePolicyQuerySpec,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    KeyPairResourcePolicySearchableFields,
-    ProjectResourcePolicySearchableFields,
-    UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
@@ -51,7 +51,7 @@ class KeyPairResourcePolicyQuerier(
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return KeyPairResourcePolicySearchableFields.own.to_data(row)
+        return KeyPairResourcePolicyQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -75,7 +75,7 @@ class ProjectResourcePolicyQuerier(
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return ProjectResourcePolicySearchableFields.own.to_data(row)
+        return ProjectResourcePolicyQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -97,7 +97,7 @@ class UserResourcePolicyQuerier(DataQuerier[UserResourcePolicyRow, UserResourceP
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return UserResourcePolicySearchableFields.own.to_data(row)
+        return UserResourcePolicyQuerySpec.own.to_data(row)
 
 
 class BulkKeyPairResourcePolicyQuerier(
@@ -115,7 +115,7 @@ class BulkKeyPairResourcePolicyQuerier(
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return KeyPairResourcePolicySearchableFields.own.to_data(row)
+        return KeyPairResourcePolicyQuerySpec.own.to_data(row)
 
 
 class BulkProjectResourcePolicyQuerier(
@@ -133,7 +133,7 @@ class BulkProjectResourcePolicyQuerier(
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return ProjectResourcePolicySearchableFields.own.to_data(row)
+        return ProjectResourcePolicyQuerySpec.own.to_data(row)
 
 
 class BulkUserResourcePolicyQuerier(
@@ -151,4 +151,4 @@ class BulkUserResourcePolicyQuerier(
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return UserResourcePolicySearchableFields.own.to_data(row)
+        return UserResourcePolicyQuerySpec.own.to_data(row)

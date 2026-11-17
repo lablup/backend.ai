@@ -12,11 +12,11 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import VFolderScanData
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderMountPolicyData
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
-from ai.backend.manager.models.vfolder.searchable_fields import (
-    VFolderMountPolicySearchableFields,
-    VFolderSearchableFields,
+from ai.backend.manager.models.vfolder.query_spec import (
+    VFolderMountPolicyQuerySpec,
+    VFolderQuerySpec,
 )
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 
 
 @dataclass
@@ -29,7 +29,7 @@ class VFolderSearcher(Searcher[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return VFolderSearchableFields.own.to_data(row)
+        return VFolderQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -73,4 +73,4 @@ class VFolderUserMountPolicySearcher(Searcher[VFolderUserMountPolicyRow, VFolder
 
     @override
     def to_data(self, row: VFolderUserMountPolicyRow) -> VFolderMountPolicyData:
-        return VFolderMountPolicySearchableFields.own.to_data(row)
+        return VFolderMountPolicyQuerySpec.own.to_data(row)

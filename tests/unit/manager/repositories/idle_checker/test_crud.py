@@ -25,10 +25,10 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerPurger
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerSearchableFields,
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerQuerySpec,
 )
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -179,7 +179,7 @@ class TestSearch:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
                 conditions=[
-                    IdleCheckerSearchableFields.own.id.filter.in_(
+                    IdleCheckerQuerySpec.own.id.filter.in_(
                         UUIDInMatchSpec(values=[created_checker.id], negated=False)
                     )
                 ],
@@ -196,7 +196,7 @@ class TestSearch:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
                 conditions=[
-                    IdleCheckerSearchableFields.own.id.filter.in_(
+                    IdleCheckerQuerySpec.own.id.filter.in_(
                         UUIDInMatchSpec(values=[_missing_id()], negated=False)
                     )
                 ],
@@ -215,9 +215,7 @@ class TestSearch:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
                 conditions=[
-                    IdleCheckerSearchableFields.own.checker_type.filter.equals(
-                        CheckerType.NETWORK_TIMEOUT
-                    )
+                    IdleCheckerQuerySpec.own.checker_type.filter.equals(CheckerType.NETWORK_TIMEOUT)
                 ],
                 pagination=NoPagination(),
             )
@@ -234,7 +232,7 @@ class TestSearch:
     ) -> None:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
-                orders=[IdleCheckerSearchableFields.own.checker_type.order.apply(ascending=True)],
+                orders=[IdleCheckerQuerySpec.own.checker_type.order.apply(ascending=True)],
                 pagination=NoPagination(),
             )
         )
@@ -257,7 +255,7 @@ class TestUpdate:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
                 conditions=[
-                    IdleCheckerSearchableFields.own.id.filter.in_(
+                    IdleCheckerQuerySpec.own.id.filter.in_(
                         UUIDInMatchSpec(values=[created_checker.id], negated=False)
                     )
                 ],

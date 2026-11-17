@@ -17,10 +17,10 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 
 __all__ = ("SystemSessionEnvironUpserter",)
 
@@ -84,4 +84,4 @@ class SystemSessionEnvironUpserter(
 
     @override
     def to_data(self, row: SystemSessionEnvironRow) -> SystemSessionEnvironData:
-        return SystemSessionEnvironSearchableFields.own.to_data(row)
+        return SystemSessionEnvironQuerySpec.own.to_data(row)

@@ -22,13 +22,13 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.fair_share.query_spec import (
+    DomainFairShareQuerySpec,
+)
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
-)
-from ai.backend.manager.models.fair_share.searchable_fields import (
-    DomainFairShareSearchableFields,
 )
 from ai.backend.manager.models.fair_share.upserters import (
     DomainFairShareUpserter,
@@ -414,11 +414,11 @@ class TestFairShareRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                DomainFairShareSearchableFields.own.resource_group.filter.equals(
+                DomainFairShareQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(test_scaling_group, case_insensitive=False, negated=False)
                 )
             ],
-            orders=[DomainFairShareSearchableFields.own.domain_name.order.apply(True)],
+            orders=[DomainFairShareQuerySpec.own.domain_name.order.apply(True)],
         )
         result = await fair_share_repository.search_domain_fair_shares(querier)
 

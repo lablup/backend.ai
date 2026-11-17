@@ -8,10 +8,10 @@ from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.bootstrap_script.types import UserDefaultBootstrapScriptData
 from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
-from ai.backend.manager.models.bootstrap_script.row import UserDefaultBootstrapScriptRow
-from ai.backend.manager.models.bootstrap_script.searchable_fields import (
-    BootstrapScriptSearchableFields,
+from ai.backend.manager.models.bootstrap_script.query_spec import (
+    BootstrapScriptQuerySpec,
 )
+from ai.backend.manager.models.bootstrap_script.row import UserDefaultBootstrapScriptRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 
@@ -51,4 +51,4 @@ class UserDefaultBootstrapScriptUpserter(
 
     @override
     def to_data(self, row: UserDefaultBootstrapScriptRow) -> UserDefaultBootstrapScriptData:
-        return BootstrapScriptSearchableFields.user_default.to_data(row)
+        return BootstrapScriptQuerySpec.user_default.to_data(row)

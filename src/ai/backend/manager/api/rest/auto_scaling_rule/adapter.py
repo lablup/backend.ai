@@ -24,7 +24,7 @@ from ai.backend.common.types import AutoScalingMetricSource
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.endpoint.searchable_fields import AutoScalingRuleSearchableFields
+from ai.backend.manager.models.endpoint.query_spec import AutoScalingRuleQuerySpec
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -116,7 +116,7 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: AutoScalingRuleFilter) -> list[QueryCondition]:
         """Convert auto-scaling rule filter to list of query conditions."""
-        fields = AutoScalingRuleSearchableFields.own
+        fields = AutoScalingRuleQuerySpec.own
         conditions: list[QueryCondition] = []
         if filter.model_deployment_id is not None:
             conditions.append(
@@ -137,7 +137,7 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case AutoScalingRuleOrderField.CREATED_AT:
-                return AutoScalingRuleSearchableFields.own.created_at.order.apply(ascending)
+                return AutoScalingRuleQuerySpec.own.created_at.order.apply(ascending)
             case _:
                 assert_never(order.field)
 

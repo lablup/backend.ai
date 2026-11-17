@@ -34,12 +34,12 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
     PresetResourceSlotCreator,
 )
 from ai.backend.manager.models.deployment_revision_preset.purgers import DeploymentPresetPurger
+from ai.backend.manager.models.deployment_revision_preset.query_spec import (
+    DeploymentPresetQuerySpec,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
     DeploymentPresetSlotTarget,
-)
-from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
-    DeploymentPresetSearchableFields,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     DeploymentPresetSearcher,
@@ -47,8 +47,8 @@ from ai.backend.manager.models.deployment_revision_preset.searchers import (
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_label.query_spec import EntityLabelQuerySpec
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -304,10 +304,10 @@ class TestSearchByLabel:
                     value="dev",
                 ),
             ])
-        labels = EntityLabelSearchableFields.own
+        labels = EntityLabelQuerySpec.own
         searcher = DeploymentPresetSearcher(
             conditions=[
-                DeploymentPresetSearchableFields.nested.labels.correlation.some([
+                DeploymentPresetQuerySpec.nested.labels.correlation.some([
                     labels.key.filter.equals(
                         StringMatchSpec(value="env", case_insensitive=False, negated=False)
                     ),

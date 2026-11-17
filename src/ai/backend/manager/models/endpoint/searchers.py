@@ -15,15 +15,15 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
 )
+from ai.backend.manager.models.endpoint.query_spec import (
+    AutoScalingRuleQuerySpec,
+    DeploymentAccessTokenQuerySpec,
+    DeploymentQuerySpec,
+)
 from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
-)
-from ai.backend.manager.models.endpoint.searchable_fields import (
-    AutoScalingRuleSearchableFields,
-    DeploymentAccessTokenSearchableFields,
-    DeploymentSearchableFields,
 )
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -37,7 +37,7 @@ class DeploymentAccessTokenSearcher(Searcher[EndpointTokenRow, ModelDeploymentAc
 
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
-        return DeploymentAccessTokenSearchableFields.own.to_data(row)
+        return DeploymentAccessTokenQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -52,7 +52,7 @@ class AutoScalingRuleSearcher(
 
     @override
     def to_data(self, row: EndpointAutoScalingRuleRow) -> ModelDeploymentAutoScalingRuleData:
-        return AutoScalingRuleSearchableFields.own.to_data(row)
+        return AutoScalingRuleQuerySpec.own.to_data(row)
 
 
 def current_revision_id_subquery() -> sa.ScalarSelect[Any]:
@@ -77,7 +77,7 @@ class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
 
     @override
     def to_data(self, row: EndpointRow) -> ModelDeploymentData:
-        data = DeploymentSearchableFields.own.to_data(row)
+        data = DeploymentQuerySpec.own.to_data(row)
         current_revision_id = row.current_revision_id
         return replace(
             data,
@@ -96,7 +96,7 @@ class DeploymentIDSearcher(Searcher[EndpointRow, DeploymentID]):
 
     @override
     def to_data(self, row: EndpointRow) -> DeploymentID:
-        return DeploymentSearchableFields.own.entity_id.read(row)
+        return DeploymentQuerySpec.own.entity_id.read(row)
 
 
 @dataclass

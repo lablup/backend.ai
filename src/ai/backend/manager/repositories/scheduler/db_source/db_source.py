@@ -111,10 +111,10 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.row import (
     KernelRow,
 )
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.kernel_group.creators import KernelGroupCreator
 from ai.backend.manager.models.kernel_group_environ.creators import KernelGroupEnvironCreator
@@ -4847,7 +4847,7 @@ class ScheduleDBSource:
             kernel_query = (
                 sa.select(KernelRow)
                 .where(
-                    KernelSearchableFields.own.session_id.filter.in_(
+                    KernelQuerySpec.own.session_id.filter.in_(
                         UUIDInMatchSpec(values=session_ids, negated=False)
                     )()
                 )

@@ -12,10 +12,10 @@ from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_usage_history.types import KernelUsageRecordData
-from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    KernelUsageRecordSearchableFields,
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    KernelUsageRecordQuerySpec,
 )
+from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
 from ai.backend.manager.models.specs.creator import NestedFieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -64,4 +64,4 @@ class KernelUsageRecordCreator(
 
     @override
     def to_data(self, row: KernelUsageRecordRow) -> KernelUsageRecordData:
-        return KernelUsageRecordSearchableFields.own.to_data(row)
+        return KernelUsageRecordQuerySpec.own.to_data(row)

@@ -76,6 +76,11 @@ from ai.backend.manager.models.fair_share.deprecated_search import (
     DeprecatedProjectFairShareFields,
     DeprecatedUserFairShareFields,
 )
+from ai.backend.manager.models.fair_share.query_spec import (
+    DomainFairShareQuerySpec,
+    ProjectFairShareQuerySpec,
+    UserFairShareQuerySpec,
+)
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
@@ -85,11 +90,6 @@ from ai.backend.manager.models.fair_share.scopes import (
     DomainFairShareTarget,
     ProjectFairShareTarget,
     UserFairShareTarget,
-)
-from ai.backend.manager.models.fair_share.searchable_fields import (
-    DomainFairShareSearchableFields,
-    ProjectFairShareSearchableFields,
-    UserFairShareSearchableFields,
 )
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -118,21 +118,21 @@ from ai.backend.manager.services.resource_group.processors import ResourceGroupP
 
 def _domain_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DomainFairShareSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=DomainFairShareQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=DomainFairShareRow.id,
     )
 
 
 def _project_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ProjectFairShareSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=ProjectFairShareQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=ProjectFairShareRow.id,
     )
 
 
 def _user_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=UserFairShareSearchableFields.own.created_at.order.apply(ascending=False),
+        forward_order=UserFairShareQuerySpec.own.created_at.order.apply(ascending=False),
         cursor_column=UserFairShareRow.id,
     )
 
@@ -540,12 +540,12 @@ class FairShareAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, DomainFairShareQuerySpec.own.resource_group.filter
             )
         )
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, DomainFairShareSearchableFields.own.domain_name.filter
+                filter.domain_name, DomainFairShareQuerySpec.own.domain_name.filter
             )
         )
         if filter.domain is not None:
@@ -576,7 +576,7 @@ class FairShareAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, DomainFairShareQuerySpec.own.resource_group.filter
             )
         )
         conditions.extend(
@@ -615,11 +615,11 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
-                return DomainFairShareSearchableFields.own.domain_name.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.domain_name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.created_at.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
                 return DeprecatedDomainFairShareFields.is_active.order.apply(ascending)
 
@@ -630,11 +630,11 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
                 return DeprecatedDomainFairShareFields.name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return DomainFairShareQuerySpec.own.created_at.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
                 return DeprecatedDomainFairShareFields.is_active.order.apply(ascending)
 
@@ -644,17 +644,17 @@ class FairShareAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, ProjectFairShareQuerySpec.own.resource_group.filter
             )
         )
         conditions.extend(
             self.apply_uuid_filter(
-                filter.project_id, ProjectFairShareSearchableFields.own.project_id.filter
+                filter.project_id, ProjectFairShareQuerySpec.own.project_id.filter
             )
         )
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, ProjectFairShareSearchableFields.own.domain_name.filter
+                filter.domain_name, ProjectFairShareQuerySpec.own.domain_name.filter
             )
         )
         if filter.project is not None:
@@ -685,7 +685,7 @@ class FairShareAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, ProjectFairShareQuerySpec.own.resource_group.filter
             )
         )
         conditions.extend(
@@ -727,9 +727,9 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.created_at.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_NAME:
                 return DeprecatedProjectFairShareFields.name.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
@@ -742,9 +742,9 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return ProjectFairShareQuerySpec.own.created_at.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_NAME:
                 return DeprecatedProjectFairShareFields.name.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
@@ -765,22 +765,18 @@ class FairShareAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, UserFairShareQuerySpec.own.resource_group.filter
             )
         )
         conditions.extend(
-            self.apply_uuid_filter(
-                filter.user_uuid, UserFairShareSearchableFields.own.user_uuid.filter
-            )
+            self.apply_uuid_filter(filter.user_uuid, UserFairShareQuerySpec.own.user_uuid.filter)
         )
         conditions.extend(
-            self.apply_uuid_filter(
-                filter.project_id, UserFairShareSearchableFields.own.project_id.filter
-            )
+            self.apply_uuid_filter(filter.project_id, UserFairShareQuerySpec.own.project_id.filter)
         )
         conditions.extend(
             self.apply_string_filter(
-                filter.domain_name, UserFairShareSearchableFields.own.domain_name.filter
+                filter.domain_name, UserFairShareQuerySpec.own.domain_name.filter
             )
         )
         if filter.user is not None:
@@ -807,7 +803,7 @@ class FairShareAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         conditions.extend(
             self.apply_string_filter(
-                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
+                filter.resource_group, UserFairShareQuerySpec.own.resource_group.filter
             )
         )
         conditions.extend(
@@ -852,9 +848,9 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return UserFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return UserFairShareQuerySpec.own.created_at.order.apply(ascending)
             case UserFairShareOrderField.USER_USERNAME:
                 return DeprecatedUserFairShareFields.username.order.apply(ascending)
             case UserFairShareOrderField.USER_EMAIL:
@@ -867,9 +863,9 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
+                return UserFairShareQuerySpec.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
+                return UserFairShareQuerySpec.own.created_at.order.apply(ascending)
             case UserFairShareOrderField.USER_USERNAME:
                 return DeprecatedUserFairShareFields.username.order.apply(ascending)
             case UserFairShareOrderField.USER_EMAIL:

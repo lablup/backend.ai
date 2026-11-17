@@ -35,8 +35,8 @@ from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.keypair.searchers import KeyPairSearcher
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -65,7 +65,7 @@ _BACKWARD_PAGE_REVERSED = pytest.mark.xfail(
 )
 
 _PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeyPairSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=KeyPairQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=KeyPairRow.id,
 )
 _PAGE_SIZE = 2

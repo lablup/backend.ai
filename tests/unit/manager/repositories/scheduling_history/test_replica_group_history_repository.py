@@ -35,10 +35,10 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.searchable_fields import (
-    ReplicaGroupHistorySearchableFields,
+from ai.backend.manager.models.replica_group_history.query_spec import (
+    ReplicaGroupHistoryQuerySpec,
 )
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.replica_group_history.searchers import (
     ReplicaGroupHistorySearcher,
 )
@@ -334,7 +334,7 @@ class TestReplicaGroupHistoryRepository:
         searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                ReplicaGroupHistorySearchableFields.own.category.filter.equals(
+                ReplicaGroupHistoryQuerySpec.own.category.filter.equals(
                     ReplicaGroupHandlerCategory.SCALING
                 )
             ],
@@ -369,7 +369,7 @@ class TestReplicaGroupHistoryRepository:
         searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.equals(
+                ReplicaGroupHistoryQuerySpec.own.replica_group_id.filter.equals(
                     UUIDEqualMatchSpec(value=seed.replica_group_id, negated=False)
                 )
             ],
@@ -394,7 +394,7 @@ class TestReplicaGroupHistoryRepository:
         searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
-            orders=[ReplicaGroupHistorySearchableFields.own.attempts.order.apply(ascending=True)],
+            orders=[ReplicaGroupHistoryQuerySpec.own.attempts.order.apply(ascending=True)],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             searcher,

@@ -12,8 +12,8 @@ from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyU
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import FieldUpserter
@@ -80,4 +80,4 @@ class KeypairUpserter(FieldUpserter[UserID, KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return KeyPairSearchableFields.own.to_data(row)
+        return KeyPairQuerySpec.own.to_data(row)

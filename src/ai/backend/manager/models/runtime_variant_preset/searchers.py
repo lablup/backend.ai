@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
-    RuntimeVariantPresetSearchableFields,
+from ai.backend.manager.models.runtime_variant_preset.query_spec import (
+    RuntimeVariantPresetQuerySpec,
 )
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +23,4 @@ class RuntimeVariantPresetSearcher(Searcher[RuntimeVariantPresetRow, RuntimeVari
 
     @override
     def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
-        return RuntimeVariantPresetSearchableFields.own.to_data(row)
+        return RuntimeVariantPresetQuerySpec.own.to_data(row)

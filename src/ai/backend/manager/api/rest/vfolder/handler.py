@@ -143,11 +143,11 @@ from ai.backend.manager.models.vfolder.creators import (
     UnmanagedProjectVFolderCreator,
     VFolderBaseCreator,
 )
+from ai.backend.manager.models.vfolder.query_spec import VFolderQuerySpec
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderTarget,
     UserVFolderTarget,
 )
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
@@ -390,7 +390,7 @@ class VFolderHandler:
         params = query.parsed
         owner_user_uuid = await self._list_owner(params.owner_user_email)
         scopes: list[ScopeTarget] = [UserVFolderTarget(user_id=UserID(owner_user_uuid))]
-        membership = VFolderSearchableFields.linked.membership
+        membership = VFolderQuerySpec.linked.membership
         orders: list[QueryOrder] = []
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
@@ -408,7 +408,7 @@ class VFolderHandler:
                         pagination=NoPagination(),
                         orders=orders,
                         conditions=[
-                            VFolderSearchableFields.own.status.filter.not_in(
+                            VFolderQuerySpec.own.status.filter.not_in(
                                 vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
                             )
                         ],

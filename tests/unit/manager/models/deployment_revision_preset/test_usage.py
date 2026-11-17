@@ -36,19 +36,19 @@ from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
 )
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.query_spec import (
+    DeploymentPresetQuerySpec,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
     PublicDeploymentPresetTarget,
-)
-from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
-    DeploymentPresetSearchableFields,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     DeploymentPresetSearcher,
 )
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -65,11 +65,11 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.query_spec import (
+    RuntimeVariantQuerySpec,
+)
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant.scopes import PublicRuntimeVariantTarget
-from ai.backend.manager.models.runtime_variant.searchable_fields import (
-    RuntimeVariantSearchableFields,
-)
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -318,9 +318,7 @@ class TestDeploymentUsage:
             ScopedSearcher(
                 scopes=[PublicRuntimeVariantTarget()],
                 used_by=[
-                    RuntimeVariantSearchableFields.linked.usage.deployments.used_by(
-                        usage.deployment_id
-                    )
+                    RuntimeVariantQuerySpec.linked.usage.deployments.used_by(usage.deployment_id)
                 ],
                 searcher=RuntimeVariantSearcher(pagination=OffsetPagination(limit=10)),
             )
@@ -337,9 +335,7 @@ class TestDeploymentUsage:
             ScopedSearcher(
                 scopes=[PublicDeploymentPresetTarget()],
                 used_by=[
-                    DeploymentPresetSearchableFields.linked.usage.deployments.used_by(
-                        usage.deployment_id
-                    )
+                    DeploymentPresetQuerySpec.linked.usage.deployments.used_by(usage.deployment_id)
                 ],
                 searcher=DeploymentPresetSearcher(pagination=OffsetPagination(limit=10)),
             )
@@ -355,9 +351,7 @@ class TestDeploymentUsage:
         result = await deployment_repository.global_search(
             GlobalSearcher(
                 used_by=[
-                    DeploymentSearchableFields.linked.usage.runtime_variants.uses(
-                        usage.used_variant_id
-                    )
+                    DeploymentQuerySpec.linked.usage.runtime_variants.uses(usage.used_variant_id)
                 ],
                 searcher=DeploymentSearcher(pagination=OffsetPagination(limit=10)),
             )
@@ -373,9 +367,7 @@ class TestDeploymentUsage:
         result = await deployment_repository.global_search(
             GlobalSearcher(
                 used_by=[
-                    DeploymentSearchableFields.linked.usage.runtime_variants.uses(
-                        usage.unused_variant_id
-                    )
+                    DeploymentQuerySpec.linked.usage.runtime_variants.uses(usage.unused_variant_id)
                 ],
                 searcher=DeploymentSearcher(pagination=OffsetPagination(limit=10)),
             )
@@ -391,9 +383,7 @@ class TestDeploymentUsage:
         result = await deployment_repository.global_search(
             GlobalSearcher(
                 used_by=[
-                    DeploymentSearchableFields.linked.usage.deployment_presets.uses(
-                        usage.used_preset_id
-                    )
+                    DeploymentQuerySpec.linked.usage.deployment_presets.uses(usage.used_preset_id)
                 ],
                 searcher=DeploymentSearcher(pagination=OffsetPagination(limit=10)),
             )

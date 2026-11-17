@@ -56,20 +56,20 @@ from ai.backend.manager.models.domain.deprecated_search import (
     DeprecatedDomainConditions,
     DeprecatedDomainOrders,
 )
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.scopes import (
     ResourceGroupDomainTarget,
 )
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.domain.updaters import (
     DomainRestoreUpdater,
     DomainSoftDeleteUpdater,
     DomainUpdater,
 )
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
@@ -99,7 +99,7 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
-    forward_order=DomainSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=DomainQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=DomainRow.id,
 )
 
@@ -369,7 +369,7 @@ class DomainAdapter(BaseAdapter):
         )
 
     def _convert_domain_filter(self, filter: DomainFilter) -> list[QueryCondition]:
-        fields = DomainSearchableFields.own
+        fields = DomainQuerySpec.own
         conditions = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_uuid_filter(filter.id, fields.id.filter),
@@ -409,7 +409,7 @@ class DomainAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over one project of the domain."""
         if project_filter is None:
             return []
-        fields = ProjectSearchableFields.own
+        fields = ProjectQuerySpec.own
         conditions = [
             *self.apply_string_filter(project_filter.name, fields.name.filter),
             *self.apply_bool_filter(project_filter.is_active, fields.is_active.filter),
@@ -424,7 +424,7 @@ class DomainAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over one user of the domain."""
         if user_filter is None:
             return []
-        fields = UserSearchableFields.own
+        fields = UserQuerySpec.own
         conditions = [
             *self.apply_string_filter(user_filter.username, fields.username.filter),
             *self.apply_string_filter(user_filter.email, fields.email.filter),
@@ -438,7 +438,7 @@ class DomainAdapter(BaseAdapter):
         """Active means the user's account status is ACTIVE."""
         if is_active is None:
             return []
-        status = UserSearchableFields.own.status.filter
+        status = UserQuerySpec.own.status.filter
         if is_active:
             return [status.equals(UserStatus.ACTIVE)]
         return [status.not_equals(UserStatus.ACTIVE)]
@@ -448,7 +448,7 @@ class DomainAdapter(BaseAdapter):
 
     def _convert_order(self, order: DomainOrder) -> QueryOrder:
         """The query order one requested order field names."""
-        fields = DomainSearchableFields.own
+        fields = DomainQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DomainOrderField.NAME:

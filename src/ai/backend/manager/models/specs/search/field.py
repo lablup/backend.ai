@@ -41,7 +41,7 @@ type FieldConditions = (
 
 
 @dataclass(frozen=True)
-class SearchableField[V, F: FieldConditions | None, O: SearchOrder | None]:
+class QueryColumn[V, F: FieldConditions | None, O: SearchOrder | None]:
     """One column: how it is read, filtered and ordered. A ``None`` slot says it cannot be."""
 
     column: InstrumentedAttribute[V]
@@ -53,8 +53,8 @@ class SearchableField[V, F: FieldConditions | None, O: SearchOrder | None]:
 
 
 @dataclass(frozen=True)
-class NestedSearchableField[TFields, C: ToManyCorrelation | ToOneCorrelation]:
-    """Fields of another table, reached from this entity through ``correlation``."""
+class NestedQueryColumn[TColumns, C: ToManyCorrelation | ToOneCorrelation]:
+    """Columns of another table, reached from this entity through ``correlation``."""
 
-    fields: TFields
+    columns: TColumns
     correlation: C

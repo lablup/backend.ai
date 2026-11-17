@@ -10,10 +10,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogEndpointData
-from ai.backend.manager.models.service_catalog.row import ServiceCatalogEndpointRow
-from ai.backend.manager.models.service_catalog.searchable_fields import (
-    ServiceCatalogEndpointSearchableFields,
+from ai.backend.manager.models.service_catalog.query_spec import (
+    ServiceCatalogEndpointQuerySpec,
 )
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogEndpointRow
 from ai.backend.manager.models.specs.purger import FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -38,4 +38,4 @@ class ServiceCatalogEndpointBatchPurger(
 
     @override
     def to_data(self, row: ServiceCatalogEndpointRow) -> ServiceCatalogEndpointData:
-        return ServiceCatalogEndpointSearchableFields.own.to_data(row)
+        return ServiceCatalogEndpointQuerySpec.own.to_data(row)

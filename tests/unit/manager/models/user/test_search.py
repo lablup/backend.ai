@@ -26,17 +26,17 @@ from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.query_spec import EntityLabelQuerySpec
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -55,8 +55,8 @@ from ai.backend.manager.models.user.deprecated_search import (
     DeprecatedUserConditions,
     DeprecatedUserOrders,
 )
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -115,7 +115,7 @@ class TestUserOwnFieldFilters:
 
     def test_integration_name_filters_the_integration_id_column(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
-        condition = UserSearchableFields.own.integration_name.filter.contains(spec)
+        condition = UserQuerySpec.own.integration_name.filter.contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "integration_id" in sql
         assert "LIKE" in sql.upper()
@@ -123,25 +123,23 @@ class TestUserOwnFieldFilters:
 
     def test_integration_name_case_insensitive_lowers_both_sides(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=True, negated=False)
-        condition = UserSearchableFields.own.integration_name.filter.contains(spec)
+        condition = UserQuerySpec.own.integration_name.filter.contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "lower" in sql.lower()
 
     def test_integration_name_negated_inverts_the_match(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
-        condition = UserSearchableFields.own.integration_name.filter.contains(spec)
+        condition = UserQuerySpec.own.integration_name.filter.contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "NOT LIKE" in sql.upper()
 
     def test_modified_at_filters_the_updated_at_column(self) -> None:
-        condition = UserSearchableFields.own.modified_at.filter.after(
-            datetime(2026, 1, 1, tzinfo=UTC)
-        )
+        condition = UserQuerySpec.own.modified_at.filter.after(datetime(2026, 1, 1, tzinfo=UTC))
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "updated_at" in sql
 
     def test_two_conditions_off_one_field_stay_independent(self) -> None:
-        conditions = UserSearchableFields.own.integration_name.filter
+        conditions = UserQuerySpec.own.integration_name.filter
         spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
         spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
         sql_a = str(conditions.contains(spec_a)().compile(compile_kwargs={"literal_binds": True}))
@@ -154,52 +152,52 @@ class TestUserContainerGidsFilters:
     """``container_gids`` is an array: containment only, and no order."""
 
     def test_contains_uses_the_containment_operator(self) -> None:
-        condition = UserSearchableFields.own.container_gids.filter.contains(1000)
+        condition = UserQuerySpec.own.container_gids.filter.contains(1000)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "container_gids" in sql
         assert "@>" in sql
 
     def test_contains_all_compares_against_every_value(self) -> None:
-        condition = UserSearchableFields.own.container_gids.filter.contains_all([1000, 1001])
+        condition = UserQuerySpec.own.container_gids.filter.contains_all([1000, 1001])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "@>" in sql
         assert "1000" in sql
         assert "1001" in sql
 
     def test_contains_any_uses_the_overlap_operator(self) -> None:
-        condition = UserSearchableFields.own.container_gids.filter.contains_any([1000, 1001])
+        condition = UserQuerySpec.own.container_gids.filter.contains_any([1000, 1001])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "&&" in sql
 
     def test_no_order_is_declared(self) -> None:
-        assert UserSearchableFields.own.container_gids.order is None
+        assert UserQuerySpec.own.container_gids.order is None
 
 
 class TestUserSensitiveFields:
     """An access control setting is neither filtered nor ordered by."""
 
     def test_allowed_client_ip_declares_neither_slot(self) -> None:
-        field = UserSearchableFields.own.allowed_client_ip
+        field = UserQuerySpec.own.allowed_client_ip
         assert field.filter is None
         assert field.order is None
 
 
-class TestKeyPairOwnFields:
+class TestKeyPairOwnColumns:
     """The keypair declaration a user search reads its nested conditions from."""
 
     def test_secret_key_declares_neither_slot(self) -> None:
-        field = KeyPairSearchableFields.own.secret_key
+        field = KeyPairQuerySpec.own.secret_key
         assert field.filter is None
         assert field.order is None
 
     def test_access_key_is_open(self) -> None:
-        field = KeyPairSearchableFields.own.access_key
+        field = KeyPairQuerySpec.own.access_key
         assert field.filter is not None
         assert field.order is not None
 
     def test_resource_policy_name_filters_the_resource_policy_column(self) -> None:
         spec = StringMatchSpec(value="default", case_insensitive=False, negated=False)
-        condition = KeyPairSearchableFields.own.resource_policy_name.filter.equals(spec)
+        condition = KeyPairQuerySpec.own.resource_policy_name.filter.equals(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "resource_policy" in sql
 
@@ -208,24 +206,24 @@ class TestUserNestedKeypairs:
     """The keypairs a user owns, reached from the user row."""
 
     def test_some_builds_an_exists_over_the_keypairs(self) -> None:
-        correlation = UserSearchableFields.nested.keypairs.correlation
-        condition = correlation.some([KeyPairSearchableFields.own.is_active.filter.equals(True)])
+        correlation = UserQuerySpec.nested.keypairs.correlation
+        condition = correlation.some([KeyPairQuerySpec.own.is_active.filter.equals(True)])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
         assert "keypairs" in sql
         assert "is_active" in sql
 
     def test_none_negates_the_exists(self) -> None:
-        correlation = UserSearchableFields.nested.keypairs.correlation
-        condition = correlation.none([KeyPairSearchableFields.own.is_active.filter.equals(True)])
+        correlation = UserQuerySpec.nested.keypairs.correlation
+        condition = correlation.none([KeyPairQuerySpec.own.is_active.filter.equals(True)])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "NOT (EXISTS" in sql
 
     def test_conditions_land_in_one_exists(self) -> None:
-        correlation = UserSearchableFields.nested.keypairs.correlation
+        correlation = UserQuerySpec.nested.keypairs.correlation
         condition = correlation.some([
-            KeyPairSearchableFields.own.is_active.filter.equals(True),
-            KeyPairSearchableFields.own.is_admin.filter.equals(False),
+            KeyPairQuerySpec.own.is_active.filter.equals(True),
+            KeyPairQuerySpec.own.is_admin.filter.equals(False),
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert sql.count("EXISTS") == 1
@@ -470,7 +468,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
-                    DomainSearchableFields.own.is_active.filter.equals(True)
+                    DomainQuerySpec.own.is_active.filter.equals(True)
                 ])
             ],
             orders=[],
@@ -491,7 +489,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
-                    DomainSearchableFields.own.description.filter.contains(spec)
+                    DomainQuerySpec.own.description.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -514,7 +512,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
-                    ProjectSearchableFields.own.name.filter.contains(spec)
+                    ProjectQuerySpec.own.name.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -535,7 +533,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
-                    ProjectSearchableFields.own.name.filter.contains(spec)
+                    ProjectQuerySpec.own.name.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -564,7 +562,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
-                    ProjectSearchableFields.own.name.filter.contains(spec)
+                    ProjectQuerySpec.own.name.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -584,7 +582,7 @@ class TestUserNestedSearchIntegration:
         searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
-            orders=[UserSearchableFields.own.domain_name.order.apply(True)],
+            orders=[UserQuerySpec.own.domain_name.order.apply(True)],
         )
         result = await user_db_source.search_users(searcher)
 
@@ -625,7 +623,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
-                    DomainSearchableFields.own.is_active.filter.equals(True)
+                    DomainQuerySpec.own.is_active.filter.equals(True)
                 ])
             ],
             orders=[DeprecatedUserOrders.by_project_name(ascending=True)],
@@ -657,11 +655,11 @@ class TestUserNestedSearchIntegration:
                     value="dev",
                 ),
             ])
-        labels = EntityLabelSearchableFields.own
+        labels = EntityLabelQuerySpec.own
         searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
-                UserSearchableFields.nested.labels.correlation.some([
+                UserQuerySpec.nested.labels.correlation.some([
                     labels.key.filter.equals(
                         StringMatchSpec(value="env", case_insensitive=False, negated=False)
                     ),

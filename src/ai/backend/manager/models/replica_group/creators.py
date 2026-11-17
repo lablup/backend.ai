@@ -16,10 +16,10 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
-from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.replica_group.searchable_fields import (
-    ReplicaGroupSearchableFields,
+from ai.backend.manager.models.replica_group.query_spec import (
+    ReplicaGroupQuerySpec,
 )
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -98,4 +98,4 @@ class ReplicaGroupCreator(FieldCreator[DeploymentID, ReplicaGroupRow, ReplicaGro
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return ReplicaGroupSearchableFields.own.to_data(row)
+        return ReplicaGroupQuerySpec.own.to_data(row)

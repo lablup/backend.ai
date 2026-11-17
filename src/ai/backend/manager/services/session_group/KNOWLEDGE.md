@@ -44,7 +44,7 @@ shape, operation, gate and backing.
 | `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
 | session `enqueue` | `EnqueueSessionAction.to_held_session_group_searcher` carries the condition; the owner's held group is refused as in use (409), any other group answers not found |
 
-- The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
+- The condition is `SessionGroupQuerySpec.linked.replica_groups.not_exists()`, one
   declaration every path reads.
 - A read answers a held group as not found, not a denial: the caller may hold READ on it
   through the project, so the permission is not what keeps it out.

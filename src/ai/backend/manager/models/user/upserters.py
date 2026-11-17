@@ -20,8 +20,8 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole, UserRow
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 __all__ = ("UserUpserter",)
 
@@ -113,4 +113,4 @@ class UserUpserter(EntityUpserter[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return UserSearchableFields.own.to_data(row)
+        return UserQuerySpec.own.to_data(row)

@@ -50,10 +50,10 @@ from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
     RolePresetUpdater,
 )
@@ -119,7 +119,7 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -159,7 +159,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -180,7 +180,7 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
@@ -196,7 +196,7 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 class _PresetFieldType(FieldType):
@@ -284,7 +284,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -307,7 +307,7 @@ class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
+        return RolePresetQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -570,7 +570,7 @@ class TestUpdate:
                 target_row=RolePresetRow,
                 target_column=RolePresetRow.id,
                 target_id=preset.id,
-                converter=RolePresetSearchableFields.own,
+                converter=RolePresetQuerySpec.own,
             )
         )
 
@@ -584,7 +584,7 @@ class TestUpdate:
                 target_row=RolePresetRow,
                 target_column=RolePresetRow.id,
                 target_id=preset.id,
-                converter=RolePresetSearchableFields.own,
+                converter=RolePresetQuerySpec.own,
             )
         )
 
@@ -593,7 +593,7 @@ class TestUpdate:
                 target_row=RolePresetRow,
                 target_column=RolePresetRow.id,
                 target_id=preset.id,
-                converter=RolePresetSearchableFields.own,
+                converter=RolePresetQuerySpec.own,
             )
         )
 

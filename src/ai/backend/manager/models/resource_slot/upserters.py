@@ -15,11 +15,11 @@ from ai.backend.common.types import SlotTypes
 from ai.backend.manager.data.resource_slot.types import AgentResourceData, ResourceSlotTypeData
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
-from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    AgentResourceSearchableFields,
-    ResourceSlotTypeSearchableFields,
+from ai.backend.manager.models.resource_slot.query_spec import (
+    AgentResourceQuerySpec,
+    ResourceSlotTypeQuerySpec,
 )
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -79,7 +79,7 @@ class AgentResourceUpserter(FieldUpserter[AgentUUID, AgentResourceRow, AgentReso
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
-        return AgentResourceSearchableFields.own.to_data(row)
+        return AgentResourceQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -143,4 +143,4 @@ class ResourceSlotTypeUpserter(
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return ResourceSlotTypeSearchableFields.own.to_data(row)
+        return ResourceSlotTypeQuerySpec.own.to_data(row)

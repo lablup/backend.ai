@@ -18,8 +18,8 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -219,7 +219,7 @@ class TestAgentUsage:
     ) -> None:
         result = await repository.global_search(
             GlobalSearcher(
-                used_by=[AgentSearchableFields.linked.usage.sessions.used_by(usage.session_id)],
+                used_by=[AgentQuerySpec.linked.usage.sessions.used_by(usage.session_id)],
                 searcher=AgentSearcher(pagination=OffsetPagination(limit=10)),
             )
         )
@@ -233,9 +233,7 @@ class TestAgentUsage:
     ) -> None:
         result = await repository.global_search(
             GlobalSearcher(
-                used_by=[
-                    AgentSearchableFields.linked.usage.sessions.used_by(SessionID(uuid.uuid4()))
-                ],
+                used_by=[AgentQuerySpec.linked.usage.sessions.used_by(SessionID(uuid.uuid4()))],
                 searcher=AgentSearcher(pagination=OffsetPagination(limit=10)),
             )
         )

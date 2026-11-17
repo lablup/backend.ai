@@ -19,8 +19,8 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -74,7 +74,7 @@ class ReplicaUpdater(DataUpdater[RoutingRow, RoutingData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RoutingData:
-        return ReplicaSearchableFields.own.to_routing_data(row)
+        return ReplicaQuerySpec.own.to_routing_data(row)
 
 
 @dataclass
@@ -99,7 +99,7 @@ class ReplicaBatchUpdater(DataBatchUpdater[RoutingRow, RoutingData]):
     @override
     def conditions(self) -> list[QueryCondition]:
         return [
-            ReplicaSearchableFields.own.field_id.filter.in_(
+            ReplicaQuerySpec.own.field_id.filter.in_(
                 UUIDInMatchSpec(values=list(self.replica_ids), negated=False)
             )
         ]
@@ -120,4 +120,4 @@ class ReplicaBatchUpdater(DataBatchUpdater[RoutingRow, RoutingData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RoutingData:
-        return ReplicaSearchableFields.own.to_routing_data(row)
+        return ReplicaQuerySpec.own.to_routing_data(row)

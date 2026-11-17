@@ -8,8 +8,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -21,4 +21,4 @@ class ProjectSearcher(Searcher[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return ProjectSearchableFields.own.to_data(row)
+        return ProjectQuerySpec.own.to_data(row)

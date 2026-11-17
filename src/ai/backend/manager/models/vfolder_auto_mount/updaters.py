@@ -15,10 +15,10 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.vfolder_auto_mount import VFolderAutoMountDestinationInUse
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
-from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
-    VFolderAutoMountSearchableFields,
+from ai.backend.manager.models.vfolder_auto_mount.query_spec import (
+    VFolderAutoMountQuerySpec,
 )
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 from ai.backend.manager.types import OptionalState
 
 __all__ = ("VFolderAutoMountUpdater",)
@@ -69,4 +69,4 @@ class VFolderAutoMountUpdater(DataUpdater[VFolderAutoMountRow, VFolderAutoMountD
 
     @override
     def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountData:
-        return VFolderAutoMountSearchableFields.own.to_data(row)
+        return VFolderAutoMountQuerySpec.own.to_data(row)

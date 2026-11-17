@@ -49,12 +49,12 @@ from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.errors.api import InvalidCursor
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
 from ai.backend.manager.models.image.row import ImageLoadFilter, ImageRow, get_permission_ctx
 from ai.backend.manager.models.image.scopes import (
     ImageTarget,
     VisibleImageTarget,
 )
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher, ReferenceImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.minilang import EnumFieldItem
@@ -139,7 +139,7 @@ def _status_searcher(statuses: list[ImageStatus], *conditions: QueryCondition) -
     """Every image matching the conditions and one of the statuses."""
     return ImageSearcher(
         pagination=NoPagination(),
-        conditions=[ImageSearchableFields.own.status.filter.in_(statuses), *conditions],
+        conditions=[ImageQuerySpec.own.status.filter.in_(statuses), *conditions],
     )
 
 
@@ -296,7 +296,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
                 targets=_caller_targets(graph_ctx),
                 searcher=_status_searcher(
                     filter_by_statuses,
-                    ImageSearchableFields.own.name.filter.in_(
+                    ImageQuerySpec.own.name.filter.in_(
                         StringInMatchSpec(
                             values=list(image_names), case_insensitive=False, negated=False
                         )
@@ -332,7 +332,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
                 targets=_caller_targets(ctx),
                 searcher=_status_searcher(
                     filter_by_statuses,
-                    ImageSearchableFields.own.id.filter.equals(
+                    ImageQuerySpec.own.id.filter.equals(
                         UUIDEqualMatchSpec(value=id, negated=False)
                     ),
                 ),
@@ -800,7 +800,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
                 searcher=ImageSearcher(
                     pagination=NoPagination(),
                     conditions=[
-                        ImageSearchableFields.own.id.filter.equals(
+                        ImageQuerySpec.own.id.filter.equals(
                             UUIDEqualMatchSpec(value=image_uuid, negated=False)
                         )
                     ],

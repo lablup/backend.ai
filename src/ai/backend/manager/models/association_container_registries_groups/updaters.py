@@ -13,11 +13,11 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import (
     AssociationContainerRegistriesGroupsData,
 )
+from ai.backend.manager.models.association_container_registries_groups.query_spec import (
+    AssociationContainerRegistriesGroupsQuerySpec,
+)
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
-)
-from ai.backend.manager.models.association_container_registries_groups.searchable_fields import (
-    AssociationContainerRegistriesGroupsSearchableFields,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -67,7 +67,7 @@ class ClearDefaultRegistryUpdater(
     def to_data(
         self, row: AssociationContainerRegistriesGroupsRow
     ) -> AssociationContainerRegistriesGroupsData:
-        return AssociationContainerRegistriesGroupsSearchableFields.own.to_data(row)
+        return AssociationContainerRegistriesGroupsQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -104,4 +104,4 @@ class SetDefaultRegistryUpdater(
     def to_data(
         self, row: AssociationContainerRegistriesGroupsRow
     ) -> AssociationContainerRegistriesGroupsData:
-        return AssociationContainerRegistriesGroupsSearchableFields.own.to_data(row)
+        return AssociationContainerRegistriesGroupsQuerySpec.own.to_data(row)

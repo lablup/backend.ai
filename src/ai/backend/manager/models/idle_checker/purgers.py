@@ -13,13 +13,13 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerQuerySpec,
+)
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
-)
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerSearchableFields,
 )
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.relation import RelationPurger
@@ -55,7 +55,7 @@ class IdleCheckerPurger(EntityPurger[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return IdleCheckerSearchableFields.own.to_data(row)
+        return IdleCheckerQuerySpec.own.to_data(row)
 
 
 @dataclass

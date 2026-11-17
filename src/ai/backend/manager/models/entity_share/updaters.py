@@ -25,8 +25,8 @@ from ai.backend.manager.data.entity_share.types import (
 )
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.entity_share.query_spec import EntityShareQuerySpec
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.entity_share.searchable_fields import EntityShareSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.row import UserRow
@@ -128,7 +128,7 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return EntityShareSearchableFields.own.to_data(row)
+        return EntityShareQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -242,7 +242,7 @@ class EntityShareRevokeUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return EntityShareSearchableFields.own.to_data(row)
+        return EntityShareQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -301,7 +301,7 @@ class EntityShareCapUpdater(GuardedDataUpdater[EntityShareRow, EntityShareData])
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return EntityShareSearchableFields.own.to_data(row)
+        return EntityShareQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -350,4 +350,4 @@ class EntityShareCancelUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return EntityShareSearchableFields.own.to_data(row)
+        return EntityShareQuerySpec.own.to_data(row)

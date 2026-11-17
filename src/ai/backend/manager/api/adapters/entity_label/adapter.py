@@ -35,8 +35,8 @@ from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.models.entity_label.query_spec import EntityLabelQuerySpec
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.entity_label.searchers import EntityLabelSearcher
 from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
 from ai.backend.manager.services.entity_label.actions.partial_bulk_get import (
@@ -55,7 +55,7 @@ from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntity
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 
 _LABEL_PAGINATION_SPEC = PaginationSpec(
-    forward_order=EntityLabelSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=EntityLabelQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=EntityLabelRow.id,
 )
 
@@ -215,7 +215,7 @@ class EntityLabelAdapter(BaseAdapter):
         return [self._convert_order(order) for order in orders]
 
     def _convert_order(self, order: EntityLabelOrder) -> QueryOrder:
-        fields = EntityLabelSearchableFields.own
+        fields = EntityLabelQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case EntityLabelOrderField.KEY:

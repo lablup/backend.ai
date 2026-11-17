@@ -34,11 +34,11 @@ from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    DomainUsageBucketQuerySpec,
+)
 from ai.backend.manager.models.resource_usage_history.row import DomainUsageBucketRow
 from ai.backend.manager.models.resource_usage_history.scopes import DomainUsageBucketTarget
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    DomainUsageBucketSearchableFields,
-)
 from ai.backend.manager.models.resource_usage_history.searchers import DomainUsageBucketSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
@@ -68,7 +68,7 @@ _BACKWARD_PAGE_REVERSED = pytest.mark.xfail(
 )
 
 _PAGINATION_SPEC = PaginationSpec(
-    forward_order=DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending=False),
+    forward_order=DomainUsageBucketQuerySpec.own.period_start.order.apply(ascending=False),
     cursor_column=DomainUsageBucketRow.id,
 )
 _PAGE_SIZE = 2

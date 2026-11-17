@@ -37,10 +37,10 @@ from ai.backend.manager.models.minilang import (
 )
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow, groups
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.query_spec import SSHKeypairQuerySpec
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
@@ -499,7 +499,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             total_cnt = await db_session.scalar(cnt_query)
             async for row in await db_session.stream_scalars(prj_query):
                 prj_row = cast(ProjectRow, row)
-                result.append(GroupNode.from_data(ProjectSearchableFields.own.to_data(prj_row)))
+                result.append(GroupNode.from_data(ProjectQuerySpec.own.to_data(prj_row)))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def __resolve_reference(
@@ -1124,7 +1124,7 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
                 user_ids=[UserID(action_result.data.user.id)],
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=1),
-                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                    conditions=[SSHKeypairQuerySpec.own.is_default.filter.equals(True)],
                 ),
             )
         )

@@ -10,10 +10,10 @@ from ai.backend.common.data.entity.login_client_type import (
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.errors.auth import LoginClientTypeConflict
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.login_client_type.searchable_fields import (
-    LoginClientTypeSearchableFields,
+from ai.backend.manager.models.login_client_type.query_spec import (
+    LoginClientTypeQuerySpec,
 )
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -52,4 +52,4 @@ class LoginClientTypeCreator(
 
     @override
     def to_data(self, row: LoginClientTypeRow) -> LoginClientTypeData:
-        return LoginClientTypeSearchableFields.own.to_data(row)
+        return LoginClientTypeQuerySpec.own.to_data(row)

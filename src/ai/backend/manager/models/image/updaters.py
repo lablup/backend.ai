@@ -11,8 +11,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.data.image.types import ImageData, ImageStatus, ImageType
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -89,7 +89,7 @@ class ImageUpdater(DataUpdater[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return ImageSearchableFields.own.to_data(row)
+        return ImageQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -115,7 +115,7 @@ class ImageSoftDeleteUpdater(GuardedDataUpdater[ImageRow, ImageData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ImageSearchableFields.own.status.filter.equals(ImageStatus.ALIVE),
+                condition=ImageQuerySpec.own.status.filter.equals(ImageStatus.ALIVE),
                 error=ImageNotFound(f"Image not found (id:{self.image_id})"),
             ),
         )
@@ -131,7 +131,7 @@ class ImageSoftDeleteUpdater(GuardedDataUpdater[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return ImageSearchableFields.own.to_data(row)
+        return ImageQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -157,7 +157,7 @@ class ImageRestoreUpdater(GuardedDataUpdater[ImageRow, ImageData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ImageSearchableFields.own.status.filter.in_(ImageStatus.restorable()),
+                condition=ImageQuerySpec.own.status.filter.in_(ImageStatus.restorable()),
                 error=ImageNotFound(f"Image not found (id:{self.image_id})"),
             ),
         )
@@ -173,4 +173,4 @@ class ImageRestoreUpdater(GuardedDataUpdater[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return ImageSearchableFields.own.to_data(row)
+        return ImageQuerySpec.own.to_data(row)

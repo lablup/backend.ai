@@ -21,8 +21,8 @@ from ai.backend.manager.errors.repository import ForeignKeyViolationError, NotNu
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -76,7 +76,7 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:
-        return SessionGroupSearchableFields.own.to_data(row)
+        return SessionGroupQuerySpec.own.to_data(row)
 
     @classmethod
     def for_replica_group(

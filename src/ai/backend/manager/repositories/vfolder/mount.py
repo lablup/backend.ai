@@ -41,6 +41,7 @@ from ai.backend.manager.models.project.row import groups as groups_table
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.user.queries import joined_project_ids_query
+from ai.backend.manager.models.vfolder.query_spec import VFolderQuerySpec
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
@@ -50,7 +51,6 @@ from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderTarget,
     UserVFolderTarget,
 )
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.repositories.vfolder.host_permission import ensure_host_permission_allowed
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.types import UserScope
@@ -126,7 +126,7 @@ async def query_reachable_vfolders(
     project_ids = (await conn.scalars(joined_project_ids_query(user_id))).all()
     scopes: list[OperationScope] = [UserVFolderTarget(user_id=user_id)]
     scopes.extend(ProjectVFolderTarget(project_id=pid) for pid in project_ids)
-    membership = VFolderSearchableFields.linked.membership
+    membership = VFolderQuerySpec.linked.membership
     project_id = ProjectID(user_scope.group_id)
     rows = (
         await conn.execute(

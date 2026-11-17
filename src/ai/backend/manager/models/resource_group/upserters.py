@@ -8,10 +8,10 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
 )
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -85,4 +85,4 @@ class ResourceGroupUpserter(
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return ResourceGroupSearchableFields.own.to_data(row)
+        return ResourceGroupQuerySpec.own.to_data(row)

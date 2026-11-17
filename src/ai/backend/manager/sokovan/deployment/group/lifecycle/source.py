@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
-from ai.backend.manager.models.replica_group.searchable_fields import (
-    ReplicaGroupSearchableFields,
+from ai.backend.manager.models.replica_group.query_spec import (
+    ReplicaGroupQuerySpec,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
@@ -35,7 +35,7 @@ class GroupLifecycleSource(
         category: ReplicaGroupHandlerCategory,
         target_statuses: GroupLifecycleTargetStatuses,
     ) -> GroupLifecycleReconcileInfo:
-        fields = ReplicaGroupSearchableFields.own
+        fields = ReplicaGroupQuerySpec.own
         conditions = [
             fields.lifecycle.filter.in_(target_statuses.lifecycles),
             fields.scaling_status.filter.in_(target_statuses.scaling_statuses),
@@ -67,7 +67,7 @@ class GroupAutoscaleSource(
         category: ReplicaGroupHandlerCategory,
         target_statuses: GroupLifecycleTargetStatuses,
     ) -> GroupAutoscaleReconcileInfo:
-        fields = ReplicaGroupSearchableFields.own
+        fields = ReplicaGroupQuerySpec.own
         conditions = [
             fields.lifecycle.filter.in_(target_statuses.lifecycles),
             fields.scaling_status.filter.in_(target_statuses.scaling_statuses),

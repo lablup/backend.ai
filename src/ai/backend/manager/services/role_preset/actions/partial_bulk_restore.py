@@ -8,11 +8,11 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import RestorePartialBulkOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.role_preset.row import (
     RolePresetRow,
-)
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
 )
 from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 
@@ -43,7 +43,7 @@ class PartialBulkRestoreRolePresetsAction(
                 target_row=RolePresetRow,
                 target_column=RolePresetRow.id,
                 target_id=preset_id,
-                converter=RolePresetSearchableFields.own,
+                converter=RolePresetQuerySpec.own,
             )
             for preset_id in self.ids
         }

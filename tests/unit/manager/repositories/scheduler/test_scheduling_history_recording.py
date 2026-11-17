@@ -99,8 +99,8 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -1203,7 +1203,7 @@ class TestEnqueueSessionSchedulingHistory:
             SessionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionSearchableFields.own.id.filter.in_(
+                    SessionQuerySpec.own.id.filter.in_(
                         UUIDInMatchSpec(values=[session_mounting_per_role], negated=False)
                     )
                 ],

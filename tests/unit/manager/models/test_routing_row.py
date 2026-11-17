@@ -16,13 +16,13 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -47,7 +47,7 @@ def test_to_route_info_carries_replica_group_id() -> None:
         replica_group_id=replica_group_id,
     )
 
-    info = ReplicaSearchableFields.own.to_route_info(row)
+    info = ReplicaQuerySpec.own.to_route_info(row)
 
     assert info.replica_group_id == replica_group_id
 
@@ -72,7 +72,7 @@ def test_to_routing_data_carries_the_row_values() -> None:
     error_data = {"type": "session_cancelled", "errors": []}
     row = _routing_row(error_data)
 
-    data = ReplicaSearchableFields.own.to_routing_data(row)
+    data = ReplicaQuerySpec.own.to_routing_data(row)
 
     assert data.id == row.id
     assert data.endpoint == row.endpoint
@@ -85,6 +85,6 @@ def test_to_routing_data_carries_the_row_values() -> None:
 
 
 def test_to_routing_data_turns_missing_error_data_into_an_empty_dict() -> None:
-    data = ReplicaSearchableFields.own.to_routing_data(_routing_row(None))
+    data = ReplicaQuerySpec.own.to_routing_data(_routing_row(None))
 
     assert data.error_data == {}

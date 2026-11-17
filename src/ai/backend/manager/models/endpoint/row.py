@@ -71,8 +71,8 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     StrEnumType,
 )
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
@@ -418,7 +418,7 @@ class EndpointRow(Base):
             id=self.id,
             name=self.name,
             image=(
-                ImageSearchableFields.own.to_data(current_rev.image_row)
+                ImageQuerySpec.own.to_data(current_rev.image_row)
                 if current_rev is not None and current_rev.image_row is not None
                 else None
             ),
@@ -478,9 +478,7 @@ class EndpointRow(Base):
             extra_mounts=current_rev.extra_mounts if current_rev is not None else [],
             scaling_state=self.scaling_state,
             model_definition=current_rev.model_definition if current_rev is not None else None,
-            routings=[
-                ReplicaSearchableFields.own.to_routing_data(routing) for routing in self.routings
-            ]
+            routings=[ReplicaQuerySpec.own.to_routing_data(routing) for routing in self.routings]
             if self.routings is not None
             else [],
         )

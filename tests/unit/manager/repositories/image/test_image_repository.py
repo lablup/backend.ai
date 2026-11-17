@@ -28,11 +28,11 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
+from ai.backend.manager.models.image.query_spec import (
+    ImageAliasQuerySpec,
+    ImageQuerySpec,
 )
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -60,7 +60,7 @@ from ai.backend.testutils.db import with_tables
 CreateKernelForImageFunc = Callable[[ImageRow, datetime], Coroutine[Any, Any, None]]
 SearchImagesFunc = Callable[..., Coroutine[Any, Any, SearcherResult[ImageData]]]
 
-fields = ImageSearchableFields.own
+fields = ImageQuerySpec.own
 
 
 def _exact(value: str) -> StringMatchSpec:
@@ -68,17 +68,13 @@ def _exact(value: str) -> StringMatchSpec:
 
 
 def _alias_contains(value: str) -> QueryCondition:
-    alias_filter = ImageAliasSearchableFields.own.alias.filter
-    return ImageSearchableFields.nested.aliases.correlation.some([
-        alias_filter.contains(_exact(value))
-    ])
+    alias_filter = ImageAliasQuerySpec.own.alias.filter
+    return ImageQuerySpec.nested.aliases.correlation.some([alias_filter.contains(_exact(value))])
 
 
 def _alias_ends_with(value: str) -> QueryCondition:
-    alias_filter = ImageAliasSearchableFields.own.alias.filter
-    return ImageSearchableFields.nested.aliases.correlation.some([
-        alias_filter.ends_with(_exact(value))
-    ])
+    alias_filter = ImageAliasQuerySpec.own.alias.filter
+    return ImageQuerySpec.nested.aliases.correlation.some([alias_filter.ends_with(_exact(value))])
 
 
 class TestImageRepositorySearch:

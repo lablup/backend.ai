@@ -6,10 +6,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryConnectionData
-from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
-from ai.backend.manager.models.reservoir_registry.searchable_fields import (
-    ReservoirRegistrySearchableFields,
+from ai.backend.manager.models.reservoir_registry.query_spec import (
+    ReservoirRegistryQuerySpec,
 )
+from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -28,7 +28,7 @@ class BulkReservoirRegistryQuerier(
 
     @override
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryConnectionData:
-        own = ReservoirRegistrySearchableFields.own
+        own = ReservoirRegistryQuerySpec.own
         return ReservoirRegistryConnectionData(
             id=ArtifactRegistryID(own.id.read(row)),
             endpoint=own.endpoint.read(row),

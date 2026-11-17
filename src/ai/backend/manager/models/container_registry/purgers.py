@@ -15,10 +15,10 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.relation import RelationPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -48,7 +48,7 @@ class ContainerRegistryPurger(EntityPurger[ContainerRegistryRow, ContainerRegist
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return ContainerRegistrySearchableFields.own.to_data(row)
+        return ContainerRegistryQuerySpec.own.to_data(row)
 
 
 @dataclass

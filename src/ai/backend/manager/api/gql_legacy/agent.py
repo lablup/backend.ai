@@ -32,8 +32,8 @@ from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.row import AgentRow, agents
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -781,7 +781,7 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
             return [
                 cls.from_data(
                     AgentDetailData(
-                        agent=AgentSearchableFields.own.to_data(agent),
+                        agent=AgentQuerySpec.own.to_data(agent),
                         resources=agent.resources_by_rank(),
                         permissions=[],
                     )

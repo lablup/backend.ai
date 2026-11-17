@@ -10,8 +10,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.querier import BulkFieldQuerier, OwnedFieldQuerier
 
 __all__ = (
@@ -38,7 +38,7 @@ class DefaultKeypairQuerier(OwnedFieldQuerier[UserID, KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return KeyPairSearchableFields.own.to_data(row)
+        return KeyPairQuerySpec.own.to_data(row)
 
 
 class BulkKeypairQuerier(BulkFieldQuerier[KeyPairRow, KeyPairData]):
@@ -54,4 +54,4 @@ class BulkKeypairQuerier(BulkFieldQuerier[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return KeyPairSearchableFields.own.to_data(row)
+        return KeyPairQuerySpec.own.to_data(row)

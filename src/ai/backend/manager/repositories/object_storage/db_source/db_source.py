@@ -8,10 +8,10 @@ from ai.backend.manager.data.object_storage.types import ObjectStorageData, Obje
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
-from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.object_storage.searchable_fields import (
-    ObjectStorageSearchableFields,
+from ai.backend.manager.models.object_storage.query_spec import (
+    ObjectStorageQuerySpec,
 )
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -40,7 +40,7 @@ class ObjectStorageDBSource:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with name {storage_name} not found."
                 )
-            return ObjectStorageSearchableFields.own.to_data(row)
+            return ObjectStorageQuerySpec.own.to_data(row)
 
     async def get_by_id(self, storage_id: uuid.UUID) -> ObjectStorageData:
         """
@@ -52,7 +52,7 @@ class ObjectStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-            return ObjectStorageSearchableFields.own.to_data(row)
+            return ObjectStorageQuerySpec.own.to_data(row)
 
     async def get_by_namespace_id(self, storage_namespace_id: uuid.UUID) -> ObjectStorageData:
         """
@@ -73,7 +73,7 @@ class ObjectStorageDBSource:
                 raise ObjectStorageNotFoundError(
                     f"Object storage not found for namespace ID {storage_namespace_id}."
                 )
-            return ObjectStorageSearchableFields.own.to_data(row)
+            return ObjectStorageQuerySpec.own.to_data(row)
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """
@@ -83,7 +83,7 @@ class ObjectStorageDBSource:
             query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [ObjectStorageSearchableFields.own.to_data(row) for row in rows]
+            return [ObjectStorageQuerySpec.own.to_data(row) for row in rows]
 
     async def search(
         self,

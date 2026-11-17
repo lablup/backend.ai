@@ -21,10 +21,10 @@ from ai.backend.manager.errors.system_session_environ import (
 )
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
+from ai.backend.manager.models.system_session_environ.query_spec import (
+    SystemSessionEnvironQuerySpec,
 )
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.types import OptionalState
 
 __all__ = ("SystemSessionEnvironUpdater",)
@@ -54,7 +54,7 @@ class SystemSessionEnvironUpdater(
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null(),
+                condition=SystemSessionEnvironQuerySpec.own.deleted_at.filter.is_null(),
                 error=SystemSessionEnvironDeleted(
                     f"System session environ is deleted: {self.environ_id}"
                 ),
@@ -85,4 +85,4 @@ class SystemSessionEnvironUpdater(
 
     @override
     def to_data(self, row: SystemSessionEnvironRow) -> SystemSessionEnvironData:
-        return SystemSessionEnvironSearchableFields.own.to_data(row)
+        return SystemSessionEnvironQuerySpec.own.to_data(row)

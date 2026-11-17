@@ -10,10 +10,10 @@ from uuid import UUID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scheduling_history.row import DeploymentHistoryRow
-from ai.backend.manager.models.scheduling_history.searchable_fields import (
-    DeploymentHistorySearchableFields,
+from ai.backend.manager.models.scheduling_history.query_spec import (
+    DeploymentHistoryQuerySpec,
 )
+from ai.backend.manager.models.scheduling_history.row import DeploymentHistoryRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 
@@ -34,7 +34,7 @@ class DeploymentHistoryAttemptUpdater(
     @override
     def conditions(self) -> list[QueryCondition]:
         return [
-            DeploymentHistorySearchableFields.own.id.filter.in_(
+            DeploymentHistoryQuerySpec.own.id.filter.in_(
                 UUIDInMatchSpec(values=list(self.history_ids), negated=False)
             )
         ]
@@ -50,4 +50,4 @@ class DeploymentHistoryAttemptUpdater(
 
     @override
     def to_data(self, row: DeploymentHistoryRow) -> DeploymentHistoryData:
-        return DeploymentHistorySearchableFields.own.to_data(row)
+        return DeploymentHistoryQuerySpec.own.to_data(row)

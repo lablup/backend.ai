@@ -11,10 +11,10 @@ from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.models.specs.purger import EntityBatchPurger, EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
-from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
-from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
-    VFolderAutoMountSearchableFields,
+from ai.backend.manager.models.vfolder_auto_mount.query_spec import (
+    VFolderAutoMountQuerySpec,
 )
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
 
 @dataclass
@@ -41,7 +41,7 @@ class VFolderAutoMountPurger(EntityPurger[VFolderAutoMountRow, VFolderAutoMountD
 
     @override
     def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountData:
-        return VFolderAutoMountSearchableFields.own.to_data(row)
+        return VFolderAutoMountQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -72,4 +72,4 @@ class VFolderAutoMountVFolderBatchPurger(
 
     @override
     def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountData:
-        return VFolderAutoMountSearchableFields.own.to_data(row)
+        return VFolderAutoMountQuerySpec.own.to_data(row)

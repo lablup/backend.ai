@@ -33,10 +33,10 @@ from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
     DeploymentAutoScalingPolicyRow,
 )
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision.searchable_fields import (
-    ModelRevisionSearchableFields,
+from ai.backend.manager.models.deployment_revision.query_spec import (
+    ModelRevisionQuerySpec,
 )
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -434,7 +434,7 @@ class TestDeploymentRevisionRow:
             # Refresh to ensure all attributes are loaded in the session context
             await db_sess.refresh(revision)
 
-            data = ModelRevisionSearchableFields.own.to_data(revision)
+            data = ModelRevisionQuerySpec.own.to_data(revision)
             assert isinstance(data, ModelRevisionData)
             assert data.id == revision.id
             assert data.cluster_config.mode == ClusterMode.SINGLE_NODE
@@ -560,7 +560,7 @@ class TestDeploymentRevisionRow:
             await db_sess.refresh(revision)
 
             assert revision.vfolder_subpath == expected_subpath
-            data = ModelRevisionSearchableFields.own.to_data(revision)
+            data = ModelRevisionQuerySpec.own.to_data(revision)
             assert isinstance(data, ModelRevisionData)
             assert data.model_mount_config.subpath == expected_subpath
 
@@ -624,7 +624,7 @@ class TestDeploymentRevisionRow:
             assert stored[0].subpath == "datasets/v2"
             assert stored[1].subpath is None
 
-            data = ModelRevisionSearchableFields.own.to_data(revision)
+            data = ModelRevisionQuerySpec.own.to_data(revision)
             data_mounts = list(data.model_mount_config.extra_mounts)
             assert data_mounts[0].subpath == "datasets/v2"
             assert data_mounts[1].subpath is None

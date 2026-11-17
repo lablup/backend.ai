@@ -12,11 +12,11 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
-from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
+from ai.backend.manager.models.image.query_spec import (
+    ImageAliasQuerySpec,
+    ImageQuerySpec,
 )
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -35,7 +35,7 @@ class ImageSearcher(Searcher[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return ImageSearchableFields.own.to_data(row)
+        return ImageQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -48,7 +48,7 @@ class ImageAliasSearcher(Searcher[ImageAliasRow, ImageAliasData]):
 
     @override
     def to_data(self, row: ImageAliasRow) -> ImageAliasData:
-        return ImageAliasSearchableFields.own.to_data(row)
+        return ImageAliasQuerySpec.own.to_data(row)
 
 
 class ImageLookupSearcher(ImageSearcher):
@@ -61,15 +61,15 @@ class ImageLookupSearcher(ImageSearcher):
     """
 
     def _canonical_match(self, canonical: str, architecture: str) -> QueryCondition:
-        fields = ImageSearchableFields.own
+        fields = ImageQuerySpec.own
         return combine_conditions_and([
             fields.name.filter.equals(self._exact(canonical)),
             fields.architecture.filter.equals(self._exact(architecture)),
         ])
 
     def _alias_match(self, alias: str) -> QueryCondition:
-        alias_field = ImageAliasSearchableFields.own.alias
-        return ImageSearchableFields.nested.aliases.correlation.some([
+        alias_field = ImageAliasQuerySpec.own.alias
+        return ImageQuerySpec.nested.aliases.correlation.some([
             alias_field.filter.equals(self._exact(alias))
         ])
 
@@ -77,10 +77,10 @@ class ImageLookupSearcher(ImageSearcher):
         """An empty collection allows every status."""
         if not statuses:
             return []
-        return [ImageSearchableFields.own.status.filter.in_(statuses)]
+        return [ImageQuerySpec.own.status.filter.in_(statuses)]
 
     def _alive_then_oldest(self) -> list[QueryOrder]:
-        fields = ImageSearchableFields.own
+        fields = ImageQuerySpec.own
         alive = fields.status.filter.equals(ImageStatus.ALIVE)
         return [ConditionOrder(alive).first(), fields.created_at.order.apply(ascending=True)]
 

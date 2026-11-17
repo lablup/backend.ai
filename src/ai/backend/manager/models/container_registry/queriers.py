@@ -7,10 +7,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -34,7 +34,7 @@ class ContainerRegistryQuerier(DataQuerier[ContainerRegistryRow, ContainerRegist
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return ContainerRegistrySearchableFields.own.to_data(row)
+        return ContainerRegistryQuerySpec.own.to_data(row)
 
 
 class BulkContainerRegistryQuerier(BulkEntityQuerier[ContainerRegistryRow, ContainerRegistryData]):
@@ -50,4 +50,4 @@ class BulkContainerRegistryQuerier(BulkEntityQuerier[ContainerRegistryRow, Conta
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return ContainerRegistrySearchableFields.own.to_data(row)
+        return ContainerRegistryQuerySpec.own.to_data(row)

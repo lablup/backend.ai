@@ -11,12 +11,12 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.models.prometheus_query_preset.query_spec import (
+    PrometheusQueryPresetQuerySpec,
+)
 from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
     PrometheusQueryPresetRow,
-)
-from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
-    PrometheusQueryPresetSearchableFields,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -79,7 +79,7 @@ class PrometheusQueryPresetUpdater(
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
-        return PrometheusQueryPresetSearchableFields.own.to_data(row)
+        return PrometheusQueryPresetQuerySpec.own.to_data(row)
 
     def _build_options(self) -> Any:
         filter_value = self.filter_labels.optional_value()

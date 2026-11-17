@@ -19,11 +19,11 @@ from ai.backend.manager.data.model_card.types import (
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict
-from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.searchable_fields import (
-    ModelCardResourceRequirementSearchableFields,
-    ModelCardSearchableFields,
+from ai.backend.manager.models.model_card.query_spec import (
+    ModelCardQuerySpec,
+    ModelCardResourceRequirementQuerySpec,
 )
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -96,7 +96,7 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return ModelCardSearchableFields.own.to_data(row)
+        return ModelCardQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -125,4 +125,4 @@ class ModelCardResourceRequirementCreator(
 
     @override
     def to_data(self, row: ModelCardResourceRequirementRow) -> ModelCardResourceRequirementData:
-        return ModelCardResourceRequirementSearchableFields.own.to_data(row)
+        return ModelCardResourceRequirementQuerySpec.own.to_data(row)

@@ -34,27 +34,27 @@ from ai.backend.manager.models.clauses import QueryCondition
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_label.query_spec import EntityLabelQuerySpec
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.deprecated_search import (
     DeprecatedRoleConditions,
 )
+from ai.backend.manager.models.rbac_models.role.query_spec import (
+    RoleQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.role.searchable_fields import (
-    RoleSearchableFields,
-)
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
+from ai.backend.manager.models.rbac_models.role_preset.query_spec import (
+    RolePresetQuerySpec,
+)
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
-    RolePresetSearchableFields,
-)
 from ai.backend.manager.models.rbac_models.role_preset.searchers import RolePresetSearcher
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -160,7 +160,7 @@ class TestSearchRoles:
         """Name ends-with filter should match all roles ending with '-role'."""
         searcher = RoleSearcher(
             conditions=[
-                RoleSearchableFields.own.name.filter.ends_with(
+                RoleQuerySpec.own.name.filter.ends_with(
                     StringMatchSpec(value="-role", case_insensitive=False, negated=False)
                 ),
             ],
@@ -179,7 +179,7 @@ class TestSearchRoles:
     ) -> None:
         searcher = RoleSearcher(
             conditions=[],
-            orders=[RoleSearchableFields.own.name.order.apply(ascending=True)],
+            orders=[RoleQuerySpec.own.name.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
@@ -197,7 +197,7 @@ class TestSearchRoles:
         """Roles created sequentially should be ordered by created_at."""
         searcher = RoleSearcher(
             conditions=[],
-            orders=[RoleSearchableFields.own.created_at.order.apply(ascending=True)],
+            orders=[RoleQuerySpec.own.created_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
@@ -298,7 +298,7 @@ class TestSearchRoles:
         searcher = RoleSearcher(
             conditions=[
                 DeprecatedRoleConditions.exists_assignment_combined([
-                    RoleAssignmentSearchableFields.own.user_id.filter.equals(
+                    RoleAssignmentQuerySpec.own.user_id.filter.equals(
                         UUIDEqualMatchSpec(value=assigned_user_id, negated=False)
                     )
                 ]),
@@ -323,7 +323,7 @@ class TestSearchRoles:
         searcher = RoleSearcher(
             conditions=[
                 DeprecatedRoleConditions.exists_assignment_combined([
-                    RoleAssignmentSearchableFields.own.user_id.filter.equals(
+                    RoleAssignmentQuerySpec.own.user_id.filter.equals(
                         UUIDEqualMatchSpec(value=unassigned_user_id, negated=False)
                     )
                 ]),
@@ -383,12 +383,12 @@ class TestSearchRoles:
 
         searcher = RoleSearcher(
             conditions=[
-                RoleSearchableFields.own.scope_type.filter.equals(
+                RoleQuerySpec.own.scope_type.filter.equals(
                     StringMatchSpec(
                         value=str(ProjectEntityType()), case_insensitive=False, negated=False
                     )
                 ),
-                RoleSearchableFields.own.scope_id.filter.equals(
+                RoleQuerySpec.own.scope_id.filter.equals(
                     UUIDEqualMatchSpec(value=uuid.UUID(project_scope_id), negated=False)
                 ),
             ],
@@ -476,9 +476,7 @@ class TestSearchRolesUsingRolePreset:
 
         result = await preset_repository.global_search(
             GlobalSearcher(
-                used_by=[
-                    RolePresetSearchableFields.linked.usage.roles.used_by(RoleID(role_of_preset))
-                ],
+                used_by=[RolePresetQuerySpec.linked.usage.roles.used_by(RoleID(role_of_preset))],
                 searcher=RolePresetSearcher(
                     conditions=[], orders=[], pagination=OffsetPagination(limit=10, offset=0)
                 ),
@@ -502,7 +500,7 @@ class TestSearchRolesUsingRolePreset:
 
         result = await repository.global_search(
             GlobalSearcher(
-                used_by=[RoleSearchableFields.linked.usage.role_presets.uses(preset_id)],
+                used_by=[RoleQuerySpec.linked.usage.role_presets.uses(preset_id)],
                 searcher=searcher,
             )
         )
@@ -515,8 +513,8 @@ def _labelled_env_prod() -> list[QueryCondition]:
     exact = StringMatchSpec(value="env", case_insensitive=False, negated=False)
     prod = StringMatchSpec(value="prod", case_insensitive=False, negated=False)
     return [
-        EntityLabelSearchableFields.own.key.filter.equals(exact),
-        EntityLabelSearchableFields.own.value.filter.equals(prod),
+        EntityLabelQuerySpec.own.key.filter.equals(exact),
+        EntityLabelQuerySpec.own.value.filter.equals(prod),
     ]
 
 
@@ -587,7 +585,7 @@ class TestSearchRolesAndPresetsByLabel:
         labelled: LabelledRolesAndPresets,
     ) -> None:
         searcher = RoleSearcher(
-            conditions=[RoleSearchableFields.nested.labels.correlation.some(_labelled_env_prod())],
+            conditions=[RoleQuerySpec.nested.labels.correlation.some(_labelled_env_prod())],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
@@ -604,9 +602,7 @@ class TestSearchRolesAndPresetsByLabel:
         labelled: LabelledRolesAndPresets,
     ) -> None:
         searcher = RolePresetSearcher(
-            conditions=[
-                RolePresetSearchableFields.nested.labels.correlation.some(_labelled_env_prod())
-            ],
+            conditions=[RolePresetQuerySpec.nested.labels.correlation.some(_labelled_env_prod())],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
@@ -714,7 +710,7 @@ class TestSearchRolesTotalCountNotInflated:
         """BA-5749: offset pagination total_count must equal distinct role count, not JOIN-inflated count."""
         searcher = RoleSearcher(
             conditions=[],
-            orders=[RoleSearchableFields.own.name.order.apply(ascending=True)],
+            orders=[RoleQuerySpec.own.name.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
@@ -734,7 +730,7 @@ class TestSearchRolesTotalCountNotInflated:
             orders=[],
             pagination=CursorForwardPagination(
                 first=10,
-                cursor_order=RoleSearchableFields.own.created_at.order.apply(ascending=True),
+                cursor_order=RoleQuerySpec.own.created_at.order.apply(ascending=True),
             ),
         )
 

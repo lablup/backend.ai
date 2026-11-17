@@ -9,8 +9,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -37,7 +37,7 @@ class DomainQuerier(DataQuerier[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return DomainSearchableFields.own.to_data(row)
+        return DomainQuerySpec.own.to_data(row)
 
 
 class BulkDomainQuerier(BulkEntityQuerier[DomainRow, DomainData]):
@@ -53,4 +53,4 @@ class BulkDomainQuerier(BulkEntityQuerier[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return DomainSearchableFields.own.to_data(row)
+        return DomainQuerySpec.own.to_data(row)

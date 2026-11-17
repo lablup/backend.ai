@@ -14,13 +14,13 @@ from ai.backend.manager.models.specs.pagination import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from .shelf_fields import ShelfSearchableFields
+from .shelf_fields import ShelfQuerySpec
 from .shelf_fixtures import Seeded, SeededShelf
 from .shelf_rows import CategoryRow, ShelfKind, ShelfRow
 from .shelf_search import ShelfSearches, ordered_ids
 
-OWN = ShelfSearchableFields.own
-CATEGORY = ShelfSearchableFields.nested.category
+OWN = ShelfQuerySpec.own
+CATEGORY = ShelfQuerySpec.nested.category
 
 
 def _sorted_ids(

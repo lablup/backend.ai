@@ -28,12 +28,12 @@ from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, 
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_revision_preset.query_spec import (
+    DeploymentPresetQuerySpec,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
     PublicDeploymentPresetTarget,
-)
-from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
-    DeploymentPresetSearchableFields,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     DeploymentPresetSearcher,
@@ -568,7 +568,7 @@ class TestModelCardScanResourceRequirements:
             await sess.flush()
             big_id = big.id
 
-        linked = DeploymentPresetSearchableFields.linked.usage
+        linked = DeploymentPresetQuerySpec.linked.usage
         async with ops_provider.read_ops() as r:
             result = await r.scoped_search(
                 ScopedSearcher(
@@ -628,7 +628,7 @@ class TestModelCardScanResourceRequirements:
             await sess.flush()
             tiny_id = tiny.id
 
-        linked = DeploymentPresetSearchableFields.linked.usage
+        linked = DeploymentPresetQuerySpec.linked.usage
         async with ops_provider.read_ops() as r:
             result = await r.scoped_search(
                 ScopedSearcher(
@@ -657,7 +657,7 @@ class TestModelCardScanResourceRequirements:
             sess.add(preset)
             await sess.flush()
 
-        linked = DeploymentPresetSearchableFields.linked.usage
+        linked = DeploymentPresetQuerySpec.linked.usage
         async with ops_provider.read_ops() as r:
             result = await r.scoped_search(
                 ScopedSearcher(

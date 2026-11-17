@@ -18,8 +18,8 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
@@ -99,7 +99,7 @@ class ProjectFairShareTarget(ScopeTarget):
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectSearchableFields.linked.membership.held_by_domain_name(domain_name)()
+            return ProjectQuerySpec.linked.membership.held_by_domain_name(domain_name)()
 
         return inner
 
@@ -154,7 +154,7 @@ class UserFairShareTarget(ScopeTarget):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                ProjectSearchableFields.linked.membership.held_by_domain_name(domain_name)(),
+                ProjectQuerySpec.linked.membership.held_by_domain_name(domain_name)(),
                 ProjectRow.id == project_id,
             )
 

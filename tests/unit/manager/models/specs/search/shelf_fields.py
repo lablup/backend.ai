@@ -31,7 +31,7 @@ from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation, ToOneCorrelation
-from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
+from ai.backend.manager.models.specs.search.field import NestedQueryColumn, QueryColumn
 from ai.backend.manager.models.specs.search.usage import UsedByConditions
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.virtual_entity.permission_reach import user_permission_reaches
@@ -56,14 +56,12 @@ from .shelf_rows import (
 )
 
 
-class _CategoryOwnFields(RowDataConverter[CategoryRow, CategoryData]):
-    id = SearchableField(
-        CategoryRow.id, UUIDConditions(CategoryRow.id), ColumnOrder(CategoryRow.id)
-    )
-    title = SearchableField(
+class _CategoryOwnColumns(RowDataConverter[CategoryRow, CategoryData]):
+    id = QueryColumn(CategoryRow.id, UUIDConditions(CategoryRow.id), ColumnOrder(CategoryRow.id))
+    title = QueryColumn(
         CategoryRow.title, StringConditions(CategoryRow.title), ColumnOrder(CategoryRow.title)
     )
-    rank = SearchableField(
+    rank = QueryColumn(
         CategoryRow.rank, IntConditions(CategoryRow.rank), ColumnOrder(CategoryRow.rank)
     )
 
@@ -76,21 +74,17 @@ class _CategoryOwnFields(RowDataConverter[CategoryRow, CategoryData]):
         )
 
 
-class CategorySearchableFields:
-    own = _CategoryOwnFields()
+class CategoryQuerySpec:
+    own = _CategoryOwnColumns()
 
 
-class _SpecOwnFields(RowDataConverter[SpecRow, SpecData]):
-    id = SearchableField(SpecRow.id, UUIDConditions(SpecRow.id), ColumnOrder(SpecRow.id))
-    shelf_id = SearchableField(
+class _SpecOwnColumns(RowDataConverter[SpecRow, SpecData]):
+    id = QueryColumn(SpecRow.id, UUIDConditions(SpecRow.id), ColumnOrder(SpecRow.id))
+    shelf_id = QueryColumn(
         SpecRow.shelf_id, UUIDConditions(SpecRow.shelf_id), ColumnOrder(SpecRow.shelf_id)
     )
-    grade = SearchableField(
-        SpecRow.grade, StringConditions(SpecRow.grade), ColumnOrder(SpecRow.grade)
-    )
-    weight = SearchableField(
-        SpecRow.weight, IntConditions(SpecRow.weight), ColumnOrder(SpecRow.weight)
-    )
+    grade = QueryColumn(SpecRow.grade, StringConditions(SpecRow.grade), ColumnOrder(SpecRow.grade))
+    weight = QueryColumn(SpecRow.weight, IntConditions(SpecRow.weight), ColumnOrder(SpecRow.weight))
 
     @override
     def to_data(self, row: SpecRow) -> SpecData:
@@ -102,21 +96,19 @@ class _SpecOwnFields(RowDataConverter[SpecRow, SpecData]):
         )
 
 
-class SpecSearchableFields:
-    own = _SpecOwnFields()
+class SpecQuerySpec:
+    own = _SpecOwnColumns()
 
 
-class _ShelfItemOwnFields(RowDataConverter[ShelfItemRow, ShelfItemData]):
-    id = SearchableField(
-        ShelfItemRow.id, UUIDConditions(ShelfItemRow.id), ColumnOrder(ShelfItemRow.id)
-    )
-    box_id = SearchableField(
+class _ShelfItemOwnColumns(RowDataConverter[ShelfItemRow, ShelfItemData]):
+    id = QueryColumn(ShelfItemRow.id, UUIDConditions(ShelfItemRow.id), ColumnOrder(ShelfItemRow.id))
+    box_id = QueryColumn(
         ShelfItemRow.box_id, UUIDConditions(ShelfItemRow.box_id), ColumnOrder(ShelfItemRow.box_id)
     )
-    code = SearchableField(
+    code = QueryColumn(
         ShelfItemRow.code, StringConditions(ShelfItemRow.code), ColumnOrder(ShelfItemRow.code)
     )
-    qty = SearchableField(
+    qty = QueryColumn(
         ShelfItemRow.qty, IntConditions(ShelfItemRow.qty), ColumnOrder(ShelfItemRow.qty)
     )
 
@@ -130,21 +122,21 @@ class _ShelfItemOwnFields(RowDataConverter[ShelfItemRow, ShelfItemData]):
         )
 
 
-class ShelfItemSearchableFields:
-    own = _ShelfItemOwnFields()
+class ShelfItemQuerySpec:
+    own = _ShelfItemOwnColumns()
 
 
-class _BoxOwnFields(RowDataConverter[BoxRow, BoxData]):
-    id = SearchableField(BoxRow.id, UUIDConditions(BoxRow.id), ColumnOrder(BoxRow.id))
-    shelf_id = SearchableField(
+class _BoxOwnColumns(RowDataConverter[BoxRow, BoxData]):
+    id = QueryColumn(BoxRow.id, UUIDConditions(BoxRow.id), ColumnOrder(BoxRow.id))
+    shelf_id = QueryColumn(
         BoxRow.shelf_id, UUIDConditions(BoxRow.shelf_id), ColumnOrder(BoxRow.shelf_id)
     )
-    label = SearchableField(BoxRow.label, StringConditions(BoxRow.label), ColumnOrder(BoxRow.label))
-    size = SearchableField(BoxRow.size, IntConditions(BoxRow.size), ColumnOrder(BoxRow.size))
-    state = SearchableField(
+    label = QueryColumn(BoxRow.label, StringConditions(BoxRow.label), ColumnOrder(BoxRow.label))
+    size = QueryColumn(BoxRow.size, IntConditions(BoxRow.size), ColumnOrder(BoxRow.size))
+    state = QueryColumn(
         BoxRow.state, EnumConditions(BoxRow.state, BoxState), ColumnOrder(BoxRow.state)
     )
-    spec_id = SearchableField(
+    spec_id = QueryColumn(
         BoxRow.spec_id, UUIDConditions(BoxRow.spec_id), ColumnOrder(BoxRow.spec_id)
     )
 
@@ -160,66 +152,60 @@ class _BoxOwnFields(RowDataConverter[BoxRow, BoxData]):
         )
 
 
-class _BoxNestedFields:
+class _BoxNestedColumns:
     """The box's own related rows: one spec, many items."""
 
-    spec = NestedSearchableField(
-        SpecSearchableFields.own,
+    spec = NestedQueryColumn(
+        SpecQuerySpec.own,
         ToOneCorrelation(SpecRow, BoxRow, SpecRow.id == BoxRow.spec_id),
     )
-    items = NestedSearchableField(
-        ShelfItemSearchableFields.own,
+    items = NestedQueryColumn(
+        ShelfItemQuerySpec.own,
         ToManyCorrelation(ShelfItemRow, BoxRow, ShelfItemRow.box_id == BoxRow.id),
     )
 
 
-class BoxSearchableFields:
-    own = _BoxOwnFields()
-    nested = _BoxNestedFields
+class BoxQuerySpec:
+    own = _BoxOwnColumns()
+    nested = _BoxNestedColumns
 
 
-class _ShelfOwnFields(RowDataConverter[ShelfRow, ShelfData]):
+class _ShelfOwnColumns(RowDataConverter[ShelfRow, ShelfData]):
     """The shelf's own columns."""
 
-    id = SearchableField(ShelfRow.id, UUIDConditions(ShelfRow.id), ColumnOrder(ShelfRow.id))
-    name = SearchableField(
-        ShelfRow.name, StringConditions(ShelfRow.name), ColumnOrder(ShelfRow.name)
-    )
-    note = SearchableField(
-        ShelfRow.note, StringConditions(ShelfRow.note), ColumnOrder(ShelfRow.note)
-    )
-    count = SearchableField(
-        ShelfRow.count, IntConditions(ShelfRow.count), ColumnOrder(ShelfRow.count)
-    )
-    price = SearchableField(
+    id = QueryColumn(ShelfRow.id, UUIDConditions(ShelfRow.id), ColumnOrder(ShelfRow.id))
+    name = QueryColumn(ShelfRow.name, StringConditions(ShelfRow.name), ColumnOrder(ShelfRow.name))
+    note = QueryColumn(ShelfRow.note, StringConditions(ShelfRow.note), ColumnOrder(ShelfRow.note))
+    count = QueryColumn(ShelfRow.count, IntConditions(ShelfRow.count), ColumnOrder(ShelfRow.count))
+    price = QueryColumn(
         ShelfRow.price, DecimalConditions(ShelfRow.price), ColumnOrder(ShelfRow.price)
     )
-    kind = SearchableField(
+    kind = QueryColumn(
         ShelfRow.kind, EnumConditions(ShelfRow.kind, ShelfKind), ColumnOrder(ShelfRow.kind)
     )
-    active = SearchableField(
+    active = QueryColumn(
         ShelfRow.active, BoolConditions(ShelfRow.active), ColumnOrder(ShelfRow.active)
     )
-    tags = SearchableField(ShelfRow.tags, ArrayConditions(ShelfRow.tags, sa.String()), None)
-    opened_at = SearchableField(
+    tags = QueryColumn(ShelfRow.tags, ArrayConditions(ShelfRow.tags, sa.String()), None)
+    opened_at = QueryColumn(
         ShelfRow.opened_at,
         DateTimeConditions(ShelfRow.opened_at),
         ColumnOrder(ShelfRow.opened_at),
     )
-    closed_at = SearchableField(
+    closed_at = QueryColumn(
         ShelfRow.closed_at,
         DateTimeConditions(ShelfRow.closed_at),
         ColumnOrder(ShelfRow.closed_at),
     )
-    stocked_on = SearchableField(
+    stocked_on = QueryColumn(
         ShelfRow.stocked_on,
         DateConditions(ShelfRow.stocked_on),
         ColumnOrder(ShelfRow.stocked_on),
     )
-    zone_id = SearchableField(
+    zone_id = QueryColumn(
         ShelfRow.zone_id, UUIDConditions(ShelfRow.zone_id), ColumnOrder(ShelfRow.zone_id)
     )
-    category_id = SearchableField(
+    category_id = QueryColumn(
         ShelfRow.category_id,
         UUIDConditions(ShelfRow.category_id),
         ColumnOrder(ShelfRow.category_id),
@@ -244,15 +230,15 @@ class _ShelfOwnFields(RowDataConverter[ShelfRow, ShelfData]):
         )
 
 
-class _ShelfNestedFields:
+class _ShelfNestedColumns:
     """Rows of other tables a shelf reaches: many boxes, one category."""
 
-    boxes = NestedSearchableField(
-        BoxSearchableFields.own,
+    boxes = NestedQueryColumn(
+        BoxQuerySpec.own,
         ToManyCorrelation(BoxRow, ShelfRow, BoxRow.shelf_id == ShelfRow.id),
     )
-    category = NestedSearchableField(
-        CategorySearchableFields.own,
+    category = NestedQueryColumn(
+        CategoryQuerySpec.own,
         ToOneCorrelation(CategoryRow, ShelfRow, CategoryRow.id == ShelfRow.category_id),
     )
 
@@ -279,9 +265,9 @@ class _ShelfLinkedEntities:
     usage = _ShelfUsage
 
 
-class ShelfSearchableFields:
-    own = _ShelfOwnFields()
-    nested = _ShelfNestedFields
+class ShelfQuerySpec:
+    own = _ShelfOwnColumns()
+    nested = _ShelfNestedColumns
     linked = _ShelfLinkedEntities
 
 
@@ -293,7 +279,7 @@ class ShelfSearcher(Searcher[ShelfRow, ShelfData]):
 
     @override
     def to_data(self, row: ShelfRow) -> ShelfData:
-        return ShelfSearchableFields.own.to_data(row)
+        return ShelfQuerySpec.own.to_data(row)
 
 
 class ZoneShelfTarget(ScopeTarget):

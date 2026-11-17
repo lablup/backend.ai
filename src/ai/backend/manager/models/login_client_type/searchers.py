@@ -8,10 +8,10 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
-from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.login_client_type.searchable_fields import (
-    LoginClientTypeSearchableFields,
+from ai.backend.manager.models.login_client_type.query_spec import (
+    LoginClientTypeQuerySpec,
 )
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +23,4 @@ class LoginClientTypeSearcher(Searcher[LoginClientTypeRow, LoginClientTypeData])
 
     @override
     def to_data(self, row: LoginClientTypeRow) -> LoginClientTypeData:
-        return LoginClientTypeSearchableFields.own.to_data(row)
+        return LoginClientTypeQuerySpec.own.to_data(row)

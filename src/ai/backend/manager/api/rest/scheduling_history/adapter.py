@@ -39,10 +39,10 @@ from ai.backend.manager.models.scheduling_history.deprecated_search import (
     DeprecatedRouteHistoryConditions,
     DeprecatedSessionSchedulingHistoryConditions,
 )
-from ai.backend.manager.models.scheduling_history.searchable_fields import (
-    DeploymentHistorySearchableFields,
-    RouteHistorySearchableFields,
-    SessionSchedulingHistorySearchableFields,
+from ai.backend.manager.models.scheduling_history.query_spec import (
+    DeploymentHistoryQuerySpec,
+    RouteHistoryQuerySpec,
+    SessionSchedulingHistoryQuerySpec,
 )
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
@@ -68,7 +68,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_session_filter(self, filter: SessionHistoryFilter) -> list[QueryCondition]:
         """Convert session history filter to list of query conditions."""
-        fields = SessionSchedulingHistorySearchableFields.own
+        fields = SessionSchedulingHistoryQuerySpec.own
         return [
             *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
@@ -83,7 +83,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_session_order(self, order: SessionHistoryOrder) -> QueryOrder:
         """Convert session history order specification to query order."""
-        fields = SessionSchedulingHistorySearchableFields.own
+        fields = SessionSchedulingHistoryQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
@@ -127,7 +127,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_deployment_filter(self, filter: DeploymentHistoryFilter) -> list[QueryCondition]:
         """Convert deployment history filter to list of query conditions."""
-        fields = DeploymentHistorySearchableFields.own
+        fields = DeploymentHistoryQuerySpec.own
         return [
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
@@ -142,7 +142,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_deployment_order(self, order: DeploymentHistoryOrder) -> QueryOrder:
         """Convert deployment history order specification to query order."""
-        fields = DeploymentHistorySearchableFields.own
+        fields = DeploymentHistoryQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
@@ -184,7 +184,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_route_filter(self, filter: RouteHistoryFilter) -> list[QueryCondition]:
         """Convert route history filter to list of query conditions."""
-        fields = RouteHistorySearchableFields.own
+        fields = RouteHistoryQuerySpec.own
         return [
             *self.apply_uuid_filter(filter.route_id, fields.route_id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
@@ -198,7 +198,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_route_order(self, order: RouteHistoryOrder) -> QueryOrder:
         """Convert route history order specification to query order."""
-        fields = RouteHistorySearchableFields.own
+        fields = RouteHistoryQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:

@@ -22,8 +22,8 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.purgers import ImagePurger
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import (
     AliasedImageSearcher,
     CanonicalImageSearcher,
@@ -75,9 +75,7 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
                 result = await r.search_in_global(
                     ImageSearcher(
                         pagination=NoPagination(),
-                        conditions=[
-                            ImageSearchableFields.own.status.filter.in_([ImageStatus.ALIVE])
-                        ],
+                        conditions=[ImageQuerySpec.own.status.filter.in_([ImageStatus.ALIVE])],
                     )
                 )
             items = result.items

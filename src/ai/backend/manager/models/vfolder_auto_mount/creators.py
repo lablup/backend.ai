@@ -25,10 +25,10 @@ from ai.backend.manager.errors.vfolder_auto_mount import (
 from ai.backend.manager.models.specs.creator import GuardedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
-from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
-    VFolderAutoMountSearchableFields,
+from ai.backend.manager.models.vfolder_auto_mount.query_spec import (
+    VFolderAutoMountQuerySpec,
 )
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
 
 @dataclass(frozen=True)
@@ -109,4 +109,4 @@ class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderA
 
     @override
     def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountData:
-        return VFolderAutoMountSearchableFields.own.to_data(row)
+        return VFolderAutoMountQuerySpec.own.to_data(row)

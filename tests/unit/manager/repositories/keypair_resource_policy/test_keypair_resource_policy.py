@@ -43,13 +43,13 @@ from ai.backend.manager.models.resource_policy.creators import (
 from ai.backend.manager.models.resource_policy.purgers import (
     KeyPairResourcePolicyPurger,
 )
+from ai.backend.manager.models.resource_policy.query_spec import (
+    KeyPairResourcePolicyQuerySpec,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    KeyPairResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.resource_policy.updaters import (
     KeyPairResourcePolicyUpdater,
@@ -184,7 +184,7 @@ class TestKeypairResourcePolicyOps:
             policy_row = sample_creator.build_row()
             db_sess.add(policy_row)
             await db_sess.commit()
-            return KeyPairResourcePolicySearchableFields.own.to_data(policy_row)
+            return KeyPairResourcePolicyQuerySpec.own.to_data(policy_row)
 
     @pytest.fixture
     async def multiple_policies(

@@ -51,10 +51,10 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
-from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.resource_preset.searchable_fields import (
-    ResourcePresetSearchableFields,
+from ai.backend.manager.models.resource_preset.query_spec import (
+    ResourcePresetQuerySpec,
 )
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.searchers import ResourcePresetSearcher
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -107,7 +107,7 @@ def _resource_slot_entries_to_slot(
 
 def _resource_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourcePresetSearchableFields.own.name.order.apply(ascending=True),
+        forward_order=ResourcePresetQuerySpec.own.name.order.apply(ascending=True),
         cursor_column=ResourcePresetRow.id,
     )
 
@@ -318,7 +318,7 @@ class ResourcePresetAdapter(BaseAdapter):
 
     def _convert_filter(self, filter_: ResourcePresetFilter) -> list[QueryCondition]:
         """Convert ResourcePresetFilter DTO to QueryConditions."""
-        fields = ResourcePresetSearchableFields.own
+        fields = ResourcePresetQuerySpec.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(
@@ -346,7 +346,7 @@ class ResourcePresetAdapter(BaseAdapter):
 
     def _convert_orders(self, orders: list[ResourcePresetOrder]) -> list[Any]:
         """Convert ResourcePresetOrder DTOs to QueryOrders."""
-        fields = ResourcePresetSearchableFields.own
+        fields = ResourcePresetQuerySpec.own
         result = []
         for order in orders:
             ascending = order.direction == ResourcePresetOrderDirection.ASC

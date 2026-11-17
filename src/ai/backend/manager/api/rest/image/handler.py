@@ -30,8 +30,8 @@ from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.image_request import GetImagePathParam
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
 from ai.backend.manager.models.image.scopes import VisibleImageTarget
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -93,11 +93,11 @@ class ImageHandler:
                 searcher=ImageSearcher(
                     pagination=NoPagination(),
                     conditions=[
-                        ImageSearchableFields.own.id.filter.equals(
+                        ImageQuerySpec.own.id.filter.equals(
                             UUIDEqualMatchSpec(value=path.parsed.image_id, negated=False)
                         ),
                         # A forgotten image is soft-deleted, so the row outlives it.
-                        ImageSearchableFields.own.status.filter.in_([ImageStatus.ALIVE]),
+                        ImageQuerySpec.own.status.filter.in_([ImageStatus.ALIVE]),
                     ],
                 ),
             )

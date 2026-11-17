@@ -25,9 +25,9 @@ from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -47,7 +47,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
     def build_kernel_searcher_for_sessions(self, session_ids: list[SessionId]) -> KernelSearcher:
         """Build a KernelSearcher for kernels belonging to the given sessions."""
         conditions: list[QueryCondition] = [
-            KernelSearchableFields.own.session_id.filter.in_(
+            KernelQuerySpec.own.session_id.filter.in_(
                 UUIDInMatchSpec(values=session_ids, negated=False)
             )
         ]
@@ -107,7 +107,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
 
     def _convert_session_filter(self, filter: ComputeSessionFilter) -> list[QueryCondition]:
         """Convert session filter to list of query conditions."""
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         conditions: list[QueryCondition] = []
         if filter.status:
             conditions.append(fields.status.filter.in_([SessionStatus(s) for s in filter.status]))
@@ -121,7 +121,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
 
     def _convert_session_order(self, order: ComputeSessionOrder) -> QueryOrder:
         """Convert session order specification to query order."""
-        fields = SessionSearchableFields.own
+        fields = SessionQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ComputeSessionOrderField.CREATED_AT:

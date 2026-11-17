@@ -11,10 +11,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.user import UserResourcePolicyNotFound
-from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
-from ai.backend.manager.models.resource_policy.searchable_fields import (
-    UserResourcePolicySearchableFields,
+from ai.backend.manager.models.resource_policy.query_spec import (
+    UserResourcePolicyQuerySpec,
 )
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -57,4 +57,4 @@ class UserResourcePolicyDBSource:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."
                 )
-            return UserResourcePolicySearchableFields.own.to_data(row)
+            return UserResourcePolicyQuerySpec.own.to_data(row)

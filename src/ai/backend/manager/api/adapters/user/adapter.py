@@ -107,18 +107,19 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
+from ai.backend.manager.models.keypair.query_spec import KeyPairQuerySpec
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.query_spec import SSHKeypairQuerySpec
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.deprecated_search import (
     DeprecatedUserConditions,
     DeprecatedUserOrders,
 )
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.scopes import (
@@ -127,7 +128,6 @@ from ai.backend.manager.models.user.scopes import (
     RoleUserTarget,
     UserTarget,
 )
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -190,12 +190,12 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
 _USER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=UserSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=UserQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=UserRow.uuid,
 )
 
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeyPairSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=KeyPairQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=KeyPairRow.id,
 )
 
@@ -985,7 +985,7 @@ class UserAdapter(BaseAdapter):
                 user_ids=unique_ids,
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=len(unique_ids)),
-                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                    conditions=[SSHKeypairQuerySpec.own.is_default.filter.equals(True)],
                 ),
             )
         )
@@ -1172,7 +1172,7 @@ class UserAdapter(BaseAdapter):
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         if resource_policy_name is not None:
             conditions.append(
-                KeyPairSearchableFields.own.resource_policy_name.filter.equals(
+                KeyPairQuerySpec.own.resource_policy_name.filter.equals(
                     StringMatchSpec(resource_policy_name, case_insensitive=False, negated=False)
                 )
             )
@@ -1213,7 +1213,7 @@ class UserAdapter(BaseAdapter):
         Used both by the keypair searches and, through ``keypairs``, to narrow a user
         search; one instance narrows one row either way.
         """
-        fields = KeyPairSearchableFields.own
+        fields = KeyPairQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
             *self.apply_bool_filter(f.is_active, fields.is_active.filter),
@@ -1247,7 +1247,7 @@ class UserAdapter(BaseAdapter):
         return [self._convert_keypair_order(order) for order in orders]
 
     def _convert_keypair_order(self, order: KeypairOrderBy) -> QueryOrder:
-        fields = KeyPairSearchableFields.own
+        fields = KeyPairQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case KeypairOrderField.CREATED_AT:
@@ -1268,7 +1268,7 @@ class UserAdapter(BaseAdapter):
     # ------------------------------------------------------------------ GQL filter/order helpers
 
     def _convert_user_filter(self, f: UserFilter) -> list[QueryCondition]:
-        fields = UserSearchableFields.own
+        fields = UserQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
             *self.apply_uuid_filter(f.entity_id, fields.id.filter),
@@ -1293,12 +1293,12 @@ class UserAdapter(BaseAdapter):
             *self.apply_datetime_filter(f.modified_at, fields.modified_at.filter),
             *self.apply_to_many_filter(
                 f.keypairs,
-                UserSearchableFields.nested.keypairs.correlation,
+                UserQuerySpec.nested.keypairs.correlation,
                 self._convert_keypair_filter,
             ),
             *self.apply_to_many_filter(
                 f.labels,
-                UserSearchableFields.nested.labels.correlation,
+                UserQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
             *self.apply_nullable_datetime_filter(
@@ -1329,7 +1329,7 @@ class UserAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over the user's domain."""
         if f is None:
             return []
-        fields = DomainSearchableFields.own
+        fields = DomainQuerySpec.own
         conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_bool_filter(f.is_active, fields.is_active.filter),
@@ -1342,7 +1342,7 @@ class UserAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over one of the user's projects."""
         if f is None:
             return []
-        fields = ProjectSearchableFields.own
+        fields = ProjectQuerySpec.own
         conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_bool_filter(f.is_active, fields.is_active.filter),
@@ -1355,7 +1355,7 @@ class UserAdapter(BaseAdapter):
         return [self._convert_user_order(order) for order in orders]
 
     def _convert_user_order(self, order: UserOrder) -> QueryOrder:
-        fields = UserSearchableFields.own
+        fields = UserQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserOrderField.ENTITY_ID:

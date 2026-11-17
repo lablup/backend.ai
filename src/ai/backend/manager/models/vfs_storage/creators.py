@@ -9,10 +9,10 @@ from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
-from ai.backend.manager.models.vfs_storage.searchable_fields import (
-    VFSStorageSearchableFields,
+from ai.backend.manager.models.vfs_storage.query_spec import (
+    VFSStorageQuerySpec,
 )
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
 
 @dataclass
@@ -39,4 +39,4 @@ class VFSStorageCreator(
 
     @override
     def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return VFSStorageSearchableFields.own.to_data(row)
+        return VFSStorageQuerySpec.own.to_data(row)

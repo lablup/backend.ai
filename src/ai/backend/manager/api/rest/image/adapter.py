@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.image.response import (
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.image.query_spec import ImageQuerySpec
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -92,7 +92,7 @@ class ImageAdapter(BaseFilterAdapter):
     def _convert_filter(self, filter_: ImageFilter | None) -> list[QueryCondition]:
         if filter_ is None:
             return []
-        fields = ImageSearchableFields.own
+        fields = ImageQuerySpec.own
         return [
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.architecture, fields.architecture.filter),
@@ -101,7 +101,7 @@ class ImageAdapter(BaseFilterAdapter):
     def _convert_order(self, orders: list[ImageOrder] | None) -> list[QueryOrder]:
         if not orders:
             return []
-        fields = ImageSearchableFields.own
+        fields = ImageQuerySpec.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC

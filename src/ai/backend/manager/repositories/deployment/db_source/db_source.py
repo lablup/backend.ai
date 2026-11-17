@@ -138,38 +138,38 @@ from ai.backend.manager.models.deployment_designated_agent.row import (
 )
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
+from ai.backend.manager.models.deployment_policy.query_spec import (
+    DeploymentPolicyQuerySpec,
+)
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.scopes import DeploymentPolicyTarget
-from ai.backend.manager.models.deployment_policy.searchable_fields import (
-    DeploymentPolicySearchableFields,
-)
 from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.query_spec import (
+    ModelRevisionQuerySpec,
+)
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.scopes import DeploymentRevisionTarget
-from ai.backend.manager.models.deployment_revision.searchable_fields import (
-    ModelRevisionSearchableFields,
-)
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
+from ai.backend.manager.models.deployment_revision_preset.query_spec import (
+    DeploymentPresetQuerySpec,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import (
     DeploymentRevisionPresetRow,
-)
-from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
-    DeploymentPresetSearchableFields,
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator
 from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
+from ai.backend.manager.models.endpoint.query_spec import (
+    AutoScalingRuleQuerySpec,
+    DeploymentAccessTokenQuerySpec,
+    DeploymentQuerySpec,
+)
 from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
-)
-from ai.backend.manager.models.endpoint.searchable_fields import (
-    AutoScalingRuleSearchableFields,
-    DeploymentAccessTokenSearchableFields,
-    DeploymentSearchableFields,
 )
 from ai.backend.manager.models.endpoint.searchers import (
     DeploymentAccessTokenSearcher,
@@ -184,9 +184,9 @@ from ai.backend.manager.models.endpoint.updaters import (
 )
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, groups
@@ -201,27 +201,27 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
-from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant.searchable_fields import (
-    RuntimeVariantSearchableFields,
+from ai.backend.manager.models.runtime_variant.query_spec import (
+    RuntimeVariantQuerySpec,
 )
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.scheduling_history.query_spec import (
+    RouteHistoryQuerySpec,
+)
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     RouteHistoryRow,
 )
-from ai.backend.manager.models.scheduling_history.searchable_fields import (
-    RouteHistorySearchableFields,
-)
 from ai.backend.manager.models.scheduling_history.updaters import (
     DeploymentHistoryAttemptUpdater,
 )
+from ai.backend.manager.models.session.query_spec import SessionQuerySpec
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.row import SessionGroupRow
@@ -448,7 +448,7 @@ class DeploymentDBSource:
         infos = await self._search_deployment_infos(
             r,
             [
-                DeploymentSearchableFields.own.entity_id.filter.equals(
+                DeploymentQuerySpec.own.entity_id.filter.equals(
                     UUIDEqualMatchSpec(value=deployment_id, negated=False)
                 )
             ],
@@ -504,7 +504,7 @@ class DeploymentDBSource:
             ModelRevisionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    ModelRevisionSearchableFields.own.field_id.filter.in_(
+                    ModelRevisionQuerySpec.own.field_id.filter.in_(
                         UUIDInMatchSpec(values=revision_ids, negated=False)
                     )
                 ],
@@ -577,7 +577,7 @@ class DeploymentDBSource:
         if not deployment_ids:
             return []
 
-        deployment_fields = DeploymentSearchableFields.own
+        deployment_fields = DeploymentQuerySpec.own
         async with self._reconcile_ops.read_ops() as r:
             return await self._search_deployment_infos(
                 r,
@@ -1014,7 +1014,7 @@ class DeploymentDBSource:
             )
             db_sess.add(row)
             await db_sess.flush()
-            return AutoScalingRuleSearchableFields.own.to_data(row)
+            return AutoScalingRuleQuerySpec.own.to_data(row)
 
     async def update_model_deployment_autoscaling_rule(
         self,
@@ -1035,7 +1035,7 @@ class DeploymentDBSource:
             for column_name, value in modifier.fields_to_update().items():
                 setattr(row, column_name, value)
             await db_sess.flush()
-            return AutoScalingRuleSearchableFields.own.to_data(row)
+            return AutoScalingRuleQuerySpec.own.to_data(row)
 
     async def list_model_deployment_autoscaling_rules(
         self,
@@ -1048,7 +1048,7 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             rows = result.scalars().all()
-            return [AutoScalingRuleSearchableFields.own.to_data(row) for row in rows]
+            return [AutoScalingRuleQuerySpec.own.to_data(row) for row in rows]
 
     async def get_model_deployment_autoscaling_rule(
         self,
@@ -1063,7 +1063,7 @@ class DeploymentDBSource:
             row = result.scalar_one_or_none()
             if not row:
                 raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
-            return AutoScalingRuleSearchableFields.own.to_data(row)
+            return AutoScalingRuleQuerySpec.own.to_data(row)
 
     # Route operations
 
@@ -1198,7 +1198,7 @@ class DeploymentDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 return None
-            return ReplicaSearchableFields.own.to_route_info(row)
+            return ReplicaQuerySpec.own.to_route_info(row)
 
     async def search_legacy_endpoints(
         self,
@@ -1412,7 +1412,7 @@ class DeploymentDBSource:
             deployment_infos = await self._search_deployment_infos(
                 r,
                 [
-                    DeploymentSearchableFields.own.entity_id.filter.in_(
+                    DeploymentQuerySpec.own.entity_id.filter.in_(
                         UUIDInMatchSpec(values=endpoint_ids, negated=False)
                     )
                 ],
@@ -1605,9 +1605,7 @@ class DeploymentDBSource:
             rows: Sequence[RoutingRow] = result.scalars().all()
             routes_by_deployment: defaultdict[DeploymentID, list[RouteInfo]] = defaultdict(list)
             for row in rows:
-                routes_by_deployment[row.endpoint].append(
-                    ReplicaSearchableFields.own.to_route_info(row)
-                )
+                routes_by_deployment[row.endpoint].append(ReplicaQuerySpec.own.to_route_info(row))
             return routes_by_deployment
 
     # Route operations
@@ -1721,7 +1719,7 @@ class DeploymentDBSource:
                     owner_id=history.deployment_id,
                     history_creator=history.creator,
                     match_conditions=[
-                        RouteHistorySearchableFields.own.route_id.filter.equals(
+                        RouteHistoryQuerySpec.own.route_id.filter.equals(
                             UUIDEqualMatchSpec(value=history.creator.route_id, negated=False)
                         )
                     ],
@@ -2298,10 +2296,10 @@ class DeploymentDBSource:
                     SessionSearcher(
                         pagination=NoPagination(),
                         conditions=[
-                            SessionSearchableFields.own.id.filter.in_(
+                            SessionQuerySpec.own.id.filter.in_(
                                 UUIDInMatchSpec(values=list(session_ids), negated=False)
                             ),
-                            SessionSearchableFields.own.status.filter.in_([
+                            SessionQuerySpec.own.status.filter.in_([
                                 SessionStatus.RUNNING,
                                 SessionStatus.CREATING,
                             ]),
@@ -2326,7 +2324,7 @@ class DeploymentDBSource:
                     KernelSearcher(
                         pagination=NoPagination(),
                         conditions=[
-                            KernelSearchableFields.own.cluster_role.filter.equals(
+                            KernelQuerySpec.own.cluster_role.filter.equals(
                                 StringMatchSpec(
                                     value=DEFAULT_ROLE, case_insensitive=False, negated=False
                                 )
@@ -2479,9 +2477,9 @@ class DeploymentDBSource:
             variant_row = await self._fetch_runtime_variant_by_id(session, runtime_variant_id)
             preset_row, preset_slots = await self._fetch_preset_with_slots(session, preset_id)
             return LegacyRevisionCreateReadBundle(
-                variant=RuntimeVariantSearchableFields.own.to_data(variant_row),
+                variant=RuntimeVariantQuerySpec.own.to_data(variant_row),
                 preset=(
-                    DeploymentPresetSearchableFields.own.to_data(preset_row)
+                    DeploymentPresetQuerySpec.own.to_data(preset_row)
                     if preset_row is not None
                     else None
                 ),
@@ -2497,9 +2495,9 @@ class DeploymentDBSource:
             variant_row = await self._fetch_runtime_variant_by_id(session, runtime_variant_id)
             preset_row, preset_slots = await self._fetch_preset_with_slots(session, preset_id)
             return DeploymentRevisionReadBundle(
-                variant=RuntimeVariantSearchableFields.own.to_data(variant_row),
+                variant=RuntimeVariantQuerySpec.own.to_data(variant_row),
                 preset=(
-                    DeploymentPresetSearchableFields.own.to_data(preset_row)
+                    DeploymentPresetQuerySpec.own.to_data(preset_row)
                     if preset_row is not None
                     else None
                 ),
@@ -2661,7 +2659,7 @@ class DeploymentDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
-            return ModelRevisionSearchableFields.own.to_data(row)
+            return ModelRevisionQuerySpec.own.to_data(row)
 
     async def get_revision_by_route_id(
         self,
@@ -2690,7 +2688,7 @@ class DeploymentDBSource:
             row = revision_result.scalar_one_or_none()
             if row is None:
                 raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
-            return ModelRevisionSearchableFields.own.to_data(row)
+            return ModelRevisionQuerySpec.own.to_data(row)
 
     async def get_current_revision(
         self,
@@ -2730,7 +2728,7 @@ class DeploymentDBSource:
                 raise DeploymentRevisionNotFound(
                     f"Deployment revision {current_revision_id} not found"
                 )
-            return ModelRevisionSearchableFields.own.to_data(row)
+            return ModelRevisionQuerySpec.own.to_data(row)
 
     async def get_latest_revision(
         self,
@@ -2750,7 +2748,7 @@ class DeploymentDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             row = await self._fetch_latest_revision_row(db_sess, DeploymentID(endpoint_id))
-            return ModelRevisionSearchableFields.own.to_data(row)
+            return ModelRevisionQuerySpec.own.to_data(row)
 
     async def search_revisions(
         self,
@@ -3040,7 +3038,7 @@ class DeploymentDBSource:
                 raise DeploymentPolicyNotFound(
                     f"Deployment policy for endpoint {endpoint_id} not found"
                 )
-            return DeploymentPolicySearchableFields.own.to_data(row)
+            return DeploymentPolicyQuerySpec.own.to_data(row)
 
     async def delete_deployment_policy(
         self,
@@ -3099,8 +3097,7 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             return [
-                DeploymentAccessTokenSearchableFields.own.to_data(row)
-                for row in result.scalars().all()
+                DeploymentAccessTokenQuerySpec.own.to_data(row) for row in result.scalars().all()
             ]
 
     async def search_access_tokens(

@@ -39,8 +39,8 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.models.resource_usage_history.searchable_fields import (
-    UserUsageBucketSearchableFields,
+from ai.backend.manager.models.resource_usage_history.query_spec import (
+    UserUsageBucketQuerySpec,
 )
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
@@ -204,15 +204,13 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
 
         payload = await info.context.adapters.resource_usage.gql_search_user_unscoped(
             base_conditions=[
-                UserUsageBucketSearchableFields.own.project_id.filter.equals(
+                UserUsageBucketQuerySpec.own.project_id.filter.equals(
                     UUIDEqualMatchSpec(value=self.project_id, negated=False)
                 ),
-                UserUsageBucketSearchableFields.own.resource_group.filter.equals(
+                UserUsageBucketQuerySpec.own.resource_group.filter.equals(
                     StringMatchSpec(self.resource_group_name, case_insensitive=False, negated=False)
                 ),
-                UserUsageBucketSearchableFields.own.period_start.filter.equals(
-                    self.metadata.period_start
-                ),
+                UserUsageBucketQuerySpec.own.period_start.filter.equals(self.metadata.period_start),
             ],
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

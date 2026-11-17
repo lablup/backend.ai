@@ -12,10 +12,10 @@ from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.retention import RetentionPolicyConflict
-from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.retention.searchable_fields import (
-    RetentionPolicySearchableFields,
+from ai.backend.manager.models.retention.query_spec import (
+    RetentionPolicyQuerySpec,
 )
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -56,4 +56,4 @@ class RetentionPolicyCreator(
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return RetentionPolicySearchableFields.own.to_data(row)
+        return RetentionPolicyQuerySpec.own.to_data(row)

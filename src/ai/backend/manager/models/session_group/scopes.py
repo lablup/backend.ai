@@ -20,8 +20,8 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
@@ -60,7 +60,7 @@ class DomainSessionGroupTarget(SessionGroupTarget):
                 scope_membership_exists(
                     DomainEntityType(), domain_id, SessionGroupEntityType(), SessionGroupRow.id
                 ),
-                SessionGroupSearchableFields.linked.replica_groups.not_exists()(),
+                SessionGroupQuerySpec.linked.replica_groups.not_exists()(),
             )
 
         return inner
@@ -96,7 +96,7 @@ class ProjectSessionGroupTarget(SessionGroupTarget):
                 scope_membership_exists(
                     ProjectEntityType(), project_id, SessionGroupEntityType(), SessionGroupRow.id
                 ),
-                SessionGroupSearchableFields.linked.replica_groups.not_exists()(),
+                SessionGroupQuerySpec.linked.replica_groups.not_exists()(),
             )
 
         return inner
@@ -130,7 +130,7 @@ class UserSessionGroupTarget(SessionGroupTarget):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 user_scope_reaches(user_id, SessionGroupEntityType(), SessionGroupRow.id),
-                SessionGroupSearchableFields.linked.replica_groups.not_exists()(),
+                SessionGroupQuerySpec.linked.replica_groups.not_exists()(),
             )
 
         return inner

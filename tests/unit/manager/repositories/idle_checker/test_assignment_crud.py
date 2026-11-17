@@ -39,11 +39,11 @@ from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerCreator,
 )
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerAssignmentQuerySpec,
+)
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentTarget
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerAssignmentSearchableFields,
-)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -529,7 +529,7 @@ class TestIdleCheckerAssignmentRepository:
 
         result = await repository.admin_search_assignments(
             IdleCheckerAssignmentSearcher(
-                conditions=[IdleCheckerAssignmentSearchableFields.own.enabled.filter.equals(False)],
+                conditions=[IdleCheckerAssignmentQuerySpec.own.enabled.filter.equals(False)],
                 pagination=NoPagination(),
             )
         )

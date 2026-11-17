@@ -12,10 +12,10 @@ from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 
@@ -87,4 +87,4 @@ class ContainerRegistryUpserter(EntityUpserter[ContainerRegistryRow, ContainerRe
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return ContainerRegistrySearchableFields.own.to_data(row)
+        return ContainerRegistryQuerySpec.own.to_data(row)

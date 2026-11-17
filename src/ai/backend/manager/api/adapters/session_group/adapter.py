@@ -49,13 +49,13 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.purgers import SessionGroupPurger
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.scopes import (
     DomainSessionGroupTarget,
     ProjectSessionGroupTarget,
     UserSessionGroupTarget,
 )
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.session_group.updaters import SessionGroupUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -76,7 +76,7 @@ from ai.backend.manager.types import OptionalState
 __all__ = ("SessionGroupAdapter",)
 
 _SESSION_GROUP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=SessionGroupSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=SessionGroupQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=SessionGroupRow.id,
 )
 
@@ -214,14 +214,14 @@ class SessionGroupAdapter(BaseAdapter):
         """The filter's conditions; groups marked deleted are left out unless the top-level
         filter names ``deleted_at``."""
         if filter is None:
-            return [SessionGroupSearchableFields.own.deleted_at.filter.is_null()]
+            return [SessionGroupQuerySpec.own.deleted_at.filter.is_null()]
         conditions = self._convert_filter(filter)
         if filter.deleted_at is None:
-            conditions.append(SessionGroupSearchableFields.own.deleted_at.filter.is_null())
+            conditions.append(SessionGroupQuerySpec.own.deleted_at.filter.is_null())
         return conditions
 
     def _convert_filter(self, filter: SessionGroupFilter) -> list[QueryCondition]:
-        fields = SessionGroupSearchableFields.own
+        fields = SessionGroupQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_uuid_filter(filter.domain_id, fields.domain_id.filter),
@@ -257,7 +257,7 @@ class SessionGroupAdapter(BaseAdapter):
 
     def _convert_order(self, order: SessionGroupOrder) -> QueryOrder:
         """The query order one requested order field names."""
-        fields = SessionGroupSearchableFields.own
+        fields = SessionGroupQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case SessionGroupOrderField.PLACEMENT_DIRECTION:

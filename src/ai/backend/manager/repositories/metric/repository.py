@@ -31,8 +31,8 @@ from ai.backend.manager.clients.prometheus.metric_types import (
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.data.idle_checker.types import SessionUtilizationQuery
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
-from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
-    PrometheusQueryPresetSearchableFields,
+from ai.backend.manager.models.prometheus_query_preset.query_spec import (
+    PrometheusQueryPresetQuerySpec,
 )
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
@@ -118,7 +118,7 @@ class MetricRepository:
             PrometheusQueryPresetSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    PrometheusQueryPresetSearchableFields.own.id.filter.in_(
+                    PrometheusQueryPresetQuerySpec.own.id.filter.in_(
                         UUIDInMatchSpec(
                             values=list({query.preset_id for query in queries}), negated=False
                         )

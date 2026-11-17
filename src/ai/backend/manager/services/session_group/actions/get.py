@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
+from ai.backend.manager.models.session_group.query_spec import SessionGroupQuerySpec
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 
@@ -40,7 +40,7 @@ class GetSessionGroupAction(BaseSingleEntityAction):
 
     def to_searcher(self) -> SessionGroupSearcher:
         """The group named, unless a replica group holds it."""
-        fields = SessionGroupSearchableFields
+        fields = SessionGroupQuerySpec
         return SessionGroupSearcher(
             pagination=NoPagination(),
             conditions=[

@@ -3,7 +3,7 @@
 ``description`` is ``sa.Text`` with no index serving partial matches, which
 `models/specs/search/AGENTS.md` limits to equality and membership. What is here shipped
 before the rule and is removed once the filter is withdrawn or an index is added.
-Nothing new goes here; the declarations are in `searchable_fields.py`.
+Nothing new goes here; the declarations are in `query_spec.py`.
 """
 
 from __future__ import annotations

@@ -13,7 +13,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -42,7 +42,7 @@ class StreamCleanupEventHandler:
             KernelSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    KernelSearchableFields.own.id.filter.equals(
+                    KernelQuerySpec.own.id.filter.equals(
                         UUIDEqualMatchSpec(value=event.kernel_id, negated=False)
                     )
                 ],

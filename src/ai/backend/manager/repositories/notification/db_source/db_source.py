@@ -19,13 +19,13 @@ from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
 )
+from ai.backend.manager.models.notification.query_spec import (
+    NotificationChannelQuerySpec,
+    NotificationRuleQuerySpec,
+)
 from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
-)
-from ai.backend.manager.models.notification.searchable_fields import (
-    NotificationChannelSearchableFields,
-    NotificationRuleSearchableFields,
 )
 
 if TYPE_CHECKING:
@@ -62,8 +62,8 @@ class NotificationDBSource:
             pairs = await self._fetch_matching_rules(db_sess, rule_type, enabled_only)
             return [
                 MatchingNotificationRuleData(
-                    rule=NotificationRuleSearchableFields.own.to_data(rule),
-                    channel=NotificationChannelSearchableFields.own.to_data(channel),
+                    rule=NotificationRuleQuerySpec.own.to_data(rule),
+                    channel=NotificationChannelQuerySpec.own.to_data(channel),
                 )
                 for rule, channel in pairs
             ]
@@ -99,7 +99,7 @@ class NotificationDBSource:
             row = await db_sess.get(NotificationChannelRow, channel_id)
             if not row:
                 raise NotificationChannelNotFound(f"Notification channel {channel_id} not found")
-            return NotificationChannelSearchableFields.own.to_data(row)
+            return NotificationChannelQuerySpec.own.to_data(row)
 
     async def get_rule_by_id(self, rule_id: UUID) -> NotificationRuleData:
         """Retrieves a notification rule by ID."""
@@ -109,4 +109,4 @@ class NotificationDBSource:
             row = result.scalar_one_or_none()
             if not row:
                 raise NotificationRuleNotFound(f"Notification rule {rule_id} not found")
-            return NotificationRuleSearchableFields.own.to_data(row)
+            return NotificationRuleQuerySpec.own.to_data(row)

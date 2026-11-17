@@ -28,7 +28,7 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
+from ai.backend.manager.models.entity_label.query_spec import EntityLabelQuerySpec
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -58,7 +58,7 @@ class BaseAdapter(BaseFilterAdapter):
         One instance narrows one row, so a `key` and a `value` given together constrain
         the same label rather than two different ones.
         """
-        fields = EntityLabelSearchableFields.own
+        fields = EntityLabelQuerySpec.own
         conditions = [
             *self.apply_string_filter(f.key, fields.key.filter),
             *self.apply_string_filter(f.value, fields.value.filter),

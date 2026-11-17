@@ -44,9 +44,9 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.query_spec import KernelQuerySpec
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
@@ -603,7 +603,7 @@ def _main_kernel_searcher() -> KernelSearcher:
     return KernelSearcher(
         pagination=NoPagination(),
         conditions=[
-            KernelSearchableFields.own.cluster_role.filter.equals(
+            KernelQuerySpec.own.cluster_role.filter.equals(
                 StringMatchSpec(value=DEFAULT_ROLE, case_insensitive=False, negated=False)
             )
         ],

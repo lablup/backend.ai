@@ -15,12 +15,12 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.spec import ActionKind
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.models.audit_log.query_spec import (
+    AuditLogQuerySpec,
+    AuditLogScopeQuerySpec,
+)
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
-from ai.backend.manager.models.audit_log.searchable_fields import (
-    AuditLogScopeSearchableFields,
-    AuditLogSearchableFields,
-)
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     FieldCreator,
@@ -76,7 +76,7 @@ class BaseAuditLogFields:
         return ()
 
     def to_data(self, row: AuditLogRow) -> AuditLogData:
-        return AuditLogSearchableFields.own.to_data(row)
+        return AuditLogQuerySpec.own.to_data(row)
 
     def _build_row(
         self,
@@ -274,4 +274,4 @@ class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, Audi
 
     @override
     def to_data(self, row: AuditLogScopeRow) -> AuditLogScopeData:
-        return AuditLogScopeSearchableFields.own.to_data(row)
+        return AuditLogScopeQuerySpec.own.to_data(row)

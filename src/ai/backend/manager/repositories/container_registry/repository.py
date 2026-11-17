@@ -23,13 +23,13 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.query_spec import (
+    ContainerRegistryQuerySpec,
+)
 from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
-)
-from ai.backend.manager.models.container_registry.searchable_fields import (
-    ContainerRegistrySearchableFields,
 )
 from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
@@ -188,7 +188,7 @@ class ContainerRegistryRepository:
             )
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
-            return [ContainerRegistrySearchableFields.own.to_data(row) for row in rows]
+            return [ContainerRegistryQuerySpec.own.to_data(row) for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def get_all(self) -> list[ContainerRegistryData]:
@@ -196,7 +196,7 @@ class ContainerRegistryRepository:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
-            return [ContainerRegistrySearchableFields.own.to_data(row) for row in rows]
+            return [ContainerRegistryQuerySpec.own.to_data(row) for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def clear_images(
@@ -298,4 +298,4 @@ class ContainerRegistryRepository:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
         row: ContainerRegistryRow | None = await session.scalar(stmt)
-        return ContainerRegistrySearchableFields.own.to_data(row) if row else None
+        return ContainerRegistryQuerySpec.own.to_data(row) if row else None

@@ -11,8 +11,8 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerAssignmentSearchableFields,
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerAssignmentQuerySpec,
 )
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -57,7 +57,7 @@ class IdleCheckerRepository:
                 IdleCheckerAssignmentSearcher(
                     pagination=OffsetPagination(limit=1),
                     conditions=[
-                        IdleCheckerAssignmentSearchableFields.own.field_id.filter.equals(
+                        IdleCheckerAssignmentQuerySpec.own.field_id.filter.equals(
                             UUIDEqualMatchSpec(value=assignment_id, negated=False)
                         )
                     ],
@@ -75,15 +75,15 @@ class IdleCheckerRepository:
                 IdleCheckerAssignmentSearcher(
                     pagination=OffsetPagination(limit=1),
                     conditions=[
-                        IdleCheckerAssignmentSearchableFields.own.scope_type.filter.equals(
+                        IdleCheckerAssignmentQuerySpec.own.scope_type.filter.equals(
                             StringMatchSpec(
                                 scope.entity_type(), case_insensitive=False, negated=False
                             )
                         ),
-                        IdleCheckerAssignmentSearchableFields.own.scope_id.filter.equals(
+                        IdleCheckerAssignmentQuerySpec.own.scope_id.filter.equals(
                             UUIDEqualMatchSpec(value=scope, negated=False)
                         ),
-                        IdleCheckerAssignmentSearchableFields.own.idle_checker_id.filter.equals(
+                        IdleCheckerAssignmentQuerySpec.own.idle_checker_id.filter.equals(
                             UUIDEqualMatchSpec(value=checker_id, negated=False)
                         ),
                     ],

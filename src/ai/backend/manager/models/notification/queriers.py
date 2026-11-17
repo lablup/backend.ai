@@ -15,13 +15,13 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.models.notification.query_spec import (
+    NotificationChannelQuerySpec,
+    NotificationRuleQuerySpec,
+)
 from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
-)
-from ai.backend.manager.models.notification.searchable_fields import (
-    NotificationChannelSearchableFields,
-    NotificationRuleSearchableFields,
 )
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
@@ -45,7 +45,7 @@ class NotificationChannelQuerier(DataQuerier[NotificationChannelRow, Notificatio
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return NotificationChannelSearchableFields.own.to_data(row)
+        return NotificationChannelQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -67,7 +67,7 @@ class NotificationRuleQuerier(DataQuerier[NotificationRuleRow, NotificationRuleD
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return NotificationRuleSearchableFields.own.to_data(row)
+        return NotificationRuleQuerySpec.own.to_data(row)
 
 
 class BulkNotificationChannelQuerier(
@@ -85,7 +85,7 @@ class BulkNotificationChannelQuerier(
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return NotificationChannelSearchableFields.own.to_data(row)
+        return NotificationChannelQuerySpec.own.to_data(row)
 
 
 class BulkNotificationRuleQuerier(BulkEntityQuerier[NotificationRuleRow, NotificationRuleData]):
@@ -101,4 +101,4 @@ class BulkNotificationRuleQuerier(BulkEntityQuerier[NotificationRuleRow, Notific
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return NotificationRuleSearchableFields.own.to_data(row)
+        return NotificationRuleQuerySpec.own.to_data(row)

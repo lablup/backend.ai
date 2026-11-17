@@ -6,10 +6,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryConnectionData
-from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
-from ai.backend.manager.models.huggingface_registry.searchable_fields import (
-    HuggingFaceRegistrySearchableFields,
+from ai.backend.manager.models.huggingface_registry.query_spec import (
+    HuggingFaceRegistryQuerySpec,
 )
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -28,7 +28,7 @@ class BulkHuggingFaceRegistryQuerier(
 
     @override
     def to_data(self, row: HuggingFaceRegistryRow) -> HuggingFaceRegistryConnectionData:
-        own = HuggingFaceRegistrySearchableFields.own
+        own = HuggingFaceRegistryQuerySpec.own
         return HuggingFaceRegistryConnectionData(
             id=ArtifactRegistryID(own.id.read(row)),
             url=own.url.read(row),

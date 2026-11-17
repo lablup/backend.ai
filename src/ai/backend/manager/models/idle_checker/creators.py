@@ -27,13 +27,13 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.idle_checker.query_spec import (
+    IdleCheckerQuerySpec,
+)
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
-)
-from ai.backend.manager.models.idle_checker.searchable_fields import (
-    IdleCheckerSearchableFields,
 )
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -76,7 +76,7 @@ class IdleCheckerCreator(
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return IdleCheckerSearchableFields.own.to_data(row)
+        return IdleCheckerQuerySpec.own.to_data(row)
 
 
 @dataclass

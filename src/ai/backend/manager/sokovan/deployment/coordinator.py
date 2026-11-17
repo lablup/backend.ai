@@ -38,7 +38,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.query_spec import DeploymentQuerySpec
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import DeploymentHistoryCreator
@@ -436,7 +436,7 @@ class DeploymentCoordinator:
         and the three predicates AND together. Pagination is skipped —
         coordinator fetches need every matching deployment per tick.
         """
-        fields = DeploymentSearchableFields.own
+        fields = DeploymentQuerySpec.own
         conditions: list[QueryCondition] = []
         if target.lifecycle_stages:
             conditions.append(fields.lifecycle_stage.filter.in_(target.lifecycle_stages))

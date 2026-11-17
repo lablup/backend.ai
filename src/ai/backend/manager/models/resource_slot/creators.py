@@ -16,12 +16,12 @@ from ai.backend.manager.data.resource_slot.types import (
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeAlreadyExists
+from ai.backend.manager.models.resource_slot.query_spec import (
+    ResourceSlotTypeQuerySpec,
+)
 from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    ResourceSlotTypeSearchableFields,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
@@ -83,7 +83,7 @@ class ResourceSlotTypeCreator(
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return ResourceSlotTypeSearchableFields.own.to_data(row)
+        return ResourceSlotTypeQuerySpec.own.to_data(row)
 
 
 @dataclass(frozen=True)

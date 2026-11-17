@@ -69,19 +69,19 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
+from ai.backend.manager.models.domain.query_spec import DomainQuerySpec
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.deprecated_search import (
     DeprecatedProjectConditions,
     DeprecatedProjectOrders,
 )
+from ai.backend.manager.models.project.query_spec import ProjectQuerySpec
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
     ProjectTarget,
     UserProjectTarget,
 )
-from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.project.updaters import (
     ProjectRestoreUpdater,
@@ -89,7 +89,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectUpdater,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
@@ -130,7 +130,7 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectSearchableFields.own.created_at.order.apply(ascending=False),
+    forward_order=ProjectQuerySpec.own.created_at.order.apply(ascending=False),
     cursor_column=ProjectRow.id,
 )
 
@@ -545,7 +545,7 @@ class ProjectAdapter(BaseAdapter):
         return [UserAdapter._user_data_to_node(user, keys.get(UserID(user.id))) for user in users]
 
     def _convert_group_filter(self, filter: ProjectFilter) -> list[QueryCondition]:
-        fields = ProjectSearchableFields.own
+        fields = ProjectQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
@@ -586,7 +586,7 @@ class ProjectAdapter(BaseAdapter):
         if type_filter is None:
             return []
         conditions: list[QueryCondition] = []
-        type_conditions = ProjectSearchableFields.own.type.filter
+        type_conditions = ProjectQuerySpec.own.type.filter
         if type_filter.equals is not None:
             conditions.append(type_conditions.equals(DataProjectType(type_filter.equals.value)))
         if type_filter.in_ is not None:
@@ -609,7 +609,7 @@ class ProjectAdapter(BaseAdapter):
         """The domain conditions, gathered into one EXISTS on the holding domain row."""
         if domain_filter is None:
             return []
-        fields = DomainSearchableFields.own
+        fields = DomainQuerySpec.own
         raw_conditions = [
             *self.apply_string_filter(domain_filter.name, fields.name.filter),
             *self.apply_bool_filter(domain_filter.is_active, fields.is_active.filter),
@@ -624,7 +624,7 @@ class ProjectAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over one enrolled member."""
         if user_filter is None:
             return []
-        fields = UserSearchableFields.own
+        fields = UserQuerySpec.own
         conditions = [
             *self.apply_uuid_filter(user_filter.id, fields.uuid.filter),
             *self.apply_string_filter(user_filter.username, fields.username.filter),
@@ -639,7 +639,7 @@ class ProjectAdapter(BaseAdapter):
         """Active means the member's account status is ACTIVE."""
         if is_active is None:
             return []
-        status = UserSearchableFields.own.status.filter
+        status = UserQuerySpec.own.status.filter
         if is_active:
             return [status.equals(UserStatus.ACTIVE)]
         return [status.not_equals(UserStatus.ACTIVE)]
@@ -649,7 +649,7 @@ class ProjectAdapter(BaseAdapter):
 
     def _convert_order(self, order: ProjectOrder) -> QueryOrder:
         """The query order one requested order field names."""
-        fields = ProjectSearchableFields.own
+        fields = ProjectQuerySpec.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ProjectOrderField.NAME:

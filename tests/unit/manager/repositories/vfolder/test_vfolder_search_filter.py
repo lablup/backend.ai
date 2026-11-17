@@ -57,12 +57,12 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.query_spec import VFolderQuerySpec
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -450,7 +450,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=filter_adapter.apply_bool_filter(
-                True, VFolderSearchableFields.own.cloneable.filter
+                True, VFolderQuerySpec.own.cloneable.filter
             ),
             orders=[],
         )
@@ -476,7 +476,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=filter_adapter.apply_bool_filter(
-                False, VFolderSearchableFields.own.cloneable.filter
+                False, VFolderQuerySpec.own.cloneable.filter
             ),
             orders=[],
         )
@@ -522,7 +522,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=filter_adapter.apply_bool_filter(
-                True, VFolderSearchableFields.own.cloneable.filter
+                True, VFolderQuerySpec.own.cloneable.filter
             ),
             orders=[],
         )
@@ -544,12 +544,10 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                *filter_adapter.apply_bool_filter(
-                    True, VFolderSearchableFields.own.cloneable.filter
-                ),
+                *filter_adapter.apply_bool_filter(True, VFolderQuerySpec.own.cloneable.filter),
                 *filter_adapter.apply_enum_filter(
                     VFolderUsageModeFilter(in_=[VFolderUsageMode.GENERAL]),
-                    VFolderSearchableFields.own.usage_mode.filter,
+                    VFolderQuerySpec.own.usage_mode.filter,
                 ),
             ],
             orders=[],
@@ -601,7 +599,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                VFolderSearchableFields.linked.usage.model_cards.used_by(
+                VFolderQuerySpec.linked.usage.model_cards.used_by(
                     ModelCardID(model_cards["card_a"])
                 ).condition
             ],
@@ -624,7 +622,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                VFolderSearchableFields.linked.usage.model_cards.used_by(
+                VFolderQuerySpec.linked.usage.model_cards.used_by(
                     ModelCardID(model_cards["card_b"])
                 ).condition
             ],
@@ -704,9 +702,7 @@ class TestVfolderSearchFilter:
     ) -> BatchQuerierResult[Row[Any]]:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                VFolderSearchableFields.linked.usage.sessions.used_by(session_id).condition
-            ],
+            conditions=[VFolderQuerySpec.linked.usage.sessions.used_by(session_id).condition],
             orders=[],
         )
         return await _search_vfolders(db, querier, UserVFolderTarget(user_id=UserID(user_id)))

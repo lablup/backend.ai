@@ -14,10 +14,10 @@ from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.artifact.types import ArtifactAvailability, ArtifactData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
-from ai.backend.manager.models.artifact.row import ArtifactRow
-from ai.backend.manager.models.artifact.searchable_fields import (
-    ArtifactSearchableFields,
+from ai.backend.manager.models.artifact.query_spec import (
+    ArtifactQuerySpec,
 )
+from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import (
@@ -75,7 +75,7 @@ class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return ArtifactSearchableFields.own.to_data(row)
+        return ArtifactQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -116,7 +116,7 @@ class ArtifactScanUpdater(DataUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return ArtifactSearchableFields.own.to_data(row)
+        return ArtifactQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -133,7 +133,7 @@ class ArtifactTouchUpdater(DataBatchUpdater[ArtifactRow, ArtifactData]):
     @override
     def conditions(self) -> list[QueryCondition]:
         return [
-            ArtifactSearchableFields.own.id.filter.in_(
+            ArtifactQuerySpec.own.id.filter.in_(
                 UUIDInMatchSpec(values=list(self.artifact_ids), negated=False)
             )
         ]
@@ -149,7 +149,7 @@ class ArtifactTouchUpdater(DataBatchUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return ArtifactSearchableFields.own.to_data(row)
+        return ArtifactQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -182,7 +182,7 @@ class ArtifactSoftDeleteUpdater(DataUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return ArtifactSearchableFields.own.to_data(row)
+        return ArtifactQuerySpec.own.to_data(row)
 
 
 @dataclass
@@ -215,4 +215,4 @@ class ArtifactRestoreUpdater(DataUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return ArtifactSearchableFields.own.to_data(row)
+        return ArtifactQuerySpec.own.to_data(row)

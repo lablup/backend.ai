@@ -13,10 +13,10 @@ from ai.backend.manager.models.bootstrap_script.row import (
     BootstrapScriptRow,
     UserDefaultBootstrapScriptRow,
 )
-from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
-from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
-    BootstrapScriptRevisionSearchableFields,
+from ai.backend.manager.models.bootstrap_script_revision.query_spec import (
+    BootstrapScriptRevisionQuerySpec,
 )
+from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -45,4 +45,4 @@ class DefaultBootstrapScriptRevisionSearcher(
 
     @override
     def to_data(self, row: BootstrapScriptRevisionRow) -> BootstrapScriptRevisionData:
-        return BootstrapScriptRevisionSearchableFields.own.to_data(row)
+        return BootstrapScriptRevisionQuerySpec.own.to_data(row)

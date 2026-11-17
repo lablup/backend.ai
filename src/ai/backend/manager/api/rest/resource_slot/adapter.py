@@ -17,8 +17,8 @@ from ai.backend.common.dto.manager.resource_slot.response import (
 )
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    ResourceSlotTypeSearchableFields,
+from ai.backend.manager.models.resource_slot.query_spec import (
+    ResourceSlotTypeQuerySpec,
 )
 from ai.backend.manager.models.resource_slot.searchers import ResourceSlotTypeSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -59,7 +59,7 @@ class ResourceSlotAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         """Convert resource slot type filter to list of query conditions."""
-        fields = ResourceSlotTypeSearchableFields.own
+        fields = ResourceSlotTypeQuerySpec.own
         return [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_string_filter(filter.slot_type, fields.slot_type.filter),
@@ -70,7 +70,7 @@ class ResourceSlotAdapter(BaseFilterAdapter):
         """Convert resource slot type order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
 
-        fields = ResourceSlotTypeSearchableFields.own
+        fields = ResourceSlotTypeQuerySpec.own
         if order.field == ResourceSlotTypeOrderField.SLOT_NAME:
             return fields.slot_name.order.apply(ascending)
         if order.field == ResourceSlotTypeOrderField.RANK:

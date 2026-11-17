@@ -41,8 +41,8 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
+from ai.backend.manager.models.agent.query_spec import AgentQuerySpec
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -77,7 +77,7 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
-    forward_order=AgentSearchableFields.own.first_contact.order.apply(ascending=False),
+    forward_order=AgentQuerySpec.own.first_contact.order.apply(ascending=False),
     cursor_column=AgentRow.uuid,
 )
 
@@ -276,7 +276,7 @@ class AgentAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, f: AgentFilter) -> list[QueryCondition]:
-        fields = AgentSearchableFields.own
+        fields = AgentQuerySpec.own
         conditions = [
             *self.apply_string_filter(f.id, fields.id.filter),
             *self.apply_uuid_filter(f.entity_id, fields.uuid.filter),
@@ -285,7 +285,7 @@ class AgentAdapter(BaseAdapter):
             *self.apply_string_filter(f.scaling_group, fields.resource_group.filter),
             *self.apply_to_many_filter(
                 f.labels,
-                AgentSearchableFields.nested.labels.correlation,
+                AgentQuerySpec.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
         ]
@@ -311,7 +311,7 @@ class AgentAdapter(BaseAdapter):
     def _convert_status_filter(sf: AgentStatusFilter | None) -> list[QueryCondition]:
         if sf is None:
             return []
-        conditions = AgentSearchableFields.own.status.filter
+        conditions = AgentQuerySpec.own.status.filter
         applied: list[QueryCondition] = []
         if sf.equals is not None:
             applied.append(conditions.equals(AgentStatus(sf.equals.value)))
@@ -325,7 +325,7 @@ class AgentAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(order: list[AgentOrder]) -> list[QueryOrder]:
-        fields = AgentSearchableFields.own
+        fields = AgentQuerySpec.own
         orders: list[QueryOrder] = []
         for o in order:
             ascending = o.direction == OrderDirection.ASC
@@ -351,7 +351,7 @@ class AgentAdapter(BaseAdapter):
             return []
         used_by = usage.used_by
         return [
-            AgentSearchableFields.linked.usage.sessions.used_by(SessionID(entity_id))
+            AgentQuerySpec.linked.usage.sessions.used_by(SessionID(entity_id))
             for entity_id in (used_by.session or () if used_by else ())
         ]
 

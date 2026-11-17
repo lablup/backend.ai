@@ -23,14 +23,14 @@ from ai.backend.common.dto.manager.scaling_group.response import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
+)
 from ai.backend.manager.models.resource_group.scopes import (
     DomainResourceGroupTarget,
     ProjectResourceGroupTarget,
     ResourceGroupTarget,
     UserResourceGroupTarget,
-)
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -91,7 +91,7 @@ class ResourceGroupHandler:
             ),
             UserResourceGroupTarget(user_id=UserID(ctx.user_uuid)),
         ]
-        fields = ResourceGroupSearchableFields.own
+        fields = ResourceGroupQuerySpec.own
         conditions = [fields.is_active.filter.equals(True)]
         if not ctx.is_admin:
             conditions.append(fields.is_public.filter.equals(True))

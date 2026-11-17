@@ -9,10 +9,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.retention.types import RetentionPolicyData
-from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.retention.searchable_fields import (
-    RetentionPolicySearchableFields,
+from ai.backend.manager.models.retention.query_spec import (
+    RetentionPolicyQuerySpec,
 )
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -41,4 +41,4 @@ class RetentionPolicyPurger(EntityPurger[RetentionPolicyRow, RetentionPolicyData
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return RetentionPolicySearchableFields.own.to_data(row)
+        return RetentionPolicyQuerySpec.own.to_data(row)

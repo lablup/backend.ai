@@ -12,10 +12,10 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_policy.searchable_fields import (
-    DeploymentPolicySearchableFields,
+from ai.backend.manager.models.deployment_policy.query_spec import (
+    DeploymentPolicyQuerySpec,
 )
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 
@@ -62,4 +62,4 @@ class DeploymentPolicyUpserter(
 
     @override
     def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:
-        return DeploymentPolicySearchableFields.own.to_data(row)
+        return DeploymentPolicyQuerySpec.own.to_data(row)

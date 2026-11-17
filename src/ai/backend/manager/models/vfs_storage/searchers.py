@@ -9,10 +9,10 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
-from ai.backend.manager.models.vfs_storage.searchable_fields import (
-    VFSStorageSearchableFields,
+from ai.backend.manager.models.vfs_storage.query_spec import (
+    VFSStorageQuerySpec,
 )
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
 
 @dataclass
@@ -23,4 +23,4 @@ class VFSStorageSearcher(Searcher[VFSStorageRow, VFSStorageData]):
 
     @override
     def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return VFSStorageSearchableFields.own.to_data(row)
+        return VFSStorageQuerySpec.own.to_data(row)

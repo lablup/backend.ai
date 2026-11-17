@@ -27,11 +27,11 @@ from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNo
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
+from ai.backend.manager.models.association_container_registries_groups.query_spec import (
+    AssociationContainerRegistriesGroupsQuerySpec,
+)
 from ai.backend.manager.models.association_container_registries_groups.scopes import (
     ProjectContainerRegistryAssociationTarget,
-)
-from ai.backend.manager.models.association_container_registries_groups.searchable_fields import (
-    AssociationContainerRegistriesGroupsSearchableFields,
 )
 from ai.backend.manager.models.association_container_registries_groups.searchers import (
     AssociationContainerRegistriesGroupsSearcher,
@@ -183,7 +183,7 @@ class ProjectRepository:
     ) -> Mapping[ProjectID, list[ProjectAllowedRegistryData]]:
         """The registries each named project is allowed on. A project allowed on none is
         absent."""
-        fields = AssociationContainerRegistriesGroupsSearchableFields.own
+        fields = AssociationContainerRegistriesGroupsQuerySpec.own
         searcher = AssociationContainerRegistriesGroupsSearcher(
             pagination=NoPagination(),
             conditions=[

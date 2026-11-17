@@ -9,8 +9,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.manager.data.deployment.types import ModelReplicaData, RouteInfo
+from ai.backend.manager.models.routing.query_spec import ReplicaQuerySpec
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.querier import BulkFieldQuerier, FieldQuerier
 
 
@@ -32,7 +32,7 @@ class ModelReplicaQuerier(FieldQuerier[RoutingRow, ModelReplicaData]):
 
     @override
     def to_data(self, row: RoutingRow) -> ModelReplicaData:
-        return ReplicaSearchableFields.own.to_data(row)
+        return ReplicaQuerySpec.own.to_data(row)
 
 
 class BulkModelReplicaQuerier(BulkFieldQuerier[RoutingRow, ModelReplicaData]):
@@ -48,7 +48,7 @@ class BulkModelReplicaQuerier(BulkFieldQuerier[RoutingRow, ModelReplicaData]):
 
     @override
     def to_data(self, row: RoutingRow) -> ModelReplicaData:
-        return ReplicaSearchableFields.own.to_data(row)
+        return ReplicaQuerySpec.own.to_data(row)
 
 
 class BulkRouteQuerier(BulkFieldQuerier[RoutingRow, RouteInfo]):
@@ -64,4 +64,4 @@ class BulkRouteQuerier(BulkFieldQuerier[RoutingRow, RouteInfo]):
 
     @override
     def to_data(self, row: RoutingRow) -> RouteInfo:
-        return ReplicaSearchableFields.own.to_route_info(row)
+        return ReplicaQuerySpec.own.to_route_info(row)

@@ -11,6 +11,9 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
+from ai.backend.manager.models.resource_slot.query_spec import (
+    ResourceSlotTypeQuerySpec,
+)
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,
@@ -18,9 +21,6 @@ from ai.backend.manager.models.resource_slot.row import (
     PresetResourceSlotRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.resource_slot.searchable_fields import (
-    ResourceSlotTypeSearchableFields,
 )
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -95,4 +95,4 @@ class ResourceSlotTypePurger(EntityPurger[ResourceSlotTypeRow, ResourceSlotTypeD
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return ResourceSlotTypeSearchableFields.own.to_data(row)
+        return ResourceSlotTypeQuerySpec.own.to_data(row)

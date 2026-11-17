@@ -25,10 +25,10 @@ from ai.backend.manager.data.session.options import AgentSelectionPolicy, Defaul
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
-from ai.backend.manager.models.resource_group.scopes import ResourceGroupTarget
-from ai.backend.manager.models.resource_group.searchable_fields import (
-    ResourceGroupSearchableFields,
+from ai.backend.manager.models.resource_group.query_spec import (
+    ResourceGroupQuerySpec,
 )
+from ai.backend.manager.models.resource_group.scopes import ResourceGroupTarget
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -223,7 +223,7 @@ class ResourceGroupRepository:
         self, targets: Sequence[ResourceGroupTarget]
     ) -> list[ResourceGroupData]:
         """List the active resource groups the named scopes reach, in name order."""
-        fields = ResourceGroupSearchableFields.own
+        fields = ResourceGroupQuerySpec.own
         searcher = ResourceGroupSearcher(
             pagination=NoPagination(),
             conditions=[fields.is_active.filter.equals(True)],

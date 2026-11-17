@@ -26,10 +26,10 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
-    RoleAssignmentSearchableFields,
+from ai.backend.manager.models.rbac_models.user_role.query_spec import (
+    RoleAssignmentQuerySpec,
 )
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy.row import (
@@ -37,8 +37,8 @@ from ai.backend.manager.models.resource_policy.row import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.query_spec import UserQuerySpec
 from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRow, UserStatus
-from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -192,7 +192,7 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 )
             ],
@@ -227,7 +227,7 @@ class TestSearchUsersAssignedToRole:
 
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=other_role_id, negated=False)
                 )
             ],
@@ -249,11 +249,11 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 ),
                 *[
-                    UserSearchableFields.own.username.filter.equals(
+                    UserQuerySpec.own.username.filter.equals(
                         StringMatchSpec(value="alice", case_insensitive=False, negated=False)
                     ),
                 ],
@@ -276,11 +276,11 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 ),
                 *[
-                    UserSearchableFields.own.username.filter.contains(
+                    UserQuerySpec.own.username.filter.contains(
                         StringMatchSpec(value="li", case_insensitive=False, negated=False)
                     ),
                 ],
@@ -306,11 +306,11 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 ),
                 *[
-                    UserSearchableFields.own.email.filter.ends_with(
+                    UserQuerySpec.own.email.filter.ends_with(
                         StringMatchSpec(value="@test.org", case_insensitive=False, negated=False)
                     ),
                 ],
@@ -334,14 +334,14 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 ),
                 *[
-                    UserSearchableFields.own.username.filter.contains(
+                    UserQuerySpec.own.username.filter.contains(
                         StringMatchSpec(value="alice", case_insensitive=False, negated=False)
                     ),
-                    UserSearchableFields.own.email.filter.ends_with(
+                    UserQuerySpec.own.email.filter.ends_with(
                         StringMatchSpec(value="@example.com", case_insensitive=False, negated=False)
                     ),
                 ],
@@ -365,11 +365,11 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 )
             ],
-            orders=[RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=True)],
+            orders=[RoleAssignmentQuerySpec.own.granted_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
@@ -390,11 +390,11 @@ class TestSearchUsersAssignedToRole:
         role_id = created_users_and_assignments[0].role_id
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 )
             ],
-            orders=[RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=True)],
+            orders=[RoleAssignmentQuerySpec.own.granted_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=2, offset=0),
         )
 
@@ -407,11 +407,11 @@ class TestSearchUsersAssignedToRole:
         # Second page
         querier_page2 = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=role_id, negated=False)
                 )
             ],
-            orders=[RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=True)],
+            orders=[RoleAssignmentQuerySpec.own.granted_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=2, offset=2),
         )
 
@@ -430,7 +430,7 @@ class TestSearchUsersAssignedToRole:
         nonexistent_role_id = uuid.uuid4()
         querier = RoleAssignmentSearcher(
             conditions=[
-                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                RoleAssignmentQuerySpec.own.role_id.filter.equals(
                     UUIDEqualMatchSpec(value=nonexistent_role_id, negated=False)
                 )
             ],
