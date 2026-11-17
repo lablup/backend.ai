@@ -93,3 +93,18 @@ class InvalidCursor(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class GraphQLFieldNotSelected(BackendAIError, web.HTTPBadRequest):
+    """A GQL field holds `MISSING`: the request did not select it for the read."""
+
+    error_type = "https://api.backend.ai/probs/graphql-field-not-selected"
+    error_title = "The field was not selected for this request."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
