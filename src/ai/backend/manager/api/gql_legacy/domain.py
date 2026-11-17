@@ -16,7 +16,6 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -29,7 +28,6 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
-    ResourceGroupPermission,
 )
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.row import DomainRow, domains, get_permission_ctx
@@ -46,7 +44,6 @@ from ai.backend.manager.models.rbac import (
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_group.row import get_resource_groups
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
@@ -183,28 +180,6 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_name,  # RBACModel uses integration_name
-        )
-
-    @classmethod
-    def from_orm_model(
-        cls,
-        graph_ctx: GraphQueryContext,
-        obj: DomainRow,
-    ) -> Self:
-        return cls(
-            id=obj.name,
-            name=obj.name,
-            description=obj.description,
-            is_active=obj.is_active,
-            created_at=obj.created_at,
-            modified_at=obj.updated_at,
-            total_resource_slots=obj.total_resource_slots,
-            allowed_vfolder_hosts=(
-                obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
-            ),
-            allowed_docker_registries=obj.allowed_docker_registries,
-            dotfiles=obj.dotfiles,
-            integration_id=obj.integration_id,
         )
 
     @classmethod
@@ -387,25 +362,6 @@ async def _apply_is_active(
         DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=data.id))
     )
     return deleted.data
-
-
-async def _ensure_sgroup_permission(
-    graph_ctx: GraphQueryContext, sgroup_names: Iterable[str], *, db_session: AsyncSession
-) -> None:
-    user = graph_ctx.user
-    client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
-    sgroup_models = await get_resource_groups(
-        SystemScope(),
-        ResourceGroupPermission.ASSOCIATE_WITH_SCOPES,
-        sgroup_names,
-        db_session=db_session,
-        ctx=client_ctx,
-    )
-    not_allowed_sgroups = set(sgroup_names) - {sg.name for sg in sgroup_models}
-    if not_allowed_sgroups:
-        raise ValueError(
-            f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
-        )
 
 
 class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]

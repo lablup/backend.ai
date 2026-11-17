@@ -1,33 +1,22 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Container, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import datetime
+from collections.abc import Callable, Iterable, Sequence
 from typing import (
     Any,
-    Self,
-    cast,
-    override,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
-    joinedload,
-    load_only,
     mapped_column,
-    relationship,
-    selectinload,
 )
 from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.deployment.types import DeploymentOptions
-from ai.backend.manager.data.permission.permission_defs import ResourceGroupPermission
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
@@ -36,20 +25,8 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-from ai.backend.manager.models.rbac import (
-    AbstractPermissionContext,
-    AbstractPermissionContextBuilder,
-    DomainScope,
-    ProjectScope,
-    RBACModel,
-    ScopeType,
-    UserScope,
-    get_predefined_roles_in_scope,
-)
-from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.types import QueryCondition
-from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = ("ResourceGroupRow",)
@@ -80,11 +57,6 @@ class ResourceGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "domain_id", name="uq_sgroup_domain"),
     )
-    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
-    # Delete it with the legacy RBAC.
-    sgroup_row: Mapped[ResourceGroupRow] = relationship(
-        "ResourceGroupRow",
-    )
 
 
 # For compatibility
@@ -113,11 +85,6 @@ class ResourceGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "group", name="uq_sgroup_ugroup"),
     )
-    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
-    # Delete it with the legacy RBAC.
-    sgroup_row: Mapped[ResourceGroupRow] = relationship(
-        "ResourceGroupRow",
-    )
 
 
 # For compatibility. In src, only gql_legacy (scaling_group.py) uses it.
@@ -145,11 +112,6 @@ class ResourceGroupForKeypairsRow(Base):
     __table_args__ = (
         # constraint
         sa.UniqueConstraint("resource_group_id", "access_key", name="uq_sgroup_akey"),
-    )
-    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
-    # Delete it with the legacy RBAC.
-    sgroup_row: Mapped[ResourceGroupRow] = relationship(
-        "ResourceGroupRow",
     )
 
 
@@ -268,342 +230,3 @@ def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
 
 # For compatibility
 resource_groups = ResourceGroupRow.__table__
-
-
-# Everything below serves the legacy RBAC path alone: get_resource_groups is its way in,
-# and its only caller, _ensure_sgroup_permission in api/gql_legacy/domain.py, is called by
-# nothing. Delete the whole block together with gql_legacy.
-@dataclass
-class ResourceGroupModel(RBACModel[ResourceGroupPermission]):
-    id: ResourceGroupID
-    name: str
-    description: str | None
-    is_active: bool
-    is_public: bool
-    created_at: datetime
-
-    wsproxy_addr: str | None
-    wsproxy_api_token: str | None
-    driver: str
-    driver_opts: dict[str, Any]
-    scheduler: str
-    use_host_network: bool
-    scheduler_opts: ResourceGroupOpts
-
-    orm_obj: ResourceGroupRow
-    _permissions: frozenset[ResourceGroupPermission] = field(default_factory=frozenset)
-
-    @property
-    @override
-    def permissions(self) -> Container[ResourceGroupPermission]:
-        return self._permissions
-
-    @classmethod
-    def from_row(
-        cls, row: ResourceGroupRow, permissions: Iterable[ResourceGroupPermission]
-    ) -> Self:
-        return cls(
-            id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active if row.is_active is not None else True,
-            is_public=row.is_public,
-            created_at=row.created_at,
-            wsproxy_addr=row.wsproxy_addr,
-            wsproxy_api_token=row.wsproxy_api_token,
-            driver=row.driver,
-            driver_opts=row.driver_opts,
-            scheduler=row.scheduler,
-            use_host_network=row.use_host_network,
-            scheduler_opts=row.scheduler_opts,
-            _permissions=frozenset(permissions),
-            orm_obj=row,
-        )
-
-
-ALL_SCALING_GROUP_PERMISSIONS: frozenset[ResourceGroupPermission] = frozenset([
-    perm for perm in ResourceGroupPermission
-])
-
-OWNER_PERMISSIONS: frozenset[ResourceGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
-ADMIN_PERMISSIONS: frozenset[ResourceGroupPermission] = frozenset({
-    # Admin permissions
-    ResourceGroupPermission.READ_ATTRIBUTE,
-    # sub-scope permissions
-    ResourceGroupPermission.AGENT_PERMISSIONS,
-    ResourceGroupPermission.COMPUTE_SESSION_PERMISSIONS,
-    ResourceGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
-    ResourceGroupPermission.STORAGE_HOST_PERMISSIONS,
-})
-MONITOR_PERMISSIONS: frozenset[ResourceGroupPermission] = frozenset({
-    # Admin permissions
-    ResourceGroupPermission.READ_ATTRIBUTE,
-    # sub-scope permissions
-    ResourceGroupPermission.AGENT_PERMISSIONS,
-    ResourceGroupPermission.COMPUTE_SESSION_PERMISSIONS,
-    ResourceGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
-    ResourceGroupPermission.STORAGE_HOST_PERMISSIONS,
-})
-PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ResourceGroupPermission] = frozenset({
-    ResourceGroupPermission.AGENT_PERMISSIONS,
-    ResourceGroupPermission.COMPUTE_SESSION_PERMISSIONS,
-    ResourceGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
-    ResourceGroupPermission.STORAGE_HOST_PERMISSIONS,
-})
-MEMBER_PERMISSIONS: frozenset[ResourceGroupPermission] = frozenset({
-    ResourceGroupPermission.AGENT_PERMISSIONS,
-    ResourceGroupPermission.COMPUTE_SESSION_PERMISSIONS,
-    ResourceGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
-    ResourceGroupPermission.STORAGE_HOST_PERMISSIONS,
-})
-
-ResourceGroupToPermissionMap = Mapping[str, frozenset[ResourceGroupPermission]]
-
-type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
-
-
-@dataclass
-class ResourceGroupPermissionContext(AbstractPermissionContext[ResourceGroupPermission, str, str]):
-    @property
-    def sgroup_to_permissions_map(self) -> ResourceGroupToPermissionMap:
-        return self.object_id_to_additional_permission_map
-
-    @property
-    def query_condition(self) -> WhereClauseType | None:
-        cond: WhereClauseType | None = None
-
-        def _OR_coalesce(
-            base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression[Any],
-        ) -> WhereClauseType:
-            return base_cond | _cond if base_cond is not None else _cond
-
-        if self.object_id_to_additional_permission_map:
-            cond = _OR_coalesce(
-                cond, ResourceGroupRow.name.in_(self.object_id_to_additional_permission_map.keys())
-            )
-        if self.object_id_to_overriding_permission_map:
-            cond = _OR_coalesce(
-                cond, ResourceGroupRow.name.in_(self.object_id_to_overriding_permission_map.keys())
-            )
-        return cond
-
-    @override
-    async def build_query(self) -> sa.sql.Select[Any] | None:
-        cond = self.query_condition
-        if cond is None:
-            return None
-        return sa.select(ResourceGroupRow).where(cond)
-
-    @override
-    async def calculate_final_permission(self, rbac_obj: str) -> frozenset[ResourceGroupPermission]:
-        host_name = rbac_obj
-        return self.object_id_to_additional_permission_map.get(host_name, frozenset())
-
-
-class ResourceGroupPermissionContextBuilder(
-    AbstractPermissionContextBuilder[ResourceGroupPermission, ResourceGroupPermissionContext]
-):
-    db_session: SASession
-
-    def __init__(self, db_session: SASession) -> None:
-        self.db_session = db_session
-
-    @override
-    async def calculate_permission(
-        self,
-        ctx: ClientContext,
-        target_scope: ScopeType,
-    ) -> frozenset[ResourceGroupPermission]:
-        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        permissions |= await self.apply_customized_role(ctx, target_scope)
-        return permissions
-
-    async def apply_customized_role(
-        self,
-        ctx: ClientContext,
-        _target_scope: ScopeType,
-    ) -> frozenset[ResourceGroupPermission]:
-        if ctx.user_role == UserRole.SUPERADMIN:
-            return ALL_SCALING_GROUP_PERMISSIONS
-        return frozenset()
-
-    @override
-    async def build_ctx_in_system_scope(
-        self,
-        ctx: ClientContext,
-    ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.domain.row import DomainRow
-
-        perm_ctx = ResourceGroupPermissionContext()
-        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
-        for row in await self.db_session.scalars(_domain_query_stmt):
-            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
-            perm_ctx.merge(to_be_merged)
-        return perm_ctx
-
-    @override
-    async def build_ctx_in_domain_scope(
-        self,
-        ctx: ClientContext,
-        scope: DomainScope,
-    ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.domain.row import DomainRow
-
-        permissions = await self.calculate_permission(ctx, scope)
-        if not permissions:
-            # User is not part of the domain.
-            return ResourceGroupPermissionContext()
-
-        stmt = (
-            sa.select(DomainRow)
-            .where(DomainRow.name == scope.domain_name)
-            .options(
-                selectinload(DomainRow.sgroup_for_domains_rows).selectinload(
-                    ResourceGroupForDomainRow.sgroup_row
-                )
-            )
-        )
-        domain_row = await self.db_session.scalar(stmt)
-        if domain_row is None:
-            return ResourceGroupPermissionContext()
-        resource_groups = domain_row.sgroup_for_domains_rows
-        return ResourceGroupPermissionContext(
-            object_id_to_additional_permission_map={
-                row.sgroup_row.name: permissions for row in resource_groups
-            }
-        )
-
-    @override
-    async def build_ctx_in_project_scope(
-        self,
-        ctx: ClientContext,
-        scope: ProjectScope,
-    ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.project.row import ProjectRow
-
-        project_permissions = await self.calculate_permission(ctx, scope)
-        if not project_permissions:
-            # User is not part of the domain.
-            return ResourceGroupPermissionContext()
-
-        stmt = (
-            sa.select(ProjectRow)
-            .where(ProjectRow.id == scope.project_id)
-            .options(
-                selectinload(ProjectRow.sgroup_for_groups_rows).selectinload(
-                    ResourceGroupForProjectRow.sgroup_row
-                )
-            )
-        )
-        project_row = await self.db_session.scalar(stmt)
-        if project_row is None:
-            return ResourceGroupPermissionContext()
-        resource_groups = project_row.sgroup_for_groups_rows
-        return ResourceGroupPermissionContext(
-            object_id_to_additional_permission_map={
-                row.sgroup_row.name: project_permissions for row in resource_groups
-            }
-        )
-
-    @override
-    async def build_ctx_in_user_scope(
-        self,
-        ctx: ClientContext,
-        scope: UserScope,
-    ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.keypair.row import KeyPairRow
-        from ai.backend.manager.models.user.row import UserRow
-
-        user_permissions = await self.calculate_permission(ctx, scope)
-        if not user_permissions:
-            # User is not part of the domain.
-            return ResourceGroupPermissionContext()
-
-        stmt = (
-            sa.select(UserRow)
-            .where(UserRow.uuid == scope.user_id)
-            .options(
-                selectinload(UserRow.keypairs).options(
-                    joinedload(KeyPairRow.sgroup_for_keypairs_rows).joinedload(
-                        ResourceGroupForKeypairsRow.sgroup_row
-                    )
-                )
-            )
-        )
-        user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
-        if user_row is None:
-            return ResourceGroupPermissionContext()
-
-        object_id_to_additional_permission_map: dict[str, frozenset[ResourceGroupPermission]] = {}
-        for keypair in user_row.keypairs:
-            resource_groups = keypair.sgroup_for_keypairs_rows
-            for sg in resource_groups:
-                if sg.sgroup_row.name not in object_id_to_additional_permission_map:
-                    object_id_to_additional_permission_map[sg.sgroup_row.name] = user_permissions
-        return ResourceGroupPermissionContext(
-            object_id_to_additional_permission_map=object_id_to_additional_permission_map
-        )
-
-    @override
-    @classmethod
-    async def _permission_for_owner(
-        cls,
-    ) -> frozenset[ResourceGroupPermission]:
-        return OWNER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_admin(
-        cls,
-    ) -> frozenset[ResourceGroupPermission]:
-        return ADMIN_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_monitor(
-        cls,
-    ) -> frozenset[ResourceGroupPermission]:
-        return MONITOR_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_privileged_member(
-        cls,
-    ) -> frozenset[ResourceGroupPermission]:
-        return PRIVILEGED_MEMBER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_member(
-        cls,
-    ) -> frozenset[ResourceGroupPermission]:
-        return MEMBER_PERMISSIONS
-
-
-# Called only by _ensure_sgroup_permission in api/gql_legacy/domain.py.
-async def get_resource_groups(
-    target_scope: ScopeType,
-    requested_permission: ResourceGroupPermission,
-    sgroup_names: Iterable[str] | None = None,
-    *,
-    sgroup_ids: Iterable[ResourceGroupID] | None = None,
-    ctx: ClientContext,
-    db_session: SASession,
-) -> list[ResourceGroupModel]:
-    ret: list[ResourceGroupModel] = []
-    builder = ResourceGroupPermissionContextBuilder(db_session)
-    permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    cond = permission_ctx.query_condition
-    if cond is None:
-        return ret
-    _stmt = sa.select(ResourceGroupRow).where(cond)
-    if sgroup_names is not None:
-        _stmt = _stmt.where(ResourceGroupRow.name.in_(sgroup_names))
-    if sgroup_ids is not None:
-        _stmt = _stmt.where(ResourceGroupRow.id.in_(sgroup_ids))
-    async for row in await db_session.stream_scalars(_stmt):
-        permissions = await permission_ctx.calculate_final_permission(row.name)
-        ret.append(ResourceGroupModel.from_row(row, permissions))
-    return ret

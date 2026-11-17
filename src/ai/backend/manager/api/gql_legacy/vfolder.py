@@ -1519,13 +1519,6 @@ class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
     storage_host_name = graphene.String(required=True)
     details = graphene.NonNull(QuotaDetails)
 
-    @classmethod
-    def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> QuotaScope:
-        return QuotaScope(
-            quota_scope_id=str(row.quota_scope_id),
-            storage_host_name=row.host,
-        )
-
     def resolve_id(self, info: graphene.ResolveInfo) -> str:
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
