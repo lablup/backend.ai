@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.partial import PartialRecord
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.pagination import QueryPagination
+from ai.backend.manager.models.specs.search.field import QueryColumn
 from ai.backend.manager.models.specs.search.usage import UsedBy
 
 
@@ -61,6 +63,26 @@ class Searcher[TRow: Base, TData](ABC):
         Receives the ORM entity itself: ``build_select`` selects a single entity,
         and the ops layer extracts it from the result row before converting.
         """
+        raise NotImplementedError
+
+
+@dataclass
+class PartialSearcher[TRow: Base, TPartial: PartialRecord](Searcher[TRow, TPartial]):
+    """A searcher whose result holds the id and the columns of ``fields`` only.
+
+    ``fields`` of ``None`` reads the whole row through ``to_data``.
+    """
+
+    fields: Collection[QueryColumn[Any, Any, Any]] | None = field(default=None, kw_only=True)
+
+    @abstractmethod
+    def id_column(self) -> QueryColumn[Any, Any, Any]:
+        """Return the id column, which every result reads."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def partial_class(self) -> type[TPartial]:
+        """Return the record type each column value is put in under the column's name."""
         raise NotImplementedError
 
 

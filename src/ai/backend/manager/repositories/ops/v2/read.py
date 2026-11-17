@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
     RuntimeEntityID,
 )
+from ai.backend.common.data.partial import PartialRecord
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,
@@ -38,9 +39,12 @@ from ai.backend.manager.models.specs.querier import (
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
+    PartialDataQuerier,
 )
+from ai.backend.manager.models.specs.search.field import QueryColumn
 from ai.backend.manager.models.specs.searcher import (
     GlobalSearcher,
+    PartialSearcher,
     ScopedSearcher,
     Searcher,
     SearcherResult,
@@ -59,6 +63,8 @@ class V2ReadOps(V2GraphReadOpsBase):
         self, querier: DataQuerier[TRow, TData]
     ) -> TData | None:
         """Fetch a single row by primary key and return it as its ``data/`` type."""
+        if isinstance(querier, PartialDataQuerier) and querier.fields is not None:
+            return await self._query_partial_data(querier, querier.fields)
         row_class = querier.row_class()
         result = await self._sess.execute(
             sa.select(row_class).where(querier.entity_id_column() == querier.entity_id_value())
@@ -67,6 +73,44 @@ class V2ReadOps(V2GraphReadOpsBase):
         if row is None:
             return None
         return querier.to_data(row)
+
+    async def _query_partial_data[TRow: Base, TPartial: PartialRecord](
+        self,
+        querier: PartialDataQuerier[TRow, TPartial],
+        fields: Collection[QueryColumn[Any, Any, Any]],
+    ) -> TPartial | None:
+        columns = self._partial_columns(querier.id_column(), fields)
+        result = await self._sess.execute(
+            sa.select(*(column.column for column in columns)).where(
+                querier.entity_id_column() == querier.entity_id_value()
+            )
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+        return self._to_partial(querier.partial_class(), columns, row)
+
+    def _partial_columns(
+        self,
+        id_column: QueryColumn[Any, Any, Any],
+        fields: Collection[QueryColumn[Any, Any, Any]],
+    ) -> list[QueryColumn[Any, Any, Any]]:
+        """The id column first, then each requested column once."""
+        columns = [id_column]
+        names = {id_column.name}
+        for column in fields:
+            if column.name not in names:
+                names.add(column.name)
+                columns.append(column)
+        return columns
+
+    def _to_partial[TPartial: PartialRecord](
+        self,
+        partial_class: type[TPartial],
+        columns: Sequence[QueryColumn[Any, Any, Any]],
+        row: sa.Row[Any],
+    ) -> TPartial:
+        return partial_class(**{column.name: row[i] for i, column in enumerate(columns)})
 
     async def query_bulk_data[TRow: Base, TData](
         self,
@@ -336,6 +380,11 @@ class V2ReadOps(V2GraphReadOpsBase):
         """
         query = searcher.build_select()
         count_query = sa.select(sa.func.count()).select_from(query.froms[0])
+        partial: tuple[type[Any], list[QueryColumn[Any, Any, Any]]] | None = None
+        if isinstance(searcher, PartialSearcher) and searcher.fields is not None:
+            partial_columns = self._partial_columns(searcher.id_column(), searcher.fields)
+            partial = (searcher.partial_class(), partial_columns)
+            query = query.with_only_columns(*(column.column for column in partial_columns))
         if scopes:
             await self._validate_scope_existence(scopes)
             scope_clause = self._scopes_condition(scopes)
@@ -355,9 +404,16 @@ class V2ReadOps(V2GraphReadOpsBase):
             # Strategy could not derive the count from rows: run the count query.
             total_count = (await self._sess.execute(count_query)).scalar() or 0
         page_info = searcher.pagination.compute_page_info(rows, total_count)
-        return SearcherResult(
+        if partial is None:
             # build_select selects a single entity, so the row's first element is TRow.
-            items=[searcher.to_data(row[0]) for row in page_info.rows],
+            items = [searcher.to_data(row[0]) for row in page_info.rows]
+        else:
+            partial_class, partial_columns = partial
+            items = [
+                self._to_partial(partial_class, partial_columns, row) for row in page_info.rows
+            ]
+        return SearcherResult(
+            items=items,
             total_count=total_count,
             has_next_page=page_info.has_next_page,
             has_previous_page=page_info.has_previous_page,

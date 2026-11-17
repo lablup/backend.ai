@@ -20,6 +20,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.partial import PartialRecord, selectable
 from ai.backend.manager.models.base import Base
 
 
@@ -50,6 +51,14 @@ class ZoneEntityType(EntityType):
     @classmethod
     def name(cls) -> str:
         return "test_search_zone"
+
+
+class ShelfID(EntityIdentifier):
+    """The id a shelf is read by."""
+
+    @override
+    def entity_type(self) -> EntityType:
+        return ShelfEntityType()
 
 
 class ZoneID(EntityIdentifier):
@@ -214,3 +223,19 @@ class CategoryData:
     id: uuid.UUID
     title: str
     rank: int
+
+
+class ShelfPartialData(PartialRecord):
+    id: uuid.UUID
+    name: str = selectable()
+    note: str | None = selectable()
+    count: int = selectable()
+    price: Decimal = selectable()
+    kind: ShelfKind = selectable()
+    active: bool = selectable()
+    tags: list[str] = selectable()
+    opened_at: datetime = selectable()
+    closed_at: datetime | None = selectable()
+    stocked_on: date = selectable()
+    zone_id: uuid.UUID = selectable()
+    category_id: uuid.UUID | None = selectable()

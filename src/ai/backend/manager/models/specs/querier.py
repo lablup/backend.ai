@@ -4,13 +4,17 @@ field row's own id."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Collection
+from dataclasses import dataclass, field
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
+from ai.backend.common.data.partial import PartialRecord
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.search.field import QueryColumn
 
 
 class DataQuerier[TRow: Base, TData](ABC):
@@ -66,6 +70,26 @@ class DataQuerier[TRow: Base, TData](ABC):
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         """Convert the fetched row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+@dataclass
+class PartialDataQuerier[TRow: Base, TPartial: PartialRecord](DataQuerier[TRow, TPartial]):
+    """A querier whose result holds the id and the columns of ``fields`` only.
+
+    ``fields`` of ``None`` reads the whole row through ``to_data``.
+    """
+
+    fields: Collection[QueryColumn[Any, Any, Any]] | None = field(default=None, kw_only=True)
+
+    @abstractmethod
+    def id_column(self) -> QueryColumn[Any, Any, Any]:
+        """Return the id column, which the result always reads."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def partial_class(self) -> type[TPartial]:
+        """Return the record type each column value is put in under the column's name."""
         raise NotImplementedError
 
 
