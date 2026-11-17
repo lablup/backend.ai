@@ -5226,6 +5226,15 @@ input CreateResourceGroupInput
   """
   isDefault: Boolean! = false
 
+  """Added in 26.10.0. Whether the resource group is active."""
+  isActive: Boolean! = true
+
+  """Added in 26.10.0. Whether the resource group is public."""
+  isPublic: Boolean! = true
+
+  """Added in 26.10.0. Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE)."""
+  schedulerType: SchedulerType! = FIFO
+
   """Added in 26.10.0. Scheduler options. Omit to use the defaults."""
   schedulerOptions: CreateResourceGroupSchedulerOptionsInput = null
 }

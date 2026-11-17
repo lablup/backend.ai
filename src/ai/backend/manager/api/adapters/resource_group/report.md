@@ -148,7 +148,7 @@ Scenario: incomplete 2 / 25
 |---|---|
 | [when no default group exists and the superadmin creates one designated as the default, the group comes back as the default](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
 | [when the superadmin creates a resource group with only a name, the whole group comes back active, public and not the default, filled from the defaults in the code](#creating-the-superadmin-makes-a-resource-group) | answered |
-| [when the superadmin creates a resource group with its scheduler options, the whole group comes back with those options](#creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options) | answered |
+| [when the superadmin creates a resource group inactive, private and with the lifo scheduler, the whole group comes back with those values](#creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler) | answered |
 | [creating with a name another resource group already holds is rejected as a duplicate name](#creating-a-name-another-resource-group-already-holds-is-refused) | rejected |
 | [when a user who is not the superadmin tries to create a resource group, the call is rejected for lacking the role](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | rejected |
 | [when the monitor tries to create a resource group, the call is rejected for lacking the role. the monitor passes reads only](#creating-the-monitor-may-not-make-a-resource-group) | rejected |
@@ -1877,11 +1877,11 @@ Then
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
-<a id="creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options"></a>
+<a id="creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler"></a>
 
-#### [the-superadmin-makes-a-resource-group-with-its-scheduler-options](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
+#### [the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-when the superadmin creates a resource group with its scheduler options, the whole group comes back with those options
+when the superadmin creates a resource group inactive, private and with the lifo scheduler, the whole group comes back with those values
 
 Given
 
@@ -1895,33 +1895,33 @@ Given
 
 When
 
-- ResourceGroupAdapter.create: user-1 creates batch-only with the allowed session types, the pending timeout, the retries before skipping a pending session, the agent selection strategy, whether fractional resources may fragment and the route statuses to clean up
+- ResourceGroupAdapter.create: user-1 creates reserved inactive and private, with the lifo scheduler
 
 Then
 
 - the whole resource group just created comes back
   - id: skipped: the database generates it
-  - name = 'batch-only'
-  - status.is_active = True
-  - status.is_public = True
+  - name = 'reserved'
+  - status.is_active = False
+  - status.is_public = False
   - status.is_default = False
   - metadata.description = None
   - metadata.created_at: the time this run wrote
   - network.wsproxy_addr = None
   - network.use_host_network = False
-  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.type = <SchedulerTypeDTO.LIFO: 'lifo'>
   - scheduler.preemption.enabled = False
   - scheduler.preemption.preemptible_priority = 5
   - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
-  - scheduler.options.pending_timeout = 60.0
-  - scheduler.options.config.num_retries_to_skip = 3
-  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
-  - scheduler.options.allow_fractional_resource_fragmentation = False
-  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 

@@ -100,7 +100,9 @@ def processors(ops_db: ExtendedAsyncSAEngine) -> BootstrapScriptProcessors:
         policy_ops_provider=ResourcePolicyOpsProvider(ops_db),
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
-    service = UserService(MagicMock(), MagicMock(), MagicMock(), repository, MagicMock())
+    service = UserService(
+        MagicMock(), MagicMock(), MagicMock(), repository, MagicMock(), MagicMock()
+    )
     return BootstrapScriptProcessors(
         harness.group(UserEntityType()),
         harness.registry.dangling_lookup_field_group(

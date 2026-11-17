@@ -158,6 +158,18 @@ class CreateResourceGroupInput(BaseRequestModel):
             " flag, so this is rejected while another one holds it; clear that one first."
         ),
     )
+    is_active: bool = Field(
+        default=True,
+        description="Whether the resource group is active.",
+    )
+    is_public: bool = Field(
+        default=True,
+        description="Whether the resource group is public.",
+    )
+    scheduler_type: SchedulerTypeDTO = Field(
+        default=SchedulerTypeDTO.FIFO,
+        description="Scheduler type value (fifo/lifo/drf/fair-share).",
+    )
     scheduler_options: CreateResourceGroupSchedulerOptionsInput | None = Field(
         default=None,
         description=(

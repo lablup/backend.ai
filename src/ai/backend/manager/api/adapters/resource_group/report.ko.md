@@ -148,7 +148,7 @@
 |---|---|
 | [기본 그룹이 없을 때 superadmin 이 기본으로 지정해 생성하면 기본인 그룹이 반환됩니다](#creating-a-resource-group-made-as-the-default-answers-default) | 성공 |
 | [superadmin 이 이름만 주고 자원 그룹을 생성하면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환됩니다](#creating-the-superadmin-makes-a-resource-group) | 성공 |
-| [superadmin 이 스케줄러 옵션을 지정해 자원 그룹을 생성하면 지정한 옵션으로 채워진 그룹 전체가 반환됩니다](#creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options) | 성공 |
+| [superadmin 이 비활성, 비공개, 후입선출 스케줄러를 지정해 자원 그룹을 생성하면 지정한 값으로 채워진 그룹 전체가 반환됩니다](#creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler) | 성공 |
 | [이미 어떤 자원 그룹이 쓰고 있는 이름으로 생성하려 하면 이름 중복으로 거부됩니다](#creating-a-name-another-resource-group-already-holds-is-refused) | 거부 |
 | [superadmin 이 아닌 사용자가 자원 그룹을 생성하려 하면 역할 부족으로 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | 거부 |
 | [모니터가 자원 그룹을 생성하려 하면 역할 부족으로 거부됩니다. 모니터는 읽기만 통과합니다](#creating-the-monitor-may-not-make-a-resource-group) | 거부 |
@@ -1877,11 +1877,11 @@ Then
   - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
   - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
 
-<a id="creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options"></a>
+<a id="creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler"></a>
 
-#### [the-superadmin-makes-a-resource-group-with-its-scheduler-options](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
+#### [the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-superadmin 이 스케줄러 옵션을 지정해 자원 그룹을 생성하면 지정한 옵션으로 채워진 그룹 전체가 반환됩니다
+superadmin 이 비활성, 비공개, 후입선출 스케줄러를 지정해 자원 그룹을 생성하면 지정한 값으로 채워진 그룹 전체가 반환됩니다
 
 Given
 
@@ -1895,33 +1895,33 @@ Given
 
 When
 
-- ResourceGroupAdapter.create: user-1이 batch-only 을 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 지정해 생성합니다
+- ResourceGroupAdapter.create: user-1이 reserved 을 비활성·비공개로, 후입선출 스케줄러로 생성합니다
 
 Then
 
 - 생성한 리소스 그룹 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
-  - name = 'batch-only'
-  - status.is_active = True
-  - status.is_public = True
+  - name = 'reserved'
+  - status.is_active = False
+  - status.is_public = False
   - status.is_default = False
   - metadata.description = None
   - metadata.created_at: 이 실행이 쓴 시각
   - network.wsproxy_addr = None
   - network.use_host_network = False
-  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.type = <SchedulerTypeDTO.LIFO: 'lifo'>
   - scheduler.preemption.enabled = False
   - scheduler.preemption.preemptible_priority = 5
   - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
-  - scheduler.options.pending_timeout = 60.0
-  - scheduler.options.config.num_retries_to_skip = 3
-  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
-  - scheduler.options.allow_fractional_resource_fragmentation = False
-  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
   - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
 

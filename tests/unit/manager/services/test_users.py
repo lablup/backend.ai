@@ -67,6 +67,7 @@ class TestCreateUser:
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
             scheduling_controller=MagicMock(),
+            auto_generated_file_repository=MagicMock(),
         )
 
     @pytest.fixture
@@ -242,6 +243,7 @@ class TestModifyUser:
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
             scheduling_controller=MagicMock(),
+            auto_generated_file_repository=MagicMock(),
         )
 
     @pytest.fixture
@@ -337,6 +339,7 @@ class TestDeleteUser:
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
             scheduling_controller=MagicMock(),
+            auto_generated_file_repository=MagicMock(),
         )
 
     async def test_delete_existing_user_returns_success(
@@ -397,6 +400,7 @@ class TestPurgeUser:
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
             scheduling_controller=MagicMock(),
+            auto_generated_file_repository=MagicMock(),
         )
 
     @pytest.fixture
@@ -646,6 +650,7 @@ class TestBulkPurgeUsers:
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
             scheduling_controller=MagicMock(),
+            auto_generated_file_repository=MagicMock(),
         )
 
     @pytest.fixture
