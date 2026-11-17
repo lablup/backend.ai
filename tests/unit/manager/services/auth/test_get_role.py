@@ -42,6 +42,7 @@ def auth_service(
     mock_auth_repository: AsyncMock,
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
+    mock_auto_generated_file_repository: AsyncMock,
     mock_group_repository: AsyncMock,
     mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
@@ -56,6 +57,7 @@ def auth_service(
         ssh_key_validator=AsyncMock(),
         client_ip_masking_repository=mock_client_ip_masking_repository,
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        auto_generated_file_repository=mock_auto_generated_file_repository,
     )
 
 
