@@ -168,7 +168,7 @@ class TestPresignedURLs:
         result = await domain.get_presigned_upload_url(request)
 
         assert isinstance(result, GetPresignedUploadURLResponse)
-        method, url, body = _last_request_call(mock_session)
+        _method, _url, body = _last_request_call(mock_session)
         assert body is not None
         assert body["content_type"] == "application/gzip"
         assert body["expiration"] == 3600
@@ -204,6 +204,6 @@ class TestPresignedURLs:
         result = await domain.get_presigned_download_url(request)
 
         assert isinstance(result, GetPresignedDownloadURLResponse)
-        method, url, body = _last_request_call(mock_session)
+        _method, _url, body = _last_request_call(mock_session)
         assert body is not None
         assert body["expiration"] == 7200

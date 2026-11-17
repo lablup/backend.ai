@@ -199,7 +199,7 @@ class TestOIDCHookLifecycle:
     def test_get_handlers_returns_authorize(self, hook_plugin: OIDCHookPlugin) -> None:
         handlers = hook_plugin.get_handlers()
         assert len(handlers) == 1
-        name, handler = handlers[0]
+        name, _handler = handlers[0]
         assert name == "AUTHORIZE"
 
     async def test_init_and_cleanup(self, hook_plugin: OIDCHookPlugin) -> None:

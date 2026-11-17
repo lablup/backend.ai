@@ -202,7 +202,7 @@ def _normalize_quantity(value: Decimal) -> Decimal:
         Decimal('4294967296.000000') -> Decimal('4294967296')
     """
     normalized = value.normalize()
-    sign, digits, exponent = normalized.as_tuple()
+    _sign, _digits, exponent = normalized.as_tuple()
     if isinstance(exponent, int) and exponent > 0:
         # normalize() may produce scientific notation for large integers
         # (e.g., Decimal('1000000000') -> Decimal('1E+9')).

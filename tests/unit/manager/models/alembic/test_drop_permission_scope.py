@@ -230,7 +230,7 @@ class TestDropRewrittenSystemRoleGrants:
     async def test_a_system_role_of_a_rewritten_preset_loses_its_other_scope_rows(
         self, db: ExtendedAsyncSAEngine, live_project: uuid.UUID
     ) -> None:
-        role_id, user_id = await _role_in_user_scope(db, RoleSource.SYSTEM, _REWRITTEN_PRESET)
+        role_id, _user_id = await _role_in_user_scope(db, RoleSource.SYSTEM, _REWRITTEN_PRESET)
         await _grant(db, role_id, "project", live_project, entity_type="vfolder")
 
         await _drop_and_check(db)

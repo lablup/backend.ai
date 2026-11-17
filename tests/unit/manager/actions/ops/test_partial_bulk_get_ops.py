@@ -206,7 +206,7 @@ class TestMulti:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """multi-1."""
-        allowed, denied = projects
+        allowed, _denied = projects
         await _grant_on(ops_db, actors, allowed)
         reads = _spy_reads(monkeypatch)
 

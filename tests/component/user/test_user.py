@@ -533,7 +533,7 @@ class TestUserPurge:
         """Purge must remove the roles the user's scope holds, so no permission is left
         pointing at a scope that is gone.
         """
-        user_id, scope_id = user_with_rbac_rows
+        user_id, _scope_id = user_with_rbac_rows
 
         await admin_registry.user.purge(PurgeUserRequest(user_id=user_id))
 

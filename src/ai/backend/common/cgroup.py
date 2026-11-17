@@ -84,7 +84,7 @@ async def get_docker_cgroup_version() -> CgroupVersion:
 
 def get_cgroup_mount_point(version: str, controller: CgroupController) -> Path:
     for line in Path("/proc/mounts").read_text().splitlines():
-        device, mount_point, fstype, options, _ = line.split(" ", 4)
+        _device, mount_point, fstype, options, _ = line.split(" ", 4)
         match version:
             case "1":
                 if fstype == "cgroup":
@@ -112,7 +112,7 @@ def get_cgroup_of_pid(controller: CgroupController, pid: PID) -> str:
     # 1:cpu,cpuacct:/<cgroup>
     controller_id = get_cgroup_controller_id(controller)
     for line in Path(f"/proc/{pid}/cgroup").read_text().splitlines():
-        id, name, cgroup = line.split(":", 2)
+        id, _name, cgroup = line.split(":", 2)
         if id == controller_id:
             return cgroup.removeprefix("/")
     raise CgroupResolutionFailed(f"could not find the cgroup of PID {pid}")

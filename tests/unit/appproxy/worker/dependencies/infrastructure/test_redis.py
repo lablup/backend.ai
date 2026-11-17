@@ -25,7 +25,7 @@ class TestRedisProvider:
         redis_container: tuple[str, HostPortPairModel],
     ) -> ServerConfig:
         """Create a worker config pointing to the test redis container."""
-        container_id, redis_addr = redis_container
+        _container_id, redis_addr = redis_container
 
         # Create Redis config with single endpoint for all roles
         redis_config_data = {

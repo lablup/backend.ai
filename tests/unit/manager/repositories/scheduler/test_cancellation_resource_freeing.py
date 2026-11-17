@@ -590,7 +590,7 @@ class TestCancelFreesResourceAllocations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         pulling_session_on_agent: tuple[SessionId, KernelId, str],
     ) -> None:
-        session_id, kernel_id, agent_id = pulling_session_on_agent
+        _session_id, kernel_id, agent_id = pulling_session_on_agent
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )

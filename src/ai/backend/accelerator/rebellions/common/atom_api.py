@@ -104,7 +104,7 @@ class ATOMAPI:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        out, err = await result.communicate()
+        _out, err = await result.communicate()
         if len(err) > 0:
             raise LibraryError(
                 f"Error while executing rbln-stat {' '.join(args)}: {err.decode('utf-8')}"
@@ -124,7 +124,7 @@ class ATOMAPI:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        out, err = await result.communicate()
+        _out, err = await result.communicate()
         if len(err) > 0:
             raise LibraryError(
                 f"Error while executing rbln-stat {' '.join(args)}: {err.decode('utf-8')}"

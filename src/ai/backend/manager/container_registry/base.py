@@ -390,7 +390,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             password = self.registry_info.password
             if password is not None:
                 self.credentials["password"] = password
-            async with self.prepare_client_session() as (url, sess):
+            async with self.prepare_client_session() as (_url, sess):
                 project_and_image_name, tag = ImageRef.parse_image_tag(image)
                 rqst_args = await registry_login(
                     sess,

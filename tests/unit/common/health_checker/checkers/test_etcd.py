@@ -21,7 +21,7 @@ class TestEtcdHealthChecker:
         test_ns: str,
     ) -> AsyncGenerator[AsyncEtcd, None]:
         """Create an AsyncEtcd client connected to the test container."""
-        container_id, etcd_addr = etcd_container
+        _container_id, etcd_addr = etcd_container
 
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",

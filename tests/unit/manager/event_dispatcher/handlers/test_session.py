@@ -104,7 +104,7 @@ async def _invoke_and_capture(
     """Run invoke_session_callback and return the captured webhook payload data."""
     mock_db_session = AsyncMock()
     mock_db = _make_mock_db(mock_db_session)
-    handler, mock_registry, _mock_valkey_live = _make_handler(mock_db, mock_row)
+    handler, _mock_registry, _mock_valkey_live = _make_handler(mock_db, mock_row)
 
     captured_data: dict[str, Any] = {}
 
@@ -225,7 +225,7 @@ class TestInvokeSessionCallbackPayload:
 
         mock_db_session = AsyncMock()
         mock_db = _make_mock_db(mock_db_session)
-        handler, mock_registry, _mock_valkey_live = _make_handler(mock_db, mock_row)
+        handler, _mock_registry, _mock_valkey_live = _make_handler(mock_db, mock_row)
 
         with patch(
             "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",

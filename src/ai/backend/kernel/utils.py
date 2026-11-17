@@ -71,7 +71,7 @@ async def wait_local_port_open(port: int) -> None:
     while True:
         try:
             async with asyncio.timeout(10.0):
-                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+                _reader, writer = await asyncio.open_connection("127.0.0.1", port)
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)
             continue

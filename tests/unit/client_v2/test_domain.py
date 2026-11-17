@@ -152,7 +152,7 @@ class TestDomainSearch:
         result = await dc.search(request)
 
         assert isinstance(result, SearchDomainsResponse)
-        method, url, body = _last_request_call(mock_session)
+        method, _url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert body is not None
         assert body["filter"]["name"]["contains"] == "test"

@@ -36,7 +36,7 @@ class TestEtcdProvider:
         test_ns: str,
     ) -> ServerConfig:
         """Create a coordinator config with Traefik enabled."""
-        container_id, etcd_addr = etcd_container
+        _container_id, etcd_addr = etcd_container
 
         # Create etcd config
         etcd_config = EtcdConfig.model_validate({

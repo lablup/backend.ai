@@ -253,7 +253,7 @@ class TestModelScanning:
         result = await client.scan_single_model("bert-base-uncased")
 
         assert isinstance(result, RetrieveArtifactModelResponse)
-        method, url, body = _last_request_call(mock_session)
+        method, url, _body = _last_request_call(mock_session)
         assert method == "GET"
         assert "/artifact-registries/model/bert-base-uncased" in url
         # No params when revision/registry_id not provided

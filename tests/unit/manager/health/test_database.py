@@ -20,7 +20,7 @@ async def database_engine(
     postgres_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Create a database engine for testing."""
-    container_id, postgres_addr = postgres_container
+    _container_id, postgres_addr = postgres_container
     db_config = DatabaseConfig(  # type: ignore[call-arg]
         addr=HostPortPair(host=postgres_addr.host, port=postgres_addr.port),
         name=POSTGRES_MAINTENANCE_DB,

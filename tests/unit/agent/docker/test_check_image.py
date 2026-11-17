@@ -144,7 +144,7 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config, cfg_src_path = config.read_from_file(None, "agent")
+        fs_local_config, _cfg_src_path = config.read_from_file(None, "agent")
         server_config.etcd.addrs = EtcdConfig.model_validate(fs_local_config["etcd"]).addrs
         _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "user")
         _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "password")

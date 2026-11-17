@@ -452,7 +452,7 @@ class TheTargetIsGone(Then[ACallerAndATarget, Answer]):
         answer = answered.response
         if not isinstance(answer, tuple) or not isinstance(answer[1], list):
             return [Refused(NotEnoughPermission, answered.raised)]
-        payload, loaded = answer
+        payload, _loaded = answer
         return [
             Same("success", payload.success, True),
             Skipped(

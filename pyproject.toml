@@ -157,7 +157,6 @@ ignore = [
     "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())
     "RUF022", # unsorted-dunder-all - semantic ordering may be preferred over alphabetical
     "RUF032", # decimal-from-float-literal - intentional float to Decimal conversion
-    "RUF059", # unused-unpacked-variable - _ convention not always followed
     # C4
     "C408",  # unnecessary-collection-call - dict()/tuple()/list() can be clearer than literals in some cases
     "C416",  # unnecessary-comprehension - explicit comprehension can be clearer
