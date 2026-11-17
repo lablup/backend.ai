@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import yarl
 from pydantic import HttpUrl
@@ -34,7 +34,12 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.image.types import ImageData
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+    from ai.backend.manager.data.deployment.types import (
+        DeploymentInfo,
+        ModelRevisionData,
+        RouteHealthStatus,
+        RouteStatus,
+    )
 
 __all__ = [
     "EndpointAccessValidationData",
@@ -75,7 +80,7 @@ class EndpointData:
     project: uuid.UUID
     resource_group: str
     resource_slots: ResourceSlot
-    url: str
+    url: str | None
     model: uuid.UUID
     model_definition_path: str | None
     model_mount_destination: str | None
@@ -93,7 +98,7 @@ class EndpointData:
     cluster_mode: ClusterMode
     cluster_size: int
     open_to_public: bool
-    created_at: datetime
+    created_at: datetime | None
     destroyed_at: datetime | None
     retries: int
     lifecycle_stage: EndpointLifecycle
@@ -111,6 +116,75 @@ class EndpointData:
     scaling_state: ScalingState = ScalingState.STABLE
     model_definition: ModelDefinition | None = None
     routings: Sequence[RoutingData] = field(default_factory=list)
+
+    @classmethod
+    def from_deployment(
+        cls,
+        info: DeploymentInfo,
+        *,
+        created_user_email: str | None,
+        session_owner_email: str,
+        routings: Sequence[RoutingData],
+    ) -> Self:
+        """The endpoint ``info`` with no revision; ``with_revision`` fills the revision fields."""
+        metadata = info.metadata
+        return cls(
+            id=info.id,
+            name=metadata.name,
+            image=None,
+            domain=metadata.domain,
+            project=metadata.project,
+            resource_group=metadata.resource_group,
+            resource_slots=ResourceSlot({}),
+            url=info.network.url,
+            model=uuid.UUID(int=0),
+            model_definition_path=None,
+            model_mount_destination=None,
+            created_user_id=metadata.created_user,
+            created_user_email=created_user_email,
+            session_owner_id=metadata.session_owner,
+            session_owner_email=session_owner_email,
+            tag=metadata.tag,
+            startup_command=None,
+            bootstrap_script=None,
+            callback_url=None,
+            environ=None,
+            resource_opts=None,
+            replicas=info.replica.replica_count,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            open_to_public=info.network.open_to_public,
+            created_at=metadata.created_at,
+            destroyed_at=metadata.destroyed_at,
+            retries=info.state.retry_count,
+            lifecycle_stage=info.state.lifecycle,
+            runtime_variant_id=None,
+            extra_mounts=[],
+            scaling_state=info.state.scaling_state,
+            routings=routings,
+        )
+
+    def with_revision(self, revision: ModelRevisionData, image: ImageData | None) -> Self:
+        """This endpoint with the fields of the revision it serves."""
+        mount = revision.model_mount_config
+        return dataclasses.replace(
+            self,
+            image=image,
+            resource_slots=revision.resource_config.resource_slot,
+            model=mount.vfolder_id or uuid.UUID(int=0),
+            model_definition_path=mount.definition_path or None,
+            model_mount_destination=mount.mount_destination,
+            startup_command=revision.execution.startup_command,
+            bootstrap_script=revision.execution.bootstrap_script,
+            callback_url=revision.execution.callback_url,
+            environ=revision.model_runtime_config.environ,
+            resource_opts=revision.resource_config.resource_opts,
+            cluster_mode=revision.cluster_config.mode,
+            cluster_size=revision.cluster_config.size,
+            runtime_variant_id=revision.model_runtime_config.runtime_variant_id,
+            extra_mounts=mount.extra_mounts,
+            model_definition=revision.model_definition,
+        )
 
 
 @dataclass

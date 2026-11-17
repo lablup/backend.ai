@@ -1,5 +1,7 @@
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -14,7 +16,7 @@ __all__ = (
 )
 
 
-class EventPayloadEncodingError(BackendAIError):
+class EventPayloadEncodingError(BackendAIError, web.HTTPInternalServerError):
     """
     Raised when an event cannot be rendered as the JSON body it is published as.
 
@@ -34,7 +36,7 @@ class EventPayloadEncodingError(BackendAIError):
         )
 
 
-class EventPayloadDecodingError(BackendAIError):
+class EventPayloadDecodingError(BackendAIError, web.HTTPInternalServerError):
     """
     Raised when a message body does not validate against the event it names.
 
