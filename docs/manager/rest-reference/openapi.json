@@ -5151,6 +5151,18 @@
               }
             ],
             "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`."
           }
         },
         "title": "ModelServiceConfigInput",
@@ -5342,6 +5354,46 @@
           }
         },
         "title": "RollingUpdateConfigInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationDelimiterInput": {
+        "properties": {
+          "start": {
+            "description": "Opening delimiter, e.g. `{{`.",
+            "minLength": 1,
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "description": "Closing delimiter, e.g. `}}`.",
+            "minLength": 1,
+            "title": "End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ServiceArgumentInterpolationDelimiterInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationInput": {
+        "properties": {
+          "delimiters": {
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiterInput"
+            },
+            "minItems": 1,
+            "title": "Delimiters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delimiters"
+        ],
+        "title": "ServiceArgumentInterpolationInput",
         "type": "object"
       },
       "CreateDeploymentInput": {
@@ -9686,6 +9738,18 @@
             ],
             "default": null,
             "description": "Health check configuration for the model service."
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`."
           }
         },
         "title": "PresetModelServiceConfigInput",
@@ -10271,6 +10335,18 @@
               }
             ],
             "title": "Health Check"
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit or null to keep the current value.",
+            "title": "Interpolation"
           }
         },
         "title": "UpdatePresetModelServiceConfigInput",
@@ -50090,6 +50166,17 @@
               }
             ],
             "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "ModelServiceConfigDraft",
@@ -50181,6 +50268,54 @@
           "model_mount_config"
         ],
         "title": "RevisionInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolation": {
+        "additionalProperties": true,
+        "properties": {
+          "delimiters": {
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiter"
+            },
+            "minItems": 1,
+            "title": "Delimiters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delimiters"
+        ],
+        "title": "ServiceArgumentInterpolation",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationDelimiter": {
+        "additionalProperties": true,
+        "properties": {
+          "start": {
+            "description": "Opening delimiter.",
+            "examples": [
+              "{{"
+            ],
+            "minLength": 1,
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "description": "Closing delimiter.",
+            "examples": [
+              "}}"
+            ],
+            "minLength": 1,
+            "title": "End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ServiceArgumentInterpolationDelimiter",
         "type": "object"
       },
       "CreateDeploymentRequest": {

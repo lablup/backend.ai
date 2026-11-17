@@ -114,7 +114,9 @@ class ServiceParser:
                 "Invalid interpolation delimiters {!r}; using the legacy syntax", delimiters
             )
             delimiters = None
-        legacy = delimiters is None
+        legacy = delimiters is None or {(d["start"], d["end"]) for d in delimiters} == {
+            (d["start"], d["end"]) for d in LEGACY_DELIMITERS
+        }
         interpolator = ServiceArgumentInterpolator(
             self.variables, LEGACY_DELIMITERS if delimiters is None else delimiters
         )
