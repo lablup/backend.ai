@@ -38,8 +38,10 @@ class TestIngressStateFactory:
         assert isinstance(in_memory, InMemoryIngressState)
         assert isinstance(redis, RedisIngressState)
         assert isinstance(state.writer, ValidatingIngressWriter)
+        assert state.in_memory is in_memory
 
     def test_redis_only_has_no_writer(self, valkey_client: ValkeyLiveClient) -> None:
         state = _create("redis", ["redis"], valkey_client)
         assert [type(layer) for layer in state.reader.layers] == [RedisIngressState]
         assert state.writer is None
+        assert state.in_memory is None
