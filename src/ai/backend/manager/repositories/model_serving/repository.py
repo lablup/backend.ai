@@ -71,7 +71,6 @@ from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.deployment_revision.scopes import DeploymentRevisionTarget
 from ai.backend.manager.models.deployment_revision.searchable_fields import (
     ModelRevisionSearchableFields,
 )
@@ -92,7 +91,6 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.scopes import DeploymentReplicaTarget
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -493,18 +491,15 @@ class ModelServingRepository:
     ) -> dict[DeploymentID, ModelRevisionData]:
         """The revision each deployment serves: the current revision, or the deploying
         revision while none is current."""
-        scopes: list[DeploymentRevisionTarget] = []
         revision_ids: list[DeploymentRevisionID] = []
         for info in deployments:
-            scopes.append(DeploymentRevisionTarget(deployment_id=info.id))
             if info.current_revision_id is not None:
                 revision_ids.append(info.current_revision_id)
             if info.deploying_revision_id is not None:
                 revision_ids.append(info.deploying_revision_id)
         if not revision_ids:
             return {}
-        result = await r.search_with_scopes(
-            scopes,
+        result = await r.search_in_global(
             ModelRevisionSearcher(
                 pagination=NoPagination(),
                 conditions=[
@@ -512,7 +507,7 @@ class ModelServingRepository:
                         UUIDInMatchSpec(values=revision_ids, negated=False)
                     )
                 ],
-            ),
+            )
         )
         revisions: dict[DeploymentRevisionID, ModelRevisionData] = {}
         for revision in result.items:
@@ -587,10 +582,19 @@ class ModelServingRepository:
         """The routes of ``deployments``, by the deployment id."""
         if not deployments:
             return {}
-        scopes: list[DeploymentReplicaTarget] = []
+        deployment_ids: list[uuid.UUID] = []
         for info in deployments:
-            scopes.append(DeploymentReplicaTarget(deployment_id=info.id))
-        result = await r.search_with_scopes(scopes, RoutingDataSearcher(pagination=NoPagination()))
+            deployment_ids.append(info.id)
+        result = await r.search_in_global(
+            RoutingDataSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    ReplicaSearchableFields.own.deployment_id.filter.in_(
+                        UUIDInMatchSpec(values=deployment_ids, negated=False)
+                    )
+                ],
+            )
+        )
         routes: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
         for route in result.items:
             routes[route.endpoint].append(route)
