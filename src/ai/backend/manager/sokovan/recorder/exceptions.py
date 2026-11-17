@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+<<<<<<< HEAD
+=======
+from typing import override
+
+from aiohttp import web
+
+>>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -23,7 +30,7 @@ class RecorderError(BackendAIError):
         )
 
 
-class NestedPhaseError(RecorderError):
+class NestedPhaseError(RecorderError, web.HTTPInternalServerError):
     """Raised when attempting to nest phases."""
 
     error_type = "https://api.backend.ai/probs/nested-phase-error"
@@ -46,7 +53,7 @@ class NestedPhaseError(RecorderError):
         )
 
 
-class StepWithoutPhaseError(RecorderError):
+class StepWithoutPhaseError(RecorderError, web.HTTPInternalServerError):
     """Raised when attempting to record a step without an active phase."""
 
     error_type = "https://api.backend.ai/probs/step-without-phase-error"

@@ -159,7 +159,11 @@ class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
         )
 
 
+<<<<<<< HEAD
 class RouteSessionNotFound(BackendAIError):
+=======
+class RouteSessionNotFound(EntityError, web.HTTPInternalServerError):
+>>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
     error_type = "https://api.backend.ai/probs/route-session-not-found"
     error_title = "No session associated with route."
 
@@ -171,7 +175,11 @@ class RouteSessionNotFound(BackendAIError):
         )
 
 
+<<<<<<< HEAD
 class RouteSessionTerminated(BackendAIError):
+=======
+class RouteSessionTerminated(EntityError, web.HTTPInternalServerError):
+>>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
     error_type = "https://api.backend.ai/probs/route-session-terminated"
     error_title = "Route session is in terminal state."
 

@@ -2,6 +2,13 @@
 Exceptions for deployment management.
 """
 
+<<<<<<< HEAD
+=======
+from typing import override
+
+from aiohttp import web
+
+>>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -25,7 +32,7 @@ class DeploymentError(BackendAIError):
         )
 
 
-class InvalidEndpointState(DeploymentError):
+class InvalidEndpointState(DeploymentError, web.HTTPConflict):
     """Raised when an endpoint is in an invalid state for the requested operation."""
 
     error_type = "https://api.backend.ai/probs/invalid-endpoint-state"
@@ -39,7 +46,7 @@ class InvalidEndpointState(DeploymentError):
         )
 
 
-class RouteCreationFailed(DeploymentError):
+class RouteCreationFailed(DeploymentError, web.HTTPInternalServerError):
     """Raised when route creation fails."""
 
     error_type = "https://api.backend.ai/probs/route-creation-failed"
@@ -53,7 +60,7 @@ class RouteCreationFailed(DeploymentError):
         )
 
 
-class ScalingOperationFailed(DeploymentError):
+class ScalingOperationFailed(DeploymentError, web.HTTPInternalServerError):
     """Raised when a scaling operation fails."""
 
     error_type = "https://api.backend.ai/probs/scaling-failed"
@@ -67,7 +74,7 @@ class ScalingOperationFailed(DeploymentError):
         )
 
 
-class ServiceInfoRetrievalFailed(DeploymentError):
+class ServiceInfoRetrievalFailed(DeploymentError, web.HTTPInternalServerError):
     """Raised when service info cannot be retrieved."""
 
     error_type = "https://api.backend.ai/probs/service-info-retrieval-failed"

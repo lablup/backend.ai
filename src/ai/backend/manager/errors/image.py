@@ -96,7 +96,7 @@ class UnknownImageReferenceError(ObjectNotFound):
         )
 
 
-class ImageAccessForbiddenError(BackendAIError):
+class ImageAccessForbiddenError(BackendAIError, web.HTTPForbidden):
     """Raised when a user tries to access an image they do not have permission to access."""
 
     error_type = "https://api.backend.ai/probs/generic-forbidden"

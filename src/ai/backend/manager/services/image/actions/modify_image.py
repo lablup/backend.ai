@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -39,8 +41,12 @@ class ModifyImageActionResult(BaseActionResult):
     def entity_id(self) -> str | None:
         return str(self.image.id)
 
+<<<<<<< HEAD:src/ai/backend/manager/services/image/actions/modify_image.py
 
 class ModifyImageActionUnknownImageReferenceError(BackendAIError):
+=======
+class UpdateImageActionUnknownImageReferenceError(BackendAIError, web.HTTPNotFound):
+>>>>>>> d2ebe76c5 (fix(BA-9049): give the error classes of the agent, common, manager and storage packages an HTTP status (#17132)):src/ai/backend/manager/services/image/actions/update_image.py
     error_type = "https://api.backend.ai/probs/image-not-found"
     error_title = "Unknown image reference."
 
