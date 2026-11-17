@@ -1,5 +1,7 @@
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.clients.storage_backends.hammerspace.exceptions import HammerspaceError
 from ai.backend.common.exception import (
     ErrorCode,
@@ -9,7 +11,7 @@ from ai.backend.common.exception import (
 )
 
 
-class ConfigurationError(HammerspaceError):
+class ConfigurationError(HammerspaceError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/hammerspace-invalid-configuration"
     error_title = "Hammerspace configuration is invalid."
 
