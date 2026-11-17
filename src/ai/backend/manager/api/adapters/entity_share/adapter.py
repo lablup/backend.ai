@@ -173,7 +173,7 @@ class EntityShareAdapter(BaseAdapter):
         result = await self._entity_share.lookup_answering_scope.run(
             LookupEntityShareAnsweringScopeAction(share_id=share_id)
         )
-        return result.resolved_entity_id
+        return result.answering_scope
 
     async def my_search(self, input: MySearchEntitySharesInput) -> SearchEntitySharesPayload:
         """Page through the shares the caller stands on a side of.

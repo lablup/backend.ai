@@ -1121,7 +1121,7 @@ def test_vfolder_allowed_types_read_is_public() -> None:
 
 
 def test_entity_share_answers_are_checked_in_the_scope_the_lookup_resolved() -> None:
-    """The answering scope resolves for any authenticated caller; each answer is checked there."""
+    """Resolving the answering scope costs READ on it; each answer is then checked there."""
     registry = _ops_registry()
     EntityShareProcessors(registry.group(GroupMeta(EntityShareEntityType())), MagicMock())
 
@@ -1129,7 +1129,7 @@ def test_entity_share_answers_are_checked_in_the_scope_the_lookup_resolved() -> 
         LookupEntityShareAnsweringScopeAction: (
             EntityShareEntityType(),
             ActionKind.LOOKUP,
-            ActionGate.PUBLIC,
+            ActionGate.PERMISSION,
         ),
         AcceptEntityShareAction: (EntityShareEntityType(), ActionKind.SCOPE, ActionGate.PERMISSION),
         RejectEntityShareAction: (EntityShareEntityType(), ActionKind.SCOPE, ActionGate.PERMISSION),

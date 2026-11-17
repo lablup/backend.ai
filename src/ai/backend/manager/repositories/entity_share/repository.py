@@ -5,6 +5,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
+from ai.backend.manager.models.entity_share.queriers import EntityShareQuerier
 from ai.backend.manager.models.entity_share.updaters import (
     EntityShareAcceptUpdater,
     EntityShareCancelUpdater,
@@ -12,6 +13,7 @@ from ai.backend.manager.models.entity_share.updaters import (
     EntityShareRejectUpdater,
     EntityShareRevokeUpdater,
 )
+from ai.backend.manager.models.user.lookups import UserEmailLookup
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 __all__ = ("EntityShareRepository",)
@@ -47,6 +49,24 @@ class EntityShareRepository:
             if restated is not None:
                 return restated
             return await w.create_entity(creator)
+
+    async def answering_scope(self, share_id: EntityShareID) -> EntityIdentifier:
+        """The scope that answers the share: the scope it names, or the user holding the
+        address it was sent to while it names none."""
+        async with self._ops.read_ops() as r:
+            share = await r.query_data(EntityShareQuerier(share_id=share_id))
+            if share is None:
+                raise EntityShareNotFound(f"No share {share_id}")
+            if share.recipient is not None:
+                return share.recipient
+            holder = (
+                await r.lookup_entity_id(UserEmailLookup(email=share.recipient_email))
+                if share.recipient_email is not None
+                else None
+            )
+            if holder is None:
+                raise EntityShareNotFound(f"No user holds the address share {share_id} names")
+            return holder
 
     async def accept(
         self, share_id: EntityShareID, answering_scope: EntityIdentifier

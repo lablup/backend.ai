@@ -6,21 +6,23 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType, EntityShareID
-from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
-from ai.backend.manager.actions.v2.lookup.base import LookupKey
-from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.models.entity_share.lookups import EntityShareAnsweringScopeLookup
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.v2.lookup.base import (
+    BaseLookupAction,
+    BaseLookupActionResult,
+    LookupKey,
+)
 
 __all__ = (
     "EntityShareIDKey",
     "LookupEntityShareAnsweringScopeAction",
+    "LookupEntityShareAnsweringScopeActionResult",
 )
 
 
 @dataclass(frozen=True)
 class EntityShareIDKey(LookupKey):
-    """The share whose recipient is read."""
+    """The share whose answering scope is read."""
 
     share_id: EntityShareID
 
@@ -34,10 +36,11 @@ class EntityShareIDKey(LookupKey):
 
 
 @dataclass(frozen=True)
-class LookupEntityShareAnsweringScopeAction(
-    LookupEntityOpsAction[VirtualEntityRow, RuntimeEntityID]
-):
-    """Resolve a share into the scope that answers it."""
+class LookupEntityShareAnsweringScopeAction(BaseLookupAction):
+    """Resolve a share into the scope that answers it.
+
+    Resolving costs READ on that scope, the user or the project the share names.
+    """
 
     share_id: EntityShareID
 
@@ -55,6 +58,11 @@ class LookupEntityShareAnsweringScopeAction(
     def lookup_key(self) -> EntityShareIDKey:
         return EntityShareIDKey(share_id=self.share_id)
 
+
+@dataclass(frozen=True)
+class LookupEntityShareAnsweringScopeActionResult(BaseLookupActionResult):
+    answering_scope: EntityIdentifier
+
     @override
-    def to_lookup(self) -> EntityShareAnsweringScopeLookup:
-        return EntityShareAnsweringScopeLookup(share_id=self.share_id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.answering_scope

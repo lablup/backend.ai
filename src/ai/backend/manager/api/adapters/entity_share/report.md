@@ -53,7 +53,7 @@ Scenario: complete
 | [when a user who can answer shares in a project accepts the offer to that project, the accepted share comes back whole](#answering-a-project-answerer-accepts-the-offer-to-the-project) | answered |
 | [when a user who can answer shares in their own scope accepts the offer, the accepted share comes back whole](#answering-the-recipient-accepts-the-offer) | answered |
 | [when a user who can only read shares in a project accepts the offer to that project, the call is rejected for lack of permission](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | rejected |
-| [when a user granted nothing accepts the offer, the call is rejected for lack of permission](#answering-a-user-granted-nothing-may-not-accept-the-offer) | rejected |
+| [when a user granted nothing accepts the offer, it is rejected because the share cannot be resolved](#answering-a-user-granted-nothing-may-not-accept-the-offer) | rejected |
 
 **cancel**
 
@@ -75,7 +75,7 @@ Scenario: complete
 |---|---|
 | [when a user who can answer shares in a project leaves the share that project took, the revoked share comes back whole](#withdrawing-a-project-answerer-leaves-the-share-the-project-took) | answered |
 | [when the receiving side leaves the share in their own scope, the revoked share comes back whole](#withdrawing-the-recipient-leaves-the-share) | answered |
-| [when a user granted nothing leaves the share, the call is rejected for lack of permission](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | rejected |
+| [when a user granted nothing leaves the share, it is rejected because the share cannot be resolved](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | rejected |
 
 **reject**
 
@@ -83,7 +83,7 @@ Scenario: complete
 |---|---|
 | [when a user who can answer shares in a project rejects the offer to that project, the rejected share comes back whole](#answering-a-project-answerer-rejects-the-offer-to-the-project) | answered |
 | [when a user who can answer shares in their own scope rejects the offer, the rejected share comes back whole](#answering-the-recipient-rejects-the-offer) | answered |
-| [when a user granted nothing rejects the offer, the call is rejected for lack of permission](#answering-a-user-granted-nothing-may-not-reject-the-offer) | rejected |
+| [when a user granted nothing rejects the offer, it is rejected because the share cannot be resolved](#answering-a-user-granted-nothing-may-not-reject-the-offer) | rejected |
 
 **revoke**
 
@@ -116,11 +116,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -176,11 +178,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -237,11 +241,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -290,11 +296,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -349,11 +357,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -401,11 +411,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -470,11 +482,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -522,11 +536,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -591,11 +607,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -650,12 +668,15 @@ Given
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
     - regular user user-2: holds Role share-recipient-2
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
     - Role share-recipient-3: READ allowed on every entity_share
     - Role share-recipient-3: UPDATE allowed on every entity_share
     - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
@@ -707,11 +728,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -771,12 +794,15 @@ Given
     - regular user user-1: holds Role share-lender-1
     - Role share-recipient-2: applies only within the scope it is granted in
     - Role share-recipient-2: READ allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
     - regular user user-2: holds Role share-recipient-2
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
     - Role share-recipient-3: READ allowed on every entity_share
     - Role share-recipient-3: UPDATE allowed on every entity_share
     - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
@@ -798,7 +824,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-accept-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user granted nothing accepts the offer, the call is rejected for lack of permission
+when a user granted nothing accepts the offer, it is rejected because the share cannot be resolved
 
 Given
 
@@ -816,11 +842,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -842,7 +870,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: GenericBadRequest
 
 ### cancel
 
@@ -868,11 +896,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -927,11 +957,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -979,11 +1011,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1037,11 +1071,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1095,12 +1131,15 @@ Given
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
     - regular user user-2: holds Role share-recipient-2
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
     - Role share-recipient-3: READ allowed on every entity_share
     - Role share-recipient-3: UPDATE allowed on every entity_share
     - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
@@ -1153,11 +1192,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1195,7 +1236,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-leave-the-share](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
 
-when a user granted nothing leaves the share, the call is rejected for lack of permission
+when a user granted nothing leaves the share, it is rejected because the share cannot be resolved
 
 Given
 
@@ -1213,11 +1254,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1239,7 +1282,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: GenericBadRequest
 
 ### reject
 
@@ -1272,12 +1315,15 @@ Given
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
     - regular user user-2: holds Role share-recipient-2
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
     - Role share-recipient-3: READ allowed on every entity_share
     - Role share-recipient-3: UPDATE allowed on every entity_share
     - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
@@ -1329,11 +1375,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1370,7 +1418,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-reject-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user granted nothing rejects the offer, the call is rejected for lack of permission
+when a user granted nothing rejects the offer, it is rejected because the share cannot be resolved
 
 Given
 
@@ -1388,11 +1436,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1414,7 +1464,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: GenericBadRequest
 
 ### revoke
 
@@ -1440,11 +1490,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1500,11 +1552,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share

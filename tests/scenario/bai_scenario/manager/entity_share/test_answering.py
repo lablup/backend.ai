@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.entity_share.response import EntityShareNo
 from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
 from ai.backend.manager.api.adapters.entity_share.adapter import EntityShareAdapter
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -76,7 +77,7 @@ class AnswerRow(
     guarantees: str
     situation: ASharedFolderAndSomeone
     accepting: bool
-    refused: bool = False
+    refused_with: type[BaseException] | None = None
 
     @override
     def summary(self) -> str:
@@ -96,8 +97,8 @@ class AnswerRow(
 
     @override
     def then(self) -> Then[ASharedFolderAndACaller, Answered]:
-        if self.refused:
-            return TheCallIsRefused(NotEnoughPermission)
+        if self.refused_with is not None:
+            return TheCallIsRefused(self.refused_with)
         status = EntityShareStatusDTO.ACCEPTED if self.accepting else EntityShareStatusDTO.REJECTED
         return TheShareNode(started=STARTED, status=status)
 
@@ -140,28 +141,28 @@ SCENARIOS: list[AnswerStep] = [
     AnswerRow(
         named="a-user-granted-nothing-may-not-accept-the-offer",
         guarantees=Says(
-            "아무 권한도 없는 사용자가 제안을 받아들이면 권한 부족으로 거부됩니다",
+            "아무 권한도 없는 사용자가 제안을 받아들이면 공유를 찾을 수 없다는 이유로 거부됩니다",
             english=(
-                "when a user granted nothing accepts the offer, the call is rejected for lack "
-                "of permission"
+                "when a user granted nothing accepts the offer, it is rejected because the share "
+                "cannot be resolved"
             ),
         ),
         situation=SOMEBODY,
         accepting=True,
-        refused=True,
+        refused_with=GenericBadRequest,
     ),
     AnswerRow(
         named="a-user-granted-nothing-may-not-reject-the-offer",
         guarantees=Says(
-            "아무 권한도 없는 사용자가 제안을 거절해도 권한 부족으로 거부됩니다",
+            "아무 권한도 없는 사용자가 제안을 거절해도 공유를 찾을 수 없다는 이유로 거부됩니다",
             english=(
-                "when a user granted nothing rejects the offer, the call is rejected for lack "
-                "of permission"
+                "when a user granted nothing rejects the offer, it is rejected because the share "
+                "cannot be resolved"
             ),
         ),
         situation=SOMEBODY,
         accepting=False,
-        refused=True,
+        refused_with=GenericBadRequest,
     ),
     AnswerRow(
         named="a-project-answerer-accepts-the-offer-to-the-project",
@@ -201,7 +202,7 @@ SCENARIOS: list[AnswerStep] = [
         ),
         situation=PROJECT_READER,
         accepting=True,
-        refused=True,
+        refused_with=NotEnoughPermission,
     ),
 ]
 

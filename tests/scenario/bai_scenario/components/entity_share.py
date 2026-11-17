@@ -14,8 +14,8 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.dto.manager.v2.entity_share.response import (
     EntityShareNode,
     SearchEntitySharesPayload,
@@ -88,12 +88,14 @@ class ASharedFolderAndACaller:
 
 @dataclass(frozen=True)
 class SomeoneGrantedOnTheProject(TestSeedNest[Laid[UserData]]):
-    """그 프로젝트에서 공유에 정해진 권한을 갖는 사용자."""
+    """그 프로젝트에서 공유에 정해진 권한을 갖고, ``project_granted`` 로 프로젝트 자체에도 권한을
+    갖는 사용자."""
 
     domain: Laid[DomainData]
     project: Laid[ProjectData]
     granted: tuple[Permission, ...]
     role_name_hint: str = "share-lender"
+    project_granted: tuple[Permission, ...] = ()
 
     @override
     def kind(self) -> str:
@@ -112,13 +114,15 @@ class SomeoneGrantedOnTheProject(TestSeedNest[Laid[UserData]]):
             seed.adding(
                 TestSeedPermission(entity_type=EntityShareEntityType(), permission=one), role
             )
+        for one in self.project_granted:
+            seed.adding(TestSeedPermission(entity_type=ProjectEntityType(), permission=one), role)
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
 
 @dataclass(frozen=True)
 class SomeoneAnsweringInTheirOwnScope(TestSeedNest[Laid[UserData]]):
-    """자기 스코프에서 공유에 답할 수 있는 사용자."""
+    """모든 사용자처럼 자기 자신을 읽을 수 있고, 자기 스코프에서 공유에 답할 수 있는 사용자."""
 
     user: Laid[UserData]
     granted: tuple[Permission, ...]
@@ -126,14 +130,20 @@ class SomeoneAnsweringInTheirOwnScope(TestSeedNest[Laid[UserData]]):
     @override
     def kind(self) -> str:
         return Says(
-            "자기 스코프의 공유 권한을 받은 사용자 준비",
-            english="Prepare a user granted share permissions in their own scope",
+            "자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비",
+            english=(
+                "Prepare a user who can read themselves and is granted share permissions in "
+                "their own scope"
+            ),
         )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
         role = seed.creating_from(
             TestSeedRole(lambda u: UserID(u.id), name_hint="share-recipient"), self.user
+        )
+        seed.adding(
+            TestSeedPermission(entity_type=UserEntityType(), permission=Permission.READ), role
         )
         for one in self.granted:
             seed.adding(
@@ -248,6 +258,7 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
                     borrowing_project,
                     self.recipient_granted,
                     role_name_hint="share-recipient",
+                    project_granted=(Permission.READ,),
                 )
             )
             await seeding.within(SomeoneAnsweringInTheirOwnScope(recipient, RECIPIENT_IN_OWN_SCOPE))

@@ -32,7 +32,6 @@ from ai.backend.manager.data.entity_share.types import (
     EntityShareStatus,
 )
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.entity_share import (
     EntityShareNotFound,
     ShareToAPersonalProject,
@@ -42,7 +41,6 @@ from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
-from ai.backend.manager.models.entity_share.lookups import EntityShareAnsweringScopeLookup
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -566,7 +564,7 @@ async def share_to_an_address_no_account_holds(
     return (await repository.create(_creator(email="nobody@example.com"))).id
 
 
-class TestEntityShareAnsweringScopeLookup:
+class TestAnsweringScope:
     @pytest.mark.parametrize(
         "case",
         [
@@ -588,24 +586,21 @@ class TestEntityShareAnsweringScopeLookup:
         ],
         ids=lambda case: case.addressed_by,
     )
-    async def test_resolves_the_node_the_share_is_addressed_to(
+    async def test_is_the_scope_the_share_is_addressed_to(
         self,
-        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
         offered_share_id: EntityShareID,
         case: _RecipientCase,
     ) -> None:
-        resolved = await ops.lookup(EntityShareAnsweringScopeLookup(share_id=offered_share_id))
-        assert resolved == case.expected_recipient
+        assert await repository.answering_scope(offered_share_id) == case.expected_recipient
 
-    async def test_an_address_no_account_holds_resolves_to_nothing(
+    async def test_an_address_no_account_holds_is_not_found(
         self,
-        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
         share_to_an_address_no_account_holds: EntityShareID,
     ) -> None:
-        with pytest.raises(EntityNotFoundError):
-            await ops.lookup(
-                EntityShareAnsweringScopeLookup(share_id=share_to_an_address_no_account_holds)
-            )
+        with pytest.raises(EntityShareNotFound):
+            await repository.answering_scope(share_to_an_address_no_account_holds)
 
 
 class TestRevoke:

@@ -1,12 +1,12 @@
 ---
 name: entity-share-service-composition
 type: design-rationale
-description: the scope each entity share answer is checked in, the scope that answers a share addressed to a project, a user or an email, why the answering scope is resolved by a public lookup before the answer
+description: the scope each entity share answer is checked in, the scope that answers a share addressed to a project, a user or an email, why the answering scope is resolved by a lookup that costs read on it
 scope: src/ai/backend/manager/services/entity_share
 keywords:
   - EntityShareProcessors
   - LookupEntityShareAnsweringScopeAction
-  - EntityShareAnsweringScopeLookup
+  - EntityShareRepository.answering_scope
   - AcceptEntityShareAction
   - RejectEntityShareAction
   - LeaveEntityShareAction
@@ -15,7 +15,7 @@ sources:
   - src/ai/backend/manager/services/entity_share/processors.py
   - src/ai/backend/manager/services/entity_share/actions/answer.py
   - src/ai/backend/manager/services/entity_share/actions/lookup_answering_scope.py
-  - src/ai/backend/manager/models/entity_share/lookups.py
+  - src/ai/backend/manager/repositories/entity_share/repository.py
   - src/ai/backend/manager/models/entity_share/updaters.py
 generated:
   by: claude-code/opus-5.5
@@ -43,8 +43,9 @@ Its output answers the entity type, shape, operation, gate and backing.
 - A share addressed by an email holds no node until it is answered, so the user holding that address answers it.
 - The write guard matches the share's recipient against `answering_scope` in the same statement, so a scope the share does not name settles nothing.
 
-## The answering scope is resolved first, by a public lookup
+## The answering scope is resolved first, and resolving it costs read on it
 
-- `lookup_answering_scope` reads the node the share is addressed to from the share id alone: the answer cannot name its scope until the row is read.
-- The receiving side holds no permission on the share itself, so the lookup is wired through `public_lookup_ops`.
-- The answer that follows is checked in the scope the lookup resolved, which is the check that matters.
+- `lookup_answering_scope` reads the share by its id and returns the scope it names: the answer cannot name its scope until the row is read.
+- A share that names no scope yet resolves through its address to the user holding it, which takes a second read by email.
+- It is wired through `group.lookup`, so the caller needs read on the scope it resolved: themselves, or the project. A caller without it gets the answer a share that does not exist gets.
+- The answer that follows is checked in the same scope for `update` (`soft_delete` for `leave`).

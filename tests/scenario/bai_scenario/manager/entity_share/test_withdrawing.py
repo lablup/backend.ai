@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.dto.manager.v2.entity_share.response import EntityShareNode
 from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
 from ai.backend.manager.api.adapters.entity_share.adapter import EntityShareAdapter
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -82,7 +83,7 @@ class EndRow(Scenario[TestSeedingSession, ASharedFolderAndACaller, EntityShareAd
     situation: ASharedFolderAndSomeone
     how: str
     status: EntityShareStatusDTO
-    refused: bool = False
+    refused_with: type[BaseException] | None = None
 
     @override
     def summary(self) -> str:
@@ -102,8 +103,8 @@ class EndRow(Scenario[TestSeedingSession, ASharedFolderAndACaller, EntityShareAd
 
     @override
     def then(self) -> Then[ASharedFolderAndACaller, Ended]:
-        if self.refused:
-            return TheCallIsRefused(NotEnoughPermission)
+        if self.refused_with is not None:
+            return TheCallIsRefused(self.refused_with)
         return TheShareNode(started=STARTED, status=self.status)
 
 
@@ -181,7 +182,7 @@ SCENARIOS: list[EndStep] = [
         situation=SOMEBODY,
         how="cancel",
         status=EntityShareStatusDTO.CANCELED,
-        refused=True,
+        refused_with=NotEnoughPermission,
     ),
     EndRow(
         named="a-user-granted-nothing-may-not-take-the-share-back",
@@ -195,21 +196,21 @@ SCENARIOS: list[EndStep] = [
         situation=ASharedFolderAndSomeone(who=Side.SOMEBODY, taken=True),
         how="revoke",
         status=EntityShareStatusDTO.REVOKED,
-        refused=True,
+        refused_with=NotEnoughPermission,
     ),
     EndRow(
         named="a-user-granted-nothing-may-not-leave-the-share",
         guarantees=Says(
-            "아무 권한도 없는 사용자가 공유에서 탈퇴해도 권한 부족으로 거부됩니다",
+            "아무 권한도 없는 사용자가 공유에서 탈퇴해도 공유를 찾을 수 없다는 이유로 거부됩니다",
             english=(
-                "when a user granted nothing leaves the share, the call is rejected for lack "
-                "of permission"
+                "when a user granted nothing leaves the share, it is rejected because the share "
+                "cannot be resolved"
             ),
         ),
         situation=SOMEBODY,
         how="leave",
         status=EntityShareStatusDTO.REVOKED,
-        refused=True,
+        refused_with=GenericBadRequest,
     ),
 ]
 

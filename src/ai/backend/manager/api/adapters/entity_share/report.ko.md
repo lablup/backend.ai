@@ -53,7 +53,7 @@
 | [프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 받아들인 공유가 통째로 옵니다](#answering-a-project-answerer-accepts-the-offer-to-the-project) | 성공 |
 | [자기 스코프에서 공유에 답할 수 있는 사용자가 제안을 받아들이면 받아들인 공유가 통째로 옵니다](#answering-the-recipient-accepts-the-offer) | 성공 |
 | [프로젝트에서 공유를 읽을 수만 있는 사용자가 그 프로젝트에 보낸 제안을 받아들이면 권한 부족으로 거부됩니다](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | 거부 |
-| [아무 권한도 없는 사용자가 제안을 받아들이면 권한 부족으로 거부됩니다](#answering-a-user-granted-nothing-may-not-accept-the-offer) | 거부 |
+| [아무 권한도 없는 사용자가 제안을 받아들이면 공유를 찾을 수 없다는 이유로 거부됩니다](#answering-a-user-granted-nothing-may-not-accept-the-offer) | 거부 |
 
 **cancel**
 
@@ -75,7 +75,7 @@
 |---|---|
 | [프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트가 빌린 공유에서 탈퇴하면 회수된 공유가 통째로 옵니다](#withdrawing-a-project-answerer-leaves-the-share-the-project-took) | 성공 |
 | [빌린 사람이 자기 스코프에서 공유에서 탈퇴하면 회수된 공유가 통째로 옵니다](#withdrawing-the-recipient-leaves-the-share) | 성공 |
-| [아무 권한도 없는 사용자가 공유에서 탈퇴해도 권한 부족으로 거부됩니다](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | 거부 |
+| [아무 권한도 없는 사용자가 공유에서 탈퇴해도 공유를 찾을 수 없다는 이유로 거부됩니다](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | 거부 |
 
 **reject**
 
@@ -83,7 +83,7 @@
 |---|---|
 | [프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트에 보낸 제안을 거절하면 거절된 공유가 통째로 옵니다](#answering-a-project-answerer-rejects-the-offer-to-the-project) | 성공 |
 | [자기 스코프에서 공유에 답할 수 있는 사용자가 제안을 거절하면 거절된 공유가 통째로 옵니다](#answering-the-recipient-rejects-the-offer) | 성공 |
-| [아무 권한도 없는 사용자가 제안을 거절해도 권한 부족으로 거부됩니다](#answering-a-user-granted-nothing-may-not-reject-the-offer) | 거부 |
+| [아무 권한도 없는 사용자가 제안을 거절해도 공유를 찾을 수 없다는 이유로 거부됩니다](#answering-a-user-granted-nothing-may-not-reject-the-offer) | 거부 |
 
 **revoke**
 
@@ -116,11 +116,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -176,11 +178,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -237,11 +241,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -290,11 +296,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -349,11 +357,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -401,11 +411,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -470,11 +482,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -522,11 +536,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -591,11 +607,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -650,12 +668,15 @@ Given
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
     - 일반 사용자 user-2: 역할 share-recipient-2 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
@@ -707,11 +728,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -771,12 +794,15 @@ Given
     - 일반 사용자 user-1: 역할 share-lender-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
     - 일반 사용자 user-2: 역할 share-recipient-2 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
@@ -798,7 +824,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-accept-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-아무 권한도 없는 사용자가 제안을 받아들이면 권한 부족으로 거부됩니다
+아무 권한도 없는 사용자가 제안을 받아들이면 공유를 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -816,11 +842,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -842,7 +870,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: NotEnoughPermission
+  - 거부: GenericBadRequest
 
 ### cancel
 
@@ -868,11 +896,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -927,11 +957,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -979,11 +1011,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1037,11 +1071,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1095,12 +1131,15 @@ Given
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
     - 일반 사용자 user-2: 역할 share-recipient-2 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
@@ -1153,11 +1192,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1195,7 +1236,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-leave-the-share](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
 
-아무 권한도 없는 사용자가 공유에서 탈퇴해도 권한 부족으로 거부됩니다
+아무 권한도 없는 사용자가 공유에서 탈퇴해도 공유를 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -1213,11 +1254,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1239,7 +1282,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: NotEnoughPermission
+  - 거부: GenericBadRequest
 
 ### reject
 
@@ -1272,12 +1315,15 @@ Given
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
     - 일반 사용자 user-2: 역할 share-recipient-2 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 READ 허용
     - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
@@ -1329,11 +1375,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1370,7 +1418,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-reject-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-아무 권한도 없는 사용자가 제안을 거절해도 권한 부족으로 거부됩니다
+아무 권한도 없는 사용자가 제안을 거절해도 공유를 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -1388,11 +1436,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1414,7 +1464,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: NotEnoughPermission
+  - 거부: GenericBadRequest
 
 ### revoke
 
@@ -1440,11 +1490,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1500,11 +1552,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
