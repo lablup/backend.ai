@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -49,7 +49,7 @@ class EntityShareProcessors:
     bulk_get: PartialBulkActionProcessor[BulkGetEntitySharesAction, EntityShareData]
     search: ScopeActionProcessor[SearchEntitySharesAction, ScopedBatchOpsResult[EntityShareData]]
     lookup_answering_scope: LookupActionProcessor[
-        LookupEntityShareAnsweringScopeAction, LookupOpsResult[EntityIdentifier]
+        LookupEntityShareAnsweringScopeAction, LookupOpsResult[RuntimeEntityID]
     ]
     accept: ScopeActionProcessor[AcceptEntityShareAction, EntityShareAnswerResult]
     reject: ScopeActionProcessor[RejectEntityShareAction, EntityShareAnswerResult]

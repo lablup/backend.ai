@@ -1,7 +1,7 @@
 ---
 name: entity-share-service-composition
 type: design-rationale
-description: the scope each entity share answer is checked in, who answers a share addressed to a project or to a person, why the answering scope is resolved by a public lookup before the answer
+description: the scope each entity share answer is checked in, the scope that answers a share addressed to a project, a user or an email, why the answering scope is resolved by a public lookup before the answer
 scope: src/ai/backend/manager/services/entity_share
 keywords:
   - EntityShareProcessors
@@ -38,13 +38,13 @@ Its output answers the entity type, shape, operation, gate and backing.
 
 ## An answer is checked in the scope that answers the share
 
-- `accept`, `reject` and `leave` are scope-shaped on `answering_scope`: the caller needs `update` on `entity_share` (`soft_delete` for `leave`) in that scope.
-- A share addressed to a project is answered by that project, so whoever holds that permission in the project (a project admin) answers for it.
-- Any other share names a person, by user id or by email, and the caller answers it as themselves.
+- `accept`, `reject` and `leave` are scope-shaped on `answering_scope`: the caller needs `update` on `entity_share` (`soft_delete` for `leave`) in that scope, granted there or in a scope governing it.
+- `answering_scope` is the node the share is addressed to: the project, or the user.
+- A share addressed by an email holds no node until it is answered, so the user holding that address answers it.
 - The write guard matches the share's recipient against `answering_scope` in the same statement, so a scope the share does not name settles nothing.
 
 ## The answering scope is resolved first, by a public lookup
 
-- `lookup_answering_scope` reads the share's recipient before the answer runs: the answer cannot name its scope until the row is read.
+- `lookup_answering_scope` reads the node the share is addressed to from the share id alone: the answer cannot name its scope until the row is read.
 - The receiving side holds no permission on the share itself, so the lookup is wired through `public_lookup_ops`.
 - The answer that follows is checked in the scope the lookup resolved, which is the check that matters.

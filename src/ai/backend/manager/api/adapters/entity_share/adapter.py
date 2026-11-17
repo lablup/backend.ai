@@ -168,15 +168,10 @@ class EntityShareAdapter(BaseAdapter):
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def _answering_scope(self, share_id: EntityShareID) -> EntityIdentifier:
-        """The scope the caller answers the share in: the project a share is addressed to,
-        or the caller. The answer is checked against it."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
+        """The scope the share is addressed to, which answers it. The answer is checked
+        against it."""
         result = await self._entity_share.lookup_answering_scope.run(
-            LookupEntityShareAnsweringScopeAction(
-                share_id=share_id, caller_user_id=UserID(me.user_id)
-            )
+            LookupEntityShareAnsweringScopeAction(share_id=share_id)
         )
         return result.resolved_entity_id
 
