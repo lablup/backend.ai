@@ -183,9 +183,9 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user.processors import UserProcessors
-from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
-from ai.backend.manager.services.vfolder.actions.lookup import (
-    LookupVFolderAction,
+from ai.backend.manager.services.vfolder.actions.base import (
+    GetTaskLogsAction,
+    LookupAccessibleVFolderAction,
 )
 
 if TYPE_CHECKING:
@@ -487,7 +487,9 @@ class SessionHandler:
             raise UnreachableError("authenticated user missing from request context")
         return user.user_id
 
-    async def _normalize_legacy_mounts(self, validated_config: dict[str, Any]) -> dict[str, Any]:
+    async def _normalize_legacy_mounts(
+        self, validated_config: dict[str, Any], owner_access_key: AccessKey
+    ) -> dict[str, Any]:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
         ``mount_options`` surfaces: route UUID-shaped entries onto the
         UUID-keyed buckets, then resolve any remaining names to UUIDs and
@@ -503,6 +505,7 @@ class SessionHandler:
             validated_config.get("mounts") or (),
             validated_config.get("mount_map") or {},
             validated_config.get("mount_options") or {},
+            owner_access_key,
         )
         return _merge_resolved_legacy_mounts(validated_config, resolutions)
 
@@ -511,6 +514,7 @@ class SessionHandler:
         mounts: Sequence[str],
         mount_map: Mapping[str, str],
         mount_options: Mapping[str, Any],
+        owner_access_key: AccessKey,
     ) -> dict[str, LegacyMountResolution]:
         """Resolve legacy v1 CLI name-keyed mount surfaces into a map
         ``name → LegacyMountResolution(vfid, subpath_or_None)``.
@@ -561,9 +565,16 @@ class SessionHandler:
         if not names_to_resolve:
             return {}
 
+        owner = await self._user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=owner_access_key)
+        )
         resolved = {
             name: (
-                await self._vfolder.lookup.run(LookupVFolderAction(vfolder_name=name))
+                await self._vfolder.get_accessible_vfolder.run(
+                    LookupAccessibleVFolderAction(
+                        user_uuid=owner.entity_id(), folder_id_or_name=name
+                    )
+                )
             ).entity_id()
             for name in names_to_resolve
         }
@@ -594,14 +605,13 @@ class SessionHandler:
             template=True,
         )
 
-        validated_config = await self._normalize_legacy_mounts(validated_config)
-
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
                 owner_access_key=params.owner_access_key,
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
+        validated_config = await self._normalize_legacy_mounts(validated_config, owner_access_key)
 
         domain_name = params.domain or request["user"]["domain_name"]
 
@@ -689,8 +699,6 @@ class SessionHandler:
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
 
-        validated_config = await self._normalize_legacy_mounts(validated_config)
-
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
             if (
@@ -708,6 +716,7 @@ class SessionHandler:
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
+        validated_config = await self._normalize_legacy_mounts(validated_config, owner_access_key)
         architecture = params.architecture or DEFAULT_IMAGE_ARCH
 
         result = await self._session.create_from_params.run(
