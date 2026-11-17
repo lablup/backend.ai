@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.types import BackendAISchema
 
@@ -224,7 +224,7 @@ def get_field_type(model: type[BackendAISchema], field_name: str) -> type | None
         return None
 
     # In Pydantic v2, annotation is already unwrapped from Annotated
-    return field_info.annotation
+    return cast(type[Any] | None, field_info.annotation)
 
 
 def generate_example(

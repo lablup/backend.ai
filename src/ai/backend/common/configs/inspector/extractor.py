@@ -142,7 +142,7 @@ class ConfigInspector:
         Returns:
             Extracted type information.
         """
-        annotation = field_info.annotation
+        annotation = cast(type[Any] | None, field_info.annotation)
 
         # Get type name
         type_name = self._get_type_name(annotation)
@@ -286,7 +286,7 @@ class ConfigInspector:
         if not isinstance(meta, BackendAIConfigMeta) or not meta.composite:
             return None
 
-        annotation = field_info.annotation
+        annotation = cast(type[Any] | None, field_info.annotation)
         if annotation is None:
             return None
 

@@ -1500,7 +1500,7 @@ class QuotaScopeID:
         scope_type, _, rest = raw.partition(":")
         match scope_type.lower():
             case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
-                return cls(t, UUID(rest))
+                return cls(QuotaScopeType(t), UUID(rest))
             case _:
                 raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 

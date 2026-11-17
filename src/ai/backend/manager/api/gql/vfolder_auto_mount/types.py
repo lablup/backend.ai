@@ -143,7 +143,7 @@ VFolderAutoMountScopeTypeGQL: type[VFolderAutoMountScopeType] = gql_enum(
 class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_field(description="ID of the auto-mount.")
-    scope_type: VFolderAutoMountScopeTypeGQL = gql_field(
+    scope_type: VFolderAutoMountScopeType = gql_field(
         description="Kind of the scope the auto-mount is set on."
     )
     scope_id: UUID = gql_field(description="ID of the project or the user.")

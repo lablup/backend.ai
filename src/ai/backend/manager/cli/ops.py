@@ -10,7 +10,7 @@ import textwrap
 import uuid
 from collections.abc import Sequence
 from itertools import groupby
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import click
 from tabulate import tabulate
@@ -161,7 +161,7 @@ class TypeCatalog:
 
 def _subclasses[T: type](base: T) -> list[T]:
     found: list[T] = []
-    for sub in base.__subclasses__():
+    for sub in cast(list[T], base.__subclasses__()):
         found.append(sub)
         found.extend(_subclasses(sub))
     return found

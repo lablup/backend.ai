@@ -13,6 +13,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
@@ -384,7 +385,7 @@ class AuthDBSource:
 
     async def _migrate_password_hash(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         row: sa.Row[Any],
         domain_name: str,
         email: str,
@@ -401,7 +402,7 @@ class AuthDBSource:
 
     async def _record_login_history(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         user_id: UUID,
         domain_name: str,
         result: LoginAttemptResult,

@@ -428,9 +428,9 @@ def run(
     stats: bool,
     tag: str | None,  # click_start_option
     quiet: bool,  # extra options
-    env_range: tuple[str, ...],
-    build_range: tuple[str, ...],
-    exec_range: tuple[str, ...],
+    env_range: tuple[tuple[str, Any], ...],
+    build_range: tuple[tuple[str, Any], ...],
+    exec_range: tuple[tuple[str, Any], ...],
     max_parallel: int,  # experiment support
     mount: tuple[str, ...],  # click_start_option
     scaling_group: str | None,  # click_start_option
@@ -480,9 +480,9 @@ def run(
         key: MountOption.model_validate(opts) for key, opts in raw_mount_options.items()
     }
 
-    env_ranges: dict[str, Any] = {v: r for v, r in env_range}  # type: ignore[has-type]
-    build_ranges: dict[str, Any] = {v: r for v, r in build_range}  # type: ignore[has-type]
-    exec_ranges: dict[str, Any] = {v: r for v, r in exec_range}  # type: ignore[has-type]
+    env_ranges: dict[str, Any] = {v: r for v, r in env_range}
+    build_ranges: dict[str, Any] = {v: r for v, r in build_range}
+    exec_ranges: dict[str, Any] = {v: r for v, r in exec_range}
 
     env_var_maps = [
         dict(zip(env_ranges.keys(), values, strict=True))
