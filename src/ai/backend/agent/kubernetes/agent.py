@@ -951,10 +951,7 @@ class KubernetesAgent(
                     f"Scratch type {self.local_config.container.scratch_type} is not supported",
                 )
 
-            try:
-                await core_api.create_persistent_volume(body=new_pv.to_dict())
-            except Exception:
-                raise
+            await core_api.create_persistent_volume(body=new_pv.to_dict())
 
         pvc = await core_api.list_persistent_volume_claim_for_all_namespaces(
             label_selector="backend.ai/backend-ai-scratch-volume",

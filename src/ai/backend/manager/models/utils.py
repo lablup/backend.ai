@@ -307,7 +307,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
                     raise asyncio.CancelledError() from e
-                raise e
+                raise
             except asyncio.CancelledError:
                 raise
             finally:

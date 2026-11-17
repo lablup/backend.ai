@@ -469,13 +469,10 @@ class WatcherClient:
                 break
 
     async def request(self, data: Request) -> Response:
-        try:
-            await Protocol.request(self.input_sock, data)
-            result = await self.result_queue.get()
-            self.result_queue.task_done()
-            return result
-        except asyncio.CancelledError:
-            raise
+        await Protocol.request(self.input_sock, data)
+        result = await self.result_queue.get()
+        self.result_queue.task_done()
+        return result
 
     async def request_task(self, task: AbstractTask) -> Response:
         return await self.request(task.serialize_to_request())

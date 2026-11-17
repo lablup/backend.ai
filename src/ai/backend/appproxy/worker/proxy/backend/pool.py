@@ -171,15 +171,12 @@ class RoutePool:
         ]
 
     async def _health_check_loop(self) -> None:
-        try:
-            while True:
-                await asyncio.sleep(self._spec.health_check_interval)
-                try:
-                    await self._probe_all_targets()
-                except Exception:
-                    log.exception("target health check failed")
-        except asyncio.CancelledError:
-            raise
+        while True:
+            await asyncio.sleep(self._spec.health_check_interval)
+            try:
+                await self._probe_all_targets()
+            except Exception:
+                log.exception("target health check failed")
 
     async def _probe_all_targets(self) -> None:
         async with self._lock:

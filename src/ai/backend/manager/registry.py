@@ -475,7 +475,7 @@ class AgentRegistry:
                                 raise SessionNotFound("Session terminated during scheduling")
             except TimeoutError as e:
                 if max_wait > 0:
-                    raise e
+                    raise
                 async with self.db.begin_readonly_session() as db_session:
                     query = sa.select(SessionRow.status).where(SessionRow.id == session_id)
                     result = await db_session.execute(query)
@@ -803,8 +803,6 @@ class AgentRegistry:
                     # Always unregister propagator
                     self._event_hub.unregister_event_propagator(propagator.id())
             return resp
-        except asyncio.CancelledError:
-            raise
         finally:
             self.pending_waits.discard(current_task)
             # Clean up old tracker if exists (for backward compatibility)
@@ -1035,8 +1033,6 @@ class AgentRegistry:
                     # Always unregister propagator
                     self._event_hub.unregister_event_propagator(propagator.id())
             return resp
-        except asyncio.CancelledError:
-            raise
         finally:
             self.pending_waits.discard(current_task)
             # Clean up old tracker if exists (for backward compatibility)

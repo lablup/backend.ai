@@ -610,11 +610,11 @@ class ArtifactRevisionService:
         except ArtifactRevisionImportInProgressError:
             # The revision belongs to the import already running; it must not be marked FAILED.
             raise
-        except Exception as e:
+        except Exception:
             await self._artifact_repository.update_artifact_revision_status(
                 action.artifact_revision_id, ArtifactStatus.FAILED
             )
-            raise e
+            raise
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
 

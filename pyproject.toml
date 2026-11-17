@@ -98,6 +98,8 @@ select = [
     "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
     "EXE",    # flake8-executable: validates shebang and file permissions consistency
     "LOG",    # flake8-logging: enforces logging best practices (warn -> warning, etc.)
+    "TRY201", # tryceratops: use bare `raise` to re-raise
+    "TRY203", # tryceratops: remove except blocks that only re-raise
     "FLY",    # flynt: converts old-style string formatting to f-strings
     "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
     "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
