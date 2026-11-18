@@ -2989,8 +2989,8 @@ class ScheduleDBSource:
                 )
                 # Use the image UUID as key for reliable matching
                 image_configs[image_row.id] = image_config
-            except Exception as e:
-                log.error("Failed to process image {}: {}", image_row.name, e)
+            except Exception:
+                log.exception("Failed to process image {}", image_row.name)
                 continue
 
         return image_configs

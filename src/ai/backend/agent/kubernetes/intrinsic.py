@@ -55,11 +55,10 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
         if "event loop is closed" in msg or "session is closed" in msg:
             return None
         raise
-    except (DockerError, aiohttp.ClientError) as e:
-        log.error(
-            "cannot read stats (cid:{}): client error: {!r}.",
+    except (DockerError, aiohttp.ClientError):
+        log.exception(
+            "cannot read stats (cid:{}): client error.",
             short_cid,
-            e,
         )
         return None
     else:

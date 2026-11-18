@@ -397,8 +397,8 @@ class OIDCWebAppPlugin(WebappPlugin):
                 token["id_token"], request.app["openid.jwks"], claims_cls=CodeIDToken
             )
             claims.validate()
-        except Exception as e:
-            log.exception("Failed to handle token: %s", e)
+        except Exception:
+            log.exception("Failed to handle token")
             log.info("OPENID.WEBAPP: request not authenticated")
             return web.HTTPUnauthorized(reason="Not authenticated by OpenID Provider")
 

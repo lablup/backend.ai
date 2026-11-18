@@ -512,7 +512,7 @@ class SessionService:
             raise UnknownImageReferenceError("Unknown image reference!") from e
         except Exception as e:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: unexpected error!", e)
+            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError from e
 
     async def create_from_params(
@@ -608,7 +608,7 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!", e)
+            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError from e
 
     async def create_from_template(
@@ -685,7 +685,7 @@ class SessionService:
         try:
             params = overwritten_param_check.check(param_from_template)
         except RuntimeError as e1:
-            log.exception(e1)
+            log.exception("Error while validating template")
             raise InvalidAPIParameters("Error while validating template") from e1
         except t.DataError as e2:
             log.debug("Error: {0}", str(e2))
@@ -797,7 +797,7 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!", e)
+            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError from e
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
@@ -877,7 +877,7 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
+            log.exception("DOWNLOAD_SINGLE: unexpected error!")
             raise InternalServerError from e
 
         return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
@@ -911,7 +911,7 @@ class SessionService:
             raise InvalidAPIParameters("The file is not found.") from e
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: unexpected error!", e)
+            log.exception("DOWNLOAD_FILE: unexpected error!")
             raise InternalServerError from e
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -1246,7 +1246,7 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: unexpected error!", e)
+            log.exception("LIST_FILES: unexpected error!")
             raise InternalServerError from e
 
         return ListFilesActionResult(result=result, session_data=session.to_dataclass())

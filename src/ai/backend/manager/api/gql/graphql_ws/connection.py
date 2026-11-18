@@ -179,8 +179,8 @@ class GraphQLWSConnection:
                 return False
             await self.sender.send_ack()
             return True
-        except Exception as e:
-            log.exception("GQL WS: error during connection initialization (error: {})", repr(e))
+        except Exception:
+            log.exception("GQL WS: error during connection initialization")
             await self.sender.close()
             return False
 

@@ -60,11 +60,10 @@ class NotificationEventHandler:
                 rule_type=rule_type,
                 data=event.notification_data,
             )
-        except Exception as e:
-            log.error(
-                "Failed to validate notification data for rule type {0}: {1}",
+        except Exception:
+            log.exception(
+                "Failed to validate notification data for rule type {0}",
                 event.rule_type,
-                str(e),
             )
             # Re-raise to let the caller know validation failed
             raise

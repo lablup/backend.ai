@@ -71,7 +71,7 @@ class ActionRunner[TAction: BaseAction, TActionResult: BaseActionResult]:
             error_code = e.error_code()
             raise
         except BaseException as e:
-            log.exception("Unexpected error during action processing: {}", e)
+            log.exception("Unexpected error during action processing")
             status = OperationStatus.ERROR
             description = str(e)
             error_code = ErrorCode.default()

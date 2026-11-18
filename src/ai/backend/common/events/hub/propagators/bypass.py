@@ -41,8 +41,8 @@ class AsyncBypassPropagator(EventPropagator):
                 if event is None:
                     break
                 yield event
-            except Exception as e:
-                log.error("Error propagating event: {}", e)
+            except Exception:
+                log.exception("Error propagating event")
 
     async def propagate_event(self, event: AbstractEvent) -> None:
         await self._queue.put(event)

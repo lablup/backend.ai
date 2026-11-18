@@ -1490,8 +1490,8 @@ class AbstractAgent[
                     )
         except asyncio.CancelledError:
             pass
-        except Exception as e:
-            log.exception("unhandled exception while processing DESTROY event: {0}", repr(e))
+        except Exception:
+            log.exception("unhandled exception while processing DESTROY event")
             await self.produce_error_event()
         else:
             log.info(
@@ -1521,7 +1521,7 @@ class AbstractAgent[
                     ev.kernel_id in self.restarting_kernels,
                 )
             except Exception as e:
-                log.exception("unhandled exception while processing CLEAN event: {0}", repr(e))
+                log.exception("unhandled exception while processing CLEAN event")
                 ev.set_done_future_exception(e)
                 await self.produce_error_event()
             else:
@@ -1595,8 +1595,8 @@ class AbstractAgent[
                     )
                     cleanup_tasks.add(cleanup_task)
                     cleanup_task.add_done_callback(cleanup_tasks.discard)
-            except Exception as e:
-                log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
+            except Exception:
+                log.exception("unexpected error in _clean_kernel_registry_loop")
             finally:
                 await asyncio.sleep(60.0)
 
@@ -1631,11 +1631,10 @@ class AbstractAgent[
                 "kernel object already removed (kernel:{})",
                 kernel_id,
             )
-        except Exception as e:
+        except Exception:
             log.exception(
-                "failed to clean kernel object (kernel:{0}): {1}",
+                "failed to clean kernel object (kernel:{0})",
                 kernel_id,
-                repr(e),
             )
             raise
         else:
@@ -1935,7 +1934,7 @@ class AbstractAgent[
                 agent_id=self.id, exception=e
             )
         except Exception as e:
-            log.exception("sync_container_lifecycles() failure, continuing (detail: {!r})", e)
+            log.exception("sync_container_lifecycles() failure, continuing")
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
@@ -2189,7 +2188,7 @@ class AbstractAgent[
                         raise
 
                     except Exception as e:
-                        log.exception("Image pull failed (img:{}, err:{!r})", img_ref, e)
+                        log.exception("Image pull failed (img:{})", img_ref)
 
                         await self.anycast_event(
                             ImagePullFailedEvent(
@@ -2251,11 +2250,10 @@ class AbstractAgent[
             kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
                 await kernel_obj.init(self.event_producer)
-            except Exception as e:
-                log.error(
-                    "Failed to initialize kernel {}: {}, skipping",
+            except Exception:
+                log.exception(
+                    "Failed to initialize kernel {}, skipping",
                     kernel_obj.kernel_id,
-                    e,
                 )
                 continue
             if kernel_obj.runner is None:
@@ -3051,7 +3049,7 @@ class AbstractAgent[
                         )
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
-                        log.error(
+                        log.exception(
                             "Kernel failed to create container. Kernel is going to be destroyed. (k:{}, detail:{})",
                             kernel_id,
                             msg,
@@ -3205,11 +3203,10 @@ class AbstractAgent[
                         )
                         log.exception(err_msg)
                         raise ContainerStartupFailedError(err_msg) from e
-                    except BaseException as e:
+                    except BaseException:
                         log.exception(
-                            "unexpected error while waiting container startup (k: {}, e: {})",
+                            "unexpected error while waiting container startup (k: {})",
                             kernel_id,
-                            repr(e),
                         )
                         await self.inject_container_lifecycle_event(
                             kernel_id,

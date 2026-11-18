@@ -217,8 +217,8 @@ class HiRedisQueue(AbstractMessageQueue):
                     continue
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
-            except Exception as e:
-                log.error("Error while auto claiming messages: {}", e)
+            except Exception:
+                log.exception("Error while auto claiming messages")
             await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
 
     async def _auto_claim(
@@ -282,8 +282,8 @@ class HiRedisQueue(AbstractMessageQueue):
                 await self._read_messages(stream_key)
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
-            except Exception as e:
-                log.exception("Error while reading messages: {}", e)
+            except Exception:
+                log.exception("Error while reading messages")
 
     async def _read_messages(self, stream_key: str) -> None:
         log.debug("Reading messages from stream {}", stream_key)
@@ -324,8 +324,8 @@ class HiRedisQueue(AbstractMessageQueue):
                 await self._read_broadcast_messages(subscribe_channels)
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
-            except Exception as e:
-                log.error("Error while reading broadcast messages: {}", e)
+            except Exception:
+                log.exception("Error while reading broadcast messages")
                 await asyncio.sleep(_DEFAULT_AUTO_RECONNECT_INTERVAL)
 
     async def _read_broadcast_messages(self, subscribe_channels: set[str]) -> None:
@@ -361,8 +361,8 @@ class HiRedisQueue(AbstractMessageQueue):
                     "$",
                     "MKSTREAM",
                 ])
-        except Exception as internal_e:
-            log.error("Error while creating group: {}", internal_e)
+        except Exception:
+            log.exception("Error while creating group")
 
 
 def _generate_consumer_id(node_id: str | None) -> str:

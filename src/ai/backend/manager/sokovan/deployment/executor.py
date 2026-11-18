@@ -208,10 +208,9 @@ class DeploymentExecutor:
                 for dep, rev, _ in group_entries
             ]
         except Exception as exc:
-            log.error(
-                "Failed to build endpoint items for proxy {}: {}",
+            log.exception(
+                "Failed to build endpoint items for proxy {}",
                 addr,
-                exc,
             )
             for deployment, _, _ in group_entries:
                 failures.append(
@@ -230,10 +229,9 @@ class DeploymentExecutor:
                 BulkCreateEndpointRequest(endpoints=items)
             )
         except Exception as exc:
-            log.error(
-                "Bulk endpoint create failed against proxy {}: {}",
+            log.exception(
+                "Bulk endpoint create failed against proxy {}",
                 addr,
-                exc,
             )
             for deployment, _, _ in group_entries:
                 failures.append(
@@ -252,10 +250,9 @@ class DeploymentExecutor:
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
             except Exception as exc:
-                log.error(
-                    "Failed to persist endpoint URL for deployment {}: {}",
+                log.exception(
+                    "Failed to persist endpoint URL for deployment {}",
                     dep_id,
-                    exc,
                 )
                 failures.append(
                     DeploymentExecutionError(

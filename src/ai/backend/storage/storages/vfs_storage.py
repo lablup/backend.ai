@@ -117,8 +117,8 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
             with tarfile.open(tar_path, "w") as tar:
                 tar.add(source_dir, arcname=".", recursive=True)
             log.debug("Tar archive created successfully: {}", tar_path)
-        except Exception as e:
-            log.error("Failed to create tar archive: {}", e)
+        except Exception:
+            log.exception("Failed to create tar archive")
             raise
 
 

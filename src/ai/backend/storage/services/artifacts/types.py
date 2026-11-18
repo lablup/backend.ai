@@ -143,7 +143,7 @@ class ImportPipeline:
                     try:
                         await step.cleanup_stage(context)
                     except Exception:
-                        log.error("Failed to cleanup step {}", step.step_type)
+                        log.exception("Failed to cleanup step {}", step.step_type)
                         pass
 
         except Exception:
@@ -153,6 +153,6 @@ class ImportPipeline:
                     await step.cleanup_stage(context)
                 except Exception:
                     # Log cleanup failures but continue with other cleanups
-                    log.error("Failed to cleanup step {}", step.step_type)
+                    log.exception("Failed to cleanup step {}", step.step_type)
                     pass
             raise

@@ -65,10 +65,9 @@ class Runner:
                     observer.name,
                     observer.timeout(),
                 )
-            except Exception as e:
+            except Exception:
                 log.exception(
-                    "Error while observing: {}",
-                    e,
+                    "Error while observing",
                 )
             await asyncio.sleep(observer.observe_interval())
         await observer.cleanup()
@@ -85,10 +84,9 @@ class Runner:
                     "Resource setup: {}",
                     resource.name,
                 )
-            except Exception as e:
+            except Exception:
                 log.exception(
-                    "Error while setting up resource: {}",
-                    e,
+                    "Error while setting up resource",
                 )
                 raise
 
@@ -100,10 +98,9 @@ class Runner:
                     "Resource released: {}",
                     resource.name,
                 )
-            except Exception as e:
+            except Exception:
                 log.exception(
-                    "Error while releasing resource: {}",
-                    e,
+                    "Error while releasing resource",
                 )
 
     async def start(self) -> None:
@@ -117,10 +114,9 @@ class Runner:
         log.info("Starting runner.")
         try:
             await self._setup()
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Error while starting runner: {}",
-                e,
+                "Error while starting runner",
             )
             await self._cleanup()
             raise

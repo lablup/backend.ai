@@ -62,8 +62,8 @@ async def auth_middleware(
             return web.json_response({"message": message}, status=HTTPStatus.OK)
         except BackendAIError:
             raise
-        except Exception as e:
-            log.exception(repr(e))
+        except Exception:
+            log.exception("unexpected error while handling the watcher request")
             raise
     log.info("invalid requested token")
     return web.HTTPForbidden()

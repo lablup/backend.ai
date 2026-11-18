@@ -169,10 +169,10 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                     mem_stats[device.device_id] = Measurement(Decimal(mem_used), Decimal(mem_total))
                     util_total += gpu_util
                     util_stats[device.device_id] = Measurement(Decimal(gpu_util), Decimal(100))
-            except RuntimeError as e:
+            except RuntimeError:
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to read the Habana device measurement")
                 self.enabled = False
         return [
             NodeMeasurement(
@@ -219,10 +219,10 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                         "mem_used": mem_info.used,
                         "mem_total": mem_info.total,
                     }
-            except RuntimeError as e:
+            except RuntimeError:
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to read the Habana device measurement")
                 self.enabled = False
                 return []
 

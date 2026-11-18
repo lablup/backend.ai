@@ -174,7 +174,7 @@ class NotificationCenter:
                 **data_dict,  # Allow direct access to data fields
             )
         except jinja2.TemplateError as e:
-            log.error(
+            log.exception(
                 "Failed to render notification template",
                 template=template_str,
                 error=str(e),

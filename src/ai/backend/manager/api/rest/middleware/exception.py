@@ -92,10 +92,9 @@ def build_exception_middleware(
                 )
             elif ex.status_code // 100 == 5:
                 log.exception(
-                    "Internal server error raised inside handlers: ({} {}): {}",
+                    "Internal server error raised inside handlers: ({} {})",
                     method,
                     endpoint,
-                    repr(ex),
                 )
             await error_monitor.capture_exception()
             await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
@@ -119,10 +118,9 @@ def build_exception_middleware(
                 )
             elif ex.status_code // 100 == 5:
                 log.exception(
-                    "Internal server error raised inside handlers: ({} {}): {}",
+                    "Internal server error raised inside handlers: ({} {})",
                     method,
                     endpoint,
-                    ex,
                 )
             if ex.status_code == 404:
                 raise URLNotFound(extra_data=request.path) from ex
@@ -142,9 +140,7 @@ def build_exception_middleware(
                 )
                 return client_closed_response()
             await error_monitor.capture_exception()
-            log.exception(
-                "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
-            )
+            log.exception("Uncaught exception in HTTP request handlers ({} {})", method, endpoint)
             if config_provider.config.debug.enabled:
                 return _debug_error_response(e)
             raise InternalServerError() from e
