@@ -43,7 +43,7 @@ PREFIX = "hyperaccel-lpu"
 SLOT_NAME = "hyperaccel-lpu.device"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class LPUPlugin(AbstractComputePlugin):
