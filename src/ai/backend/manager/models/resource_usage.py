@@ -511,6 +511,18 @@ async def parse_resource_usage_groups(
             continue
         stat_map[kern_id] = msgpack.unpackb(raw_stat)
 
+    used_time_map: dict[KernelId, str] = {}
+    used_days_map: dict[KernelId, int] = {}
+    for kern in kernels:
+        if kern.terminated_at is None or kern.created_at is None:
+            continue
+        used_time_map[kern.id] = str(kern.terminated_at - kern.created_at)
+        used_days_map[kern.id] = (
+            kern.terminated_at.astimezone(local_tz).toordinal()
+            - kern.created_at.astimezone(local_tz).toordinal()
+            + 1
+        )
+
     return [
         BaseResourceUsageGroup(
             kernel_row=kern,
@@ -523,8 +535,8 @@ async def parse_resource_usage_groups(
                 if kern.status_history
                 else None
             ),
-            used_time=kern.used_time,
-            used_days=kern.get_used_days(local_tz),
+            used_time=used_time_map.get(kern.id),
+            used_days=used_days_map.get(kern.id),
             last_stat=stat_map.get(kern.id),
             user_id=kern.session.user_uuid,
             user_email=kern.session.user.email if kern.session.user is not None else None,
