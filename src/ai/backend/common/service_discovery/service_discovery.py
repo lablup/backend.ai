@@ -297,8 +297,8 @@ class ServiceDiscoveryLoop:
                             service_group=service.service_group,
                             service_id=service.id,
                         )
-            except Exception as e:
-                log.error("Error sweeping unhealthy services: {}", e)
+            except Exception:
+                log.exception("Error sweeping unhealthy services")
             await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
 
     async def _run_service_loop(self) -> None:
@@ -314,8 +314,8 @@ class ServiceDiscoveryLoop:
                 await self._service_discovery.heartbeat(
                     service_meta=self._metadata,
                 )
-            except Exception as e:
-                log.error("Error sending heartbeat: {}", e)
+            except Exception:
+                log.exception("Error sending heartbeat")
             await asyncio.sleep(self._interval_seconds)
         await self._service_discovery.unregister(
             service_group=self._metadata.service_group,

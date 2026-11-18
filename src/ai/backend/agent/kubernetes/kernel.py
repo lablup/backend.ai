@@ -147,8 +147,8 @@ class KubernetesKernel(AbstractKernel):
                     "status": {"replicas": num, "selector": f"run={self.deployment_name}"},
                 },
             )
-        except Exception as e:
-            log.exception("scale failed: {}", e)
+        except Exception:
+            log.exception("scale failed")
 
     async def is_scaled(self) -> bool:
         await kube_config.load_kube_config()

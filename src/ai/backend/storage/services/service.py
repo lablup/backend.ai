@@ -64,7 +64,7 @@ class VolumeService:
         try:
             yield
         except ExternalStorageServiceError as e:
-            log.exception("An external error occurred: %s", str(e))
+            log.exception("An external error occurred")
             # TODO: Extract exception handling to middleware
             raise web.HTTPInternalServerError(
                 text=dump_json_str({
@@ -99,7 +99,7 @@ class VolumeService:
                 )
             )
         except Exception as e:
-            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{!s})", vfolder_id, e)
+            log.exception("VFolder deletion task failed. (vfolder_id:{})", vfolder_id)
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,

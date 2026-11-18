@@ -430,11 +430,9 @@ class HuggingFaceScanner:
                             continue  # type: ignore[unreachable]
                     file_infos.append(file_obj)
 
-                except Exception as e:
+                except Exception:
                     path = getattr(file, "path", "unknown")
-                    log.error(
-                        "Error processing file {} info for model {}. Details: {!s}", path, model, e
-                    )
+                    log.exception("Error processing file {} info for model {}", path, model)
                     continue
 
             return file_infos

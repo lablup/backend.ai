@@ -134,8 +134,8 @@ class ClientPool:
                 del self._clients[key]
                 try:
                     await client.session.close()
-                except Exception as e:
-                    log.exception("Error closing client session: {}", e)
+                except Exception:
+                    log.exception("Error closing client session")
 
     def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
         session = self._clients.get(key, None)

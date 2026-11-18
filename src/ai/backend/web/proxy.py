@@ -116,8 +116,8 @@ class WebSocketProxy:
             # here, server gracefully disconnected
         except asyncio.CancelledError:
             pass
-        except Exception as e:
-            log.error("WebSocketProxy: unexpected error: {}", e)
+        except Exception:
+            log.exception("WebSocketProxy: unexpected error")
         finally:
             await self.close_upstream()
 

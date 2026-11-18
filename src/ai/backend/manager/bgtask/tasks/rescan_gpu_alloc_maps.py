@@ -67,6 +67,6 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
             # Store result in cache via repository
             await self._agent_repository.update_gpu_alloc_map(manifest.agent_id, alloc_map)
             log.info("Agent {} GPU alloc map scanned successfully", manifest.agent_id)
-        except Exception as e:
-            log.error("Failed to scan GPU alloc map for agent {}: {}", manifest.agent_id, e)
+        except Exception:
+            log.exception("Failed to scan GPU alloc map for agent {}", manifest.agent_id)
             raise

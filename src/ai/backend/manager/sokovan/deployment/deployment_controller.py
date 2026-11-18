@@ -330,8 +330,8 @@ class DeploymentController:
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
-        except Exception as e:
-            log.error("Failed to mark deployment lifecycle needed: {}", e)
+        except Exception:
+            log.exception("Failed to mark deployment lifecycle needed")
         return res
 
     async def destroy_deployment(

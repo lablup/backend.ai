@@ -67,8 +67,8 @@ class PollyInprocRunner(threading.Thread):
                         buffer.getvalue()
                     )
                     buffer.close()
-                except Exception as e:
-                    log.error(str(e))
+                except Exception:
+                    log.exception("Polly request failed")
 
             self.output_queue.put([
                 b"media",

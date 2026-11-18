@@ -34,7 +34,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
         try:
             fixture = load_json(fixture_path.read_text(encoding="utf8"))
         except AttributeError:
-            log.error("No such fixture.")
+            log.exception("No such fixture.")
             return
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         engine = create_async_engine(bootstrap_config.db.sqlalchemy_url())

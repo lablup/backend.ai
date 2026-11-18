@@ -259,8 +259,8 @@ class RouteCoordinator:
 
             try:
                 await handler.post_process(result)
-            except Exception as e:
-                log.error("Error during post-processing: {}", e)
+            except Exception:
+                log.exception("Error during post-processing")
 
     async def _process_observer(self, observer: RouteObserver) -> None:
         """Process a route observer (no state transitions).

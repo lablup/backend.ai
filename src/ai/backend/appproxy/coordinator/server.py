@@ -265,7 +265,7 @@ async def exception_middleware(
                     request.rel_url,
                 )
                 return client_closed_response()
-            log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+            log.exception("Uncaught exception in HTTP request handlers")
             if root_ctx.local_config.debug.enabled:
                 raise InternalServerError(traceback.format_exc()) from e
             raise InternalServerError() from e

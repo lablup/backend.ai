@@ -473,8 +473,8 @@ class HuggingFaceService:
                 model_data = await scanner.scan_model_without_metadata(model)
                 retrieved_models.append(model_data)
                 log.debug("Successfully retrieved basic model data: {}", model)
-            except Exception as e:
-                log.error("Failed to retrieve model {}: {!s}", model, e)
+            except Exception:
+                log.exception("Failed to retrieve model {}", model)
                 raise
 
         # Start background metadata processing for multiple models
@@ -622,8 +622,8 @@ class HuggingFaceService:
                         return await resp.text()
                     log.warning("Failed to download README.md: HTTP {}", resp.status)
                     return None
-        except Exception as e:
-            log.error("Error downloading README.md: {!s}", e)
+        except Exception:
+            log.exception("Error downloading README.md")
             return None
 
     async def import_models_batch(
@@ -695,7 +695,7 @@ class HuggingFaceService:
 
                     except HuggingFaceModelNotFoundError as e:
                         failed_models += 1
-                        log.error(
+                        log.exception(
                             "Model not found in batch import: model_id={}, progress={}/{}",
                             model_id,
                             idx,
@@ -705,9 +705,8 @@ class HuggingFaceService:
 
                     except Exception as e:
                         failed_models += 1
-                        log.error(
-                            "Failed to import model in batch: {!s}, model_id={}, progress={}/{}",
-                            e,
+                        log.exception(
+                            "Failed to import model in batch: model_id={}, progress={}/{}",
                             model_id,
                             idx,
                             model_count,
@@ -732,7 +731,7 @@ class HuggingFaceService:
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error("Batch model import failed: {!s}", e)
+                log.exception("Batch model import failed")
                 return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)

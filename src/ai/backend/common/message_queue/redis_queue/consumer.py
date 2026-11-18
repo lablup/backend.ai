@@ -208,7 +208,7 @@ class RedisConsumer(AbstractConsumer):
                 await self._client.done_stream_message(stream_key, self._group_name, msg_id)
                 break
             except Exception:
-                continue  # Try next stream if this one fails
+                log.debug("Failed to ack the message on stream {}; trying next", stream_key)
 
     @override
     async def close(self) -> None:
@@ -265,8 +265,8 @@ class RedisConsumer(AbstractConsumer):
                 except glide.GlideError as e:
                     await self._failover_consumer(stream_key, e)
                     await self._handle_backoff(stream_key)
-                except Exception as e:
-                    log.error("Error while reading messages from stream {}: {}", stream_key, e)
+                except Exception:
+                    log.exception("Error while reading messages from stream {}", stream_key)
                     await self._handle_backoff(stream_key)
         finally:
             await client.close()
@@ -328,10 +328,8 @@ class RedisConsumer(AbstractConsumer):
                 await self._failover_consumer(stream_key, e)
                 await self._handle_backoff(stream_key)
                 continue
-            except Exception as e:
-                log.exception(
-                    "Error while auto claiming messages from stream {}: {}", stream_key, e
-                )
+            except Exception:
+                log.exception("Error while auto claiming messages from stream {}", stream_key)
                 await self._handle_backoff(stream_key)
                 continue
 
@@ -437,12 +435,11 @@ class RedisConsumer(AbstractConsumer):
             )
             try:
                 await self._client.make_consumer_group(stream_key, self._group_name)
-            except Exception as internal_exception:
+            except Exception:
                 log.exception(
-                    "Error while creating consumer group {} for stream {}: {}",
+                    "Error while creating consumer group {} for stream {}",
                     self._group_name,
                     stream_key,
-                    internal_exception,
                 )
         else:
             log.exception("Error while reading messages from stream {}: {}", stream_key, e)

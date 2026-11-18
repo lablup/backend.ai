@@ -164,7 +164,7 @@ def apply_missing_revisions(
             with (f / f"{previous_version}.json").open() as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
-            log.error(
+            log.exception(
                 "Could not find revision history dump as of Backend.AI version {}. Make sure you have upgraded this Backend.AI cluster to very latest version of prior major release before initiating this major upgrade.",
                 previous_version,
             )

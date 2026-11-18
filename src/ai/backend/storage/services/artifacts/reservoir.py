@@ -198,15 +198,14 @@ class ReservoirVFSFileDownloader:
                     async for chunk in stream_reader.read():
                         await f.write(chunk)
                         self._bytes_downloaded += len(chunk)
-                except aiohttp.ClientError as e:
-                    log.error(
-                        "Network error during download: {}, Downloaded {} bytes before failure",
-                        e,
+                except aiohttp.ClientError:
+                    log.exception(
+                        "Network error during download. Downloaded {} bytes before failure",
                         self._bytes_downloaded,
                     )
                     raise
                 except TimeoutError:
-                    log.error("Timeout after downloading {} bytes", self._bytes_downloaded)
+                    log.exception("Timeout after downloading {} bytes", self._bytes_downloaded)
                     raise
         except Exception as e:
             # Update Redis with error status for any unexpected errors
@@ -593,9 +592,8 @@ class ReservoirService:
                         )
                     except Exception as e:
                         failed_models += 1
-                        log.error(
-                            "Failed to import model in batch: {!s}, model_id={}, progress={}/{}",
-                            e,
+                        log.exception(
+                            "Failed to import model in batch: model_id={}, progress={}/{}",
                             model_id,
                             idx,
                             model_count,
@@ -620,7 +618,7 @@ class ReservoirService:
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error("Batch model import failed: {!s}", e)
+                log.exception("Batch model import failed")
                 return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
@@ -817,8 +815,8 @@ class ReservoirDownloadStep(ImportStep[None]):
             )
             return total_bytes
 
-        except Exception as e:
-            log.error("VFS download failed for {}: {!s}", model_prefix, e)
+        except Exception:
+            log.exception("VFS download failed for {}", model_prefix)
             raise
 
     def _model_relative_path(self, remote_path: str, model_prefix: str) -> PurePosixPath:

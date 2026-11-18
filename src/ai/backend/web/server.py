@@ -246,8 +246,8 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     try:
         text = await request.text()
         creds = json.loads(text)
-    except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+    except json.JSONDecodeError:
+        log.exception("Login: JSON decoding error")
         creds = {}
 
     def _check_params(param_names: list[str]) -> web.Response | None:
@@ -414,8 +414,8 @@ async def login_handler(request: web.Request) -> web.Response:
         request["payload"] = await request.text()
     try:
         creds = json.loads(request["payload"])
-    except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+    except json.JSONDecodeError:
+        log.exception("Login: JSON decoding error")
         creds = {}
     if "username" not in creds or not creds["username"]:
         raise web.HTTPBadRequest(

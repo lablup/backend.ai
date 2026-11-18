@@ -71,8 +71,8 @@ class WithCachePropagator(EventPropagator):
                 cached_event = await self._fetch_cached_event_safe(cache_id)
                 if cached_event is not None:
                     yield cached_event
-            except Exception as e:
-                log.error("Error propagating event: {}", e)
+            except Exception:
+                log.exception("Error propagating event")
 
     async def propagate_event(self, event: AbstractEvent) -> None:
         await self._queue.put(event)

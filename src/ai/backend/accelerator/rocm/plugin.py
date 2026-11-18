@@ -92,7 +92,7 @@ class ROCmPlugin(AbstractComputePlugin):
                 raise RuntimeError("Unsupported ROCm version {}.{}.{}", major, minor, patch)
             log.info("Running on ROCm {}.{}.{}", major, minor, patch)
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             libhip.get_device_count()
             log.info("ROCm acceleration is enabled.")
         except (ImportError, NoRocmDeviceError, GenericRocmError):
@@ -222,10 +222,10 @@ class ROCmPlugin(AbstractComputePlugin):
                         util_total += gpu_util
                         util_stats[device.device_id] = Measurement(Decimal(gpu_util), Decimal(100))
 
-            except (RocmUtilFetchError, RocmMemFetchError) as e:
+            except (RocmUtilFetchError, RocmMemFetchError):
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to read the ROCm device measurement")
                 self.enabled = False
         return [
             NodeMeasurement(
@@ -272,10 +272,10 @@ class ROCmPlugin(AbstractComputePlugin):
                             "mem_used": mem_used,
                             "mem_total": mem_total,
                         }
-            except (RocmUtilFetchError, RocmMemFetchError) as e:
+            except (RocmUtilFetchError, RocmMemFetchError):
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to read the ROCm device measurement")
                 self.enabled = False
                 return []
 

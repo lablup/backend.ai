@@ -41,9 +41,7 @@ async def general_exception_middleware(
         if ex.status_code // 100 == 4:
             log.warning("client error raised inside handlers: ({} {}): {}", method, endpoint, ex)
         elif ex.status_code // 100 == 5:
-            log.exception(
-                "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
-            )
+            log.exception("Internal server error raised inside handlers: ({} {})", method, endpoint)
         raise
     except ConnectionError as e:
         if is_client_disconnect(request, e):
@@ -56,10 +54,8 @@ async def general_exception_middleware(
         # request.  Atomic requests are still executed to their ends.
         log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
         raise
-    except Exception as e:
-        log.exception(
-            "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
-        )
+    except Exception:
+        log.exception("Uncaught exception in HTTP request handlers ({} {})", method, endpoint)
         raise
     else:
         return resp

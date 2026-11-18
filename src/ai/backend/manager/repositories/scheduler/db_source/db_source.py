@@ -607,12 +607,12 @@ class ScheduleDBSource:
             )
 
         # Ensure keypairs with only SFTP sessions still appear
-        for ak in sftp_sessions_by_keypair:
+        for ak, sftp_sessions in sftp_sessions_by_keypair.items():
             if ak not in occupancy_by_keypair:
                 occupancy_by_keypair[ak] = KeypairOccupancy(
                     occupied_slots=[],
                     session_count=0,
-                    sftp_session_count=len(sftp_sessions_by_keypair[ak]),
+                    sftp_session_count=len(sftp_sessions),
                 )
 
         occupancy_by_user = {
@@ -2989,8 +2989,8 @@ class ScheduleDBSource:
                 )
                 # Use the image UUID as key for reliable matching
                 image_configs[image_row.id] = image_config
-            except Exception as e:
-                log.error("Failed to process image {}: {}", image_row.name, e)
+            except Exception:
+                log.exception("Failed to process image {}", image_row.name)
                 continue
 
         return image_configs

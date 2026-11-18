@@ -75,13 +75,13 @@ class SingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult]:
         try:
             result = await self._func(action)
         except BackendAIError as e:
-            log.exception("Action processing error: {}", e)
+            log.exception("Action processing error")
             status = OperationStatus.ERROR
             description = str(e)
             error_code = e.error_code()
             raise
         except BaseException as e:
-            log.exception("Unexpected error during action processing: {}", e)
+            log.exception("Unexpected error during action processing")
             status = OperationStatus.ERROR
             description = str(e)
             error_code = ErrorCode.default()

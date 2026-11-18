@@ -157,7 +157,7 @@ class MockPlugin(AbstractComputePlugin):
             try:
                 self._mode = AllocationModes(mode)
             except ValueError:
-                log.error("Invalid fractional mode value.")
+                log.exception("Invalid fractional mode value.")
                 log.info("{} acceleration is disabled.", self.key)
                 self.enabled = False
                 return
@@ -191,7 +191,7 @@ class MockPlugin(AbstractComputePlugin):
                 stdout, _ = await proc.communicate()
                 lines = stdout.decode().splitlines()
             except FileNotFoundError:
-                log.error('could not execute the "docker version" command.')
+                log.exception('could not execute the "docker version" command.')
                 log.warning("CUDA acceleration is disabled.")
                 self.enabled = False
                 return
@@ -244,7 +244,7 @@ class MockPlugin(AbstractComputePlugin):
         # Detect devices.
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices (mocked):\n" + pformat(detected_devices))
+            log.info("detected devices (mocked):\n{}", pformat(detected_devices))
             log.info("{} acceleration is enabled.", self.key)
         except ImportError:
             log.warning("{} acceleration is disabled.", self.key)
