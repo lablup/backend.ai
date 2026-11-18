@@ -20,6 +20,7 @@ from typing import (
 import aiodocker
 import trafaret as t
 
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.errors import InitializationError
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -28,14 +29,6 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
     FractionAllocMap,
 )
-from ai.backend.agent.types import Container, MountInfo
-from ai.backend.agent.utils import update_nested_dict
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -44,6 +37,8 @@ from ai.backend.agent.stats import (
     ProcessMeasurement,
     StatContext,
 )
+from ai.backend.agent.types import Container, MountInfo
+from ai.backend.agent.utils import update_nested_dict
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.types import (
@@ -70,7 +65,7 @@ __all__ = (
     "MockPlugin",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 MIN_MEM_UNIT = 512 * (2**20)  # 512 MiB

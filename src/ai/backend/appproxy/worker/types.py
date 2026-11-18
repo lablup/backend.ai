@@ -14,6 +14,7 @@ from typing import (
     Final,
     Self,
     TypeVar,
+    cast,
 )
 from uuid import UUID
 
@@ -586,7 +587,7 @@ class Metric:
     def to_serializable_dict(self) -> MetricValue:
         q = Decimal("0.000")
         q_pct = Decimal("0.00")
-        return {
+        result: dict[str, Any] = {
             "__type": self.type.name,
             "current": str(remove_exponent(self.current.quantize(q))),
             "capacity": (
@@ -605,11 +606,12 @@ class Metric:
             ),
             "unit_hint": self.unit_hint,
             **{
-                f"stats.{k}": v  # type: ignore
+                f"stats.{k}": v
                 for k, v in self.stats.to_serializable_dict().items()
                 if k in self.stats_filter
             },
         }
+        return cast(MetricValue, result)
 
 
 @attrs.define(auto_attribs=True, slots=True)

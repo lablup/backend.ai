@@ -22,8 +22,8 @@ if batch_enabled:
                     userdata = b"<user-input-unavailable>"
             return userdata.decode()
 
-        builtins._input = input  # type: ignore
-        builtins.input = _input
+        vars(builtins)["_input"] = input
+        vars(builtins)["input"] = _input
     else:
         # __builtins__ is an alias dict for __builtin__ in modules other than __main__.
         # Thus, we have to explicitly import __builtin__ module in Python 2.
@@ -46,5 +46,5 @@ if batch_enabled:
                     sock.close()
             return userdata.decode()
 
-        builtins._raw_input = builtins.raw_input  # type: ignore
-        builtins.raw_input = _raw_input  # type: ignore
+        vars(builtins)["_raw_input"] = vars(builtins)["raw_input"]
+        vars(builtins)["raw_input"] = _raw_input

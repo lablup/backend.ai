@@ -647,7 +647,7 @@ class ModeMenu(Static):
         os_info = await detect_os()
         text = Text()
         text.append("Platform: ")
-        text.append_text(os_info.__rich__())  # type: ignore
+        text.append_text(os_info.__rich__())
         text.append("\n\n")
         text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
         self.query_one("#heading", Static).update(text)
