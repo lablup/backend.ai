@@ -16,7 +16,6 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-
 from ai.backend.logging import BraceStyleAdapter
 
 from . import AbstractPlugin, BasePluginContext
@@ -167,11 +166,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                     reason=e.reason,
                 )
             except Exception as e:
-                return HookResult(
-                    status=ERROR,
-                    src_plugin=plugin_name,
-                    reason=repr(e),
-                )
+                raise HookHandlerFailed(extra_data={"plugins": plugin_name}) from e
             else:
                 if return_when == FIRST_COMPLETED:
                     # A handler returns None when the event is not its to handle, so the next handler gets it.
