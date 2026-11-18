@@ -44,7 +44,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
-from ai.backend.common.plugin.hook import ERROR, FIRST_COMPLETED, PASSED
+from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
@@ -56,7 +56,7 @@ from ai.backend.manager.errors.auth import (
     InvalidClientIPConfig,
     UserNotFound,
 )
-from ai.backend.manager.errors.common import GenericForbidden, HookHandlerFailed, RejectedByHook
+from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT, KeyPairRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -809,8 +809,6 @@ async def _authenticate_via_hook(
         return_when=FIRST_COMPLETED,
     )
 
-    if hook_result.status == ERROR:
-        raise HookHandlerFailed.from_hook_result(hook_result)
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
 

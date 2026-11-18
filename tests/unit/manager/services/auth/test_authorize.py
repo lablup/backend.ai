@@ -25,7 +25,7 @@ from ai.backend.manager.errors.auth import (
     PasswordExpired,
     PasswordMismatch,
 )
-from ai.backend.manager.errors.common import HookHandlerFailed
+from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -692,7 +692,7 @@ class TestPostAuthorizeHookRefusal:
         assert recorded_result == LoginAttemptResult.FAILED_REJECTED_BY_HOOK
 
     @pytest.mark.usefixtures("verified_user")
-    async def test_a_failing_plugin_raises_hook_handler_failed(
+    async def test_a_failing_plugin_stays_a_hook_error(
         self,
         auth_service: AuthService,
         mock_hook_plugin_ctx: MagicMock,
@@ -703,5 +703,5 @@ class TestPostAuthorizeHookRefusal:
             HookResult(status=HookResults.ERROR, src_plugin="totp", reason="RuntimeError()"),
         ]
 
-        with pytest.raises(HookHandlerFailed):
+        with pytest.raises(RejectedByHook):
             await auth_service.authorize(action)

@@ -31,7 +31,6 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.plugin.hook import (
     ALL_COMPLETED,
-    ERROR,
     FIRST_COMPLETED,
     PASSED,
     REJECTED,
@@ -59,7 +58,6 @@ from ai.backend.manager.errors.auth import (
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
     GenericForbidden,
-    HookHandlerFailed,
     ObjectNotFound,
     RejectedByHook,
 )
@@ -317,8 +315,6 @@ class AuthService:
             (action.request, params),
             return_when=FIRST_COMPLETED,
         )
-        if hook_result.status == ERROR:
-            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result:
@@ -375,8 +371,6 @@ class AuthService:
         # one and counts toward the login attempt limit.
         if hook_result.status == REJECTED:
             raise LoginRejectedByHook.from_hook_result(hook_result)
-        if hook_result.status == ERROR:
-            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):
@@ -558,8 +552,6 @@ class AuthService:
             ),
             return_when=ALL_COMPLETED,
         )
-        if hook_result.status == ERROR:
-            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         # Merge the hook results as a single map.
@@ -580,8 +572,6 @@ class AuthService:
             ),
             return_when=ALL_COMPLETED,
         )
-        if hook_result.status == ERROR:
-            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             hook_result.reason = hook_result.reason or "invalid password format"
             raise RejectedByHook.from_hook_result(hook_result)
@@ -758,8 +748,6 @@ class AuthService:
             ),
             return_when=ALL_COMPLETED,
         )
-        if hook_result.status == ERROR:
-            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             hook_result.reason = hook_result.reason or "invalid password format"
             raise RejectedByHook.from_hook_result(hook_result)
@@ -819,8 +807,6 @@ class AuthService:
             ),
             return_when=ALL_COMPLETED,
         )
-        if hook_result.status == ERROR:
-            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             hook_result.reason = hook_result.reason or "invalid password format"
             raise RejectedByHook.from_hook_result(hook_result)
