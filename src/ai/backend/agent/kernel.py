@@ -639,6 +639,10 @@ class SocketPair:
             await self.input_sock.socket.send_multipart(msg_parts)
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
+                if self.input_sock.closed:
+                    # Closed with its runner: nothing would close a new socket, and it would
+                    # reconnect to whichever kernel gets the address next.
+                    raise InvalidSocket from e
                 log.warning(
                     "Socket invalid, recreating socket (addr: {}, err: {!r})",
                     self.input_sock.addr,
