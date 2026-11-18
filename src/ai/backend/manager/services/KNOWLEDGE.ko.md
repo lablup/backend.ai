@@ -48,7 +48,7 @@ entity (`Entity*`):
 | artifact_revision | artifact | import/approve 상태 기계는 revision 단위이다 |
 | model_card | project | |
 | session_template | 생성 scope (domain/project/user) | |
-| auto_generated_file | 생성 scope (domain/project/user) | 여기서 생성하는 것은 사용자 파일뿐이다. 프로젝트와 도메인의 파일은 아직 그 row 의 `dotfiles` column 에 있다 |
+| auto_generated_file | 생성 scope (domain/project/user) | 사용자, 프로젝트, 도메인의 파일을 모두 여기서 생성하고, owner 가 scope 다 |
 | role | role 이 속한 scope | |
 
 ## field 로 내린 entity_type

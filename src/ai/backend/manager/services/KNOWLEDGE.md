@@ -73,7 +73,7 @@ Entity (`Entity*`):
 | artifact_revision | artifact | the import/approve state machine is per revision |
 | model_card | project | |
 | session_template | creating scope (domain/project/user) | |
-| auto_generated_file | creating scope (domain/project/user) | only user files are created here; project and domain files still live in their rows' `dotfiles` column |
+| auto_generated_file | creating scope (domain/project/user) | user, project and domain files are all created here, with the owner as the scope |
 | role | the scope the role belongs to | |
 
 ## entity_types demoted to fields
