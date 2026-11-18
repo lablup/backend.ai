@@ -1,12 +1,9 @@
 import enum
 import pwd
-import types
-import typing
 from pathlib import Path
-from typing import Annotated, Any, cast, override
+from typing import Annotated, Any, override
 
 from pydantic import (
-    BaseModel,
     ByteSize,
     ConfigDict,
     Field,
@@ -15,7 +12,7 @@ from pydantic import (
     StringConstraints,
 )
 from pydantic.json_schema import JsonSchemaValue
-from pydantic_core import PydanticUndefined, core_schema
+from pydantic_core import core_schema
 
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
@@ -29,7 +26,6 @@ from .errors import (
     GroupNotFoundError,
     InvalidGIDTypeError,
     InvalidUIDTypeError,
-    MissingAnnotationError,
     UserNotFoundError,
 )
 from .types import DigestModType
@@ -62,7 +58,7 @@ class PermitHashConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Hash digest method to use.",
             added_version="25.13.0",
-            example=ConfigExample(local="SHA256", prod="SHA256"),
+            example=ConfigExample(local="sha256", prod="sha256"),
         ),
     ]
 
@@ -736,51 +732,6 @@ class ProfilingConfig(BaseSchema):
             composite=CompositeType.FIELD,
         ),
     ]
-
-
-class Undefined:
-    pass
-
-
-class UnsupportedTypeError(RuntimeError):
-    pass
-
-
-def generate_example_json(
-    schema: type[BackendAISchema] | types.GenericAlias | types.UnionType,
-    parent: list[str] | None = None,
-) -> dict[str, Any] | list[Any]:
-    if parent is None:
-        parent = []
-    if isinstance(schema, types.UnionType):
-        return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
-    if isinstance(schema, types.GenericAlias):
-        if typing.get_origin(schema) is not list:
-            raise RuntimeError("GenericAlias other than list not supported!")
-        return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    if issubclass(schema, BaseModel):
-        res = {}
-        for name, info in schema.model_fields.items():
-            config_key = [*parent, name]
-            if not info.annotation:
-                raise MissingAnnotationError(f"Field '{name}' is missing type annotation")
-            alternative_example = Undefined
-            if info.examples:
-                res[name] = info.examples[0]
-            elif info.default != PydanticUndefined:
-                alternative_example = info.default
-            if name not in res:
-                try:
-                    res[name] = generate_example_json(
-                        cast(type[Any], info.annotation), parent=config_key
-                    )
-                except RuntimeError:
-                    if alternative_example != Undefined and alternative_example is not None:
-                        res[name] = alternative_example
-                    else:
-                        raise
-        return res
-    raise UnsupportedTypeError(str(schema))
 
 
 def get_default_redis_key_ttl() -> int:
