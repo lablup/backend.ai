@@ -24,6 +24,12 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.dto.manager.v2.common import (
+    ServiceArgumentInterpolationDelimiterInput as ServiceArgumentInterpolationDelimiterInputDTO,
+)
+from ai.backend.common.dto.manager.v2.common import (
+    ServiceArgumentInterpolationInput as ServiceArgumentInterpolationInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
@@ -86,12 +92,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder as RevisionOrderDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    ServiceArgumentInterpolationDelimiterInput as ServiceArgumentInterpolationDelimiterInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    ServiceArgumentInterpolationInput as ServiceArgumentInterpolationInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload as ActivateRevisionPayloadDTO,

@@ -29,6 +29,8 @@ __all__ = (
     "ResourceSlotEntryInfo",
     "ResourceSlotEntryInput",
     "ResourceSlotInfo",
+    "ServiceArgumentInterpolationDelimiterInput",
+    "ServiceArgumentInterpolationInput",
     "VFolderHostPermissionEntryInfo",
     "String64",
     "String128",
@@ -235,4 +237,16 @@ class PartialBulkPayload[TNode: BaseResponseModel](BaseResponseModel):
     successes: list[TNode] = Field(description="The entities processed, as they now stand.")
     failed: list[PartialBulkFailure] = Field(
         description="The entities not processed, each with the reason."
+    )
+
+
+class ServiceArgumentInterpolationDelimiterInput(BaseRequestModel):
+    start: str = Field(min_length=1, description="Opening delimiter, e.g. `{{`.")
+    end: str = Field(min_length=1, description="Closing delimiter, e.g. `}}`.")
+
+
+class ServiceArgumentInterpolationInput(BaseRequestModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInput] = Field(
+        min_length=1,
+        description="Delimiters that mark the variables to fill in the service arguments.",
     )

@@ -41,7 +41,11 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import NonEmptyList, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    NonEmptyList,
+    ResourceSlotEntryInput,
+    ServiceArgumentInterpolationInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
@@ -127,8 +131,6 @@ __all__ = (
     "SearchDeploymentPoliciesInput",
     "SearchReplicasInput",
     "SearchRoutesInput",
-    "ServiceArgumentInterpolationDelimiterInput",
-    "ServiceArgumentInterpolationInput",
     "SyncReplicaInput",
     "UpdateAutoScalingRuleInput",
     "UpdateDeploymentInput",
@@ -161,18 +163,6 @@ class ModelMetadataInput(BaseRequestModel):
     label: list[str] | None = None
     license: str | None = None
     min_resource: dict[str, Any] | None = None
-
-
-class ServiceArgumentInterpolationDelimiterInput(BaseRequestModel):
-    start: str = Field(min_length=1, description="Opening delimiter, e.g. `{{`.")
-    end: str = Field(min_length=1, description="Closing delimiter, e.g. `}}`.")
-
-
-class ServiceArgumentInterpolationInput(BaseRequestModel):
-    delimiters: list[ServiceArgumentInterpolationDelimiterInput] = Field(
-        min_length=1,
-        description="Delimiters that mark the variables to fill in the service arguments.",
-    )
 
 
 class ModelServiceConfigInput(BaseRequestModel):
