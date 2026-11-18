@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging import BraceStyleAdapter
 
 from . import BasePluginContext
 from .hook import (
@@ -20,7 +20,7 @@ from .hook import (
     Reject,
 )
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("HookPluginContext",)
 
@@ -116,8 +116,8 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                 await hook_handler(*args)
             except Exception:
                 log.exception(
-                    "hook handler failed, skipped",
-                    event_name=event_name,
-                    plugin_name=plugin_name,
+                    "hook handler failed, skipped (event_name={}, plugin_name={})",
+                    event_name,
+                    plugin_name,
                 )
                 continue
