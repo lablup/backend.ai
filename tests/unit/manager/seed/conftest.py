@@ -20,6 +20,9 @@ from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolic
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -326,6 +329,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     KeyPairRow,
     ProjectRow,
     AssociationContainerRegistriesGroupsRow,
+    DomainContainerRegistryRelationRow,
     SessionTemplateRow,
     ResourceGroupRow,
     ResourceGroupForDomainRow,

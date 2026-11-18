@@ -110,7 +110,10 @@ from ai.backend.manager.models.bootstrap_script.row import (
 )
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher
@@ -3788,13 +3791,17 @@ class ScheduleDBSource:
             if image_row is None:
                 raise ImageNotFound
             if not image_row.is_local:
-                query = (
-                    sa.select(domains.c.allowed_docker_registries)
-                    .select_from(domains)
-                    .where(domains.c.name == domain)
+                related = await db_sess.scalar(
+                    sa.select(
+                        sa.exists().where(
+                            DomainContainerRegistryRelationRow.domain_id == DomainRow.id,
+                            DomainRow.name == domain,
+                            DomainContainerRegistryRelationRow.container_registry_id
+                            == image_row.registry_id,
+                        )
+                    )
                 )
-                allowed_registries = await db_sess.scalar(query)
-                if allowed_registries is None or image_row.registry not in allowed_registries:
+                if not related:
                     raise ImageNotFound
 
     async def _resolve_image_configs(

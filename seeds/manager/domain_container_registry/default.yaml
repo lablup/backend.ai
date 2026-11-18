@@ -1,0 +1,9 @@
+kind: domain_container_registry
+version: 1
+items:
+- domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9  # default
+  registry_id: fe878f09-06cc-4b91-9242-4c71015cce04  # cr.backend.ai/stable
+- domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9  # default
+  registry_id: f9617204-12c8-4a44-b650-98201a2fb406  # cr.backend.ai/community
+- domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9  # default
+  registry_id: d53a6b55-78dd-4412-8786-585777300870  # cr.backend.ai/multiarch
