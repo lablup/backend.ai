@@ -50,6 +50,9 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -179,6 +182,7 @@ async def db_with_cleanup(
             AssocGroupUserRow,
             ContainerRegistryRow,
             AssociationContainerRegistriesGroupsRow,
+            DomainContainerRegistryRelationRow,
             ImageRow,
             ImageAliasRow,
             VirtualEntityRow,
@@ -245,6 +249,12 @@ async def registry_id(
         )
         await VirtualEntitySeeder().get_or_create_node(
             sess, ContainerRegistryEntityType(), registry_id
+        )
+        await sess.flush()
+        sess.add(
+            DomainContainerRegistryRelationRow(
+                domain_id=domain_id, container_registry_id=registry_id
+            )
         )
         await sess.commit()
     return registry_id

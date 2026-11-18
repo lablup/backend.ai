@@ -136,7 +136,10 @@ from ai.backend.manager.models.bootstrap_script_revision.searchers import (
     DefaultBootstrapScriptRevisionSearcher,
 )
 from ai.backend.manager.models.condition_utils import combine_conditions_or
-from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageSearcher,
@@ -571,14 +574,18 @@ class AgentRegistry:
                 raise ImageNotFound
             if not image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
-                    query = (
-                        sa.select(domains.c.allowed_docker_registries)
-                        .select_from(domains)
-                        .where(domains.c.name == user_scope.domain_name)
+                    related = await conn.scalar(
+                        sa.select(
+                            sa.exists().where(
+                                DomainContainerRegistryRelationRow.domain_id == DomainRow.id,
+                                DomainRow.name == user_scope.domain_name,
+                                DomainContainerRegistryRelationRow.container_registry_id
+                                == image.registry_id,
+                            )
+                        )
                     )
-                    allowed_registries = await conn.scalar(query)
-                    if allowed_registries is None or image_ref.registry not in allowed_registries:
-                        raise AliasResolutionFailed
+                if not related:
+                    raise AliasResolutionFailed
         except AliasResolutionFailed as e:
             raise ImageNotFound("unknown alias or disallowed registry") from e
 
@@ -919,18 +926,19 @@ class AgentRegistry:
                 )
                 requested_image_ref = image.image_ref
                 async with self.db.begin_readonly() as conn:
-                    query = (
-                        sa.select(domains.c.allowed_docker_registries)
-                        .select_from(domains)
-                        .where(domains.c.name == user_scope.domain_name)
+                    related = await conn.scalar(
+                        sa.select(
+                            sa.exists().where(
+                                DomainContainerRegistryRelationRow.domain_id == DomainRow.id,
+                                DomainRow.name == user_scope.domain_name,
+                                DomainContainerRegistryRelationRow.container_registry_id
+                                == image.registry_id,
+                            )
+                        )
                     )
-                    allowed_registries = await conn.scalar(query)
-                    if (
-                        allowed_registries is None
-                        or requested_image_ref.registry not in allowed_registries
-                    ):
-                        raise AliasResolutionFailed
-                    kernel_config["image_ref"] = requested_image_ref
+                if not related:
+                    raise AliasResolutionFailed
+                kernel_config["image_ref"] = requested_image_ref
             except AliasResolutionFailed as e:
                 raise ImageNotFound("unknown alias or disallowed registry") from e
 

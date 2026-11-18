@@ -30,6 +30,9 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.image.row import (
     ImagePermissionContextBuilder,
     ImageRow,
@@ -137,6 +140,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                 ProjectRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
+                DomainContainerRegistryRelationRow,
                 ImageRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -228,7 +232,9 @@ class TestImagePermissionContextNonGlobalRegistry:
         return await self._create_project(db_with_cleanup, "unassociated-project", domain, user)
 
     @pytest.fixture
-    async def global_registry_id(self, db_with_cleanup: ExtendedAsyncSAEngine) -> UUID:
+    async def global_registry_id(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData
+    ) -> UUID:
         registry_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -241,6 +247,13 @@ class TestImagePermissionContextNonGlobalRegistry:
                     is_global=True,
                 )
             )
+            await sess.flush()
+            sess.add(
+                DomainContainerRegistryRelationRow(
+                    domain_id=domain.domain_id,
+                    container_registry_id=ContainerRegistryID(registry_id),
+                )
+            )
             await sess.commit()
         return registry_id
 
@@ -248,6 +261,7 @@ class TestImagePermissionContextNonGlobalRegistry:
     async def non_global_registry_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain: DomainFixtureData,
         queried_project: UUID,
         other_associated_project: UUID,
     ) -> UUID:
@@ -265,6 +279,12 @@ class TestImagePermissionContextNonGlobalRegistry:
                 )
             )
             await sess.flush()
+            sess.add(
+                DomainContainerRegistryRelationRow(
+                    domain_id=domain.domain_id,
+                    container_registry_id=ContainerRegistryID(registry_id),
+                )
+            )
             for project_id in [queried_project, other_associated_project]:
                 sess.add(
                     AssociationContainerRegistriesGroupsRow(

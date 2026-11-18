@@ -386,25 +386,24 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         items: Sequence[Image],
         domain_name: str,
     ) -> Sequence[Image]:
-        from ai.backend.manager.models.domain.row import domains
+        from ai.backend.manager.models.domain.row import DomainRow
+        from ai.backend.manager.models.domain_container_registry_relation.row import (
+            DomainContainerRegistryRelationRow,
+        )
+        from ai.backend.manager.models.image.row import ImageRow
 
-        async with ctx.db.begin() as conn:
-            query = (
-                sa.select(domains.c.allowed_docker_registries)
-                .select_from(domains)
-                .where(domains.c.name == domain_name)
-            )
-            result = await conn.execute(query)
-            allowed_docker_registries = result.scalar()
-
-        if allowed_docker_registries is None:
-            return []
-
-        filtered_items: list[Image] = [
-            item for item in items if item.registry in allowed_docker_registries
-        ]
-
-        return filtered_items
+        related_registries = (
+            sa.select(DomainContainerRegistryRelationRow.container_registry_id)
+            .join(DomainRow, DomainRow.id == DomainContainerRegistryRelationRow.domain_id)
+            .where(DomainRow.name == domain_name)
+        )
+        query = sa.select(ImageRow.id).where(
+            ImageRow.id.in_([item.id for item in items]),
+            ImageRow.registry_id.in_(related_registries),
+        )
+        async with ctx.db.begin_readonly() as conn:
+            allowed_ids = set((await conn.execute(query)).scalars())
+        return [item for item in items if item.id in allowed_ids]
 
     def matches_filter(
         self,
