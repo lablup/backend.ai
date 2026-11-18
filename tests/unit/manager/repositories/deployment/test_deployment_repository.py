@@ -810,7 +810,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_group_id: uuid.UUID,
     ) -> None:
         """Test fetching service discovery info for a single route with inference port."""
-        kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
+        _kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
 
         result = await deployment_repository.fetch_route_service_discovery_info({
             ReplicaID(test_route_id)

@@ -71,7 +71,7 @@ async def proxy_connection(
         task_results: tuple[set[Future[Any]], set[Future[Any]]] = await asyncio.wait(
             tasks, return_when=asyncio.FIRST_COMPLETED
         )
-        done, pending = task_results
+        _done, pending = task_results
     except asyncio.CancelledError:
         pass
     finally:

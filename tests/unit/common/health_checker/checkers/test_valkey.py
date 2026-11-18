@@ -22,7 +22,7 @@ class TestValkeyHealthChecker:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyStandaloneClient, None]:
         """Create a Valkey standalone client connected to the test container."""
-        container_id, hostport_pair = redis_container
+        _container_id, hostport_pair = redis_container
 
         target = ValkeyStandaloneTarget(address=hostport_pair.address)
         client = ValkeyStandaloneClient(

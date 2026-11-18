@@ -1376,7 +1376,7 @@ class VFolderService:
         user_info = await self._vfolder_repository.get_user_info(action.user_id)
         if not user_info:
             raise VFolderInvalidParameter("No such user.")
-        user_role, user_domain_name = user_info
+        _user_role, user_domain_name = user_info
 
         source_vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 

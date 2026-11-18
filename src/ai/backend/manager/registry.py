@@ -1847,7 +1847,7 @@ class AgentRegistry:
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = (session.name or "")[:SESSION_NAME_LEN_LIMIT]
         registry, _, filtered = kernel.image.partition("/")
-        img_path, _, image_name = filtered.partition("/")
+        _img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
         async with handle_session_exception("commit_session_to_file"):

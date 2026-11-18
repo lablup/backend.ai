@@ -21,7 +21,7 @@ class TestEtcdDependency:
         test_ns: str,
     ) -> BootstrapConfig:
         """Create a bootstrap config pointing to the test etcd container."""
-        container_id, etcd_addr = etcd_container
+        _container_id, etcd_addr = etcd_container
 
         # Create minimal etcd config for testing
         etcd_config = EtcdConfig.model_validate({

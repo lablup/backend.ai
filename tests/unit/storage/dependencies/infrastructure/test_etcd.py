@@ -23,7 +23,7 @@ class TestEtcdProvider:
         test_ns: str,
     ) -> StorageProxyUnifiedConfig:
         """Create a mock storage config with etcd settings."""
-        container_id, etcd_addr = etcd_container
+        _container_id, etcd_addr = etcd_container
 
         # Create mock config with only etcd settings
         config = MagicMock(spec=StorageProxyUnifiedConfig)

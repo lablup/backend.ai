@@ -622,7 +622,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
 
         (
             arch,
-            matched_distro,
+            _matched_distro,
             matched_libc_style,
             krunner_volume,
             krunner_pyver,
