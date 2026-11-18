@@ -65,7 +65,7 @@ __all__ = (
     "MockPlugin",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 MIN_MEM_UNIT = 512 * (2**20)  # 512 MiB

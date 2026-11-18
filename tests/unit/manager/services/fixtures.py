@@ -26,7 +26,7 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
 
 CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
+    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER)
 )
 
 

@@ -51,7 +51,7 @@ from .types import TTn300Device
 PREFIX = "tt-n300"
 VALID_CARD_TYPE = "n300"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TTn300Plugin(AbstractComputePlugin):

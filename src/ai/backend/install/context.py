@@ -557,13 +557,8 @@ class Context(metaclass=ABCMeta):
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
         text = Text()
-<<<<<<< HEAD
         text.append("Detetced OS info: ")
-        text.append(self.os_info.__rich__())  # type: ignore
-=======
-        text.append("Detected OS info: ")
         text.append(self.os_info.__rich__())
->>>>>>> d62855f0f (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
