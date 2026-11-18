@@ -418,7 +418,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             added_version=NEXT_RELEASE_VERSION,
             description="Container registries this domain is allowed to use.",
         )
-    )  # type: ignore[misc]
+    )
     async def container_registries(
         self,
         info: Info[StrawberryGQLContext],
@@ -491,7 +491,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
