@@ -166,7 +166,7 @@ async def api_ctx(
     @asynccontextmanager
     async def _init_storage_webapp_plugin(
         plugin_ctx: BasePluginContext[AbstractPlugin], root_app: web.Application
-    ) -> AsyncGenerator[BasePluginContext[AbstractPlugin], None]:
+    ) -> AsyncGenerator[BasePluginContext[AbstractPlugin]]:
         pid = os.getpid()
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():

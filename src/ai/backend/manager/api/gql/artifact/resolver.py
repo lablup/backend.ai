@@ -756,7 +756,7 @@ async def scan_artifact_models(
 )
 async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
-) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
+) -> AsyncGenerator[ArtifactStatusChangedPayload]:
     # TODO: Implement actual subscription logic using pub/sub system
     raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator
@@ -774,7 +774,7 @@ async def artifact_status_changed(
 )
 async def artifact_import_progress_updated(
     artifact_revision_id: ID,
-) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:
+) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload]:
     # TODO: Implement actual subscription logic using pub/sub system
     raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

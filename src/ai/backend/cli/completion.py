@@ -99,6 +99,7 @@ def get_completion_command(prog_name: str) -> click.Command:
                 # Generate and write fish completion script
                 result = subprocess.run(
                     [prog_name],
+                    check=False,
                     env={**os.environ, env_var: "fish_source"},
                     capture_output=True,
                     text=True,

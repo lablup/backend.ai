@@ -64,7 +64,7 @@ class _ScopeID(EntityIdentifier):
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [RoleRow, PermissionRow, PermissionFieldRow, VirtualEntityRow, EntityMembershipRow],

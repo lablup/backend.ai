@@ -14,7 +14,7 @@ from ai.backend.manager.models.utils import agg_to_array
 
 
 @pytest.fixture
-async def virtual_grid_db(database_connection: Any) -> AsyncGenerator[tuple[Any, Any, Any], None]:
+async def virtual_grid_db(database_connection: Any) -> AsyncGenerator[tuple[Any, Any, Any]]:
     base = declarative_base()
     metadata = base.metadata
     grid = sa.Table(

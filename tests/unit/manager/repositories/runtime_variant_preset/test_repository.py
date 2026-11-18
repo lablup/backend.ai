@@ -52,7 +52,7 @@ from ai.backend.testutils.db import with_tables
 @pytest.fixture
 async def db_with_cleanup(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         global_entity_ids,
         [
@@ -74,7 +74,7 @@ async def db_with_cleanup(
 @pytest.fixture
 async def runtime_variant_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     variant_id = uuid.uuid4()
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(

@@ -158,10 +158,8 @@ class AffinityMap(nx.Graph):  # type: ignore[misc]
             for device2 in devices_copy:
                 # weight = abs((max(0, device2.numa_node or 0)) - max(0, (device1.numa_node or 0)))
                 weight = 0 if device1.numa_node == device2.numa_node else 1
-                if max_weight < weight:
-                    max_weight = weight
-                if min_weight > weight:
-                    min_weight = weight
+                max_weight = max(max_weight, weight)
+                min_weight = min(min_weight, weight)
                 g.add_edge(device1, device2, weight=weight)
         g.max_weight = max_weight
         g.min_weight = min_weight

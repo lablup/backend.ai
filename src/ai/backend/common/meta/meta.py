@@ -313,10 +313,9 @@ def generate_composite_example(
                 and issubclass(child_type, BackendAISchema)
             ):
                 result[name] = generate_composite_example(child_type, env)
-        else:
-            # Use direct example
-            if meta.example is not None:
-                result[name] = meta.example.get(env)
+        # Use direct example
+        elif meta.example is not None:
+            result[name] = meta.example.get(env)
 
     return result
 

@@ -83,7 +83,7 @@ class TestArtifactRevisionRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -130,7 +130,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample artifact directly in DB and return its ID"""
         artifact_id = uuid.uuid4()
 
@@ -157,7 +157,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample artifact revision directly in DB and return its ID"""
         revision_id = uuid.uuid4()
 
@@ -180,7 +180,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[ArtifactIdFilteringFixture, None]:
+    ) -> AsyncGenerator[ArtifactIdFilteringFixture]:
         """Create two artifacts with revisions for artifact_id filtering test."""
         fixture = ArtifactIdFilteringFixture(
             target_artifact_id=uuid.uuid4(),
@@ -245,7 +245,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[dict[ArtifactStatus, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[ArtifactStatus, uuid.UUID]]:
         """Create sample revisions with different statuses for filter testing"""
         revision_map: dict[ArtifactStatus, uuid.UUID] = {}
         statuses = [
@@ -277,7 +277,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample revisions with predictable versions for ordering tests"""
         revision_ids = []
         versions = ["v1.0.0", "v2.0.0", "v3.0.0", "v0.1.0"]
@@ -304,7 +304,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample revisions for pagination testing"""
         revision_ids = []
         now = datetime.now(UTC)
@@ -333,7 +333,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample revisions for combined pagination, filter, and ordering tests"""
         revision_ids = []
         # Create 8 AVAILABLE revisions and 4 SCANNED revisions
@@ -360,7 +360,7 @@ class TestArtifactRevisionRepository:
     async def artifact_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ArtifactRepository, None]:
+    ) -> AsyncGenerator[ArtifactRepository]:
         """Create ArtifactRepository instance with database"""
         repo = ArtifactRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo

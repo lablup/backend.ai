@@ -246,9 +246,8 @@ def _search_docker_socket_files_impl() -> tuple[
                 yarl.URL("http://docker"),  # a fake hostname to construct a valid URL
                 connector_cls,
             )
-    else:
-        searched_paths = ", ".join(map(os.fsdecode, search_paths))
-        raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
+    searched_paths = ", ".join(map(os.fsdecode, search_paths))
+    raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
 
 
 def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:

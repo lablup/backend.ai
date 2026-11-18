@@ -152,20 +152,19 @@ class PackageSetup(Static):
             if self._non_interactive:
                 if dist_info.target_path is None:
                     raise ValueError("Target path must be specified in non-interactive mode")
-            else:
-                if dist_info.target_path.exists():
-                    input_box = InputDialog(
-                        f"The target path {dist_info.target_path} already exists. "
-                        "Please set a different target path below, or "
-                        "leave the box as blank to overwrite the folder.",
-                        str(dist_info.target_path),
-                        allow_cancel=False,
-                    )
-                    _log.mount(input_box)
-                    value = await input_box.wait()
-                    if value is None:
-                        raise ValueError("Target path input was cancelled")
-                    dist_info.target_path = Path(value)
+            elif dist_info.target_path.exists():
+                input_box = InputDialog(
+                    f"The target path {dist_info.target_path} already exists. "
+                    "Please set a different target path below, or "
+                    "leave the box as blank to overwrite the folder.",
+                    str(dist_info.target_path),
+                    allow_cancel=False,
+                )
+                _log.mount(input_box)
+                value = await input_box.wait()
+                if value is None:
+                    raise ValueError("Target path input was cancelled")
+                dist_info.target_path = Path(value)
             ctx = PackageContext(
                 dist_info,
                 install_variable,
@@ -281,20 +280,19 @@ class DockerSetup(Static):
         if self._non_interactive:
             if dist_info.target_path is None:
                 raise ValueError("Target path must be specified in non-interactive mode")
-        else:
-            if dist_info.target_path.exists():
-                input_box = InputDialog(
-                    f"The target path {dist_info.target_path} already exists. "
-                    "Please set a different target path below, or "
-                    "leave the box as blank to overwrite the folder.",
-                    str(dist_info.target_path),
-                    allow_cancel=False,
-                )
-                _log.mount(input_box)
-                value = await input_box.wait()
-                if value is None:
-                    raise ValueError("Target path input was cancelled")
-                dist_info.target_path = Path(value)
+        elif dist_info.target_path.exists():
+            input_box = InputDialog(
+                f"The target path {dist_info.target_path} already exists. "
+                "Please set a different target path below, or "
+                "leave the box as blank to overwrite the folder.",
+                str(dist_info.target_path),
+                allow_cancel=False,
+            )
+            _log.mount(input_box)
+            value = await input_box.wait()
+            if value is None:
+                raise ValueError("Target path input was cancelled")
+            dist_info.target_path = Path(value)
         ctx = DockerContext(
             dist_info,
             install_variable,

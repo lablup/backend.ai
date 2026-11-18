@@ -109,7 +109,7 @@ class SchedulingBroadcastEventPayloadGQL:
 async def scheduling_events_by_session(
     session_id: strawberry.ID,
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[SchedulingBroadcastEventPayloadGQL, None]:
+) -> AsyncGenerator[SchedulingBroadcastEventPayloadGQL]:
     """Subscribe to scheduling events for a specific session.
 
     Streams status transition events for a session during its lifecycle,

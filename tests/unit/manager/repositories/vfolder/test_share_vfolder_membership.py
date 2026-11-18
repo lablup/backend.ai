@@ -102,7 +102,7 @@ class TestShareVfolderWithUsersMembership:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -132,7 +132,7 @@ class TestShareVfolderWithUsersMembership:
     async def domain_fixture(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -152,7 +152,7 @@ class TestShareVfolderWithUsersMembership:
     @pytest.fixture
     async def project_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"proj-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -169,7 +169,7 @@ class TestShareVfolderWithUsersMembership:
     @pytest.fixture
     async def user_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"user-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -190,7 +190,7 @@ class TestShareVfolderWithUsersMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         project_resource_policy: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -214,7 +214,7 @@ class TestShareVfolderWithUsersMembership:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         project: UUID,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Materialize `project`'s virtual entity and yield its id."""
         ve_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
@@ -235,7 +235,7 @@ class TestShareVfolderWithUsersMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         user_resource_policy: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         user_uuid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -263,7 +263,7 @@ class TestShareVfolderWithUsersMembership:
         domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         vfolder_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -302,7 +302,7 @@ class TestShareVfolderWithUsersMembership:
         project_resource_policy: str,
         project: UUID,
         project_scope_id: UUID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """An ACTIVE user enrolled in `project`'s virtual entity."""
         user_uuid = uuid4()
         email = f"member-{user_uuid.hex[:8]}@example.com"
@@ -369,7 +369,7 @@ class TestShareVfolderWithUsersMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         user_resource_policy: str,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """An ACTIVE user with no project membership."""
         user_uuid = uuid4()
         email = f"stranger-{user_uuid.hex[:8]}@example.com"
@@ -400,7 +400,7 @@ class TestShareVfolderWithUsersMembership:
         user_resource_policy: str,
         project: UUID,
         project_scope_id: UUID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """An INACTIVE user that is nonetheless enrolled in `project`'s virtual entity."""
         user_uuid = uuid4()
         email = f"inactive-{user_uuid.hex[:8]}@example.com"
@@ -445,7 +445,7 @@ class TestShareVfolderWithUsersMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         project_resource_policy: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """A separate project in the same domain (used to verify cross-project isolation)."""
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
@@ -470,7 +470,7 @@ class TestShareVfolderWithUsersMembership:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         other_project: UUID,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Materialize `other_project`'s virtual entity and yield its id."""
         ve_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
@@ -493,7 +493,7 @@ class TestShareVfolderWithUsersMembership:
         user_resource_policy: str,
         other_project: UUID,
         other_project_scope_id: UUID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """An ACTIVE user enrolled in `other_project`'s virtual entity (not `project`'s)."""
         user_uuid = uuid4()
         email = f"elsewhere-{user_uuid.hex[:8]}@example.com"

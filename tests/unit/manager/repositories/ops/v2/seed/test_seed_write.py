@@ -127,7 +127,7 @@ class NullPermissionUpserter(RolePermissionPresetUpserter):
 @pytest.fixture
 async def db(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     ensure_all_tables_registered()
     async with with_tables(global_entity_ids, _TABLES):
         yield global_entity_ids

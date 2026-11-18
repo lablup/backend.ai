@@ -717,27 +717,26 @@ class MockPlugin(AbstractComputePlugin):
                         },
                     ),
                 })
-        else:  # older agents without lablup/backend.ai-agent#180
-            if self._mode == AllocationModes.DISCRETE:
-                alloc_map.allocations[SlotName(f"{self.key}.device")].update(
-                    resource_spec.allocations.get(
-                        self.key,
-                        {},
-                    ).get(
-                        SlotName(f"{self.key}.device"),
-                        {},
-                    ),
-                )
-            elif self._mode == AllocationModes.FRACTIONAL:
-                alloc_map.allocations[SlotName(f"{self.key}.shares")].update(
-                    resource_spec.allocations.get(
-                        self.key,
-                        {},
-                    ).get(
-                        SlotName(f"{self.key}.shares"),
-                        {},
-                    ),
-                )
+        elif self._mode == AllocationModes.DISCRETE:
+            alloc_map.allocations[SlotName(f"{self.key}.device")].update(
+                resource_spec.allocations.get(
+                    self.key,
+                    {},
+                ).get(
+                    SlotName(f"{self.key}.device"),
+                    {},
+                ),
+            )
+        elif self._mode == AllocationModes.FRACTIONAL:
+            alloc_map.allocations[SlotName(f"{self.key}.shares")].update(
+                resource_spec.allocations.get(
+                    self.key,
+                    {},
+                ).get(
+                    SlotName(f"{self.key}.shares"),
+                    {},
+                ),
+            )
 
     async def get_attached_devices(
         self,

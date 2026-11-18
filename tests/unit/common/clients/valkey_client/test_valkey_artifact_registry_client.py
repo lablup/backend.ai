@@ -24,7 +24,7 @@ class TestValkeyArtifactRegistryClient:
     async def valkey_artifact_registry_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyArtifactRegistryClient, None]:
+    ) -> AsyncGenerator[ValkeyArtifactRegistryClient]:
         """Valkey client that auto-cleans cache after each test"""
         hostport_pair: HostPortPairModel = redis_container[1]
         valkey_target = ValkeyTarget(

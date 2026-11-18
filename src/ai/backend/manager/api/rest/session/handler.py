@@ -218,23 +218,22 @@ def _validate_creation_config(
                 model = CreationConfigV3Template.model_validate(config)
             else:
                 model = CreationConfigV3Template.model_validate(config)
+        elif api_version[0] >= 9:
+            model = CreationConfigV7.model_validate(config)
+        elif api_version[0] >= 8:
+            model = CreationConfigV6.model_validate(config)
+        elif api_version[0] >= 6:
+            model = CreationConfigV5.model_validate(config)
+        elif api_version[0] >= 5:
+            model = CreationConfigV4.model_validate(config)
+        elif api_version >= (4, "20190315"):
+            model = CreationConfigV3.model_validate(config)
+        elif 2 <= api_version[0] <= 4:
+            model = CreationConfigV2.model_validate(config)
+        elif api_version[0] == 1:
+            model = CreationConfigV1.model_validate(config)
         else:
-            if api_version[0] >= 9:
-                model = CreationConfigV7.model_validate(config)
-            elif api_version[0] >= 8:
-                model = CreationConfigV6.model_validate(config)
-            elif api_version[0] >= 6:
-                model = CreationConfigV5.model_validate(config)
-            elif api_version[0] >= 5:
-                model = CreationConfigV4.model_validate(config)
-            elif api_version >= (4, "20190315"):
-                model = CreationConfigV3.model_validate(config)
-            elif 2 <= api_version[0] <= 4:
-                model = CreationConfigV2.model_validate(config)
-            elif api_version[0] == 1:
-                model = CreationConfigV1.model_validate(config)
-            else:
-                raise InvalidAPIParameters("API version not supported")
+            raise InvalidAPIParameters("API version not supported")
         return model.model_dump(by_alias=False)
     except Exception as e:
         if isinstance(e, InvalidAPIParameters):

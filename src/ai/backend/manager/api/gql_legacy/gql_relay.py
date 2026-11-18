@@ -261,7 +261,6 @@ class Connection(graphene.ObjectType):  # type: ignore[misc]
             )
 
         super().__init_subclass_with_meta__(_meta=_meta, **options)
-        return
 
 
 class ConnectionPaginationOrder(enum.Enum):

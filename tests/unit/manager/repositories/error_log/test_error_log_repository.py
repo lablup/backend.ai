@@ -60,7 +60,7 @@ class TestErrorLogOps:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -266,7 +266,7 @@ class TestErrorLogOps:
         self,
         error_log_ops: OpsRepository[ErrorLogData],
         test_user_id: UserID,
-    ) -> AsyncGenerator[dict[str, ErrorLogID], None]:
+    ) -> AsyncGenerator[dict[str, ErrorLogID]]:
         """Create sample error logs with different sources for filter testing"""
         entity_map: dict[str, ErrorLogID] = {}
 
@@ -293,7 +293,7 @@ class TestErrorLogOps:
         self,
         error_log_ops: OpsRepository[ErrorLogData],
         test_user_id: UserID,
-    ) -> AsyncGenerator[list[ErrorLogID], None]:
+    ) -> AsyncGenerator[list[ErrorLogID]]:
         """Create sample error logs with predictable sources for ordering tests"""
         error_log_ids: list[ErrorLogID] = []
         sources = ["alpha-source", "beta-source", "gamma-source", "delta-source"]
@@ -316,7 +316,7 @@ class TestErrorLogOps:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_id: UserID,
-    ) -> AsyncGenerator[list[ErrorLogID], None]:
+    ) -> AsyncGenerator[list[ErrorLogID]]:
         """Create 25 error logs for pagination testing"""
         specs = [
             ErrorLogCreator(

@@ -65,7 +65,7 @@ async def _grant_global(
 
 
 @pytest.fixture
-async def preset_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def preset_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [ResourceSlotTypeRow, PresetResourceSlotRow]):
         async with ops_db.begin_session() as sess:
             sess.add_all([

@@ -72,7 +72,7 @@ class SessionFixtures:
     @pytest.fixture
     async def database_with_tables(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Set up tables required for session tests with automatic cleanup."""
         async with with_tables(
             database_connection,
@@ -109,7 +109,7 @@ class SessionFixtures:
     @pytest.fixture
     async def domain(
         self, database_with_tables: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[DomainRow, None]:
+    ) -> AsyncGenerator[DomainRow]:
         """Create test domain."""
         domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid.uuid4()}")
 
@@ -122,7 +122,7 @@ class SessionFixtures:
     @pytest.fixture
     async def resource_group(
         self, database_with_tables: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ResourceGroupRow, None]:
+    ) -> AsyncGenerator[ResourceGroupRow]:
         """Create test scaling group."""
         sgroup = ResourceGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
@@ -140,7 +140,7 @@ class SessionFixtures:
     @pytest.fixture
     async def user_policy(
         self, database_with_tables: ExtendedAsyncSAEngine, domain: DomainRow
-    ) -> AsyncGenerator[UserResourcePolicyRow, None]:
+    ) -> AsyncGenerator[UserResourcePolicyRow]:
         """Create test user resource policy."""
         policy = UserResourcePolicyRow(
             name=f"{uuid.uuid4()}",
@@ -159,7 +159,7 @@ class SessionFixtures:
     @pytest.fixture
     async def group_policy(
         self, database_with_tables: ExtendedAsyncSAEngine, domain: DomainRow
-    ) -> AsyncGenerator[ProjectResourcePolicyRow, None]:
+    ) -> AsyncGenerator[ProjectResourcePolicyRow]:
         """Create test project resource policy."""
         policy = ProjectResourcePolicyRow(
             name=f"{uuid.uuid4()}",
@@ -180,7 +180,7 @@ class SessionFixtures:
         database_with_tables: ExtendedAsyncSAEngine,
         domain: DomainRow,
         user_policy: UserResourcePolicyRow,
-    ) -> AsyncGenerator[UserData, None]:
+    ) -> AsyncGenerator[UserData]:
         """Create test user for testing unique constraint."""
         user_a = UserRow(
             uuid=uuid.uuid4(),
@@ -203,7 +203,7 @@ class SessionFixtures:
         database_with_tables: ExtendedAsyncSAEngine,
         domain: DomainRow,
         user_policy: UserResourcePolicyRow,
-    ) -> AsyncGenerator[UserData, None]:
+    ) -> AsyncGenerator[UserData]:
         user_b = UserRow(
             uuid=uuid.uuid4(),
             username=f"testuser-{uuid.uuid4().hex[:8]}",
@@ -225,7 +225,7 @@ class SessionFixtures:
         database_with_tables: ExtendedAsyncSAEngine,
         domain: DomainRow,
         group_policy: ProjectResourcePolicyRow,
-    ) -> AsyncGenerator[ProjectRow, None]:
+    ) -> AsyncGenerator[ProjectRow]:
         """Create test group."""
         group = ProjectRow(
             id=uuid.uuid4(),
@@ -251,7 +251,7 @@ class TestSessionUniqueNamePerUser(SessionFixtures):
         domain: DomainRow,
         resource_group: ResourceGroupRow,
         test_config: TestConfig,
-    ) -> AsyncGenerator[SessionData, None]:
+    ) -> AsyncGenerator[SessionData]:
         """Create first session with status from parametrize (indirect fixture)"""
         user_a = user_one
         status = test_config.first_session_status

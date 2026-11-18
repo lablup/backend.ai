@@ -53,7 +53,7 @@ from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
-async def notification_center() -> AsyncGenerator[NotificationCenter, None]:
+async def notification_center() -> AsyncGenerator[NotificationCenter]:
     nc = NotificationCenter()
     yield nc
     await nc.close()

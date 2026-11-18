@@ -37,7 +37,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 @pytest.fixture
 async def database_with_fair_share_tables(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Set up tables required for fair share tests with automatic cleanup."""
     async with with_tables(
         database_connection,
@@ -65,7 +65,7 @@ async def database_with_fair_share_tables(
 @pytest.fixture
 async def domain_fixture(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[DomainFixtureData, None]:
+) -> AsyncGenerator[DomainFixtureData]:
     """Create DomainRow and return its name."""
     domain_id = DomainID(uuid.uuid4())
     name = "test-domain"
@@ -83,7 +83,7 @@ def resource_group_id() -> ResourceGroupID:
 async def resource_group(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     """Create ResourceGroupRow and return its name."""
     name = "default"
     async with database_with_fair_share_tables.begin_session() as db_sess:
@@ -107,7 +107,7 @@ async def resource_group(
 @pytest.fixture
 async def user_resource_policy(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     """Create UserResourcePolicyRow and return its name."""
     name = "test-user-policy"
     async with database_with_fair_share_tables.begin_session() as db_sess:
@@ -126,7 +126,7 @@ async def user_resource_policy(
 @pytest.fixture
 async def project_resource_policy(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     """Create ProjectResourcePolicyRow and return its name."""
     name = "test-project-policy"
     async with database_with_fair_share_tables.begin_session() as db_sess:
@@ -146,7 +146,7 @@ async def user_uuid(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     user_resource_policy: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create UserRow and return its UUID."""
     user_id = uuid.uuid4()
     password_info = PasswordInfo(
@@ -175,7 +175,7 @@ async def project_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     domain_fixture: DomainFixtureData,
     project_resource_policy: str,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create ProjectRow and return its ID."""
     group_id = uuid.uuid4()
     async with database_with_fair_share_tables.begin_session() as db_sess:
@@ -196,7 +196,7 @@ async def domain_fair_share_id(
     domain_fixture: DomainFixtureData,
     resource_group: str,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create DomainFairShareRow and return its ID."""
     row = DomainFairShareRow(
         domain_name=domain_fixture.domain_name,
@@ -221,7 +221,7 @@ async def domain_fair_share_with_usage_id(
     domain_fixture: DomainFixtureData,
     resource_group: str,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create DomainFairShareRow with calculated usage values and return its ID."""
     row = DomainFairShareRow(
         domain_name=domain_fixture.domain_name,
@@ -247,7 +247,7 @@ async def project_fair_share_id(
     domain_fixture: DomainFixtureData,
     resource_group: str,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create ProjectFairShareRow and return its ID."""
     row = ProjectFairShareRow(
         project_id=project_id,
@@ -275,7 +275,7 @@ async def user_fair_share_id(
     domain_fixture: DomainFixtureData,
     resource_group: str,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create UserFairShareRow and return its ID."""
     row = UserFairShareRow(
         user_uuid=user_uuid,
@@ -304,7 +304,7 @@ async def user_fair_share_with_large_usage_id(
     domain_fixture: DomainFixtureData,
     resource_group: str,
     resource_group_id: ResourceGroupID,
-) -> AsyncGenerator[uuid.UUID, None]:
+) -> AsyncGenerator[uuid.UUID]:
     """Create UserFairShareRow with large resource-seconds values and return its ID."""
     row = UserFairShareRow(
         user_uuid=user_uuid,

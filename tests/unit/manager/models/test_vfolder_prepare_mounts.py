@@ -138,7 +138,7 @@ class TestPrepareVFolderMountsSubpathFlow:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -178,7 +178,7 @@ class TestPrepareVFolderMountsSubpathFlow:
     async def fixture_vfolder(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[tuple[UUID, str, UUID, UUID], None]:
+    ) -> AsyncGenerator[tuple[UUID, str, UUID, UUID]]:
         """Provision the minimum row chain (domain → policies → user → group → vfolder)
         with a host name whose volume part matches ``NOOP_STORAGE_VOLUME_NAME``
         so ``ensure_host_permission_allowed`` short-circuits.

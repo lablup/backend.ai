@@ -369,7 +369,7 @@ async def download_directory_as_archive(
     Serve a directory as a zip archive on the fly.
     """
 
-    def _iter2aiter(iter: Iterator[Any]) -> AsyncGenerator[Any, None]:
+    def _iter2aiter(iter: Iterator[Any]) -> AsyncGenerator[Any]:
         """Iterable to async iterable"""
 
         def _consume(
@@ -384,7 +384,7 @@ async def download_directory_as_archive(
             else:
                 q.put(SENTINEL)
 
-        async def _aiter() -> AsyncGenerator[Any, None]:
+        async def _aiter() -> AsyncGenerator[Any]:
             loop = asyncio.get_running_loop()
             q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:

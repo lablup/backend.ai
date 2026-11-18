@@ -17,7 +17,7 @@ from ai.backend.testutils.db import with_tables
 @pytest.fixture
 async def db_engine(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(global_entity_ids, [ContainerRegistryRow]):
         yield global_entity_ids
 

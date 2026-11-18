@@ -76,7 +76,7 @@ def mock_agent_client_pool() -> MagicMock:
     mock_client.check_running = AsyncMock(return_value=False)
 
     @asynccontextmanager
-    async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock, None]:
+    async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock]:
         yield mock_client
 
     pool.acquire = MagicMock(side_effect=acquire)

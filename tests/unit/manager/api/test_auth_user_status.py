@@ -134,7 +134,7 @@ class TestAuthenticateByUserStatus:
     @pytest.fixture
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, ALL_ROWS):
             yield database_connection
 

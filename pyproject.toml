@@ -90,6 +90,15 @@ src = ["src"]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
 select = [
     "E",      # pycodestyle errors: PEP8 style violations
+    "PLR5501",  # collapsible-else-if: `else: if` can be `elif`
+    "PLR1730",  # if-stmt-min-max: `if` assignment can be `min`/`max`
+    "PLW0120",  # useless-else-on-loop: `else` on a loop without `break`
+    "PLW1510",  # subprocess-run-without-check: explicit `check=` for `subprocess.run`
+    "PLR1711",  # useless-return: bare `return None` at the end of a function
+    "PLC1802",  # len-test: `len(x)` as a truth test
+    "FAST",   # fastapi: FastAPI route misuse
+    "ICN",    # flake8-import-conventions: conventional import aliases
+    "YTT",    # flake8-2020: `sys.version` misuse
     "W",      # pycodestyle warnings: PEP8 style warnings
     "F",      # pyflakes: detects unused imports, undefined names, and other logical errors
     "I",      # isort: enforces consistent import ordering
@@ -173,8 +182,6 @@ ignore = [
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
-    # UP (pyupgrade) - defer large-scale changes for gradual adoption
-    "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
     # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
     "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)

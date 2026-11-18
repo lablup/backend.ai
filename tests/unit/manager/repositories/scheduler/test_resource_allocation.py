@@ -125,7 +125,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -167,7 +167,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -188,7 +188,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -213,7 +213,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -231,7 +231,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -250,7 +250,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -277,7 +277,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -301,7 +301,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -325,7 +325,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -349,7 +349,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -371,7 +371,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
     async def resource_slot_types(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         async with db_with_cleanup.begin_session() as db_sess:
             for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
                 db_sess.add(ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type))

@@ -13,7 +13,7 @@ class AbstractConsumer(ABC):
     """
 
     @abstractmethod
-    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:
+    async def consume_queue(self) -> AsyncGenerator[MQMessage]:
         """
         Consume messages from the queue.
 

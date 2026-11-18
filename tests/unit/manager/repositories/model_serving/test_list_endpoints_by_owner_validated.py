@@ -70,7 +70,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 @pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Provision the table set ``list_endpoints_by_owner_validated`` exercises."""
     async with with_tables(
         database_connection,

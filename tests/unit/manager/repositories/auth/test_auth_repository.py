@@ -106,7 +106,7 @@ class TestAuthRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self, global_entity_ids: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [
@@ -164,7 +164,7 @@ class TestAuthRepository:
     @pytest.fixture
     async def default_domain(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[DomainTestData, None]:
+    ) -> AsyncGenerator[DomainTestData]:
         """Create default domain"""
         domain_name = f"domain-{uuid.uuid4()}"
         domain_id = DomainID(uuid.uuid4())
@@ -185,7 +185,7 @@ class TestAuthRepository:
     @pytest.fixture
     async def user_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ResourcePolicyTestData, None]:
+    ) -> AsyncGenerator[ResourcePolicyTestData]:
         """Create user resource policy"""
         policy_name = f"test-user-policy-{uuid.uuid4()}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -236,7 +236,7 @@ class TestAuthRepository:
     @pytest.fixture
     async def keypair_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ResourcePolicyTestData, None]:
+    ) -> AsyncGenerator[ResourcePolicyTestData]:
         """Create keypair resource policy"""
         policy_name = f"test-keypair-policy-{uuid.uuid4()}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -258,7 +258,7 @@ class TestAuthRepository:
         default_domain: DomainTestData,
         user_resource_policy: ResourcePolicyTestData,
         keypair_resource_policy: ResourcePolicyTestData,
-    ) -> AsyncGenerator[UserTestData, None]:
+    ) -> AsyncGenerator[UserTestData]:
         """Create a sample user for testing"""
         user_uuid = uuid.uuid4()
         email = f"test-{uuid.uuid4()}@example.com"
@@ -327,7 +327,7 @@ class TestAuthRepository:
     @pytest.fixture
     async def project_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ResourcePolicyTestData, None]:
+    ) -> AsyncGenerator[ResourcePolicyTestData]:
         """Create project resource policy"""
         policy_name = f"test-group-policy-{uuid.uuid4()}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -347,7 +347,7 @@ class TestAuthRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user_data: UserTestData,
         project_resource_policy: ResourcePolicyTestData,
-    ) -> AsyncGenerator[ProjectData, None]:
+    ) -> AsyncGenerator[ProjectData]:
         """Create a sample group with user membership for testing"""
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4()}"

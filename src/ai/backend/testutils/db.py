@@ -82,7 +82,7 @@ def _to_table(item: TableOrORM) -> Table:
 async def with_tables(
     engine: AsyncEngine,
     orms: Sequence[TableOrORM],
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[None]:
     """
     Create specified tables on enter, TRUNCATE CASCADE on exit.
 

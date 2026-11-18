@@ -523,8 +523,7 @@ class UserRepository:
 
             start_index = int((kernel_created_at - start_date_ts) // time_window)
             end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
-            if start_index < 0:
-                start_index = 0
+            start_index = max(start_index, 0)
             for time_series in time_series_list[start_index:end_index]:
                 time_series["num_sessions"]["value"] += 1
                 time_series["cpu_allocated"]["value"] += cpu_value

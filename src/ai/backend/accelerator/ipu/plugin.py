@@ -192,8 +192,7 @@ class IPUPlugin(AbstractComputePlugin):
         for subnet, network in self.subnet_network_map.items():
             if ipaddress.ip_address(device.ip) in subnet:
                 return network
-        else:
-            raise DockerNetworkError(f"Device {device.hw_location} not available")
+        raise DockerNetworkError(f"Device {device.hw_location} not available")
 
     def get_version(self) -> str:
         return __version__

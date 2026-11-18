@@ -82,7 +82,7 @@ from ai.backend.testutils.db import with_tables
 @pytest.fixture
 async def db_with_referencing_tables(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Every table the purger's conflict checks read, plus their FK parents.
 
     The conflict checks are validated in one query spanning all five referencing

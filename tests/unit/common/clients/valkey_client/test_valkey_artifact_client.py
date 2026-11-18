@@ -20,7 +20,7 @@ class TestValkeyArtifactDownloadTrackingClient:
     async def valkey_client_with_cleanup(
         self,
         test_valkey_artifact: ValkeyArtifactDownloadTrackingClient,
-    ) -> AsyncGenerator[ValkeyArtifactDownloadTrackingClient, None]:
+    ) -> AsyncGenerator[ValkeyArtifactDownloadTrackingClient]:
         """Valkey client that auto-cleans artifact tracking data after each test"""
         yield test_valkey_artifact
 

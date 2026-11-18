@@ -96,7 +96,7 @@ _KEYPAIR_POLICY_DEFAULTS = {
 @pytest.fixture
 async def db(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(global_entity_ids, _TABLES):
         yield global_entity_ids
 

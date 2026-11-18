@@ -21,4 +21,3 @@ class NoopKernelRegistryWriter(AbstractKernelRegistryWriter):
     @override
     async def save_kernel(self, kernel: AbstractKernel) -> None:
         log.debug("kernel recovery data save skipped by noop writer")
-        return

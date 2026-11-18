@@ -30,7 +30,7 @@ class TestVFSStorageRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -50,7 +50,7 @@ class TestVFSStorageRepository:
     async def sample_vfs_storage_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample VFS storage directly in DB and return its ID"""
         storage_id = uuid.uuid4()
 
@@ -70,7 +70,7 @@ class TestVFSStorageRepository:
     async def sample_vfs_storages_for_filtering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create sample VFS storages with different hosts for filter testing"""
         storage_map: dict[str, uuid.UUID] = {}
         hosts = ["host-a", "host-b"]
@@ -94,7 +94,7 @@ class TestVFSStorageRepository:
     async def sample_vfs_storages_for_ordering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample VFS storages with predictable names for ordering tests"""
         storage_ids = []
         names = ["alpha-storage", "beta-storage", "gamma-storage", "delta-storage"]
@@ -118,7 +118,7 @@ class TestVFSStorageRepository:
     async def sample_vfs_storages_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 VFS storages for pagination testing"""
         storage_ids = []
 

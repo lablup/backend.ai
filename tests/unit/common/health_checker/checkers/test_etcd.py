@@ -19,7 +19,7 @@ class TestEtcdHealthChecker:
         self,
         etcd_container: tuple[str, HostPortPairModel],
         test_ns: str,
-    ) -> AsyncGenerator[AsyncEtcd, None]:
+    ) -> AsyncGenerator[AsyncEtcd]:
         """Create an AsyncEtcd client connected to the test container."""
         _container_id, etcd_addr = etcd_container
 

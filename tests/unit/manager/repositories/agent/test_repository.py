@@ -163,7 +163,7 @@ class TestAgentRepositoryDB:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -318,7 +318,7 @@ class TestAgentRepositoryDB:
     async def resource_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ResourceGroupFixtureData, None]:
+    ) -> AsyncGenerator[ResourceGroupFixtureData]:
         """Create default scaling group in database"""
         name = str(uuid4())
         resource_group_id = ResourceGroupID(uuid4())
@@ -346,7 +346,7 @@ class TestAgentRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         resource_group: ResourceGroupFixtureData,
-    ) -> AsyncGenerator[AgentFixtureData, None]:
+    ) -> AsyncGenerator[AgentFixtureData]:
         """Create an alive agent in database"""
         agent_id = AgentId(str(uuid4()))
         async with db_with_cleanup.begin_session() as db_sess:
@@ -376,7 +376,7 @@ class TestAgentRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         resource_group: ResourceGroupFixtureData,
-    ) -> AsyncGenerator[AgentFixtureData, None]:
+    ) -> AsyncGenerator[AgentFixtureData]:
         """Create a lost agent in database"""
         agent_id = AgentId(str(uuid4()))
         async with db_with_cleanup.begin_session() as db_sess:
@@ -685,7 +685,7 @@ class TestAgentRepositoryDB:
     async def default_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ResourceGroupFixtureData, None]:
+    ) -> AsyncGenerator[ResourceGroupFixtureData]:
         """Create a scaling group marked as the default (is_default=True)."""
         name = str(uuid4())
         resource_group_id = ResourceGroupID(uuid4())
@@ -1068,7 +1068,7 @@ class TestAgentRepositoryCache:
     async def valkey_image_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyImageClient, None]:
+    ) -> AsyncGenerator[ValkeyImageClient]:
         """Create ValkeyImageClient with real Redis container"""
         _, redis_addr = redis_container
 
@@ -1091,7 +1091,7 @@ class TestAgentRepositoryCache:
     async def valkey_live_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyLiveClient, None]:
+    ) -> AsyncGenerator[ValkeyLiveClient]:
         """Create ValkeyLiveClient with real Redis container"""
         _, redis_addr = redis_container
 
@@ -1114,7 +1114,7 @@ class TestAgentRepositoryCache:
     async def valkey_stat_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyStatClient, None]:
+    ) -> AsyncGenerator[ValkeyStatClient]:
         """Create ValkeyStatClient with real Redis container"""
         _, redis_addr = redis_container
 
@@ -1154,7 +1154,7 @@ class TestAgentRepositoryCache:
         valkey_live_client: ValkeyLiveClient,
         valkey_stat_client: ValkeyStatClient,
         mock_config_provider: MagicMock,
-    ) -> AsyncGenerator[AgentRepository, None]:
+    ) -> AsyncGenerator[AgentRepository]:
         """Create AgentRepository with real Redis clients and mock database"""
         repo = AgentRepository(
             db=mock_database_engine,
@@ -1195,7 +1195,7 @@ class TestAgentDBSourceKernelFiltering:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables for kernel filtering tests"""
         async with with_tables(
             database_connection,
@@ -1252,7 +1252,7 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db_with_tables: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create default domain"""
         domain_name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
@@ -1270,7 +1270,7 @@ class TestAgentDBSourceKernelFiltering:
     async def test_resource_policy(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create default project resource policy"""
         policy_name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
@@ -1289,7 +1289,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
         test_domain: str,
         test_resource_policy: str,
-    ) -> AsyncGenerator[tuple[str, str], None]:
+    ) -> AsyncGenerator[tuple[str, str]]:
         """Create default group"""
         group_id = uuid4()
         async with db_with_tables.begin_session() as db_sess:
@@ -1310,7 +1310,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
         test_domain: str,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         """Create a user to own the seeded sessions and kernels"""
         policy_name = str(uuid4())
         user_uuid = uuid4()
@@ -1342,7 +1342,7 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db_with_tables: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create default scaling group"""
         name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
@@ -1365,7 +1365,7 @@ class TestAgentDBSourceKernelFiltering:
     async def db_source(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[AgentDBSource, None]:
+    ) -> AsyncGenerator[AgentDBSource]:
         """Create AgentDBSource for testing"""
         db_source = AgentDBSource(db_with_tables, ShareOpsProvider(db_with_tables))
         yield db_source

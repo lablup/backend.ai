@@ -77,7 +77,7 @@ class TestSyncInstalledImagesIntegration:
     async def valkey_image_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyImageClient, None]:
+    ) -> AsyncGenerator[ValkeyImageClient]:
         """Create ValkeyImageClient with real Redis container."""
         _, redis_addr = redis_container
 
@@ -102,7 +102,7 @@ class TestSyncInstalledImagesIntegration:
     async def valkey_live_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyLiveClient, None]:
+    ) -> AsyncGenerator[ValkeyLiveClient]:
         """Create ValkeyLiveClient with real Redis container."""
         _, redis_addr = redis_container
 
@@ -125,7 +125,7 @@ class TestSyncInstalledImagesIntegration:
     async def valkey_stat_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyStatClient, None]:
+    ) -> AsyncGenerator[ValkeyStatClient]:
         """Create ValkeyStatClient with real Redis container."""
         _, redis_addr = redis_container
 
@@ -158,7 +158,7 @@ class TestSyncInstalledImagesIntegration:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,

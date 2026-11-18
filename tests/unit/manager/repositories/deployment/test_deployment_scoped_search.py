@@ -107,7 +107,7 @@ class TestDeploymentScopedSearch:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -146,7 +146,7 @@ class TestDeploymentScopedSearch:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[TestData, None]:
+    ) -> AsyncGenerator[TestData]:
         """One owner with 2 endpoints in project A and 1 in project B; one user with none."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())

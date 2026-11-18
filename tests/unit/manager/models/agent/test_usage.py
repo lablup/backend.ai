@@ -57,7 +57,7 @@ class TestAgentUsage:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -83,7 +83,7 @@ class TestAgentUsage:
     async def usage(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[UsageFixture, None]:
+    ) -> AsyncGenerator[UsageFixture]:
         """Two agents, one of which runs the session's only kernel."""
         suffix = uuid.uuid4().hex[:8]
         domain_id = DomainID(uuid.uuid4())

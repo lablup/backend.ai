@@ -31,7 +31,7 @@ from .shelf_search import ShelfSearches
 @pytest.fixture
 async def shelf_db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [CategoryRow, ShelfRow, SpecRow, BoxRow, ShelfItemRow, CartRow, CartLineRow],

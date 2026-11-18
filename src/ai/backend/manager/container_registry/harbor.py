@@ -476,11 +476,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         architecture = config_data.get("architecture")
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
+        elif tag.endswith(("-arm64", "-aarch64")):
+            architecture = "aarch64"
         else:
-            if tag.endswith(("-arm64", "-aarch64")):
-                architecture = "aarch64"
-            else:
-                architecture = "x86_64"
+            architecture = "x86_64"
 
         manifests = {
             architecture: {

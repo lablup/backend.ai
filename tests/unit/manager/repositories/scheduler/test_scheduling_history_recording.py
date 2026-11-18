@@ -133,7 +133,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -178,7 +178,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -201,7 +201,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -227,7 +227,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -247,7 +247,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test user resource policy and return policy name."""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -268,7 +268,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test keypair resource policy and return policy name."""
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
 
@@ -297,7 +297,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -323,7 +323,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
 
@@ -349,7 +349,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -373,7 +373,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_image_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ImageID, None]:
+    ) -> AsyncGenerator[ImageID]:
         """Register a container registry and one image, and return the image id."""
         registry_id = uuid.uuid4()
         image_id = ImageID(uuid.uuid4())
@@ -414,7 +414,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def resource_slot_types(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Register the slot types the requested amounts refer to."""
         async with db_with_cleanup.begin_session() as db_sess:
             for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
@@ -429,7 +429,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Provision the user's and the project's virtual entities.
 
         Existing deployments carry them from the backfill migration; a session joins
@@ -1419,7 +1419,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -1460,7 +1460,7 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -1483,7 +1483,7 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -1510,7 +1510,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1530,7 +1530,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test user resource policy and return policy name."""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1551,7 +1551,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test keypair resource policy and return policy name."""
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1580,7 +1580,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -1606,7 +1606,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
 
@@ -1632,7 +1632,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -1658,7 +1658,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test agent and return agent ID."""
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
 

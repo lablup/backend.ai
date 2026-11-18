@@ -903,7 +903,7 @@ class AbstractAgent[
     _deferred_destroys: dict[KernelId, list[ContainerLifecycleEvent]]
 
     @contextmanager
-    def track_pull(self, image: str) -> Generator[bool, None, None]:
+    def track_pull(self, image: str) -> Generator[bool]:
         """Context manager to track pull operations."""
         # Check if image is already being pulled
         if image in self._active_pulls:
@@ -919,9 +919,7 @@ class AbstractAgent[
             self._active_pulls.pop(image, None)
 
     @contextmanager
-    def track_create(
-        self, kernel_id: KernelId, session_id: SessionId
-    ) -> Generator[bool, None, None]:
+    def track_create(self, kernel_id: KernelId, session_id: SessionId) -> Generator[bool]:
         """Context manager to track kernel creation operations."""
         # Check if kernel is already being created
         if kernel_id in self._active_creates:
@@ -2662,10 +2660,9 @@ class AbstractAgent[
                         session_id=session_id,
                     )
             await self.reconstruct_resource_usage()
-        else:
-            if self.kernel_registry.get(kernel_id) is registered:
-                # A failed re-creation ends the kernel: CLEAN must forget it, not keep it.
-                self.restarting_kernels.pop(kernel_id, None)
+        elif self.kernel_registry.get(kernel_id) is registered:
+            # A failed re-creation ends the kernel: CLEAN must forget it, not keep it.
+            self.restarting_kernels.pop(kernel_id, None)
         if deferred:
             # Held while this create had no container; sent now with the one it made, if any.
             container_id = registered.container_id if registered is not None else None
@@ -2779,10 +2776,9 @@ class AbstractAgent[
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:
                     environ["LOCAL_USER_ID"] = str(ouid)
-                else:
-                    if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                        uid = self.local_config.container.kernel_uid
-                        environ["LOCAL_USER_ID"] = str(uid)
+                elif KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    uid = self.local_config.container.kernel_uid
+                    environ["LOCAL_USER_ID"] = str(uid)
 
                 sgids = set(ctx.get_supplementary_gids() or [])
                 kernel_gid: int = self.local_config.container.kernel_gid
@@ -2790,9 +2786,8 @@ class AbstractAgent[
                     environ["LOCAL_GROUP_ID"] = str(ogid)
                     if KernelFeatures.UID_MATCH in ctx.kernel_features:
                         sgids.add(kernel_gid)
-                else:
-                    if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                        environ["LOCAL_GROUP_ID"] = str(kernel_gid)
+                elif KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    environ["LOCAL_GROUP_ID"] = str(kernel_gid)
 
                 environ.update(
                     await ctx.get_extra_envs(),

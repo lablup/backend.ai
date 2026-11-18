@@ -138,19 +138,17 @@ def _glob(
                         # Keep searching - queue without suffix match
                         should_queue = True
                         new_suffix_match = False
-                else:
-                    # Already found a matching directory - only queue if this also matches
-                    if any(item.match(pattern) for pattern in match_patterns):
-                        should_queue = True
-                        new_suffix_match = True
+                # Already found a matching directory - only queue if this also matches
+                elif any(item.match(pattern) for pattern in match_patterns):
+                    should_queue = True
+                    new_suffix_match = True
 
                 if should_queue:
                     q.append((item, new_suffix_match))
-            else:
-                if item.name == filename:
-                    # Yield file if no patterns or current directory matches
-                    if match_patterns is None or current_matches:
-                        yield item
+            elif item.name == filename:
+                # Yield file if no patterns or current directory matches
+                if match_patterns is None or current_matches:
+                    yield item
 
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:

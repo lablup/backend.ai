@@ -66,7 +66,7 @@ def create_test_password_info(password: str) -> PasswordInfo:
 @pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Database connection with tables created for test_utils tests."""
     async with with_tables(
         database_connection,
@@ -104,7 +104,7 @@ async def db_with_cleanup(
 @pytest.fixture
 async def session_info(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[tuple[str, Any], None]:
+) -> AsyncGenerator[tuple[str, Any]]:
     """Create test session data for sql_json_merge and aggregate function tests."""
     user_uuid = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]

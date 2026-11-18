@@ -86,13 +86,12 @@ async def check_params(
                 ),
                 content_type="application/problem+json",
             )
+    elif read_from == CheckParamSource.BODY:
+        raw_params = await request.json()
+    elif read_from == CheckParamSource.QUERY:
+        raw_params = request.query
     else:
-        if read_from == CheckParamSource.BODY:
-            raw_params = await request.json()
-        elif read_from == CheckParamSource.QUERY:
-            raw_params = request.query
-        else:
-            raise InvalidConfigurationSourceError("Invalid source for check_params() helper")
+        raise InvalidConfigurationSourceError("Invalid source for check_params() helper")
     try:
         if checker is None:
             yield None

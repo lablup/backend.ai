@@ -1880,7 +1880,7 @@ def main(
                 child_exit_monitor = ChildExitMonitor(child_statuses)
 
                 @aiotools.main_context
-                def server_main_ctx() -> Generator[None, signal.Signals, None]:
+                def server_main_ctx() -> Generator[None, signal.Signals]:
                     """Tear the supervisor down when a worker dies outside the shutdown
                     path, so that the service manager sees a failed unit instead of a
                     supervisor with no worker."""

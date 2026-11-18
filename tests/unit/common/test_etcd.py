@@ -547,7 +547,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -575,7 +575,7 @@ class TestWatchExponentialBackoff:
             "message": "h2 protocol error: error reading a body from connection",
         })
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -597,7 +597,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -626,7 +626,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_initial_failures:
@@ -660,7 +660,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -688,7 +688,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:

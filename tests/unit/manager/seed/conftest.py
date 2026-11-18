@@ -354,7 +354,7 @@ def registered_models() -> None:
 async def db(
     registered_models: None,
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(global_entity_ids, _SEED_TABLES):
         yield global_entity_ids
 

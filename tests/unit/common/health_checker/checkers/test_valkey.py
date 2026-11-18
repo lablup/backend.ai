@@ -20,7 +20,7 @@ class TestValkeyHealthChecker:
     async def valkey_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyStandaloneClient, None]:
+    ) -> AsyncGenerator[ValkeyStandaloneClient]:
         """Create a Valkey standalone client connected to the test container."""
         _container_id, hostport_pair = redis_container
 

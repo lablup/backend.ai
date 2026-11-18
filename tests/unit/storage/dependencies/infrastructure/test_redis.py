@@ -48,7 +48,7 @@ class TestRedisProvider:
         self,
         storage_config: StorageProxyUnifiedConfig,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[AsyncEtcd, None]:
+    ) -> AsyncGenerator[AsyncEtcd]:
         """Create an etcd client for testing."""
         _redis_container_id, redis_addr = redis_container
 

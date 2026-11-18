@@ -87,7 +87,7 @@ class TestDeploymentRevisionRow:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -137,7 +137,7 @@ class TestDeploymentRevisionRow:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DomainRow, None]:
+    ) -> AsyncGenerator[DomainRow]:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
@@ -161,7 +161,7 @@ class TestDeploymentRevisionRow:
     async def test_user_resource_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[UserResourcePolicyRow, None]:
+    ) -> AsyncGenerator[UserResourcePolicyRow]:
         """Create test user resource policy."""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -184,7 +184,7 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_user_resource_policy: UserResourcePolicyRow,
-    ) -> AsyncGenerator[UserRow, None]:
+    ) -> AsyncGenerator[UserRow]:
         """Create test user."""
         async with db_with_cleanup.begin_session() as db_sess:
             user = UserRow(
@@ -210,7 +210,7 @@ class TestDeploymentRevisionRow:
     async def test_project_resource_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ProjectResourcePolicyRow, None]:
+    ) -> AsyncGenerator[ProjectResourcePolicyRow]:
         """Create test project resource policy."""
         policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
 
@@ -232,7 +232,7 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_project_resource_policy: ProjectResourcePolicyRow,
-    ) -> AsyncGenerator[ProjectRow, None]:
+    ) -> AsyncGenerator[ProjectRow]:
         """Create test group."""
         async with db_with_cleanup.begin_session() as db_sess:
             group = ProjectRow(
@@ -254,7 +254,7 @@ class TestDeploymentRevisionRow:
     async def test_image(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ImageRow, None]:
+    ) -> AsyncGenerator[ImageRow]:
         """Create test image."""
         registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
@@ -289,7 +289,7 @@ class TestDeploymentRevisionRow:
     async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ResourceGroupRow, None]:
+    ) -> AsyncGenerator[ResourceGroupRow]:
         """Create test scaling group."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -312,7 +312,7 @@ class TestDeploymentRevisionRow:
     async def test_runtime_variant(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[RuntimeVariantRow, None]:
+    ) -> AsyncGenerator[RuntimeVariantRow]:
         """Create a test runtime variant row."""
         async with db_with_cleanup.begin_session() as db_sess:
             variant = RuntimeVariantRow(
@@ -333,7 +333,7 @@ class TestDeploymentRevisionRow:
         test_user: UserRow,
         test_image: ImageRow,
         test_scaling_group: ResourceGroupRow,
-    ) -> AsyncGenerator[EndpointRow, None]:
+    ) -> AsyncGenerator[EndpointRow]:
         """Create test endpoint without an initial deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(

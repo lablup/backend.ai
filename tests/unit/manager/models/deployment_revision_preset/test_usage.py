@@ -96,7 +96,7 @@ class TestDeploymentUsage:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -132,7 +132,7 @@ class TestDeploymentUsage:
     async def usage(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[UsageFixture, None]:
+    ) -> AsyncGenerator[UsageFixture]:
         """One deployment with a single revision naming one variant and one preset."""
         suffix = uuid.uuid4().hex[:8]
         domain_id = DomainID(uuid.uuid4())

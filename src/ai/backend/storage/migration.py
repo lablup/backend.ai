@@ -129,9 +129,8 @@ async def upgrade_2_to_3(
             if depth < 2:
                 if p.is_dir() and rx_two_digits_hex.search(p.name):
                     yield from scan_vfolders(p, depth=depth + 1)
-            else:
-                if p.is_dir() and rx_rest_digits_hex.search(p.name):
-                    yield p
+            elif p.is_dir() and rx_rest_digits_hex.search(p.name):
+                yield p
 
     targets = [*scan_vfolders(volume.mount_path)]
     created_quota_scopes: set[str] = set()

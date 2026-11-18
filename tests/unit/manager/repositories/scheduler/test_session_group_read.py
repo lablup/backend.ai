@@ -49,7 +49,7 @@ from .conftest import _SCHEDULER_ROWS
 @pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """The scheduler table set plus the tables a deployment's group is held through."""
     async with with_tables(database_connection, [*_SCHEDULER_ROWS, EndpointRow, ReplicaGroupRow]):
         yield database_connection

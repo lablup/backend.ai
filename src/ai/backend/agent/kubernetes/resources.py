@@ -93,5 +93,4 @@ async def get_resource_spec_from_container(container_info: Any) -> KernelResourc
         if mount["Target"] == "/home/config":
             async with aiofiles.open(Path(mount["Source"]) / "resource.txt") as f:
                 return await KernelResourceSpec.aread_from_file(f)
-    else:
-        return None
+    return None

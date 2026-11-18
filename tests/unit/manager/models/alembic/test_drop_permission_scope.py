@@ -71,7 +71,7 @@ _REWRITTEN_PRESET = uuid.UUID("776c1366-dcf3-5abd-b8de-bc3ad3b759ad")
 @pytest.fixture
 async def db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, _TABLES):
         yield database_connection
 

@@ -1581,11 +1581,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             # for backward compatibility.
             # TODO: remove this part after `project_id` argument is fully deprecated
             _scope_id = ProjectScope(project_id)
+        elif scope_id is None:
+            _scope_id = SystemScope()
         else:
-            if scope_id is None:
-                _scope_id = SystemScope()
-            else:
-                _scope_id = scope_id
+            _scope_id = scope_id
         return await VirtualFolderNode.get_accessible_connection(
             info,
             _scope_id,
@@ -2635,11 +2634,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             # for backward compatibility.
             # TODO: remove this part after `project_id` argument is fully deprecated
             final_scope_id = ProjectScope(project_id)
+        elif scope_id is None:
+            final_scope_id = SystemScope()
         else:
-            if scope_id is None:
-                final_scope_id = SystemScope()
-            else:
-                final_scope_id = scope_id
+            final_scope_id = scope_id
         return await ComputeSessionNode.get_accessible_connection(
             info,
             final_scope_id,

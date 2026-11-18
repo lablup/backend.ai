@@ -505,11 +505,10 @@ class StreamHandler:
                             f"Service {service} does not open the port number {params.port}."
                         ) from e
                     host_port = sport["host_ports"][hport_idx]
+                elif "host_ports" not in sport:
+                    host_port = sport["host_port"]
                 else:
-                    if "host_ports" not in sport:
-                        host_port = sport["host_port"]
-                    else:
-                        host_port = sport["host_ports"][0]
+                    host_port = sport["host_ports"][0]
                 dest = (kernel_host, host_port)
                 break
         else:

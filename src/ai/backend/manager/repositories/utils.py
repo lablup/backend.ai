@@ -16,7 +16,7 @@ def suppress_with_log(
     exceptions: list[type[BaseException]],
     message: str | None = None,
     log_level: int = logging.WARNING,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """
     Context manager that suppresses specified exceptions and logs them.
 
