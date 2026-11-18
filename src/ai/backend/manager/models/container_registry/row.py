@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -16,7 +15,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.errors.container_registry import InvalidContainerRegistryURL
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.models.base import (
     GUID,
@@ -28,8 +26,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.association_container_registries_groups.row import (
         AssociationContainerRegistriesGroupsRow,
     )
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ContainerRegistryRow",
