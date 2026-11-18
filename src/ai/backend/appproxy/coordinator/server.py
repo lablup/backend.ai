@@ -274,11 +274,11 @@ async def exception_middleware(
                 http_status=ex.status_code,
             )
             raise GenericBadRequest from ex
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             # The server is closing or the client has disconnected in the middle of
             # request.  Atomic requests are still executed to their ends.
             log.trace("request cancelled", http_method=method, route_path=endpoint)
-            raise e
+            raise
         except Exception as e:
             if is_client_disconnect(request, e):
                 log.trace(

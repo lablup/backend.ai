@@ -58,9 +58,5 @@ class H2Frontend(BaseFrontend[H2Backend]):
             log.debug("nghttpx {}: {}", log_header_postfix, line.decode("utf-8"))
 
     async def _proc_monitor_task(self, proc: subprocess.Process) -> None:
-        try:
-            await proc.wait()
-        except asyncio.CancelledError:
-            raise  # process did not terminate before task cleanup
-        else:
-            log.error("E20010: nghttpx terminated unexpectedly", exit_code=proc.returncode)
+        await proc.wait()
+        log.error("E20010: nghttpx terminated unexpectedly", exit_code=proc.returncode)

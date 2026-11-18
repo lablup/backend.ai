@@ -34,8 +34,6 @@ def toml_get(filepath: str, key: str) -> str:
             else:
                 table = table[k]  # type: ignore
         return table  # type: ignore
-    except NonExistentKey:
-        raise
     finally:
         if isinstance(file, io.BufferedIOBase):
             file.close()

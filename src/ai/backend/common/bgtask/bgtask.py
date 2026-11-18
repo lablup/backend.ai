@@ -534,7 +534,7 @@ class BackgroundTaskManager:
             except Exception as e:
                 task_status = TaskStatus.FAILURE
                 last_message = f"Task failed with exception: {e}"
-                raise e
+                raise
             finally:
                 await self._finish_subtask(task_id, subkey, task_status, last_message)
 
@@ -563,7 +563,7 @@ class BackgroundTaskManager:
             except Exception as e:
                 task_status = TaskStatus.FAILURE
                 last_message = f"Task failed with exception: {e}"
-                raise e
+                raise
             finally:
                 await self._finish_subtask(task_info.task_id, task_key, task_status, last_message)
 

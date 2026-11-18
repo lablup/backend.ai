@@ -203,9 +203,6 @@ class WebSocketProxy:
                 elif msg.type == aiohttp.WSMsgType.CLOSE:
                     break
             # here, client gracefully disconnected
-        except asyncio.CancelledError:
-            # here, client forcibly disconnected
-            raise
         finally:
             await self.close_downstream()
 
