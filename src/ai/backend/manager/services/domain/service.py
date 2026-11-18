@@ -2,23 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.dotfile import DotfilePath
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.dotfile.types import DotfileEntries
-from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
-from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
-    CreateDomainDotfileAction,
-    CreateDomainDotfileActionResult,
-)
-from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
-    DeleteDomainDotfileAction,
-    DeleteDomainDotfileActionResult,
-)
 from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
     GlobalSearchDomainContainerRegistryRelationsAction,
     GlobalSearchDomainContainerRegistryRelationsActionResult,
@@ -34,10 +22,6 @@ from ai.backend.manager.services.domain.actions.scoped_search_container_registry
 from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
     UpdateDomainContainerRegistryRelationsAction,
     UpdateDomainContainerRegistryRelationsActionResult,
-)
-from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
-    UpdateDomainDotfileAction,
-    UpdateDomainDotfileActionResult,
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -91,39 +75,3 @@ class DomainService:
     async def purge(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         domain_data = await self._repository.purge_domain(action.domain_id, action.name)
         return PurgeDomainActionResult(domain_data=domain_data)
-
-    async def create_dotfile(
-        self, action: CreateDomainDotfileAction
-    ) -> CreateDomainDotfileActionResult:
-        DotfilePath(action.entry.path)
-        domain_id, current = await self._read_dotfiles(action.name)
-        entries = current.added(action.entry)
-        await self._write_dotfiles(domain_id, entries)
-        return CreateDomainDotfileActionResult(entries=entries.entries)
-
-    async def update_dotfile(
-        self, action: UpdateDomainDotfileAction
-    ) -> UpdateDomainDotfileActionResult:
-        DotfilePath(action.entry.path)
-        domain_id, current = await self._read_dotfiles(action.name)
-        entries = current.replaced(action.entry)
-        await self._write_dotfiles(domain_id, entries)
-        return UpdateDomainDotfileActionResult(entries=entries.entries)
-
-    async def delete_dotfile(
-        self, action: DeleteDomainDotfileAction
-    ) -> DeleteDomainDotfileActionResult:
-        domain_id, current = await self._read_dotfiles(action.name)
-        entries = current.removed(action.path)
-        await self._write_dotfiles(domain_id, entries)
-        return DeleteDomainDotfileActionResult(entries=entries.entries)
-
-    async def _read_dotfiles(self, name: str) -> tuple[DomainID, DotfileEntries]:
-        """The domain's id alongside its entries, so the write keys on the id it read."""
-        data = await self._repository.get_domain(name)
-        return data.id, DotfileEntries.unpack(data.dotfiles)
-
-    async def _write_dotfiles(self, domain_id: DomainID, entries: DotfileEntries) -> None:
-        await self._repository.update_dotfiles(
-            DomainDotfilesUpdater(domain_id=domain_id, dotfiles=entries.pack())
-        )

@@ -4687,6 +4687,8 @@ input CreateDomainNodeInput
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
   integration_id: String = null
+
+  """Deprecated: use the auto-generated file API."""
   dotfiles: Bytes = "90"
   scaling_groups: [String]
 }
@@ -7832,7 +7834,7 @@ type DomainNode implements Node
   total_resource_slots: JSONString @join__field(graph: GRAPHENE)
   allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
   allowed_docker_registries: [String] @join__field(graph: GRAPHENE)
-  dotfiles: Bytes @join__field(graph: GRAPHENE)
+  dotfiles: Bytes @join__field(graph: GRAPHENE) @deprecated(reason: "Use the auto-generated file API.")
   integration_id: String @join__field(graph: GRAPHENE)
   scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection @join__field(graph: GRAPHENE)
 }
@@ -13896,6 +13898,8 @@ input ModifyDomainNodeInput
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
   integration_id: String
+
+  """Deprecated: use the auto-generated file API."""
   dotfiles: Bytes
   sgroups_to_add: [String]
   sgroups_to_remove: [String]

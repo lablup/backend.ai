@@ -5,7 +5,11 @@ import pytest
 from ai.backend.common import msgpack
 from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.data.dotfile.types import (
+    MAXIMUM_DOTFILE_COUNT,
+    DotfileEntries,
+    DotfileEntry,
+)
 
 
 class TestVerifyPaths:
@@ -39,6 +43,13 @@ class TestVerifyPacked:
     )
     def test_accepts_entries_under_work_dir(self, packed: bytes) -> None:
         DotfileEntries.verify_packed(packed)
+
+    def test_rejects_more_entries_than_the_limit(self) -> None:
+        packed = msgpack.packb([
+            {"path": f".f{i}", "perm": "644", "data": ""} for i in range(MAXIMUM_DOTFILE_COUNT + 1)
+        ])
+        with pytest.raises(InvalidAPIParameters):
+            DotfileEntries.verify_packed(packed)
 
     def test_rejects_path_by_path_rule(self) -> None:
         with pytest.raises(InvalidDotfilePath):

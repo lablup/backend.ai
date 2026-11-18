@@ -704,7 +704,7 @@ type DomainNode implements Node @key(fields: "id") {
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  dotfiles: Bytes
+  dotfiles: Bytes @deprecated(reason: "Use the auto-generated file API.")
   integration_id: String
   scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection
 }
@@ -2679,6 +2679,8 @@ input CreateDomainNodeInput {
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
   integration_id: String = null
+
+  """Deprecated: use the auto-generated file API."""
   dotfiles: Bytes = "90"
   scaling_groups: [String]
 }
@@ -2700,6 +2702,8 @@ input ModifyDomainNodeInput {
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
   integration_id: String
+
+  """Deprecated: use the auto-generated file API."""
   dotfiles: Bytes
   sgroups_to_add: [String]
   sgroups_to_remove: [String]

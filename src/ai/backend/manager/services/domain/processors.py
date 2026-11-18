@@ -24,15 +24,7 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
-from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
-    CreateDomainDotfileAction,
-    CreateDomainDotfileActionResult,
-)
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
-from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
-    DeleteDomainDotfileAction,
-    DeleteDomainDotfileActionResult,
-)
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
     GlobalSearchDomainContainerRegistryRelationsAction,
@@ -64,10 +56,6 @@ from ai.backend.manager.services.domain.actions.update_container_registry_relati
     UpdateDomainContainerRegistryRelationsActionResult,
 )
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
-from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
-    UpdateDomainDotfileAction,
-    UpdateDomainDotfileActionResult,
-)
 from ai.backend.manager.services.domain.service import DomainService
 
 
@@ -100,15 +88,6 @@ class DomainProcessors:
     global_search_container_registry_relations: GlobalActionProcessor[
         GlobalSearchDomainContainerRegistryRelationsAction,
         GlobalSearchDomainContainerRegistryRelationsActionResult,
-    ]
-    create_dotfile: SingleEntityActionProcessor[
-        CreateDomainDotfileAction, CreateDomainDotfileActionResult
-    ]
-    update_dotfile: SingleEntityActionProcessor[
-        UpdateDomainDotfileAction, UpdateDomainDotfileActionResult
-    ]
-    delete_dotfile: SingleEntityActionProcessor[
-        DeleteDomainDotfileAction, DeleteDomainDotfileActionResult
     ]
 
     def __init__(
@@ -144,6 +123,3 @@ class DomainProcessors:
         self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateDomainsAction)
         self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteDomainsAction)
         self.partial_bulk_restore = group.partial_bulk_restore_ops(PartialBulkRestoreDomainsAction)
-        self.create_dotfile = group.single_entity(CreateDomainDotfileAction, service.create_dotfile)
-        self.update_dotfile = group.single_entity(UpdateDomainDotfileAction, service.update_dotfile)
-        self.delete_dotfile = group.single_entity(DeleteDomainDotfileAction, service.delete_dotfile)
