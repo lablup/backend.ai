@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import pytest
 
@@ -31,7 +32,7 @@ def test_jwt_user_context_immutable() -> None:
     )
 
     with pytest.raises(AttributeError):
-        context.role = "admin"  # type: ignore
+        cast(Any, context).role = "admin"
 
 
 def test_jwt_claims_creation() -> None:

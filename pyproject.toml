@@ -122,6 +122,7 @@ select = [
     "UP",     # pyupgrade: modernizes Python syntax to latest version
     "A",      # flake8-builtins: prevents shadowing Python builtins
     "RET",    # flake8-return: enforces consistent return statement usage
+    "PGH003", # pygrep-hooks: forbids blanket type: ignore without rule codes
     "T20",    # flake8-print: detects print statements (should use logging)
     "TID251", # flake8-tidy-imports: enforce banned imports (pytest.mark.asyncio)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports

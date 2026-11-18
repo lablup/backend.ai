@@ -569,14 +569,14 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
+    def __init__(self, name: str | None, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
 
     @classmethod
     def from_session_id(cls, session_id: UUID) -> Self:
-        o = cls(None, None)  # type: ignore
+        o = cls(None, None)
         o.id = session_id
         return o
 
@@ -1483,14 +1483,14 @@ class InferenceSession(BaseFunction):
         """
         raise NotImplementedError
 
-    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
+    def __init__(self, name: str | None, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
 
     @classmethod
     def from_session_id(cls, session_id: UUID) -> InferenceSession:
-        o = cls(None, None)  # type: ignore
+        o = cls(None, None)
         o.id = session_id
         return o
 
