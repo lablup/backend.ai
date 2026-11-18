@@ -322,6 +322,21 @@ class TestStartSessionServiceInput:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartSessionServiceInput(service="jupyter", port=70000)
 
+    def test_interpolation(self) -> None:
+        result = StartSessionServiceInput.model_validate({
+            "service": "jupyter",
+            "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
+        })
+        assert result.interpolation is not None
+        assert [(d.start, d.end) for d in result.interpolation.delimiters] == [("{{", "}}")]
+
+    def test_interpolation_without_delimiters(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            StartSessionServiceInput.model_validate({
+                "service": "jupyter",
+                "interpolation": {"delimiters": []},
+            })
+
 
 class TestShutdownSessionServiceInput:
     """Tests for ShutdownSessionServiceInput model."""
