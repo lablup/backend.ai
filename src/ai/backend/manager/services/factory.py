@@ -89,7 +89,10 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
-from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
+from ai.backend.manager.data.bootstrap_script.types import (
+    BootstrapScriptData,
+    BootstrapScriptRevisionData,
+)
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
@@ -960,6 +963,12 @@ def create_processors(
             organization_groups.dangling_lookup_field_group(
                 FieldGroupMeta(BootstrapScriptFieldType()),
                 BootstrapScriptData,
+                LookupBootstrapScriptOwnerAction,
+                LookupBulkBootstrapScriptOwnerAction,
+            ),
+            organization_groups.dangling_lookup_field_group(
+                FieldGroupMeta(BootstrapScriptFieldType()),
+                BootstrapScriptRevisionData,
                 LookupBootstrapScriptOwnerAction,
                 LookupBulkBootstrapScriptOwnerAction,
             ),

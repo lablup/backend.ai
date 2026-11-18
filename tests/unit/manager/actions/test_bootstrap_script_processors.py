@@ -16,7 +16,10 @@ from ai.backend.common.data.entity.bootstrap_script import (
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
+from ai.backend.manager.data.bootstrap_script.types import (
+    BootstrapScriptData,
+    BootstrapScriptRevisionData,
+)
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.bootstrap_script.row import (
@@ -108,6 +111,12 @@ def processors(ops_db: ExtendedAsyncSAEngine) -> BootstrapScriptProcessors:
         harness.registry.dangling_lookup_field_group(
             FieldGroupMeta(BootstrapScriptFieldType()),
             BootstrapScriptData,
+            LookupBootstrapScriptOwnerAction,
+            LookupBulkBootstrapScriptOwnerAction,
+        ),
+        harness.registry.dangling_lookup_field_group(
+            FieldGroupMeta(BootstrapScriptFieldType()),
+            BootstrapScriptRevisionData,
             LookupBootstrapScriptOwnerAction,
             LookupBulkBootstrapScriptOwnerAction,
         ),
