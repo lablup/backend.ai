@@ -15,32 +15,29 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.dto.manager.artifact.request import (
+    ArtifactPathParam,
+    ArtifactRevisionPathParam,
+    CancelImportTaskRequest,
+    CleanupRevisionsRequest,
+    ImportArtifactsRequest,
+    UpdateArtifactRequest,
+)
+from ai.backend.common.dto.manager.artifact.response import (
+    ApproveRevisionResponse,
+    ArtifactRevisionImportTaskDTO,
+    CancelImportTaskResponse,
+    CleanupRevisionsResponse,
+    GetRevisionDownloadProgressResponse,
+    GetRevisionReadmeResponse,
+    ImportArtifactsResponse,
+    RejectRevisionResponse,
+    UpdateArtifactResponse,
+)
 from ai.backend.common.dto.storage.request import GetVerificationResultReq
 from ai.backend.common.dto.storage.response import GetVerificationResultResponse
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
-from ai.backend.manager.dto.request import (
-    ApproveArtifactRevisionReq,
-    CancelImportArtifactReq,
-    CleanupArtifactsReq,
-    GetArtifactRevisionReadmeReq,
-    GetDownloadProgressReqPathParam,
-    ImportArtifactsReq,
-    RejectArtifactRevisionReq,
-    UpdateArtifactReqBodyParam,
-    UpdateArtifactReqPathParam,
-)
-from ai.backend.manager.dto.response import (
-    ApproveArtifactRevisionResponse,
-    ArtifactRevisionImportTask,
-    CancelImportArtifactResponse,
-    CleanupArtifactsResponse,
-    GetArtifactRevisionReadmeResponse,
-    GetDownloadProgressResponse,
-    ImportArtifactsResponse,
-    RejectArtifactRevisionResponse,
-    UpdateArtifactResponse,
-)
+from ai.backend.manager.api.rest.artifact.converters import artifact_to_dto, revision_to_dto
 from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact.revision.actions.approve import (
@@ -90,7 +87,7 @@ class ArtifactHandler:
 
     async def cleanup_artifacts(
         self,
-        body: BodyParam[CleanupArtifactsReq],
+        body: BodyParam[CleanupRevisionsRequest],
     ) -> APIResponse:
         """
         Clean up stored artifact revision data to free storage space.
@@ -114,17 +111,14 @@ class ArtifactHandler:
             )
             cleaned_revisions.append(action_result.result)
 
-        resp = CleanupArtifactsResponse(
-            artifact_revisions=[
-                ArtifactRevisionResponseData.from_revision_data(revision)
-                for revision in cleaned_revisions
-            ],
+        resp = CleanupRevisionsResponse(
+            artifact_revisions=[revision_to_dto(revision) for revision in cleaned_revisions],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def cancel_import_artifact(
         self,
-        body: BodyParam[CancelImportArtifactReq],
+        body: BodyParam[CancelImportTaskRequest],
     ) -> APIResponse:
         """
         Cancel an in-progress artifact import operation.
@@ -139,14 +133,14 @@ class ArtifactHandler:
             )
         )
 
-        resp = CancelImportArtifactResponse(
-            artifact_revision=ArtifactRevisionResponseData.from_revision_data(action_result.result),
+        resp = CancelImportTaskResponse(
+            artifact_revision=revision_to_dto(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def approve_artifact_revision(
         self,
-        path: PathParam[ApproveArtifactRevisionReq],
+        path: PathParam[ArtifactRevisionPathParam],
     ) -> APIResponse:
         """
         Approve an artifact revision for general use.
@@ -161,14 +155,14 @@ class ArtifactHandler:
             )
         )
 
-        resp = ApproveArtifactRevisionResponse(
-            artifact_revision=ArtifactRevisionResponseData.from_revision_data(action_result.result),
+        resp = ApproveRevisionResponse(
+            artifact_revision=revision_to_dto(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def reject_artifact_revision(
         self,
-        path: PathParam[RejectArtifactRevisionReq],
+        path: PathParam[ArtifactRevisionPathParam],
     ) -> APIResponse:
         """
         Reject an artifact revision, preventing its use.
@@ -183,14 +177,14 @@ class ArtifactHandler:
             )
         )
 
-        resp = RejectArtifactRevisionResponse(
-            artifact_revision=ArtifactRevisionResponseData.from_revision_data(action_result.result),
+        resp = RejectRevisionResponse(
+            artifact_revision=revision_to_dto(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def import_artifacts(
         self,
-        body: BodyParam[ImportArtifactsReq],
+        body: BodyParam[ImportArtifactsRequest],
     ) -> APIResponse:
         """
         Import scanned artifact revisions from external registries.
@@ -207,7 +201,7 @@ class ArtifactHandler:
 
         # Process each artifact revision sequentially
         # TODO: Optimize with asyncio.gather() for parallel processing
-        force = body.parsed.options.force
+        force = body.parsed.options.force if body.parsed.options is not None else False
         for artifact_revision_id in body.parsed.artifact_revision_ids:
             # When using VFolderStorage (vfolder_id provided), store at root path
             storage_prefix = "/" if body.parsed.vfolder_id else None
@@ -221,11 +215,9 @@ class ArtifactHandler:
             )
             imported_revisions.append(action_result.result)
             tasks.append(
-                ArtifactRevisionImportTask(
+                ArtifactRevisionImportTaskDTO(
                     task_id=str(action_result.task_id),
-                    artifact_revision=ArtifactRevisionResponseData.from_revision_data(
-                        action_result.result
-                    ),
+                    artifact_revision=revision_to_dto(action_result.result),
                 )
             )
 
@@ -234,8 +226,8 @@ class ArtifactHandler:
 
     async def update_artifact(
         self,
-        path: PathParam[UpdateArtifactReqPathParam],
-        body: BodyParam[UpdateArtifactReqBodyParam],
+        path: PathParam[ArtifactPathParam],
+        body: BodyParam[UpdateArtifactRequest],
     ) -> APIResponse:
         """
         Update artifact metadata properties.
@@ -256,13 +248,13 @@ class ArtifactHandler:
         )
 
         resp = UpdateArtifactResponse(
-            artifact=action_result.result,
+            artifact=artifact_to_dto(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def get_artifact_revision_readme(
         self,
-        path: PathParam[GetArtifactRevisionReadmeReq],
+        path: PathParam[ArtifactRevisionPathParam],
     ) -> APIResponse:
         """
         Retrieve the README content for a specific artifact revision.
@@ -277,7 +269,7 @@ class ArtifactHandler:
             )
         )
 
-        resp = GetArtifactRevisionReadmeResponse(
+        resp = GetRevisionReadmeResponse(
             readme=action_result.readme_data.readme,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -306,7 +298,7 @@ class ArtifactHandler:
 
     async def get_download_progress(
         self,
-        path: PathParam[GetDownloadProgressReqPathParam],
+        path: PathParam[ArtifactRevisionPathParam],
     ) -> APIResponse:
         """
         Retrieve download progress for an artifact revision.
@@ -322,7 +314,7 @@ class ArtifactHandler:
             )
         )
 
-        resp = GetDownloadProgressResponse(
+        resp = GetRevisionDownloadProgressResponse(
             download_progress=action_result.download_progress,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

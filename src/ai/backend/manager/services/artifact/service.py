@@ -7,6 +7,22 @@ from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.dto.manager.artifact_registry.request import (
+    ArtifactFilterInput,
+    DelegateeTargetInput,
+    DelegateScanArtifactsRequest,
+    OffsetPaginationInput,
+    PaginationInput,
+    SearchArtifactsRequest,
+)
+from ai.backend.common.dto.manager.artifact_registry.response import (
+    DelegateScanArtifactsResponse,
+    SearchArtifactsResponse,
+)
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.artifact import types as v2_types
 from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqPathParam,
     HuggingFaceRetrieveModelReqQueryParam,
@@ -18,8 +34,8 @@ from ai.backend.manager.clients.artifact_registry.reservoir_client import Reserv
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
     ArtifactDataWithRevisions,
-    ArtifactFilterOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
@@ -27,15 +43,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.data.common.types import StringFilterData
-from ai.backend.manager.dto.request import (
-    DelegateScanArtifactsReq,
-    SearchArtifactsReq,
-)
-from ai.backend.manager.dto.response import (
-    DelegateScanArtifactsResponse,
-    SearchArtifactsResponse,
-)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.artifact import ArtifactRevisionNotFoundError
 from ai.backend.manager.errors.artifact_registry import (
@@ -96,7 +103,6 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
     UpsertArtifactsActionResult,
 )
-from ai.backend.manager.types import OffsetBasedPaginationOptions, PaginationOptions
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -208,13 +214,13 @@ class ArtifactService:
                             # Create filters from action parameters
                             filters = None
                             if action.search is not None:
-                                filters = ArtifactFilterOptions(
-                                    name_filter=StringFilterData(contains=action.search)
+                                filters = ArtifactFilterInput(
+                                    name_filter=StringFilter(contains=action.search)
                                 )
 
-                            req = SearchArtifactsReq(
-                                pagination=PaginationOptions(
-                                    offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
+                            req = SearchArtifactsRequest(
+                                pagination=PaginationInput(
+                                    offset=OffsetPaginationInput(offset=offset, limit=limit)
                                 ),
                                 filters=filters,
                             )
@@ -269,7 +275,7 @@ class ArtifactService:
                             try:
                                 # Try to get existing local revision to check current remote_status
                                 # If remote artifact is AVAILABLE and we were tracking it, update remote_status
-                                if response_revision.status in [
+                                if ArtifactStatus(response_revision.status.value) in [
                                     ArtifactStatus.AVAILABLE,
                                     ArtifactStatus.SCANNED,
                                     ArtifactStatus.FAILED,
@@ -283,12 +289,12 @@ class ArtifactService:
 
                             # Create full revision data with readme
                             full_revision = ArtifactRevisionData(
-                                id=response_revision.id,
-                                artifact_id=response_revision.artifact_id,
+                                id=ArtifactRevisionID(response_revision.id),
+                                artifact_id=ArtifactID(response_revision.artifact_id),
                                 version=response_revision.version,
                                 readme=readme,
                                 size=response_revision.size,
-                                status=response_revision.status,
+                                status=ArtifactStatus(response_revision.status.value),
                                 remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
@@ -299,9 +305,9 @@ class ArtifactService:
 
                         # Create full artifact data
                         full_artifact = ArtifactDataWithRevisions(
-                            id=response_artifact.id,
+                            id=ArtifactID(response_artifact.id),
                             name=response_artifact.name,
-                            type=response_artifact.type,
+                            type=ArtifactType(response_artifact.type.value),
                             description=response_artifact.description,
                             registry_id=response_artifact.registry_id,
                             source_registry_id=response_artifact.source_registry_id,
@@ -310,7 +316,7 @@ class ArtifactService:
                             scanned_at=response_artifact.scanned_at,
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
-                            availability=response_artifact.availability,
+                            availability=ArtifactAvailability(response_artifact.availability.value),
                             extra=response_artifact.extra,
                             revisions=full_revisions,
                         )
@@ -569,10 +575,19 @@ class ArtifactService:
         delegatee_reservoir_id = (
             action.delegatee_target.delegatee_reservoir_id if action.delegatee_target else None
         )
-        req = DelegateScanArtifactsReq(
+        req = DelegateScanArtifactsRequest(
             delegator_reservoir_id=delegatee_reservoir_id,
-            delegatee_target=action.delegatee_target,
-            artifact_type=action.artifact_type,
+            delegatee_target=(
+                DelegateeTargetInput(
+                    delegatee_reservoir_id=action.delegatee_target.delegatee_reservoir_id,
+                    target_registry_id=action.delegatee_target.target_registry_id,
+                )
+                if action.delegatee_target
+                else None
+            ),
+            artifact_type=(
+                v2_types.ArtifactType(action.artifact_type.value) if action.artifact_type else None
+            ),
             limit=action.limit,
             search=action.search,
             order=action.order,
@@ -593,12 +608,12 @@ class ArtifactService:
                 readme = parsed_resp.readme_data[response_revision.id]
 
                 remote_status = ArtifactRemoteStatus.SCANNED
-                if response_revision.status == ArtifactStatus.AVAILABLE:
+                if response_revision.status.value == ArtifactStatus.AVAILABLE:
                     remote_status = ArtifactRemoteStatus.AVAILABLE
 
                 full_revision = ArtifactRevisionData(
-                    id=response_revision.id,
-                    artifact_id=response_revision.artifact_id,
+                    id=ArtifactRevisionID(response_revision.id),
+                    artifact_id=ArtifactID(response_revision.artifact_id),
                     version=response_revision.version,
                     readme=readme.readme,
                     size=response_revision.size,
@@ -613,9 +628,9 @@ class ArtifactService:
 
             # Create full artifact data
             full_artifact = ArtifactDataWithRevisions(
-                id=response_artifact.id,
+                id=ArtifactID(response_artifact.id),
                 name=response_artifact.name,
-                type=response_artifact.type,
+                type=ArtifactType(response_artifact.type.value),
                 description=response_artifact.description,
                 registry_id=response_artifact.registry_id,
                 source_registry_id=response_artifact.source_registry_id,
@@ -624,7 +639,7 @@ class ArtifactService:
                 scanned_at=response_artifact.scanned_at,
                 updated_at=response_artifact.updated_at,
                 readonly=response_artifact.readonly,
-                availability=response_artifact.availability,
+                availability=ArtifactAvailability(response_artifact.availability.value),
                 extra=response_artifact.extra,
                 revisions=full_revisions,
             )
@@ -648,5 +663,8 @@ class ArtifactService:
             result=scanned_models,
             source_registry_id=parsed_resp.source_registry_id,
             source_registry_type=parsed_resp.source_registry_type,
-            readme_data=parsed_resp.readme_data,
+            readme_data={
+                revision_id: ArtifactRevisionReadme(readme=readme.readme)
+                for revision_id, readme in parsed_resp.readme_data.items()
+            },
         )

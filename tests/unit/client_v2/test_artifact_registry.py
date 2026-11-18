@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.artifact_registry import (
     SearchArtifactsRequest,
     SearchArtifactsResponse,
 )
+from ai.backend.common.dto.manager.v2.artifact.types import ArtifactType
 
 from .conftest import MockAuth
 
@@ -124,7 +125,7 @@ class TestScanOperations:
 
         request = ScanArtifactsRequest(
             registry_id=_SAMPLE_REGISTRY_ID,
-            artifact_type="MODEL",
+            artifact_type=ArtifactType.MODEL,
             limit=50,
             search="DialoGPT",
         )
@@ -187,7 +188,7 @@ class TestScanOperations:
         request = DelegateImportArtifactsRequest(
             artifact_revision_ids=[_SAMPLE_REVISION_ID],
             delegator_reservoir_id=_SAMPLE_REGISTRY_ID,
-            artifact_type="MODEL",
+            artifact_type=ArtifactType.MODEL,
             options=ImportArtifactsOptionsInput(force=True),
         )
         result = await client.delegate_import_artifacts(request)
