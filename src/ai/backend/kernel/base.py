@@ -352,7 +352,7 @@ class BaseRunner(metaclass=ABCMeta):
                             # self.init_jupyter_kernel()
                         except RuntimeError:
                             # Clean up for client and kernel will be done in `shutdown`.
-                            log.error("jupyter channel is not active!")
+                            log.exception("jupyter channel is not active!")
                             self.kernel_mgr = None
                     break
             else:
@@ -493,8 +493,8 @@ class BaseRunner(metaclass=ABCMeta):
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
-        except Exception as e:
-            log.exception("unexpected error: {}", e)
+        except Exception:
+            log.exception("unexpected error")
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
@@ -617,8 +617,8 @@ class BaseRunner(metaclass=ABCMeta):
                 allow_stdin=allow_stdin,
                 stdin_hook=stdin_hook if allow_stdin else None,
             )
-        except Exception as e:
-            log.exception(str(e))
+        except Exception:
+            log.exception("Failed to run the command")
             return 127
         return exit_code
 
@@ -1270,7 +1270,7 @@ class BaseRunner(metaclass=ABCMeta):
             except asyncio.CancelledError:
                 break
             except NotImplementedError:
-                log.error("Unsupported operation for this kernel: {0}", op_type)
+                log.exception("Unsupported operation for this kernel: {0}", op_type)
                 await asyncio.sleep(0)
             except Exception:
                 log.exception("main_loop: unexpected error")
