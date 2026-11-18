@@ -3,7 +3,7 @@ from __future__ import annotations
 import urllib
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextvars import ContextVar
-from typing import Any, override
+from typing import Any, cast, override
 
 import aiotools
 import yarl
@@ -57,7 +57,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
                 flattened_key = key_prefix + "/" + urllib.parse.quote(k, safe="")
             match v:
                 case Mapping():
-                    flattened_dict.update(cls.flatten(flattened_key, v))  # type: ignore
+                    flattened_dict.update(cls.flatten(flattened_key, cast(NestedStrKeyedDict, v)))
                 case str():
                     flattened_dict[flattened_key] = v
                 case int() | float() | yarl.URL():

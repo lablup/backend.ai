@@ -5,8 +5,13 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
+<<<<<<< HEAD
 from decimal import Decimal
 from typing import Any
+=======
+from datetime import datetime
+from typing import Any, cast
+>>>>>>> d62855f0f (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -107,8 +112,8 @@ async def registry_ctx() -> AsyncGenerator[
     mock_event_hub.subscribe = AsyncMock()
     mock_event_hub.unsubscribe = AsyncMock()
 
-    hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
-    network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
+    hook_plugin_ctx = HookPluginContext(cast(Any, mocked_etcd), {})
+    network_plugin_ctx = NetworkPluginContext(cast(Any, mocked_etcd), {})
 
     mock_scheduling_controller = AsyncMock()
     mock_scheduling_controller.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
@@ -126,7 +131,7 @@ async def registry_ctx() -> AsyncGenerator[
         valkey_image=mock_redis_image,
         event_producer=mock_event_producer,
         event_hub=mock_event_hub,
-        storage_manager=None,  # type: ignore
+        storage_manager=cast(Any, None),
         hook_plugin_ctx=hook_plugin_ctx,
         network_plugin_ctx=network_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,

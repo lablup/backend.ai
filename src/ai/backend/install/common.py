@@ -96,7 +96,7 @@ async def detect_os() -> OSInfo:
     if wsl_version == 1:
         raise PrerequisiteError(f"Unsupported WSL version: {wsl_version}")
     return OSInfo(
-        platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
+        platform=Platform(f"{platform_kernel}-{platform_arch}"),
         distro=distro,
         distro_variants=distro_variants,
     )

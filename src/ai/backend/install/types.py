@@ -138,7 +138,12 @@ class OSInfo(RichCast):
     distro: str
     distro_variants: set[str]
 
+<<<<<<< HEAD
     def __rich__(self) -> ConsoleRenderable:
+=======
+    @override
+    def __rich__(self) -> Text:
+>>>>>>> d62855f0f (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
         variants = [self.distro, *sorted(self.distro_variants)]
         variant = ", ".join(variants)
         return Text.from_markup(f"[bold cyan]{self.platform} [not bold](variant: {variant})[/]")

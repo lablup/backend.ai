@@ -332,7 +332,7 @@ class Metric:
 
     def to_serializable_dict(self) -> MetricValue:
         q_pct = Decimal("0.00")
-        return {
+        result: dict[str, Any] = {
             "current": _to_serializable_value(self.current),
             "capacity": (
                 _to_serializable_value(self.capacity) if self.capacity is not None else None
@@ -346,11 +346,12 @@ class Metric:
             ),
             "unit_hint": self.unit_hint,
             **{
-                f"stats.{k}": v  # type: ignore
+                f"stats.{k}": v
                 for k, v in self.stats.to_serializable_dict().items()
                 if k in self.stats_filter
             },
         }
+        return cast(MetricValue, result)
 
 
 class StatContext:

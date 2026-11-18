@@ -11,6 +11,7 @@ import aiodocker
 import trafaret as t
 
 from ai.backend.accelerator.furiosa import __version__
+<<<<<<< HEAD
 
 from .warboy_api import WarboyAPI
 
@@ -19,6 +20,9 @@ try:
 except ImportError:
     from ai.backend.agent.docker.resources import get_resource_spec_from_container
 
+=======
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
+>>>>>>> d62855f0f (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -33,6 +37,7 @@ from ai.backend.agent.stats import (
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -43,6 +48,8 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+from .warboy_api import WarboyAPI
 
 PREFIX = "warboy"
 

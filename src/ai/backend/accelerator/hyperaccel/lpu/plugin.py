@@ -10,14 +10,7 @@ from typing import (
 import aiodocker
 import trafaret as t
 
-from . import __version__, lpu_api
-from .types import LPUDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -42,6 +35,9 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+from . import __version__, lpu_api
+from .types import LPUDevice
 
 PREFIX = "hyperaccel-lpu"
 SLOT_NAME = "hyperaccel-lpu.device"

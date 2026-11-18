@@ -557,8 +557,13 @@ class Context(metaclass=ABCMeta):
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
         text = Text()
+<<<<<<< HEAD
         text.append("Detetced OS info: ")
         text.append(self.os_info.__rich__())  # type: ignore
+=======
+        text.append("Detected OS info: ")
+        text.append(self.os_info.__rich__())
+>>>>>>> d62855f0f (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
@@ -911,7 +916,7 @@ class Context(metaclass=ABCMeta):
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
         with toml_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             etcd_table = tomlkit.table()
             etcd_addr_table = tomlkit.inline_table()
             etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
@@ -927,26 +932,26 @@ class Context(metaclass=ABCMeta):
             else:
                 etcd_table.pop("password", None)
             data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
+            data["storage-proxy"]["secret"] = service.storage_proxy_random
+            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path
             client_facing_addr_table = tomlkit.inline_table()
             client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
             client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
+            data["api"]["client"]["service-addr"] = client_facing_addr_table
             manager_facing_addr_table = tomlkit.inline_table()
             manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
             manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
+            data["api"]["manager"]["service-addr"] = manager_facing_addr_table
+            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key
             announce_addr_table = tomlkit.inline_table()
             announce_addr_table["host"] = self.install_variable.public_facing_address
             announce_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["announce-addr"] = announce_addr_table  # type: ignore
+            data["api"]["manager"]["announce-addr"] = announce_addr_table
             announce_internal_table = tomlkit.inline_table()
             announce_internal_table["host"] = self.install_variable.public_facing_address
             announce_internal_table["port"] = 16023
-            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table  # type: ignore
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table
+            data["volume"]["volume1"]["path"] = service.vfolder_relpath
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -983,12 +988,12 @@ class Context(metaclass=ABCMeta):
         )
 
         with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
-            data["api"][  # type: ignore
-                "endpoint"
-            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value
+            data["api"]["endpoint"] = (
+                f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+            )
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -1014,9 +1019,9 @@ class Context(metaclass=ABCMeta):
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table  # type: ignore
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+            data["session"]["redis"] = redis_table
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:

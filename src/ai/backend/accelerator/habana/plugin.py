@@ -12,20 +12,13 @@ import aiodocker
 import pyhlml
 import trafaret as t
 
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-
-from . import __version__
-from .types import AbstractGaudiDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -47,6 +40,9 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+from . import __version__
+from .types import AbstractGaudiDevice
 
 __all__ = (
     "PREFIX",
