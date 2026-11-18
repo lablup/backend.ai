@@ -41,6 +41,8 @@ class ContainerRegistryValidatorArgs:
     project: str | None
 
 
+# Used by ContainerRegistryRepository.modify_registry, gql_legacy and the registry seed.
+# Move it out of models once the place of the modify_registry check is settled.
 # TODO: Refactor this using inheritance
 class ContainerRegistryValidator:
     """
@@ -132,6 +134,8 @@ class ContainerRegistryRow(Base):
         "extra", sa.JSON, nullable=True, default=None
     )
 
+    # Read only by the legacy RBAC (ImagePermissionContextBuilder in models/image/row.py).
+    # Delete it together with the join condition in the models/rbac cleanup.
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
@@ -163,6 +167,8 @@ class ContainerRegistryRow(Base):
         self.is_global = is_global
         self.extra = extra
 
+    # Called only by gql_legacy (container_registry.py).
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list_by_registry_name(
         cls,
