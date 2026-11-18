@@ -215,9 +215,9 @@ async def handle_mount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        log.error("Mount error: " + err)
+        log.error("Mount error: {}", err)
         raise VolumeMountFailedError(extra_msg=err)
-    log.info("Mounted " + params["name"] + " on " + mount_prefix)
+    log.info("Mounted {} on {}", params["name"], mount_prefix)
     if params["edit_fstab"]:
         fstab_path = request.app["config"]["watcher"]["fstab-path"]
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
@@ -251,9 +251,9 @@ async def handle_umount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        log.error("Unmount error: " + err)
+        log.error("Unmount error: {}", err)
         raise VolumeUnmountFailedError(extra_msg=err)
-    log.info("Unmounted " + params["name"] + " from " + mount_prefix)
+    log.info("Unmounted {} from {}", params["name"], mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty
     except OSError:

@@ -319,7 +319,7 @@ class BackendAIAccessLogger(AccessLogger):
             return
 
         if "request_id" not in request:
-            self.logger.warn("Request ID not set at request object!")
+            self.logger.warning("Request ID not set at request object!")
             prepend_to_log = ""
         else:
             prepend_to_log = f"#{request['request_id']} "
@@ -342,7 +342,8 @@ class BackendAIAccessLogger(AccessLogger):
                     dct[k2] = value
                     extra[k1] = dct
 
-            self.logger.info((prepend_to_log + self._log_format) % tuple(values), extra=extra)
+            message = (prepend_to_log + self._log_format) % tuple(values)
+            self.logger.info("%s", message, extra=extra)
         except Exception:
             self.logger.exception("Error in logging")
 
