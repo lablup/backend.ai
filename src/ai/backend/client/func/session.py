@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 import secrets
 import tarfile
@@ -1143,7 +1144,7 @@ class ComputeSession(BaseFunction):
                         chunk = await part.read_chunk(DEFAULT_CHUNK_SIZE)
                         if not chunk:
                             break
-                        await loop.run_in_executor(None, lambda: fp.write(chunk))
+                        await loop.run_in_executor(None, functools.partial(fp.write, chunk))
                         pbar.update(len(chunk))
                     fp.close()
                     with tarfile.open(fp.name) as tarf:
