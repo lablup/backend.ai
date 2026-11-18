@@ -159,7 +159,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 ])
             await client.pipeline(pipeline_commands)
 
-    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
+    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:
         """
         Consume messages from the queue.
         This method will block until a message is available.
@@ -177,7 +177,7 @@ class HiRedisQueue(AbstractMessageQueue):
             except asyncio.CancelledError:
                 break
 
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessage, None]:  # type: ignore
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessage, None]:
         while not self._closed:
             try:
                 yield await self._subscribe_queue.get()
