@@ -56,32 +56,6 @@ def main(
     ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=LogLevel(log_level)))
 
 
-@main.command()
-@click.option(
-    "--output",
-    "-o",
-    default=None,
-    type=click.Path(dir_okay=False, writable=True, path_type=Path),
-    help="Output file path (default: stdout)",
-)
-def generate_example_configuration(output: Path | None) -> None:
-    """
-    Generates example TOML configuration file for Backend.AI Proxy Worker.
-    """
-    import tomli_w
-
-    from ai.backend.appproxy.common.config import generate_example_json
-    from ai.backend.appproxy.common.utils import ensure_json_serializable
-    from ai.backend.appproxy.worker.config import ServerConfig
-
-    generated_example = generate_example_json(ServerConfig)
-    if output is None:
-        print(tomli_w.dumps(ensure_json_serializable(generated_example)))
-    else:
-        with output.open(mode="w") as fw:
-            fw.write(tomli_w.dumps(ensure_json_serializable(generated_example)))
-
-
 async def _generate() -> dict[str, Any]:
     import importlib
 

@@ -1,13 +1,9 @@
 import enum
 import pwd
-import tomllib
-import types
-import typing
 from pathlib import Path
 from typing import Annotated, Any, override
 
 from pydantic import (
-    BaseModel,
     ByteSize,
     ConfigDict,
     Field,
@@ -16,13 +12,12 @@ from pydantic import (
     StringConstraints,
 )
 from pydantic.json_schema import JsonSchemaValue
-from pydantic_core import PydanticUndefined, core_schema
+from pydantic_core import core_schema
 
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
-    ConfigEnvironment,
     ConfigExample,
 )
 from ai.backend.common.types import BackendAISchema
@@ -31,7 +26,6 @@ from .errors import (
     GroupNotFoundError,
     InvalidGIDTypeError,
     InvalidUIDTypeError,
-    MissingAnnotationError,
     UserNotFoundError,
 )
 from .types import DigestModType
@@ -738,66 +732,6 @@ class ProfilingConfig(BaseSchema):
             composite=CompositeType.FIELD,
         ),
     ]
-
-
-class UnsupportedTypeError(RuntimeError):
-    pass
-
-
-def _parse_config_example(example: ConfigExample, annotation: Any) -> Any:
-    example_text = example.get(ConfigEnvironment.PROD)
-    if annotation is str:
-        return example_text
-    try:
-        return tomllib.loads(f"value = {example_text}")["value"]
-    except tomllib.TOMLDecodeError:
-        return example_text
-
-
-def generate_example_json(
-    schema: type[BackendAISchema] | types.GenericAlias | types.UnionType,
-    parent: list[str] | None = None,
-) -> dict[str, Any] | list[Any]:
-    if parent is None:
-        parent = []
-    if typing.get_origin(schema) in (types.UnionType, typing.Union, typing.Annotated):
-        return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
-    if isinstance(schema, types.GenericAlias):
-        if typing.get_origin(schema) is not list:
-            raise RuntimeError("GenericAlias other than list not supported!")
-        return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    if isinstance(schema, type) and issubclass(schema, BaseModel):
-        res = {}
-        for name, info in schema.model_fields.items():
-            config_key = [*parent, name]
-            if not info.annotation:
-                raise MissingAnnotationError(f"Field '{name}' is missing type annotation")
-            if info.examples:
-                res[name] = info.examples[0]
-                continue
-            try:
-                res[name] = generate_example_json(info.annotation, parent=config_key)
-            except RuntimeError:
-                if info.default is None:
-                    # TOML has no null: leave the optional field out.
-                    continue
-                config_example = next(
-                    (
-                        meta.example
-                        for meta in info.metadata
-                        if isinstance(meta, BackendAIConfigMeta)
-                    ),
-                    None,
-                )
-                if config_example is not None:
-                    res[name] = _parse_config_example(config_example, info.annotation)
-                    continue
-                field_default = info.get_default(call_default_factory=True)
-                if field_default is PydanticUndefined:
-                    raise
-                res[name] = field_default
-        return res
-    raise UnsupportedTypeError(str(schema))
 
 
 def get_default_redis_key_ttl() -> int:
