@@ -10,16 +10,16 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainContainerRegistryRelationsInput,
     CreateDomainInput,
     DeleteDomainInput,
-    LinkDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
+    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     RestoreDomainInput,
     ScopedSearchDomainsInput,
-    UnlinkDomainContainerRegistriesInput,
     UpdateDomainInput,
 )
 from ai.backend.logging.structured import StructuredLogger
@@ -120,20 +120,20 @@ class V2DomainHandler:
         result = await self._adapter.partial_bulk_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def link_container_registries(
+    async def create_container_registry_relations(
         self,
-        body: BodyParam[LinkDomainContainerRegistriesInput],
+        body: BodyParam[CreateDomainContainerRegistryRelationsInput],
     ) -> APIResponse:
-        """Link container registries to domains."""
-        result = await self._adapter.link_container_registries(body.parsed)
+        """Create relations between domains and container registries."""
+        result = await self._adapter.create_container_registry_relations(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def unlink_container_registries(
+    async def purge_container_registry_relations(
         self,
-        body: BodyParam[UnlinkDomainContainerRegistriesInput],
+        body: BodyParam[PurgeDomainContainerRegistryRelationsInput],
     ) -> APIResponse:
-        """Unlink container registries from domains."""
-        result = await self._adapter.unlink_container_registries(body.parsed)
+        """Purge relations between domains and container registries."""
+        result = await self._adapter.purge_container_registry_relations(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_update(

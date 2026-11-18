@@ -1,4 +1,4 @@
-"""도메인에서 레지스트리 unlink하기 — 두 스코프의 권한과 link되지 않은 레지스트리."""
+"""도메인과 레지스트리 사이의 relation 지우기: 두 스코프의 권한, 없는 relation."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.dto.manager.v2.domain.request import (
-    DomainContainerRegistryLinkInput,
-    UnlinkDomainContainerRegistriesInput,
+    DomainContainerRegistryRelationInput,
+    PurgeDomainContainerRegistryRelationsInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
-    DomainContainerRegistryLink,
-    UnlinkDomainContainerRegistriesPayload,
+    DomainContainerRegistryRelation,
+    PurgeDomainContainerRegistryRelationsPayload,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -45,30 +45,33 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Laid = ADomainAndARegistryToAllowAndACaller
-type Unlinked = UnlinkDomainContainerRegistriesPayload
-type UnlinkScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Unlinked]
+type Purged = PurgeDomainContainerRegistryRelationsPayload
+type PurgeScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Purged]
 
 
 @dataclass(frozen=True)
-class Unlinking(When[Laid, DomainAdapter, Unlinked]):
+class PurgingRelations(When[Laid, DomainAdapter, Purged]):
     @override
     def operation(self) -> str:
-        return "unlink_container_registries"
+        return "purge_container_registry_relations"
 
     @override
     def describe(self, laid: Laid) -> str:
         return Says(
-            f"{laid.caller.username}이 {laid.domain.name}에서 그 레지스트리를 unlink합니다",
-            english=f"{laid.caller.username} unlinks that registry from {laid.domain.name}",
+            f"{laid.caller.username}이 {laid.domain.name}과 그 레지스트리 사이의 relation을 지웁니다",
+            english=(
+                f"{laid.caller.username} purges the relation between {laid.domain.name} and "
+                "that registry"
+            ),
         )
 
     @override
-    async def call(self, adapter: DomainAdapter, laid: Laid) -> Unlinked:
+    async def call(self, adapter: DomainAdapter, laid: Laid) -> Purged:
         with ActingAs(laid.caller):
-            return await adapter.unlink_container_registries(
-                UnlinkDomainContainerRegistriesInput(
+            return await adapter.purge_container_registry_relations(
+                PurgeDomainContainerRegistryRelationsInput(
                     items=[
-                        DomainContainerRegistryLinkInput(
+                        DomainContainerRegistryRelationInput(
                             domain_id=laid.domain.id, container_registry_id=laid.registry.id
                         )
                     ]
@@ -77,32 +80,32 @@ class Unlinking(When[Laid, DomainAdapter, Unlinked]):
 
 
 @dataclass(frozen=True)
-class TheUnlinkedPairsComeBack(Then[Laid, Unlinked]):
-    """이번 요청이 unlink한 쌍만 응답에 온다."""
+class ThePurgedRelationsComeBack(Then[Laid, Purged]):
+    """이번 요청이 지운 relation만 응답에 온다."""
 
-    was_linked: bool
+    existed: bool
 
     @override
     def says(self) -> str:
-        if self.was_linked:
+        if self.existed:
             return Says(
-                "unlink한 도메인과 레지스트리 한 쌍이 옵니다",
-                english="the unlinked domain and registry pair comes back",
+                "지운 도메인과 레지스트리 relation 하나가 옵니다",
+                english="the purged domain and registry relation comes back",
             )
         return Says("빈 목록이 옵니다", english="an empty list comes back")
 
     @override
-    def look(self, laid: Laid, answered: Answered[Unlinked]) -> list[Verdict]:
+    def look(self, laid: Laid, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        if not self.was_linked:
-            return [Same[list[DomainContainerRegistryLink]]("items", payload.items, [])]
-        requested = DomainContainerRegistryLink(
+        if not self.existed:
+            return [Same[list[DomainContainerRegistryRelation]]("items", payload.items, [])]
+        requested = DomainContainerRegistryRelation(
             domain_id=laid.domain.id, container_registry_id=laid.registry.id
         )
         return [
-            Held[list[DomainContainerRegistryLink]](
+            Held[list[DomainContainerRegistryRelation]](
                 "items",
                 payload.items,
                 SameAs(
@@ -117,18 +120,20 @@ class TheUnlinkedPairsComeBack(Then[Laid, Unlinked]):
 
 
 @dataclass(frozen=True)
-class AUserGrantedOnBothScopesUnlinks(Scenario[TestSeedingSession, Laid, DomainAdapter, Unlinked]):
+class AUserGrantedOnBothScopesPurgesARelation(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Purged]
+):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain"
+        return "a-user-granted-on-both-scopes-purges-a-domain-registry-relation"
 
     @override
     def describe(self) -> str:
         return Says(
-            "도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에서 그 레지스트리를 unlink할 수 있습니다",
+            "도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 도메인과 레지스트리 사이의 relation을 지울 수 있습니다",
             english=(
                 "a user granted permission on both the domain and the registry scopes can "
-                "unlink the registry from the domain"
+                "purge the relation between them"
             ),
         )
 
@@ -137,29 +142,29 @@ class AUserGrantedOnBothScopesUnlinks(Scenario[TestSeedingSession, Laid, DomainA
         return ADomainAndARegistryToAllow(allowed=True)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Unlinked]:
-        return Unlinking()
+    def when(self) -> When[Laid, DomainAdapter, Purged]:
+        return PurgingRelations()
 
     @override
-    def then(self) -> Then[Laid, Unlinked]:
-        return TheUnlinkedPairsComeBack(was_linked=True)
+    def then(self) -> Then[Laid, Purged]:
+        return ThePurgedRelationsComeBack(existed=True)
 
 
 @dataclass(frozen=True)
-class AUserGrantedOnTheRegistryAloneMayNotUnlink(
-    Scenario[TestSeedingSession, Laid, DomainAdapter, Unlinked]
+class AUserGrantedOnTheRegistryAloneMayNotPurgeARelation(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain"
+        return "a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation"
 
     @override
     def describe(self) -> str:
         return Says(
-            "레지스트리에만 권한을 받은 사용자가 도메인에서 그 레지스트리를 unlink하려 하면 거부됩니다",
+            "레지스트리에만 권한을 받은 사용자가 도메인과 그 레지스트리 사이의 relation을 지우려 하면 거부됩니다",
             english=(
-                "a user granted permission on the registry alone is refused when unlinking "
-                "it from a domain"
+                "a user granted permission on the registry alone is refused when purging "
+                "the relation between a domain and it"
             ),
         )
 
@@ -168,8 +173,8 @@ class AUserGrantedOnTheRegistryAloneMayNotUnlink(
         return ADomainAndARegistryToAllow(on_domain=False, allowed=True)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Unlinked]:
-        return Unlinking()
+    def when(self) -> When[Laid, DomainAdapter, Purged]:
+        return PurgingRelations()
 
     @override
     def then(self) -> Then[Laid, Any]:
@@ -177,20 +182,18 @@ class AUserGrantedOnTheRegistryAloneMayNotUnlink(
 
 
 @dataclass(frozen=True)
-class UnlinkingARegistryNotLinkedLeavesItOut(
-    Scenario[TestSeedingSession, Laid, DomainAdapter, Unlinked]
-):
+class PurgingAMissingRelationLeavesItOut(Scenario[TestSeedingSession, Laid, DomainAdapter, Purged]):
     @override
     def summary(self) -> str:
-        return "unlinking-a-registry-not-linked-leaves-it-out-of-the-response"
+        return "purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response"
 
     @override
     def describe(self) -> str:
         return Says(
-            "link되지 않은 레지스트리를 unlink해도 거부되지 않고, 응답에서는 빠집니다",
+            "없는 relation을 지워도 거부되지 않고, 응답에서는 빠집니다",
             english=(
-                "unlinking a registry not linked to the domain is not refused, and the "
-                "pair is left out of the response"
+                "purging a relation that does not exist is not refused, and the relation is "
+                "left out of the response"
             ),
         )
 
@@ -199,24 +202,24 @@ class UnlinkingARegistryNotLinkedLeavesItOut(
         return ADomainAndARegistryToAllow()
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Unlinked]:
-        return Unlinking()
+    def when(self) -> When[Laid, DomainAdapter, Purged]:
+        return PurgingRelations()
 
     @override
-    def then(self) -> Then[Laid, Unlinked]:
-        return TheUnlinkedPairsComeBack(was_linked=False)
+    def then(self) -> Then[Laid, Purged]:
+        return ThePurgedRelationsComeBack(existed=False)
 
 
-SCENARIOS: list[UnlinkScenario] = [
-    AUserGrantedOnBothScopesUnlinks(),
-    AUserGrantedOnTheRegistryAloneMayNotUnlink(),
-    UnlinkingARegistryNotLinkedLeavesItOut(),
+SCENARIOS: list[PurgeScenario] = [
+    AUserGrantedOnBothScopesPurgesARelation(),
+    AUserGrantedOnTheRegistryAloneMayNotPurgeARelation(),
+    PurgingAMissingRelationLeavesItOut(),
 ]
 
 
-def expected_relation_count(scenario: UnlinkScenario) -> int:
+def expected_relation_count(scenario: PurgeScenario) -> int:
     match scenario:
-        case AUserGrantedOnTheRegistryAloneMayNotUnlink():
+        case AUserGrantedOnTheRegistryAloneMayNotPurgeARelation():
             return 1
         case _:
             return 0
@@ -229,8 +232,8 @@ async def relation_count(engine: ExtendedAsyncSAEngine) -> int:
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_unlinking_registries(
-    scenario: UnlinkScenario, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
+async def test_purging_registry_relations(
+    scenario: PurgeScenario, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
     assert await relation_count(engine) == expected_relation_count(scenario)

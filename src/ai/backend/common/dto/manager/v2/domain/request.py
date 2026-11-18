@@ -25,8 +25,8 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchDomainsInput",
-    "DomainContainerRegistryLinkInput",
-    "LinkDomainContainerRegistriesInput",
+    "DomainContainerRegistryRelationInput",
+    "CreateDomainContainerRegistryRelationsInput",
     "CreateDomainInput",
     "DeleteDomainInput",
     "RestoreDomainInput",
@@ -36,7 +36,7 @@ __all__ = (
     "PartialBulkRestoreDomainsInput",
     "PartialBulkUpdateDomainItemInput",
     "PartialBulkUpdateDomainsInput",
-    "UnlinkDomainContainerRegistriesInput",
+    "PurgeDomainContainerRegistryRelationsInput",
     "PurgeDomainInput",
     "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
@@ -118,26 +118,26 @@ class PurgeDomainInput(BaseRequestModel):
     name: str = Field(description="Name of the domain to permanently purge.")
 
 
-class DomainContainerRegistryLinkInput(BaseRequestModel):
-    """One domain and one container registry to link or unlink."""
+class DomainContainerRegistryRelationInput(BaseRequestModel):
+    """One domain and one container registry, the two ends of a relation."""
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_id: UUID = Field(description="ID of the container registry.")
 
 
-class LinkDomainContainerRegistriesInput(BaseRequestModel):
-    """Input for linking container registries to domains."""
+class CreateDomainContainerRegistryRelationsInput(BaseRequestModel):
+    """Input for creating relations between domains and container registries."""
 
-    items: NonEmptyList[DomainContainerRegistryLinkInput] = Field(
-        description="The domain and container registry pairs to link. At least one."
+    items: NonEmptyList[DomainContainerRegistryRelationInput] = Field(
+        description="The domain and container registry pairs to relate. At least one."
     )
 
 
-class UnlinkDomainContainerRegistriesInput(BaseRequestModel):
-    """Input for unlinking container registries from domains."""
+class PurgeDomainContainerRegistryRelationsInput(BaseRequestModel):
+    """Input for purging relations between domains and container registries."""
 
-    items: NonEmptyList[DomainContainerRegistryLinkInput] = Field(
-        description="The domain and container registry pairs to unlink. At least one."
+    items: NonEmptyList[DomainContainerRegistryRelationInput] = Field(
+        description="The domain and container registry pairs whose relations to purge. At least one."
     )
 
 

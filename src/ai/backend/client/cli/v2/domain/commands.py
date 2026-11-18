@@ -37,20 +37,22 @@ def get(domain_name: str) -> None:
 @domain.command()
 @click.argument("domain_id", type=click.UUID)
 @click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
-def link_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
-    """Link container registries to a domain."""
+def create_container_registry_relations(
+    domain_id: UUID, container_registry_ids: tuple[UUID, ...]
+) -> None:
+    """Create relations between a domain and container registries."""
     from ai.backend.common.dto.manager.v2.domain.request import (
-        DomainContainerRegistryLinkInput,
-        LinkDomainContainerRegistriesInput,
+        CreateDomainContainerRegistryRelationsInput,
+        DomainContainerRegistryRelationInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.link_container_registries(
-                LinkDomainContainerRegistriesInput(
+            result = await registry.domain.create_container_registry_relations(
+                CreateDomainContainerRegistryRelationsInput(
                     items=[
-                        DomainContainerRegistryLinkInput(
+                        DomainContainerRegistryRelationInput(
                             domain_id=domain_id, container_registry_id=registry_id
                         )
                         for registry_id in container_registry_ids
@@ -67,20 +69,22 @@ def link_container_registries(domain_id: UUID, container_registry_ids: tuple[UUI
 @domain.command()
 @click.argument("domain_id", type=click.UUID)
 @click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
-def unlink_container_registries(domain_id: UUID, container_registry_ids: tuple[UUID, ...]) -> None:
-    """Unlink container registries from a domain."""
+def purge_container_registry_relations(
+    domain_id: UUID, container_registry_ids: tuple[UUID, ...]
+) -> None:
+    """Purge relations between a domain and container registries."""
     from ai.backend.common.dto.manager.v2.domain.request import (
-        DomainContainerRegistryLinkInput,
-        UnlinkDomainContainerRegistriesInput,
+        DomainContainerRegistryRelationInput,
+        PurgeDomainContainerRegistryRelationsInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.domain.unlink_container_registries(
-                UnlinkDomainContainerRegistriesInput(
+            result = await registry.domain.purge_container_registry_relations(
+                PurgeDomainContainerRegistryRelationsInput(
                     items=[
-                        DomainContainerRegistryLinkInput(
+                        DomainContainerRegistryRelationInput(
                             domain_id=domain_id, container_registry_id=registry_id
                         )
                         for registry_id in container_registry_ids

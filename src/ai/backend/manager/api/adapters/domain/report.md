@@ -19,10 +19,10 @@ Scenario: incomplete 3 / 17
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (5)
   - create: success present 2 · rejection present 4 (global_scope)
-  - link_container_registries: success present 2 · rejection present 2 (relation)
+  - create_container_registry_relations: success present 2 · rejection present 2 (relation)
   - purge: success present 1 · rejection present 4 (single_entity)
+  - purge_container_registry_relations: success present 2 · rejection present 1 (relation)
   - sync_registry_relations: success present 2 · rejection present 1 (relation)
-  - unlink_container_registries: success present 2 · rejection present 1 (relation)
 
 **bulk_get_ids**
 
@@ -135,14 +135,14 @@ Scenario: incomplete 3 / 17
 | [when a user who is not the superadmin tries to create a domain, the role rejects it regardless of how much permission the user holds](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | rejected |
 | [turning entity permission enforcement off still rejects creating a domain, because a role checks this operation, not the permission graph](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | rejected |
 
-**link_container_registries**
+**create_container_registry_relations**
 
 | scenario | verdict |
 |---|---|
-| [a user granted permission on both the domain and the registry scopes can link the registry to the domain](#linking_registries-a-user-granted-on-both-scopes-links-a-registry-to-a-domain) | answered |
-| [linking a registry already linked to the domain is not refused, and the pair is left out of the response](#linking_registries-linking-an-already-linked-registry-leaves-it-out-of-the-response) | answered |
-| [linking a registry that does not exist to a domain is refused because there is no such registry](#linking_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | rejected |
-| [a user granted permission on the registry alone is refused when linking it to a domain](#linking_registries-a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain) | rejected |
+| [a user granted permission on both the domain and the registry scopes can create a relation between them](#creating_registry_relations-a-user-granted-on-both-scopes-creates-a-domain-registry-relation) | answered |
+| [creating a relation that already exists is not refused, and the relation is left out of the response](#creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response) | answered |
+| [creating a relation between a domain and a registry that does not exist is refused because there is no such registry](#creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | rejected |
+| [a user granted permission on the registry alone is refused when creating a relation between a domain and it](#creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation) | rejected |
 
 **purge**
 
@@ -154,6 +154,14 @@ Scenario: incomplete 3 / 17
 | [a user granted nothing cannot purge a domain even when nothing else refers to it](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | rejected |
 | [purging a name no domain answers to is rejected as not found](#deleting-purging-a-name-nothing-answers-to-is-not-found) | rejected |
 
+**purge_container_registry_relations**
+
+| scenario | verdict |
+|---|---|
+| [a user granted permission on both the domain and the registry scopes can purge the relation between them](#purging_registry_relations-a-user-granted-on-both-scopes-purges-a-domain-registry-relation) | answered |
+| [purging a relation that does not exist is not refused, and the relation is left out of the response](#purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response) | answered |
+| [a user granted permission on the registry alone is refused when purging the relation between a domain and it](#purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation) | rejected |
+
 **sync_registry_relations**
 
 | scenario | verdict |
@@ -161,14 +169,6 @@ Scenario: incomplete 3 / 17
 | [when the superadmin syncs with a registry, the domain and that registry become related](#syncing_registry_relations-giving-a-registry-links-the-domain-to-it) | answered |
 | [syncing with an empty list removes the relation to a registry left out](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | answered |
 | [a user granted nothing on the domain is refused when syncing the relations](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | rejected |
-
-**unlink_container_registries**
-
-| scenario | verdict |
-|---|---|
-| [a user granted permission on both the domain and the registry scopes can unlink the registry from the domain](#unlinking_registries-a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain) | answered |
-| [unlinking a registry not linked to the domain is not refused, and the pair is left out of the response](#unlinking_registries-unlinking-a-registry-not-linked-leaves-it-out-of-the-response) | answered |
-| [a user granted permission on the registry alone is refused when unlinking it from a domain](#unlinking_registries-a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain) | rejected |
 
 ### bulk_get_ids
 
@@ -1673,13 +1673,13 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### link_container_registries
+### create_container_registry_relations
 
-<a id="linking_registries-a-user-granted-on-both-scopes-links-a-registry-to-a-domain"></a>
+<a id="creating_registry_relations-a-user-granted-on-both-scopes-creates-a-domain-registry-relation"></a>
 
-#### [a-user-granted-on-both-scopes-links-a-registry-to-a-domain](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
+#### [a-user-granted-on-both-scopes-creates-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
 
-a user granted permission on both the domain and the registry scopes can link the registry to the domain
+a user granted permission on both the domain and the registry scopes can create a relation between them
 
 Given
 
@@ -1704,22 +1704,22 @@ Given
 
 When
 
-- DomainAdapter.link_container_registries: user-1 links that registry to home-1
+- DomainAdapter.create_container_registry_relations: user-1 creates a relation between home-1 and that registry
 
 Then
 
-- the newly linked domain and registry pair comes back
+- the newly created domain and registry relation comes back
   - items: same as the requested domain and registry pair
 
-<a id="linking_registries-linking-an-already-linked-registry-leaves-it-out-of-the-response"></a>
+<a id="creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response"></a>
 
-#### [linking-an-already-linked-registry-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
+#### [creating-an-existing-relation-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
 
-linking a registry already linked to the domain is not refused, and the pair is left out of the response
+creating a relation that already exists is not refused, and the relation is left out of the response
 
 Given
 
-- one domain, one registry, and one user holding permission on the domain and the registry, and the registry is already linked to the domain
+- one domain, one registry, and one user holding permission on the domain and the registry, and a relation between the domain and the registry already exists
   - Domain home-1
   - Container registry host-1: image source
   - Domain home-1 allows Container registry host-1
@@ -1741,18 +1741,18 @@ Given
 
 When
 
-- DomainAdapter.link_container_registries: user-1 links that registry to home-1
+- DomainAdapter.create_container_registry_relations: user-1 creates a relation between home-1 and that registry
 
 Then
 
 - an empty list comes back
   - items = []
 
-<a id="linking_registries-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+<a id="creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
 
-#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
 
-linking a registry that does not exist to a domain is refused because there is no such registry
+creating a relation between a domain and a registry that does not exist is refused because there is no such registry
 
 Given
 
@@ -1777,18 +1777,18 @@ Given
 
 When
 
-- DomainAdapter.link_container_registries: user-1 links a registry that does not exist to home-1
+- DomainAdapter.create_container_registry_relations: user-1 creates a relation between home-1 and a registry that does not exist
 
 Then
 
 - the call is rejected
   - rejected: ContainerRegistryNotFound
 
-<a id="linking_registries-a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain"></a>
+<a id="creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation"></a>
 
-#### [a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain](/tests/scenario/bai_scenario/manager/domain/test_linking_registries.py): pass
+#### [a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
 
-a user granted permission on the registry alone is refused when linking it to a domain
+a user granted permission on the registry alone is refused when creating a relation between a domain and it
 
 Given
 
@@ -1808,7 +1808,7 @@ Given
 
 When
 
-- DomainAdapter.link_container_registries: user-1 links that registry to home-1
+- DomainAdapter.create_container_registry_relations: user-1 creates a relation between home-1 and that registry
 
 Then
 
@@ -1951,6 +1951,113 @@ Then
 - the call is rejected
   - rejected: EntityNotFoundError
 
+### purge_container_registry_relations
+
+<a id="purging_registry_relations-a-user-granted-on-both-scopes-purges-a-domain-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-purges-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_purging_registry_relations.py): pass
+
+a user granted permission on both the domain and the registry scopes can purge the relation between them
+
+Given
+
+- one domain, one registry, and one user holding permission on the domain and the registry, and a relation between the domain and the registry already exists
+  - Domain home-1
+  - Container registry host-1: image source
+  - Domain home-1 allows Container registry host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-domain permission
+    - Role allow-on-domain-1: applies only within the scope it is granted in
+    - Role allow-on-domain-1: CREATE allowed on every domain
+    - Role allow-on-domain-1: SOFT_DELETE allowed on every domain
+    - regular user user-1: holds Role allow-on-domain-1
+
+When
+
+- DomainAdapter.purge_container_registry_relations: user-1 purges the relation between home-1 and that registry
+
+Then
+
+- the purged domain and registry relation comes back
+  - items: same as the requested domain and registry pair
+
+<a id="purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response"></a>
+
+#### [purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_purging_registry_relations.py): pass
+
+purging a relation that does not exist is not refused, and the relation is left out of the response
+
+Given
+
+- one domain, one registry, and one user holding permission on the domain and the registry
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-domain permission
+    - Role allow-on-domain-1: applies only within the scope it is granted in
+    - Role allow-on-domain-1: CREATE allowed on every domain
+    - Role allow-on-domain-1: SOFT_DELETE allowed on every domain
+    - regular user user-1: holds Role allow-on-domain-1
+
+When
+
+- DomainAdapter.purge_container_registry_relations: user-1 purges the relation between home-1 and that registry
+
+Then
+
+- an empty list comes back
+  - items = []
+
+<a id="purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_purging_registry_relations.py): pass
+
+a user granted permission on the registry alone is refused when purging the relation between a domain and it
+
+Given
+
+- one domain, one registry, and one user holding permission on the registry alone, and a relation between the domain and the registry already exists
+  - Domain home-1
+  - Container registry host-1: image source
+  - Domain home-1 allows Container registry host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+
+When
+
+- DomainAdapter.purge_container_registry_relations: user-1 purges the relation between home-1 and that registry
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
 ### sync_registry_relations
 
 <a id="syncing_registry_relations-giving-a-registry-links-the-domain-to-it"></a>
@@ -2026,113 +2133,6 @@ Given
 When
 
 - DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to that registry
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-### unlink_container_registries
-
-<a id="unlinking_registries-a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain"></a>
-
-#### [a-user-granted-on-both-scopes-unlinks-a-registry-from-a-domain](/tests/scenario/bai_scenario/manager/domain/test_unlinking_registries.py): pass
-
-a user granted permission on both the domain and the registry scopes can unlink the registry from the domain
-
-Given
-
-- one domain, one registry, and one user holding permission on the domain and the registry, and the registry is already linked to the domain
-  - Domain home-1
-  - Container registry host-1: image source
-  - Domain home-1 allows Container registry host-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Prepare a user granted the allow-on-registry permission
-    - Role allow-on-registry-1: applies only within the scope it is granted in
-    - Role allow-on-registry-1: CREATE allowed on every container_registry
-    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
-    - regular user user-1: holds Role allow-on-registry-1
-  - Prepare a user granted the allow-on-domain permission
-    - Role allow-on-domain-1: applies only within the scope it is granted in
-    - Role allow-on-domain-1: CREATE allowed on every domain
-    - Role allow-on-domain-1: SOFT_DELETE allowed on every domain
-    - regular user user-1: holds Role allow-on-domain-1
-
-When
-
-- DomainAdapter.unlink_container_registries: user-1 unlinks that registry from home-1
-
-Then
-
-- the unlinked domain and registry pair comes back
-  - items: same as the requested domain and registry pair
-
-<a id="unlinking_registries-unlinking-a-registry-not-linked-leaves-it-out-of-the-response"></a>
-
-#### [unlinking-a-registry-not-linked-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_unlinking_registries.py): pass
-
-unlinking a registry not linked to the domain is not refused, and the pair is left out of the response
-
-Given
-
-- one domain, one registry, and one user holding permission on the domain and the registry
-  - Domain home-1
-  - Container registry host-1: image source
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Prepare a user granted the allow-on-registry permission
-    - Role allow-on-registry-1: applies only within the scope it is granted in
-    - Role allow-on-registry-1: CREATE allowed on every container_registry
-    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
-    - regular user user-1: holds Role allow-on-registry-1
-  - Prepare a user granted the allow-on-domain permission
-    - Role allow-on-domain-1: applies only within the scope it is granted in
-    - Role allow-on-domain-1: CREATE allowed on every domain
-    - Role allow-on-domain-1: SOFT_DELETE allowed on every domain
-    - regular user user-1: holds Role allow-on-domain-1
-
-When
-
-- DomainAdapter.unlink_container_registries: user-1 unlinks that registry from home-1
-
-Then
-
-- an empty list comes back
-  - items = []
-
-<a id="unlinking_registries-a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain"></a>
-
-#### [a-user-granted-on-the-registry-alone-may-not-unlink-it-from-a-domain](/tests/scenario/bai_scenario/manager/domain/test_unlinking_registries.py): pass
-
-a user granted permission on the registry alone is refused when unlinking it from a domain
-
-Given
-
-- one domain, one registry, and one user holding permission on the registry alone, and the registry is already linked to the domain
-  - Domain home-1
-  - Container registry host-1: image source
-  - Domain home-1 allows Container registry host-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Prepare a user granted the allow-on-registry permission
-    - Role allow-on-registry-1: applies only within the scope it is granted in
-    - Role allow-on-registry-1: CREATE allowed on every container_registry
-    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
-    - regular user user-1: holds Role allow-on-registry-1
-
-When
-
-- DomainAdapter.unlink_container_registries: user-1 unlinks that registry from home-1
 
 Then
 

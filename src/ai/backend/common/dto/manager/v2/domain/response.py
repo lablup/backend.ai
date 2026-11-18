@@ -17,8 +17,8 @@ from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchDomainsPayload",
-    "DomainContainerRegistryLink",
-    "LinkDomainContainerRegistriesPayload",
+    "DomainContainerRegistryRelation",
+    "CreateDomainContainerRegistryRelationsPayload",
     "DeleteDomainPayload",
     "RestoreDomainPayload",
     "DomainBasicInfo",
@@ -26,7 +26,7 @@ __all__ = (
     "DomainNode",
     "DomainPayload",
     "DomainRegistryInfo",
-    "UnlinkDomainContainerRegistriesPayload",
+    "PurgeDomainContainerRegistryRelationsPayload",
     "PurgeDomainPayload",
     "SearchDomainsPayload",
 )
@@ -156,24 +156,24 @@ class PurgeDomainPayload(BaseResponseModel):
     )
 
 
-class DomainContainerRegistryLink(BaseResponseModel):
-    """One domain and one container registry linked to it."""
+class DomainContainerRegistryRelation(BaseResponseModel):
+    """A relation between one domain and one container registry."""
 
     domain_id: UUID = Field(description="ID of the domain.")
     container_registry_id: UUID = Field(description="ID of the container registry.")
 
 
-class LinkDomainContainerRegistriesPayload(BaseResponseModel):
-    """Payload for linking container registries to domains."""
+class CreateDomainContainerRegistryRelationsPayload(BaseResponseModel):
+    """Payload for creating relations between domains and container registries."""
 
-    items: list[DomainContainerRegistryLink] = Field(
-        description="The pairs this request linked. A pair already linked is left out."
+    items: list[DomainContainerRegistryRelation] = Field(
+        description="The relations this request created. A relation that already exists is left out."
     )
 
 
-class UnlinkDomainContainerRegistriesPayload(BaseResponseModel):
-    """Payload for unlinking container registries from domains."""
+class PurgeDomainContainerRegistryRelationsPayload(BaseResponseModel):
+    """Payload for purging relations between domains and container registries."""
 
-    items: list[DomainContainerRegistryLink] = Field(
-        description="The pairs this request unlinked. A pair not linked is left out."
+    items: list[DomainContainerRegistryRelation] = Field(
+        description="The relations this request purged. A relation that does not exist is left out."
     )

@@ -12,31 +12,31 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainContainerRegistryRelationsInput,
     CreateDomainInput,
     DomainFilter,
     DomainOrder,
-    LinkDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
+    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     ScopedSearchDomainsInput,
-    UnlinkDomainContainerRegistriesInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
+    CreateDomainContainerRegistryRelationsPayload,
     DeleteDomainPayload,
     DomainBasicInfo,
-    DomainContainerRegistryLink,
+    DomainContainerRegistryRelation,
     DomainLifecycleInfo,
     DomainNode,
     DomainPayload,
     DomainRegistryInfo,
-    LinkDomainContainerRegistriesPayload,
+    PurgeDomainContainerRegistryRelationsPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
-    UnlinkDomainContainerRegistriesPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
@@ -344,11 +344,11 @@ class DomainAdapter(BaseAdapter):
             )
         )
 
-    async def link_container_registries(
-        self, input: LinkDomainContainerRegistriesInput
-    ) -> LinkDomainContainerRegistriesPayload:
-        """Link each named registry to its domain. The permission is asked of every domain
-        and every registry; a pair already linked is left as it stands."""
+    async def create_container_registry_relations(
+        self, input: CreateDomainContainerRegistryRelationsInput
+    ) -> CreateDomainContainerRegistryRelationsPayload:
+        """Create a relation for each named pair. The permission is asked of every domain
+        and every registry; a relation that already exists is left as it stands."""
         result = await self._rbac.create_relation.run(
             CreateRelationAction(
                 pairs=[
@@ -361,21 +361,21 @@ class DomainAdapter(BaseAdapter):
                 creator=DomainContainerRegistryRelationCreator(),
             )
         )
-        linked: list[DomainContainerRegistryLink] = []
-        for link in result.results:
-            if link.linked:
-                linked.append(
-                    DomainContainerRegistryLink(
-                        domain_id=link.pair.scope, container_registry_id=link.pair.target
+        created: list[DomainContainerRegistryRelation] = []
+        for relation in result.results:
+            if relation.linked:
+                created.append(
+                    DomainContainerRegistryRelation(
+                        domain_id=relation.pair.scope, container_registry_id=relation.pair.target
                     )
                 )
-        return LinkDomainContainerRegistriesPayload(items=linked)
+        return CreateDomainContainerRegistryRelationsPayload(items=created)
 
-    async def unlink_container_registries(
-        self, input: UnlinkDomainContainerRegistriesInput
-    ) -> UnlinkDomainContainerRegistriesPayload:
-        """Unlink each named registry from its domain. The permission is asked of every
-        domain and every registry; a pair not linked is skipped."""
+    async def purge_container_registry_relations(
+        self, input: PurgeDomainContainerRegistryRelationsInput
+    ) -> PurgeDomainContainerRegistryRelationsPayload:
+        """Purge the relation of each named pair. The permission is asked of every domain
+        and every registry; a relation that does not exist is skipped."""
         result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
@@ -388,15 +388,15 @@ class DomainAdapter(BaseAdapter):
                 purger=DomainContainerRegistryRelationPurger(),
             )
         )
-        unlinked: list[DomainContainerRegistryLink] = []
-        for unlink in result.results:
-            if unlink.unlinked:
-                unlinked.append(
-                    DomainContainerRegistryLink(
-                        domain_id=unlink.pair.scope, container_registry_id=unlink.pair.target
+        purged: list[DomainContainerRegistryRelation] = []
+        for relation in result.results:
+            if relation.unlinked:
+                purged.append(
+                    DomainContainerRegistryRelation(
+                        domain_id=relation.pair.scope, container_registry_id=relation.pair.target
                     )
                 )
-        return UnlinkDomainContainerRegistriesPayload(items=unlinked)
+        return PurgeDomainContainerRegistryRelationsPayload(items=purged)
 
     async def _apply_deprecated_is_active(
         self, data: DomainData, is_active: bool | None | Unset

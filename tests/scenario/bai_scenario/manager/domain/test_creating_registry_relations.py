@@ -1,4 +1,4 @@
-"""도메인에 레지스트리 link하기 — 두 스코프의 권한과 이미 link된 레지스트리."""
+"""도메인과 레지스트리 사이에 relation 만들기: 두 스코프의 권한, 이미 있는 relation, 없는 레지스트리."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import (
-    DomainContainerRegistryLinkInput,
-    LinkDomainContainerRegistriesInput,
+    CreateDomainContainerRegistryRelationsInput,
+    DomainContainerRegistryRelationInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
-    DomainContainerRegistryLink,
-    LinkDomainContainerRegistriesPayload,
+    CreateDomainContainerRegistryRelationsPayload,
+    DomainContainerRegistryRelation,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
@@ -48,40 +48,43 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Laid = ADomainAndARegistryToAllowAndACaller
-type Linked = LinkDomainContainerRegistriesPayload
-type LinkScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Linked]
+type Created = CreateDomainContainerRegistryRelationsPayload
+type CreateScenario = Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
 
 
 @dataclass(frozen=True)
-class Linking(When[Laid, DomainAdapter, Linked]):
+class CreatingRelations(When[Laid, DomainAdapter, Created]):
     missing_registry: bool = False
 
     @override
     def operation(self) -> str:
-        return "link_container_registries"
+        return "create_container_registry_relations"
 
     @override
     def describe(self, laid: Laid) -> str:
         if self.missing_registry:
             return Says(
-                f"{laid.caller.username}이 {laid.domain.name}에 존재하지 않는 레지스트리를 link합니다",
+                f"{laid.caller.username}이 {laid.domain.name}과 존재하지 않는 레지스트리 사이에 relation을 만듭니다",
                 english=(
-                    f"{laid.caller.username} links a registry that does not exist to "
-                    f"{laid.domain.name}"
+                    f"{laid.caller.username} creates a relation between {laid.domain.name} and a "
+                    "registry that does not exist"
                 ),
             )
         return Says(
-            f"{laid.caller.username}이 {laid.domain.name}에 그 레지스트리를 link합니다",
-            english=f"{laid.caller.username} links that registry to {laid.domain.name}",
+            f"{laid.caller.username}이 {laid.domain.name}과 그 레지스트리 사이에 relation을 만듭니다",
+            english=(
+                f"{laid.caller.username} creates a relation between {laid.domain.name} and "
+                "that registry"
+            ),
         )
 
     @override
-    async def call(self, adapter: DomainAdapter, laid: Laid) -> Linked:
+    async def call(self, adapter: DomainAdapter, laid: Laid) -> Created:
         with ActingAs(laid.caller):
-            return await adapter.link_container_registries(
-                LinkDomainContainerRegistriesInput(
+            return await adapter.create_container_registry_relations(
+                CreateDomainContainerRegistryRelationsInput(
                     items=[
-                        DomainContainerRegistryLinkInput(
+                        DomainContainerRegistryRelationInput(
                             domain_id=laid.domain.id,
                             container_registry_id=(
                                 MISSING_ENTITY_ID if self.missing_registry else laid.registry.id
@@ -93,32 +96,32 @@ class Linking(When[Laid, DomainAdapter, Linked]):
 
 
 @dataclass(frozen=True)
-class TheLinkedPairsComeBack(Then[Laid, Linked]):
-    """이번 요청이 새로 link한 쌍만 응답에 온다."""
+class TheCreatedRelationsComeBack(Then[Laid, Created]):
+    """이번 요청이 새로 만든 relation만 응답에 온다."""
 
-    newly_linked: bool
+    newly_created: bool
 
     @override
     def says(self) -> str:
-        if self.newly_linked:
+        if self.newly_created:
             return Says(
-                "새로 link한 도메인과 레지스트리 한 쌍이 옵니다",
-                english="the newly linked domain and registry pair comes back",
+                "새로 만든 도메인과 레지스트리 relation 하나가 옵니다",
+                english="the newly created domain and registry relation comes back",
             )
         return Says("빈 목록이 옵니다", english="an empty list comes back")
 
     @override
-    def look(self, laid: Laid, answered: Answered[Linked]) -> list[Verdict]:
+    def look(self, laid: Laid, answered: Answered[Created]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        if not self.newly_linked:
-            return [Same[list[DomainContainerRegistryLink]]("items", payload.items, [])]
-        requested = DomainContainerRegistryLink(
+        if not self.newly_created:
+            return [Same[list[DomainContainerRegistryRelation]]("items", payload.items, [])]
+        requested = DomainContainerRegistryRelation(
             domain_id=laid.domain.id, container_registry_id=laid.registry.id
         )
         return [
-            Held[list[DomainContainerRegistryLink]](
+            Held[list[DomainContainerRegistryRelation]](
                 "items",
                 payload.items,
                 SameAs(
@@ -133,18 +136,20 @@ class TheLinkedPairsComeBack(Then[Laid, Linked]):
 
 
 @dataclass(frozen=True)
-class AUserGrantedOnBothScopesLinks(Scenario[TestSeedingSession, Laid, DomainAdapter, Linked]):
+class AUserGrantedOnBothScopesCreatesARelation(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
+):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-both-scopes-links-a-registry-to-a-domain"
+        return "a-user-granted-on-both-scopes-creates-a-domain-registry-relation"
 
     @override
     def describe(self) -> str:
         return Says(
-            "도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 도메인에 그 레지스트리를 link할 수 있습니다",
+            "도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 도메인과 레지스트리 사이에 relation을 만들 수 있습니다",
             english=(
                 "a user granted permission on both the domain and the registry scopes can "
-                "link the registry to the domain"
+                "create a relation between them"
             ),
         )
 
@@ -153,29 +158,29 @@ class AUserGrantedOnBothScopesLinks(Scenario[TestSeedingSession, Laid, DomainAda
         return ADomainAndARegistryToAllow()
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Linked]:
-        return Linking()
+    def when(self) -> When[Laid, DomainAdapter, Created]:
+        return CreatingRelations()
 
     @override
-    def then(self) -> Then[Laid, Linked]:
-        return TheLinkedPairsComeBack(newly_linked=True)
+    def then(self) -> Then[Laid, Created]:
+        return TheCreatedRelationsComeBack(newly_created=True)
 
 
 @dataclass(frozen=True)
-class AUserGrantedOnTheRegistryAloneMayNotLink(
-    Scenario[TestSeedingSession, Laid, DomainAdapter, Linked]
+class AUserGrantedOnTheRegistryAloneMayNotCreateARelation(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-on-the-registry-alone-may-not-link-it-to-a-domain"
+        return "a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation"
 
     @override
     def describe(self) -> str:
         return Says(
-            "레지스트리에만 권한을 받은 사용자가 도메인에 그 레지스트리를 link하려 하면 거부됩니다",
+            "레지스트리에만 권한을 받은 사용자가 도메인과 그 레지스트리 사이에 relation을 만들려 하면 거부됩니다",
             english=(
-                "a user granted permission on the registry alone is refused when linking "
-                "it to a domain"
+                "a user granted permission on the registry alone is refused when creating "
+                "a relation between a domain and it"
             ),
         )
 
@@ -184,8 +189,8 @@ class AUserGrantedOnTheRegistryAloneMayNotLink(
         return ADomainAndARegistryToAllow(on_domain=False)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Linked]:
-        return Linking()
+    def when(self) -> When[Laid, DomainAdapter, Created]:
+        return CreatingRelations()
 
     @override
     def then(self) -> Then[Laid, Any]:
@@ -193,18 +198,20 @@ class AUserGrantedOnTheRegistryAloneMayNotLink(
 
 
 @dataclass(frozen=True)
-class LinkingALinkedRegistryLeavesItOut(Scenario[TestSeedingSession, Laid, DomainAdapter, Linked]):
+class CreatingAnExistingRelationLeavesItOut(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
+):
     @override
     def summary(self) -> str:
-        return "linking-an-already-linked-registry-leaves-it-out-of-the-response"
+        return "creating-an-existing-relation-leaves-it-out-of-the-response"
 
     @override
     def describe(self) -> str:
         return Says(
-            "이미 link된 레지스트리를 다시 link해도 거부되지 않고, 응답에서는 빠집니다",
+            "이미 있는 relation을 다시 만들어도 거부되지 않고, 응답에서는 빠집니다",
             english=(
-                "linking a registry already linked to the domain is not refused, and the "
-                "pair is left out of the response"
+                "creating a relation that already exists is not refused, and the relation "
+                "is left out of the response"
             ),
         )
 
@@ -213,16 +220,18 @@ class LinkingALinkedRegistryLeavesItOut(Scenario[TestSeedingSession, Laid, Domai
         return ADomainAndARegistryToAllow(allowed=True)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Linked]:
-        return Linking()
+    def when(self) -> When[Laid, DomainAdapter, Created]:
+        return CreatingRelations()
 
     @override
-    def then(self) -> Then[Laid, Linked]:
-        return TheLinkedPairsComeBack(newly_linked=False)
+    def then(self) -> Then[Laid, Created]:
+        return TheCreatedRelationsComeBack(newly_created=False)
 
 
 @dataclass(frozen=True)
-class LinkingAMissingRegistryIsRefused(Scenario[TestSeedingSession, Laid, DomainAdapter, Linked]):
+class CreatingARelationToAMissingRegistryIsRefused(
+    Scenario[TestSeedingSession, Laid, DomainAdapter, Created]
+):
     @override
     def summary(self) -> str:
         return "a-superadmin-naming-a-registry-that-does-not-exist-is-refused"
@@ -230,11 +239,11 @@ class LinkingAMissingRegistryIsRefused(Scenario[TestSeedingSession, Laid, Domain
     @override
     def describe(self) -> str:
         return Says(
-            "존재하지 않는 레지스트리를 도메인에 link하려 하면 그 레지스트리가 없다는 이유로 "
-            "거부됩니다",
+            "도메인과 존재하지 않는 레지스트리 사이에 relation을 만들려 하면 그 레지스트리가 없다는 "
+            "이유로 거부됩니다",
             english=(
-                "linking a registry that does not exist to a domain is refused because "
-                "there is no such registry"
+                "creating a relation between a domain and a registry that does not exist is "
+                "refused because there is no such registry"
             ),
         )
 
@@ -243,25 +252,28 @@ class LinkingAMissingRegistryIsRefused(Scenario[TestSeedingSession, Laid, Domain
         return ADomainAndARegistryToAllow(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[Laid, DomainAdapter, Linked]:
-        return Linking(missing_registry=True)
+    def when(self) -> When[Laid, DomainAdapter, Created]:
+        return CreatingRelations(missing_registry=True)
 
     @override
     def then(self) -> Then[Laid, Any]:
         return TheCallIsRefused(ContainerRegistryNotFound)
 
 
-SCENARIOS: list[LinkScenario] = [
-    AUserGrantedOnBothScopesLinks(),
-    AUserGrantedOnTheRegistryAloneMayNotLink(),
-    LinkingALinkedRegistryLeavesItOut(),
-    LinkingAMissingRegistryIsRefused(),
+SCENARIOS: list[CreateScenario] = [
+    AUserGrantedOnBothScopesCreatesARelation(),
+    AUserGrantedOnTheRegistryAloneMayNotCreateARelation(),
+    CreatingAnExistingRelationLeavesItOut(),
+    CreatingARelationToAMissingRegistryIsRefused(),
 ]
 
 
-def expected_relation_count(scenario: LinkScenario) -> int:
+def expected_relation_count(scenario: CreateScenario) -> int:
     match scenario:
-        case AUserGrantedOnTheRegistryAloneMayNotLink() | LinkingAMissingRegistryIsRefused():
+        case (
+            AUserGrantedOnTheRegistryAloneMayNotCreateARelation()
+            | CreatingARelationToAMissingRegistryIsRefused()
+        ):
             return 0
         case _:
             return 1
@@ -274,8 +286,8 @@ async def relation_count(engine: ExtendedAsyncSAEngine) -> int:
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_linking_registries(
-    scenario: LinkScenario, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
+async def test_creating_registry_relations(
+    scenario: CreateScenario, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
     assert await relation_count(engine) == expected_relation_count(scenario)

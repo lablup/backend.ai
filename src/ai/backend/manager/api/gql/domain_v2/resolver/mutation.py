@@ -14,19 +14,19 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
 )
 from ai.backend.manager.api.gql.domain_v2.types.mutations import (
+    CreateDomainContainerRegistryRelationsInputGQL,
+    CreateDomainContainerRegistryRelationsPayloadGQL,
     CreateDomainInputGQL,
     DeleteDomainPayloadGQL,
     DomainPayloadGQL,
-    LinkDomainContainerRegistriesInputGQL,
-    LinkDomainContainerRegistriesPayloadGQL,
     PartialBulkDeleteDomainsInputGQL,
     PartialBulkDomainsPayloadGQL,
     PartialBulkRestoreDomainsInputGQL,
     PartialBulkUpdateDomainsInputGQL,
+    PurgeDomainContainerRegistryRelationsInputGQL,
+    PurgeDomainContainerRegistryRelationsPayloadGQL,
     PurgeDomainPayloadGQL,
     RestoreDomainPayloadGQL,
-    UnlinkDomainContainerRegistriesInputGQL,
-    UnlinkDomainContainerRegistriesPayloadGQL,
     UpdateDomainInputGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -207,27 +207,35 @@ async def admin_purge_domain_v2(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Link container registries to domains. A pair already linked is left as it stands."
+            "Create relations between domains and container registries. A relation that "
+            "already exists is left as it stands."
         ),
     )
 )
-async def link_domain_container_registries(
+async def create_domain_container_registry_relations(
     info: Info[StrawberryGQLContext],
-    input: LinkDomainContainerRegistriesInputGQL,
-) -> LinkDomainContainerRegistriesPayloadGQL | None:
-    payload = await info.context.adapters.domain.link_container_registries(input.to_pydantic())
-    return LinkDomainContainerRegistriesPayloadGQL.from_pydantic(payload)
+    input: CreateDomainContainerRegistryRelationsInputGQL,
+) -> CreateDomainContainerRegistryRelationsPayloadGQL | None:
+    payload = await info.context.adapters.domain.create_container_registry_relations(
+        input.to_pydantic()
+    )
+    return CreateDomainContainerRegistryRelationsPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=("Unlink container registries from domains. A pair not linked is skipped."),
+        description=(
+            "Purge relations between domains and container registries. A relation that "
+            "does not exist is skipped."
+        ),
     )
 )
-async def unlink_domain_container_registries(
+async def purge_domain_container_registry_relations(
     info: Info[StrawberryGQLContext],
-    input: UnlinkDomainContainerRegistriesInputGQL,
-) -> UnlinkDomainContainerRegistriesPayloadGQL | None:
-    payload = await info.context.adapters.domain.unlink_container_registries(input.to_pydantic())
-    return UnlinkDomainContainerRegistriesPayloadGQL.from_pydantic(payload)
+    input: PurgeDomainContainerRegistryRelationsInputGQL,
+) -> PurgeDomainContainerRegistryRelationsPayloadGQL | None:
+    payload = await info.context.adapters.domain.purge_container_registry_relations(
+        input.to_pydantic()
+    )
+    return PurgeDomainContainerRegistryRelationsPayloadGQL.from_pydantic(payload)

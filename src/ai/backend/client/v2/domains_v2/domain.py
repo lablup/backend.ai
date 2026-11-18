@@ -8,25 +8,25 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainContainerRegistryRelationsInput,
     CreateDomainInput,
     DeleteDomainInput,
-    LinkDomainContainerRegistriesInput,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
+    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
-    UnlinkDomainContainerRegistriesInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
+    CreateDomainContainerRegistryRelationsPayload,
     DeleteDomainPayload,
     DomainNode,
     DomainPayload,
-    LinkDomainContainerRegistriesPayload,
+    PurgeDomainContainerRegistryRelationsPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
-    UnlinkDomainContainerRegistriesPayload,
 )
 
 _PATH = "/v2/domains"
@@ -122,26 +122,26 @@ class V2DomainClient(BaseDomainClient):
             response_model=PartialBulkPayload[DomainNode],
         )
 
-    async def link_container_registries(
-        self, request: LinkDomainContainerRegistriesInput
-    ) -> LinkDomainContainerRegistriesPayload:
-        """Link container registries to domains."""
+    async def create_container_registry_relations(
+        self, request: CreateDomainContainerRegistryRelationsInput
+    ) -> CreateDomainContainerRegistryRelationsPayload:
+        """Create relations between domains and container registries."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/container-registries/link",
+            f"{_PATH}/container-registry-relations/create",
             request=request,
-            response_model=LinkDomainContainerRegistriesPayload,
+            response_model=CreateDomainContainerRegistryRelationsPayload,
         )
 
-    async def unlink_container_registries(
-        self, request: UnlinkDomainContainerRegistriesInput
-    ) -> UnlinkDomainContainerRegistriesPayload:
-        """Unlink container registries from domains."""
+    async def purge_container_registry_relations(
+        self, request: PurgeDomainContainerRegistryRelationsInput
+    ) -> PurgeDomainContainerRegistryRelationsPayload:
+        """Purge relations between domains and container registries."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/container-registries/unlink",
+            f"{_PATH}/container-registry-relations/purge",
             request=request,
-            response_model=UnlinkDomainContainerRegistriesPayload,
+            response_model=PurgeDomainContainerRegistryRelationsPayload,
         )
 
     async def admin_update(self, domain_name: str, request: UpdateDomainInput) -> DomainPayload:

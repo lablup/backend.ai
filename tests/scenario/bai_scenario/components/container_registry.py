@@ -438,8 +438,12 @@ class ADomainAndARegistryToAllow(Given[TestSeedingSession, ADomainAndARegistryTo
             )
         holds_ko = "도메인과 레지스트리에" if self.on_domain else "레지스트리에만"
         holds_en = "the domain and the registry" if self.on_domain else "the registry alone"
-        already_ko = ", 도메인과 그 레지스트리는 이미 link되어 있음" if self.allowed else ""
-        already_en = ", and the registry is already linked to the domain" if self.allowed else ""
+        already_ko = ", 도메인과 그 레지스트리 사이에 relation이 이미 있음" if self.allowed else ""
+        already_en = (
+            ", and a relation between the domain and the registry already exists"
+            if self.allowed
+            else ""
+        )
         return Says(
             f"도메인 하나, 레지스트리 하나, {holds_ko} 권한이 있는 사용자 한 명{already_ko}",
             english=(

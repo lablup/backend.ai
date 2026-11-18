@@ -3251,6 +3251,24 @@ type CreateDeploymentRevisionPresetPayload {
   preset: DeploymentRevisionPreset!
 }
 
+"""
+Added in 26.10.0. Input for creating relations between domains and container registries.
+"""
+input CreateDomainContainerRegistryRelationsInput {
+  """The domain and container registry pairs to relate. At least one."""
+  items: [DomainContainerRegistryRelationInput!]!
+}
+
+"""
+Added in 26.10.0. Payload for creating relations between domains and container registries.
+"""
+type CreateDomainContainerRegistryRelationsPayload {
+  """
+  The relations this request created. A relation that already exists is left out.
+  """
+  items: [DomainContainerRegistryRelation!]!
+}
+
 """Added in 26.4.2. Input for creating a new domain."""
 input CreateDomainInput {
   """Domain name. Must be unique across the system."""
@@ -5412,8 +5430,10 @@ type DomainBasicInfo {
   integrationName: String
 }
 
-"""Added in 26.10.0. One domain and one container registry linked to it."""
-type DomainContainerRegistryLink {
+"""
+Added in 26.10.0. A relation between one domain and one container registry.
+"""
+type DomainContainerRegistryRelation {
   """ID of the domain."""
   domainId: UUID!
 
@@ -5422,9 +5442,9 @@ type DomainContainerRegistryLink {
 }
 
 """
-Added in 26.10.0. One domain and one container registry to link or unlink.
+Added in 26.10.0. One domain and one container registry, the two ends of a relation.
 """
-input DomainContainerRegistryLinkInput {
+input DomainContainerRegistryRelationInput {
   """ID of the domain."""
   domainId: UUID!
 
@@ -8690,18 +8710,6 @@ enum KeypairResourcePolicyV2OrderField {
   MAX_PRIORITY
 }
 
-"""Added in 26.10.0. Input for linking container registries to domains."""
-input LinkDomainContainerRegistriesInput {
-  """The domain and container registry pairs to link. At least one."""
-  items: [DomainContainerRegistryLinkInput!]!
-}
-
-"""Added in 26.10.0. Payload for linking container registries to domains."""
-type LinkDomainContainerRegistriesPayload {
-  """The pairs this request linked. A pair already linked is left out."""
-  items: [DomainContainerRegistryLink!]!
-}
-
 """Added in 26.4.2. Input for listing files in a virtual folder."""
 input ListFilesV2Input {
   """Directory path to list files from."""
@@ -10848,14 +10856,14 @@ type Mutation {
   partialBulkRestoreDomainsV2(input: PartialBulkRestoreDomainsInput!): PartialBulkDomainsPayload!
 
   """
-  Added in 26.10.0. Link container registries to domains. A pair already linked is left as it stands.
+  Added in 26.10.0. Create relations between domains and container registries. A relation that already exists is left as it stands.
   """
-  linkDomainContainerRegistries(input: LinkDomainContainerRegistriesInput!): LinkDomainContainerRegistriesPayload
+  createDomainContainerRegistryRelations(input: CreateDomainContainerRegistryRelationsInput!): CreateDomainContainerRegistryRelationsPayload
 
   """
-  Added in 26.10.0. Unlink container registries from domains. A pair not linked is skipped.
+  Added in 26.10.0. Purge relations between domains and container registries. A relation that does not exist is skipped.
   """
-  unlinkDomainContainerRegistries(input: UnlinkDomainContainerRegistriesInput!): UnlinkDomainContainerRegistriesPayload
+  purgeDomainContainerRegistryRelations(input: PurgeDomainContainerRegistryRelationsInput!): PurgeDomainContainerRegistryRelationsPayload
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
@@ -14967,6 +14975,26 @@ type PurgeDeploymentRevisionPresetPayload {
 
   """UUID of the purged deployment revision preset."""
   entityId: UUID!
+}
+
+"""
+Added in 26.10.0. Input for purging relations between domains and container registries.
+"""
+input PurgeDomainContainerRegistryRelationsInput {
+  """
+  The domain and container registry pairs whose relations to purge. At least one.
+  """
+  items: [DomainContainerRegistryRelationInput!]!
+}
+
+"""
+Added in 26.10.0. Payload for purging relations between domains and container registries.
+"""
+type PurgeDomainContainerRegistryRelationsPayload {
+  """
+  The relations this request purged. A relation that does not exist is left out.
+  """
+  items: [DomainContainerRegistryRelation!]!
 }
 
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
@@ -21824,22 +21852,6 @@ Added in 26.4.2. Payload returned after clearing a user's failed-login block.
 type UnblockUserPayload {
   """Whether the unblock was successful"""
   success: Boolean!
-}
-
-"""
-Added in 26.10.0. Input for unlinking container registries from domains.
-"""
-input UnlinkDomainContainerRegistriesInput {
-  """The domain and container registry pairs to unlink. At least one."""
-  items: [DomainContainerRegistryLinkInput!]!
-}
-
-"""
-Added in 26.10.0. Payload for unlinking container registries from domains.
-"""
-type UnlinkDomainContainerRegistriesPayload {
-  """The pairs this request unlinked. A pair not linked is left out."""
-  items: [DomainContainerRegistryLink!]!
 }
 
 """Added in 25.15.0. Input type for unregistering a storage namespace."""
