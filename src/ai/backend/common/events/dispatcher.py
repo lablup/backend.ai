@@ -628,11 +628,11 @@ class EventDispatcher(EventDispatcherGroup):
 
     @preserve_termination_log  # type: ignore[misc]
     async def _consume_loop(self) -> None:
-        async for msg in self._msg_queue.consume_queue():  # type: ignore
+        async for msg in self._msg_queue.consume_queue():
             if self._closed:
                 return
             try:
-                await self._dispatch_consumers(cast(MQMessage, msg))
+                await self._dispatch_consumers(msg)
             except Exception as e:
                 log.exception(
                     "EventDispatcher._consume_loop: unexpected-error, {}",
@@ -643,11 +643,11 @@ class EventDispatcher(EventDispatcherGroup):
 
     @preserve_termination_log  # type: ignore[misc]
     async def _subscribe_loop(self) -> None:
-        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
+        async for msg in self._msg_queue.subscribe_queue():
             if self._closed:
                 return
             try:
-                await self._dispatch_subscribers(cast(BroadcastMessage, msg))
+                await self._dispatch_subscribers(msg)
             except Exception as e:
                 log.exception(
                     "EventDispatcher._subscribe_loop: unexpected-error, {}",

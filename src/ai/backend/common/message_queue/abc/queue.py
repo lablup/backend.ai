@@ -80,7 +80,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def consume_queue(
+    def consume_queue(
         self,
     ) -> AsyncGenerator[MQMessage, None]:
         """
@@ -93,7 +93,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def subscribe_queue(
+    def subscribe_queue(
         self,
     ) -> AsyncGenerator[BroadcastMessage, None]:
         """

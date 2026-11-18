@@ -925,7 +925,7 @@ def _init_subapp(
         subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
     prefix = subapp["prefix"]
     root_app.add_subapp("/" + prefix, subapp)
-    root_app.middlewares.extend(global_middlewares)  # type: ignore
+    root_app.middlewares.extend(cast(Iterable[Any], global_middlewares))
 
 
 def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCreator) -> None:

@@ -19,6 +19,7 @@ from aiotools import closing_async
 from pydantic import BaseModel, Field
 
 from ai.backend.agent.data.device import DeviceAllocation
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.errors.resources import InvalidResourceArgument
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -27,13 +28,6 @@ from ai.backend.agent.resources import (
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-from ai.backend.logging import BraceStyleAdapter
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -53,6 +47,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from . import __version__
 from .nvidia import LibraryError, libcudart, libnvml

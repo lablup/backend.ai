@@ -138,7 +138,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     print(line, end="")
             else:
                 for line in tabulate_items(
-                    items,  # type: ignore
+                    iter(items),
                     fields,
                 ):
                     print(line, end="")

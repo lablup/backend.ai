@@ -82,7 +82,7 @@ type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 type DeviceCapacityMap = Mapping[tuple[SlotName, DeviceId], Decimal]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-known_slot_types: Mapping[SlotName, SlotTypes] = {}
+known_slot_types: dict[SlotName, SlotTypes] = {}
 _GPU_ALLOC_RATIO_PRECISION = Decimal("0.0001")
 
 
@@ -148,7 +148,7 @@ class KernelResourceSpec:
         # def _frozen_setattr(self, name, value):
         #     raise RuntimeError("tried to modify a frozen KernelResourceSpec object")
 
-        # self.mounts = tuple(self.mounts)  # type: ignore
+        # self.mounts = tuple(self.mounts)
         # # TODO: wrap slots and allocations with frozendict?
         # setattr(self, '__setattr__', _frozen_setattr)  # <-- __setattr__ is read-only... :(
 
