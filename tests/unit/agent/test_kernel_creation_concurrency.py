@@ -7,6 +7,8 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from callosum.rpc import RPCMessage
+from callosum.rpc.message import RPCMessageTypes
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors.resources import ResourceError
@@ -81,14 +83,23 @@ async def _create_kernels(server: AgentRPCServer, num_kernels: int) -> Any:
     kernel_ids = [KernelId(uuid.uuid4()) for _ in range(num_kernels)]
     image_ref = MagicMock()
     image_ref.canonical = "cr.backend.ai/stable/python:latest"
-    return await AgentRPCServer.create_kernels(
-        server,
+    args: tuple[Any, ...] = (
         str(uuid.uuid4()),
         [str(k) for k in kernel_ids],
         [{"image": {"canonical": image_ref.canonical}} for _ in kernel_ids],
         {},
         dict.fromkeys(kernel_ids, image_ref),
     )
+    request = RPCMessage(
+        None,
+        RPCMessageTypes.FUNCTION,
+        "create_kernels",
+        "",
+        0,
+        None,
+        {"args": args, "kwargs": {}},
+    )
+    return await AgentRPCServer.create_kernels(server, request)
 
 
 @pytest.fixture
