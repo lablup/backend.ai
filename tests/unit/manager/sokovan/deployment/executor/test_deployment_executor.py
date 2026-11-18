@@ -11,10 +11,14 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
@@ -305,3 +309,177 @@ class TestCalculateDesiredReplicas:
         # Critical: no desired-replica write. That is what was previously
         # flipping the deployment into SCALING and wedging it.
         mock_deployment_repo.update_desired_replicas_bulk.assert_not_awaited()
+
+
+# =============================================================================
+# TestBulkDispatchCancellation (BAI-777)
+# =============================================================================
+
+_GroupEntries = list[tuple[DeploymentWithHistory, DeploymentRevisionID, ScalingGroupProxyTarget]]
+
+
+class TestBulkDispatchCancellation:
+    """Cancellation propagates out of bulk endpoint create/persist/delete;
+    ordinary exceptions are recorded as the deployment's failure.
+    """
+
+    @pytest.fixture
+    def proxy_client(self, deployment_executor: DeploymentExecutor) -> Iterator[AsyncMock]:
+        client = AsyncMock()
+        with patch.object(deployment_executor, "_load_app_proxy_client", return_value=client):
+            yield client
+
+    @pytest.fixture
+    def build_item(self, deployment_executor: DeploymentExecutor) -> Iterator[AsyncMock]:
+        with (
+            patch.object(
+                deployment_executor, "_build_endpoint_item", new_callable=AsyncMock
+            ) as mock,
+            patch("ai.backend.manager.sokovan.deployment.executor.BulkCreateEndpointRequest"),
+        ):
+            yield mock
+
+    @pytest.fixture
+    def group_entries(
+        self,
+        destroying_deployment: DeploymentWithHistory,
+        proxy_target_default: ScalingGroupProxyTarget,
+    ) -> _GroupEntries:
+        return [(destroying_deployment, DeploymentRevisionID(uuid4()), proxy_target_default)]
+
+    async def test_register_build_propagates_cancellation(
+        self,
+        deployment_executor: DeploymentExecutor,
+        build_item: AsyncMock,
+        proxy_client: AsyncMock,
+        group_entries: _GroupEntries,
+    ) -> None:
+        build_item.side_effect = asyncio.CancelledError()
+        failures: list[DeploymentExecutionError] = []
+
+        with pytest.raises(asyncio.CancelledError):
+            await deployment_executor._dispatch_bulk_register(
+                "addr", "token", group_entries, [], failures
+            )
+
+        assert failures == []
+
+    async def test_register_create_propagates_cancellation(
+        self,
+        deployment_executor: DeploymentExecutor,
+        build_item: AsyncMock,
+        proxy_client: AsyncMock,
+        group_entries: _GroupEntries,
+    ) -> None:
+        proxy_client.create_endpoints_bulk.side_effect = asyncio.CancelledError()
+        registered: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
+
+        with pytest.raises(asyncio.CancelledError):
+            await deployment_executor._dispatch_bulk_register(
+                "addr", "token", group_entries, registered, failures
+            )
+
+        assert failures == []
+        assert registered == []
+
+    async def test_register_create_records_ordinary_exception(
+        self,
+        deployment_executor: DeploymentExecutor,
+        build_item: AsyncMock,
+        proxy_client: AsyncMock,
+        group_entries: _GroupEntries,
+    ) -> None:
+        proxy_client.create_endpoints_bulk.side_effect = RuntimeError("boom")
+        registered: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
+
+        await deployment_executor._dispatch_bulk_register(
+            "addr", "token", group_entries, registered, failures
+        )
+
+        assert registered == []
+        assert len(failures) == 1
+        assert failures[0].error_detail == "Bulk endpoint create failed"
+
+    async def test_register_url_persist_propagates_cancellation(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+        build_item: AsyncMock,
+        proxy_client: AsyncMock,
+        group_entries: _GroupEntries,
+    ) -> None:
+        proxy_client.create_endpoints_bulk.return_value = MagicMock(
+            endpoints=[MagicMock(url="http://endpoint")]
+        )
+        mock_deployment_repo.update_endpoint_url.side_effect = asyncio.CancelledError()
+        registered: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
+
+        with pytest.raises(asyncio.CancelledError):
+            await deployment_executor._dispatch_bulk_register(
+                "addr", "token", group_entries, registered, failures
+            )
+
+        assert failures == []
+        assert registered == []
+
+    async def test_register_url_persist_records_ordinary_exception(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+        build_item: AsyncMock,
+        proxy_client: AsyncMock,
+        group_entries: _GroupEntries,
+    ) -> None:
+        proxy_client.create_endpoints_bulk.return_value = MagicMock(
+            endpoints=[MagicMock(url="http://endpoint")]
+        )
+        mock_deployment_repo.update_endpoint_url.side_effect = RuntimeError("db down")
+        registered: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
+
+        await deployment_executor._dispatch_bulk_register(
+            "addr", "token", group_entries, registered, failures
+        )
+
+        assert registered == []
+        assert len(failures) == 1
+        assert failures[0].error_detail == "Failed to persist endpoint URL"
+
+    async def test_unregister_propagates_cancellation(
+        self,
+        deployment_executor: DeploymentExecutor,
+        proxy_client: AsyncMock,
+        destroying_deployment: DeploymentWithHistory,
+    ) -> None:
+        proxy_client.delete_endpoints_bulk.side_effect = asyncio.CancelledError()
+        successes: list[DeploymentWithHistory] = []
+        errors: list[DeploymentExecutionError] = []
+
+        with pytest.raises(asyncio.CancelledError):
+            await deployment_executor._dispatch_bulk_unregister(
+                "addr", "token", [destroying_deployment], successes, errors
+            )
+
+        assert errors == []
+        assert successes == []
+
+    async def test_unregister_records_ordinary_exception(
+        self,
+        deployment_executor: DeploymentExecutor,
+        proxy_client: AsyncMock,
+        destroying_deployment: DeploymentWithHistory,
+    ) -> None:
+        proxy_client.delete_endpoints_bulk.side_effect = RuntimeError("boom")
+        successes: list[DeploymentWithHistory] = []
+        errors: list[DeploymentExecutionError] = []
+
+        await deployment_executor._dispatch_bulk_unregister(
+            "addr", "token", [destroying_deployment], successes, errors
+        )
+
+        assert successes == []
+        assert len(errors) == 1
+        assert errors[0].reason == "Failed to unregister endpoint"
