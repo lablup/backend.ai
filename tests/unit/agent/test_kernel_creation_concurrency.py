@@ -78,7 +78,7 @@ def _server(agent: MagicMock) -> AgentRPCServer:
 
 
 async def _create_kernels(server: AgentRPCServer, num_kernels: int) -> Any:
-    kernel_ids = [uuid.uuid4() for _ in range(num_kernels)]
+    kernel_ids = [KernelId(uuid.uuid4()) for _ in range(num_kernels)]
     image_ref = MagicMock()
     image_ref.canonical = "cr.backend.ai/stable/python:latest"
     return await AgentRPCServer.create_kernels(
