@@ -15,8 +15,7 @@ When unsure: if it is imported from outside `manager/`, put it in `common/dto/`.
 
 - Every DTO must inherit `BaseRequestModel` (Pydantic v2).
 - DTOs are for serialization/validation only: no business-logic methods.
-- Do not import ORM `Row` types from `manager/models/` inside a DTO.
-- Do not import `data/` domain types into a DTO used by external callers (preserve the dependency direction: dto → common types only).
+- Do not import `manager/models/` ORM `Row` types or `manager/data/` types inside a DTO. The import-linter `dto-layer` contract enforces this.
 
 ## Naming convention
 

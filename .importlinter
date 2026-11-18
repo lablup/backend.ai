@@ -49,7 +49,7 @@ modules =
     ai.backend.appproxy
 
 [importlinter:contract:dto-layer]
-name = DTOs import no ORM row
+name = DTOs import no ORM row or data type
 type = forbidden
 allow_indirect_imports = true
 source_modules =
@@ -57,3 +57,4 @@ source_modules =
     ai.backend.common.dto.*
 forbidden_modules =
     ai.backend.manager.models
+    ai.backend.manager.data

@@ -6,11 +6,6 @@ and group registry quota endpoints.
 
 Models already defined in other ``common`` modules are re-exported here
 so that callers can import everything from a single domain-specific path.
-
-Note: Artifact registry request models that depend on manager-specific types
-(e.g., ArtifactType, DelegateeTarget, PaginationOptions) remain in
-``ai.backend.manager.dto.request`` to comply with the ``common → manager``
-visibility constraint.
 """
 
 from pydantic import AliasChoices, Field
