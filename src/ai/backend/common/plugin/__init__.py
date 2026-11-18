@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -182,7 +182,7 @@ class BasePluginContext[P: AbstractPlugin]:
             try:
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
-            except ValidationError:
+            except (ValidationError, BackendAISchemaValidationFailed):
                 raise
             except Exception:
                 log.exception("plugin initialization failed", plugin_name=plugin_name)
@@ -211,7 +211,7 @@ class BasePluginContext[P: AbstractPlugin]:
             )
             try:
                 await self.plugins[plugin_name].update_plugin_config(new_config)
-            except ValidationError:
+            except (ValidationError, BackendAISchemaValidationFailed):
                 log.exception("plugin configuration validation failed", plugin_name=plugin_name)
 
     async def watch_config_changes(self, plugin_name: str) -> None:
