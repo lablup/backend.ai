@@ -98,14 +98,14 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
                 orig_lost = proto.connection_lost
                 orig_eof_received = proto.eof_received
 
-                def connection_lost(exc: Exception | None) -> None:
+                def connection_lost(exc: Exception | None, orig_lost: Any = orig_lost) -> None:
                     orig_lost(exc)
                     nonlocal transports
                     transports -= 1
                     if transports == 0:
                         all_is_lost.set()
 
-                def eof_received() -> None:
+                def eof_received(orig_eof_received: Any = orig_eof_received) -> None:
                     try:
                         orig_eof_received()
                     except AttributeError:
