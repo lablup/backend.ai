@@ -206,8 +206,12 @@ class TestComputeSessionNodeScopeCondition:
     @pytest.mark.parametrize("enforcement_enabled", [False])
     @pytest.mark.parametrize(
         ("role", "role_bound"),
-        [(UserRole.ADMIN, "default"), (UserRole.USER, _CALLER_ID)],
-        ids=["admin-within-domain", "user-own-sessions"],
+        [
+            (UserRole.ADMIN, "default"),
+            (UserRole.MONITOR, "default"),
+            (UserRole.USER, _CALLER_ID),
+        ],
+        ids=["admin-within-domain", "monitor-within-domain", "user-own-sessions"],
     )
     async def test_with_enforcement_off_the_role_bounds_the_scope(
         self,
