@@ -12,6 +12,8 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 
 __all__ = (
+    "ArtifactPathParam",
+    "ArtifactRevisionPathParam",
     "ImportArtifactsOptions",
     "ImportArtifactsRequest",
     "UpdateArtifactRequest",
@@ -72,3 +74,15 @@ class CancelImportTaskRequest(BaseRequestModel):
     artifact_revision_id: UUID = Field(
         description="The artifact revision ID to cancel import.",
     )
+
+
+class ArtifactPathParam(BaseRequestModel):
+    """Path parameter selecting an artifact."""
+
+    artifact_id: UUID = Field(description="The artifact ID.")
+
+
+class ArtifactRevisionPathParam(BaseRequestModel):
+    """Path parameter selecting an artifact revision."""
+
+    artifact_revision_id: UUID = Field(description="The artifact revision ID.")

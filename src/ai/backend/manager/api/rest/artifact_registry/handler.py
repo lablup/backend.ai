@@ -17,31 +17,41 @@ import sqlalchemy as sa
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.artifact.types import (
-    ArtifactDataWithRevisionsResponse,
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
-    ArtifactRevisionResponseData,
-)
-from ai.backend.manager.dto.request import (
-    DelegateImportArtifactsReq,
-    DelegateScanArtifactsReq,
+from ai.backend.common.dto.manager.artifact_registry.request import (
+    ArtifactFilterInput,
+    ArtifactOrderingInput,
+    DelegateeTargetInput,
+    DelegateImportArtifactsRequest,
+    DelegateScanArtifactsRequest,
     ScanArtifactModelPathParam,
     ScanArtifactModelQueryParam,
-    ScanArtifactModelsReq,
-    ScanArtifactsReq,
-    SearchArtifactsReq,
+    ScanArtifactModelsRequest,
+    ScanArtifactsRequest,
+    SearchArtifactsRequest,
 )
-from ai.backend.manager.dto.response import (
-    ArtifactRevisionImportTask,
+from ai.backend.common.dto.manager.artifact_registry.response import (
+    ArtifactRevisionImportTaskDTO,
+    ArtifactRevisionReadmeDTO,
     DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
-    RetreiveArtifactModelResponse,
+    RetrieveArtifactModelResponse,
     ScanArtifactModelsResponse,
     ScanArtifactsResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.common.dto.manager.v2.artifact import types as v2_types
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.rest.artifact.converters import (
+    artifact_with_revisions_and_readme_to_dto,
+    artifact_with_revisions_to_dto,
+    revision_to_dto,
+)
+from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
+    ArtifactType,
+    DelegateeTarget,
+)
+from ai.backend.manager.data.common.types import StringFilterData
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
@@ -81,7 +91,7 @@ class ArtifactRegistryHandler:
 
     async def scan_artifacts(
         self,
-        body: BodyParam[ScanArtifactsReq],
+        body: BodyParam[ScanArtifactsRequest],
     ) -> APIResponse:
         """
         Scan external registries to discover available artifacts.
@@ -98,7 +108,7 @@ class ArtifactRegistryHandler:
                 registry_id=ArtifactRegistryID(body.parsed.registry_id)
                 if body.parsed.registry_id is not None
                 else None,
-                artifact_type=body.parsed.artifact_type,
+                artifact_type=_to_artifact_type(body.parsed.artifact_type),
                 limit=body.parsed.limit,
                 order=ModelSortKey.DOWNLOADS,
                 search=body.parsed.search,
@@ -107,54 +117,51 @@ class ArtifactRegistryHandler:
 
         resp = ScanArtifactsResponse(
             artifacts=[
-                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
-                for artifact in action_result.result
+                artifact_with_revisions_to_dto(artifact) for artifact in action_result.result
             ],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def delegate_scan_artifacts(
         self,
-        body: BodyParam[DelegateScanArtifactsReq],
+        body: BodyParam[DelegateScanArtifactsRequest],
     ) -> APIResponse:
         action_result = await self._artifact.delegate_scan.run(
             DelegateScanArtifactsAction(
                 delegator_reservoir_id=body.parsed.delegator_reservoir_id,
-                artifact_type=body.parsed.artifact_type,
+                artifact_type=_to_artifact_type(body.parsed.artifact_type),
                 search=body.parsed.search,
                 order=ModelSortKey.DOWNLOADS,
-                delegatee_target=body.parsed.delegatee_target
-                if body.parsed.delegatee_target
-                else None,
+                delegatee_target=_to_delegatee_target(body.parsed.delegatee_target),
                 limit=body.parsed.limit,
             )
         )
 
         resp = DelegateScanArtifactsResponse(
             artifacts=[
-                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
-                for artifact in action_result.result
+                artifact_with_revisions_to_dto(artifact) for artifact in action_result.result
             ],
             source_registry_id=ArtifactRegistryID(action_result.source_registry_id)
             if action_result.source_registry_id is not None
             else None,
             source_registry_type=action_result.source_registry_type,
-            readme_data=action_result.readme_data,
+            readme_data={
+                revision_id: ArtifactRevisionReadmeDTO(readme=readme.readme)
+                for revision_id, readme in action_result.readme_data.items()
+            },
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def delegate_import_artifacts(
         self,
-        body: BodyParam[DelegateImportArtifactsReq],
+        body: BodyParam[DelegateImportArtifactsRequest],
     ) -> APIResponse:
         force = body.parsed.options.force
         action_result = await self._artifact_revision.delegate_import_revision_batch.run(
             DelegateImportArtifactRevisionBatchAction(
                 delegator_reservoir_id=body.parsed.delegator_reservoir_id,
-                artifact_type=body.parsed.artifact_type,
-                delegatee_target=body.parsed.delegatee_target
-                if body.parsed.delegatee_target
-                else None,
+                artifact_type=_to_artifact_type(body.parsed.artifact_type),
+                delegatee_target=_to_delegatee_target(body.parsed.delegatee_target),
                 artifact_revision_ids=body.parsed.artifact_revision_ids,
                 force=force,
             )
@@ -170,9 +177,9 @@ class ArtifactRegistryHandler:
         for task_uuid, revision in zip(action_result.task_ids, action_result.result, strict=True):
             task_id = str(task_uuid) if task_uuid is not None else None
             tasks.append(
-                ArtifactRevisionImportTask(
+                ArtifactRevisionImportTaskDTO(
                     task_id=task_id,
-                    artifact_revision=ArtifactRevisionResponseData.from_revision_data(revision),
+                    artifact_revision=revision_to_dto(revision),
                 )
             )
 
@@ -181,7 +188,7 @@ class ArtifactRegistryHandler:
 
     async def search_artifacts(
         self,
-        body: BodyParam[SearchArtifactsReq],
+        body: BodyParam[SearchArtifactsRequest],
     ) -> APIResponse:
         """
         Search registered artifacts with offset-based pagination.
@@ -222,16 +229,13 @@ class ArtifactRegistryHandler:
 
         artifacts = action_result.data
         resp = SearchArtifactsResponse(
-            artifacts=[
-                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
-                for artifact in artifacts
-            ],
+            artifacts=[artifact_with_revisions_to_dto(artifact) for artifact in artifacts],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def scan_models(
         self,
-        body: BodyParam[ScanArtifactModelsReq],
+        body: BodyParam[ScanArtifactModelsRequest],
     ) -> APIResponse:
         """
         Perform batch scanning of specific models from external registries.
@@ -252,8 +256,7 @@ class ArtifactRegistryHandler:
 
         resp = ScanArtifactModelsResponse(
             artifacts=[
-                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
-                for artifact in action_result.result
+                artifact_with_revisions_to_dto(artifact) for artifact in action_result.result
             ],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -284,22 +287,26 @@ class ArtifactRegistryHandler:
             )
         )
 
-        resp = RetreiveArtifactModelResponse(artifact=action_result.result)
+        resp = RetrieveArtifactModelResponse(
+            artifact=artifact_with_revisions_and_readme_to_dto(action_result.result)
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
 
 def _build_artifact_filter_conditions(
-    filters: ArtifactFilterOptions,
+    filters: ArtifactFilterInput,
 ) -> list[QueryCondition]:
-    """Convert ArtifactFilterOptions to a list of QueryConditions for the searcher."""
+    """Convert ArtifactFilterInput to a list of QueryConditions for the searcher."""
     conditions: list[QueryCondition] = []
 
     if filters.artifact_type:
-        artifact_types = filters.artifact_type
+        artifact_types = [ArtifactType(t.value) for t in filters.artifact_type]
         conditions.append(lambda: ArtifactRow.type.in_(artifact_types))
 
     if filters.name_filter is not None:
-        name_filter = filters.name_filter
+        name_filter = StringFilterData(
+            **filters.name_filter.model_dump(include=set(_STRING_FILTER_FIELDS))
+        )
 
         def _name_cond() -> sa.sql.expression.ColumnElement[bool]:
             cond = name_filter.apply_to_column(
@@ -328,16 +335,16 @@ def _build_artifact_filter_conditions(
         conditions.append(lambda: ArtifactRow.source_registry_type == source_registry_type)
 
     if filters.availability:
-        availability = filters.availability
+        availability = [ArtifactAvailability(a.value) for a in filters.availability]
         conditions.append(lambda: ArtifactRow.availability.in_(availability))
 
     return conditions
 
 
 def _build_artifact_query_orders(
-    ordering: ArtifactOrderingOptions,
+    ordering: ArtifactOrderingInput,
 ) -> list[QueryOrder]:
-    """Convert ArtifactOrderingOptions to a list of QueryOrders for the searcher."""
+    """Convert ArtifactOrderingInput to a list of QueryOrders for the searcher."""
     orders: list[QueryOrder] = []
     for field, desc in ordering.order_by:
         column: Any = getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)
@@ -346,3 +353,30 @@ def _build_artifact_query_orders(
         else:
             orders.append(column.asc())
     return orders
+
+
+_STRING_FILTER_FIELDS: Final = (
+    "contains",
+    "starts_with",
+    "ends_with",
+    "equals",
+    "not_equals",
+    "i_contains",
+    "i_starts_with",
+    "i_ends_with",
+    "i_equals",
+    "i_not_equals",
+)
+
+
+def _to_artifact_type(value: v2_types.ArtifactType | None) -> ArtifactType | None:
+    return ArtifactType(value.value) if value is not None else None
+
+
+def _to_delegatee_target(value: DelegateeTargetInput | None) -> DelegateeTarget | None:
+    if value is None:
+        return None
+    return DelegateeTarget(
+        delegatee_reservoir_id=value.delegatee_reservoir_id,
+        target_registry_id=value.target_registry_id,
+    )

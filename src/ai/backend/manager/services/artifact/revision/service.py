@@ -27,6 +27,12 @@ from ai.backend.common.data.storage.types import (
     ArtifactStorageType,
     VFolderStorageTarget,
 )
+from ai.backend.common.dto.manager.artifact_registry.request import (
+    DelegateeTargetInput,
+    DelegateImportArtifactsRequest,
+    ImportArtifactsOptionsInput,
+)
+from ai.backend.common.dto.manager.v2.artifact import types as v2_types
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceGetCommitHashReqPathParam,
@@ -51,10 +57,6 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.dto.request import (
-    DelegateImportArtifactsReq,
-    ImportArtifactsOptions,
-)
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionError,
     ArtifactImportBadRequestError,
@@ -507,9 +509,9 @@ class ArtifactRevisionService:
 
                             # Wait for remote to start pulling if not yet AVAILABLE
                             if remote_progress.status != ArtifactStatus.AVAILABLE.value:
-                                delegate_import_req = DelegateImportArtifactsReq(
+                                delegate_import_req = DelegateImportArtifactsRequest(
                                     artifact_revision_ids=[revision_data.id],
-                                    artifact_type=artifact.type,
+                                    artifact_type=v2_types.ArtifactType(artifact.type.value),
                                     # We can't pass delegatee_reservoir_id here since we don't have it.
                                     # So we depend on default.
                                     delegator_reservoir_id=None,
@@ -783,12 +785,21 @@ class ArtifactRevisionService:
         delegatee_reservoir_id = (
             action.delegatee_target.delegatee_reservoir_id if action.delegatee_target else None
         )
-        req = DelegateImportArtifactsReq(
+        req = DelegateImportArtifactsRequest(
             artifact_revision_ids=action.artifact_revision_ids,
             delegator_reservoir_id=delegatee_reservoir_id,
-            delegatee_target=action.delegatee_target,
-            artifact_type=action.artifact_type,
-            options=ImportArtifactsOptions(force=action.force),
+            delegatee_target=(
+                DelegateeTargetInput(
+                    delegatee_reservoir_id=action.delegatee_target.delegatee_reservoir_id,
+                    target_registry_id=action.delegatee_target.target_registry_id,
+                )
+                if action.delegatee_target
+                else None
+            ),
+            artifact_type=(
+                v2_types.ArtifactType(action.artifact_type.value) if action.artifact_type else None
+            ),
+            options=ImportArtifactsOptionsInput(force=action.force),
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
