@@ -43,6 +43,9 @@ from etcd_client import (
     Client as EtcdClient,
 )
 from etcd_client import (
+    ClientError as EtcdClientError,
+)
+from etcd_client import (
     Communicator as EtcdCommunicator,
 )
 from etcd_client import (
@@ -523,9 +526,12 @@ class AsyncEtcd(AbstractKVStore):
                 async with asyncio.timeout(self.request_deadline):
                     async with self._connect() as communicator:
                         return await request(communicator)
-            except TimeoutError:
+            except TimeoutError as e:
                 if attempt >= self.request_retries or not read:
-                    raise
+                    # A ClientError like any other etcd failure, so that callers handle it too.
+                    raise EtcdClientError(
+                        f"etcd request passed its deadline of {self.request_deadline}s"
+                    ) from e
                 attempt += 1
                 log.warning("etcd request passed its deadline, retrying", retry_count=attempt)
                 continue

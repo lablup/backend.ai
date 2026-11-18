@@ -7,7 +7,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
+from etcd_client import ClientError, CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -846,7 +846,7 @@ class TestRequestRetry:
     ) -> None:
         communicator.put.side_effect = self._never_returns
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(ClientError, match="deadline"):
             await etcd.put("k", "v")
 
         assert communicator.put.call_count == 1
@@ -871,7 +871,7 @@ class TestRequestRetry:
     ) -> None:
         communicator.get.side_effect = self._never_returns
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(ClientError, match="deadline"):
             await etcd.get("k", scope=ConfigScopes.GLOBAL)
 
         assert communicator.get.call_count == 4
