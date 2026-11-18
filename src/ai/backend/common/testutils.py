@@ -1,12 +1,6 @@
 from typing import Any
 from unittest import mock
-
-try:
-    # Since Python 3.8, AsyncMock is now part of the stdlib.
-    # Python 3.8 also adds magic-mocking async iterators and async context managers.
-    from unittest.mock import AsyncMock
-except ImportError:
-    from asynctest import CoroutineMock as AsyncMock  # type: ignore
+from unittest.mock import AsyncMock
 
 
 def mock_corofunc(return_value: Any) -> mock.Mock:

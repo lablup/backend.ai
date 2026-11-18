@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -749,7 +750,7 @@ class TestHuggingFaceDownloadStep:
         context = ImportStepContext(
             model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
             registry_name="test_registry",
-            storage_pool=None,  # type: ignore
+            storage_pool=cast(Any, None),
             storage_step_mappings={
                 ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
                 ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
