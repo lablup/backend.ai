@@ -451,20 +451,12 @@ class RedisConsumer(AbstractConsumer):
             )
             try:
                 await self._client.make_consumer_group(stream_key, self._group_name)
-<<<<<<< HEAD
             except Exception as internal_exception:
                 log.exception(
                     "Error while creating consumer group {} for stream {}: {}",
                     self._group_name,
                     stream_key,
                     internal_exception,
-=======
-            except Exception:
-                log.exception(
-                    "consumer group creation failed",
-                    group_name=self._group_name,
-                    stream_key=stream_key,
->>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
                 )
         else:
             log.exception("Error while reading messages from stream {}: {}", stream_key, e)

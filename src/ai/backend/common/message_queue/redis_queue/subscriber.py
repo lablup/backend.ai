@@ -125,17 +125,7 @@ class RedisSubscriber(AbstractSubscriber):
                 log.info("Client connection closed, stopping read broadcast messages loop")
                 break
             except Exception as e:
-<<<<<<< HEAD
                 log.error("Error while reading broadcast messages: {}", e)
-=======
-                failure_count += 1
-                if failure_count == _ERROR_FAILURE_COUNT:
-                    log.exception("broadcast read keeps failing", attempt_count=failure_count)
-                elif failure_count == 1:
-                    log.warning("broadcast read failed", exc_info=e, attempt_count=failure_count)
-                else:
-                    log.debug("broadcast read failed", attempt_count=failure_count)
->>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
                 # Add a small delay to avoid tight error loops
                 await asyncio.sleep(1.0)
 

@@ -1011,13 +1011,9 @@ async def scan_gpu_alloc_map(
             alloc_map = await task
         except Exception as e:
             kernel_id = getattr(e, "kernel_id", "(unknown)")
-<<<<<<< HEAD
             log.error(
                 f"GPU alloc map scanning for kernel_id '{kernel_id}' resulted in exception: {e}"
             )
-=======
-            log.exception("gpu alloc map scan failed", kernel_id=str(kernel_id))
->>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
             break
 
         for device_id, alloc in alloc_map.items():

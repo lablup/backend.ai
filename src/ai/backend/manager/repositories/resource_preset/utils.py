@@ -28,14 +28,7 @@ def suppress_with_log(
     try:
         yield
     except tuple(exceptions) as e:
-<<<<<<< HEAD
         if message:
             log.log(log_level, "{}: {}", message, e)
-=======
-        if log_level >= logging.ERROR:
-            log.exception("exception suppressed", failure_reason=message)
-        elif log_level >= logging.WARNING:
-            log.warning("exception suppressed", failure_reason=message, exc_info=e)
->>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
         else:
             log.log(log_level, "Suppressed exception: {}", e)

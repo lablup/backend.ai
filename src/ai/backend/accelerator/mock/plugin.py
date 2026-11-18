@@ -162,16 +162,8 @@ class MockPlugin(AbstractComputePlugin):
             try:
                 self._mode = AllocationModes(mode)
             except ValueError:
-<<<<<<< HEAD
                 log.error("Invalid fractional mode value.")
                 log.info("{} acceleration is disabled.", self.key)
-=======
-                log.exception(
-                    "accelerator disabled: invalid allocation mode",
-                    plugin_name=self.key,
-                    allocation_mode=str(mode),
-                )
->>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
                 self.enabled = False
                 return
 
@@ -204,14 +196,8 @@ class MockPlugin(AbstractComputePlugin):
                 stdout, _ = await proc.communicate()
                 lines = stdout.decode().splitlines()
             except FileNotFoundError:
-<<<<<<< HEAD
                 log.error('could not execute the "docker version" command.')
                 log.warning("CUDA acceleration is disabled.")
-=======
-                log.exception(
-                    "accelerator disabled: docker version command failed", plugin_name=self.key
-                )
->>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
                 self.enabled = False
                 return
             rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
