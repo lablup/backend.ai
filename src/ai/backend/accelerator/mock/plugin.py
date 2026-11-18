@@ -20,6 +20,7 @@ from typing import (
 import aiodocker
 import trafaret as t
 
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.errors import InitializationError
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -28,14 +29,6 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
     FractionAllocMap,
 )
-from ai.backend.agent.types import Container, MountInfo
-from ai.backend.agent.utils import update_nested_dict
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -44,6 +37,8 @@ from ai.backend.agent.stats import (
     ProcessMeasurement,
     StatContext,
 )
+from ai.backend.agent.types import Container, MountInfo
+from ai.backend.agent.utils import update_nested_dict
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.types import (
@@ -122,6 +117,7 @@ _cuda_attributes_iv = t.Dict({
 
 class MockPlugin(AbstractComputePlugin):
     config_watch_enabled = False
+    require_explicit_allow = True
 
     key: DeviceName
     slot_types: list[tuple[SlotName, SlotTypes]] = []
@@ -161,7 +157,7 @@ class MockPlugin(AbstractComputePlugin):
             try:
                 self._mode = AllocationModes(mode)
             except ValueError:
-                log.error(
+                log.exception(
                     "accelerator disabled: invalid allocation mode",
                     plugin_name=self.key,
                     allocation_mode=str(mode),
@@ -202,7 +198,7 @@ class MockPlugin(AbstractComputePlugin):
                 stdout, _ = await proc.communicate()
                 lines = stdout.decode().splitlines()
             except FileNotFoundError:
-                log.error(
+                log.exception(
                     "accelerator disabled: docker version command failed", plugin_name=self.key
                 )
                 self.enabled = False
@@ -716,27 +712,26 @@ class MockPlugin(AbstractComputePlugin):
                         },
                     ),
                 })
-        else:  # older agents without lablup/backend.ai-agent#180
-            if self._mode == AllocationModes.DISCRETE:
-                alloc_map.allocations[SlotName(f"{self.key}.device")].update(
-                    resource_spec.allocations.get(
-                        self.key,
-                        {},
-                    ).get(
-                        SlotName(f"{self.key}.device"),
-                        {},
-                    ),
-                )
-            elif self._mode == AllocationModes.FRACTIONAL:
-                alloc_map.allocations[SlotName(f"{self.key}.shares")].update(
-                    resource_spec.allocations.get(
-                        self.key,
-                        {},
-                    ).get(
-                        SlotName(f"{self.key}.shares"),
-                        {},
-                    ),
-                )
+        elif self._mode == AllocationModes.DISCRETE:
+            alloc_map.allocations[SlotName(f"{self.key}.device")].update(
+                resource_spec.allocations.get(
+                    self.key,
+                    {},
+                ).get(
+                    SlotName(f"{self.key}.device"),
+                    {},
+                ),
+            )
+        elif self._mode == AllocationModes.FRACTIONAL:
+            alloc_map.allocations[SlotName(f"{self.key}.shares")].update(
+                resource_spec.allocations.get(
+                    self.key,
+                    {},
+                ).get(
+                    SlotName(f"{self.key}.shares"),
+                    {},
+                ),
+            )
 
     async def get_attached_devices(
         self,

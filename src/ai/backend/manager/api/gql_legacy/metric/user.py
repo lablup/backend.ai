@@ -15,6 +15,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResult,
+    ensure_container_metric_name,
 )
 from ai.backend.manager.services.metric.actions.search_container_metrics import (
     GlobalSearchContainerMetricsAction,
@@ -55,6 +56,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):  # type: ignore
     )
 
     def metric_query_param(self) -> MetricQueryParameter:
+        ensure_container_metric_name(self.metric_name)
         return MetricQueryParameter(
             metric_name=self.metric_name,
             value_type=self.value_type,

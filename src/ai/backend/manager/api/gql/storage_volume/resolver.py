@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.storage_volume.types import (
     UpdateStorageVolumePayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 __all__ = (
     "admin_storage_volumes",
@@ -40,12 +41,12 @@ __all__ = (
         added_version=NEXT_RELEASE_VERSION,
         description="Read one storage volume.",
     )
-)  # type: ignore[misc]
+)
 async def storage_volume(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> StorageVolumeGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()
 
 
 @gql_root_field(
@@ -53,7 +54,7 @@ async def storage_volume(
         added_version=NEXT_RELEASE_VERSION,
         description="Page through every declared storage volume. Admin only.",
     )
-)  # type: ignore[misc]
+)
 async def admin_storage_volumes(
     info: Info[StrawberryGQLContext],
     filter: StorageVolumeFilterGQL | None = None,
@@ -65,7 +66,7 @@ async def admin_storage_volumes(
     limit: int | None = None,
     offset: int | None = None,
 ) -> StorageVolumeConnectionGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()
 
 
 @gql_mutation(
@@ -81,7 +82,7 @@ async def update_storage_volume(
     id: UUID,
     input: UpdateStorageVolumeInputGQL,
 ) -> UpdateStorageVolumePayloadGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()
 
 
 @gql_mutation(
@@ -96,7 +97,7 @@ async def purge_storage_volume(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> PurgeStorageVolumePayloadGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()
 
 
 @gql_mutation(
@@ -113,7 +114,7 @@ async def delete_storage_volume(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteStorageVolumePayloadGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()
 
 
 @gql_mutation(
@@ -126,4 +127,4 @@ async def restore_storage_volume(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> RestoreStorageVolumePayloadGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()

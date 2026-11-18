@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from graphql import GraphQLError
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 from ai.backend.manager.api.gql_legacy.schema import GQLExceptionMiddleware
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -23,7 +23,7 @@ class UserTypes(enum.Enum):
 
 
 @pytest.fixture
-async def virtual_user_db(test_database_url: str) -> AsyncGenerator[tuple[Any, Any], None]:
+async def virtual_user_db(test_database_url: str) -> AsyncGenerator[tuple[Any, Any]]:
     db_id = secrets.token_hex(16)
     engine = sa.engine.create_engine(test_database_url, echo=False)
     async_engine = AsyncEngine(engine)

@@ -2,15 +2,15 @@
 
 [background](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
 
-Scenario: incomplete 4 / 8
+Scenario: incomplete 2 / 8
 
 - built from ops (6)
-  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - create: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge: representative success ✓ · representative rejection ✓
-  - search: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - search: representative success ✓ · representative rejection ✓
 - direct implementation (2)
   - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
   - update: success present 5 · rejection present 2 (single_entity)
@@ -21,6 +21,7 @@ Scenario: incomplete 4 / 8
 |---|---|
 | [when an empty id list is read, an empty response comes back and the lower layer is not called](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | answered |
 | [when two existing ids and one unknown id are read together, the items come back in the order asked and the place of the unknown id is empty](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | answered |
+| [when a user without read permission on presets in public reads several by id, the whole read is refused](#reading-a-user-without-read-permission-is-refused-on-batch-read) | rejected |
 
 **create**
 
@@ -66,6 +67,7 @@ Scenario: incomplete 4 / 8
 | [when presets are split across two runtime variants and one runtime variant is named in the filter, only the presets of that runtime variant come back](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | answered |
 | [when presets with different added and deprecated versions are read with a version filter, only the presets at or above the added version and below the deprecated version come back. An empty side places no limit](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | answered |
 | [when eleven presets exist and the page size is omitted, ten come back and the response marks that there is a next page](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | answered |
+| [when a user without read permission on presets in public searches, the whole search is refused](#searching-a-user-without-read-permission-is-refused-on-search) | rejected |
 
 **partial_bulk_update**
 
@@ -181,6 +183,34 @@ Then
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
   - items[2] = None
+
+<a id="reading-a-user-without-read-permission-is-refused-on-batch-read"></a>
+
+#### [a-user-without-read-permission-is-refused-on-batch-read](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
+
+when a user without read permission on presets in public reads several by id, the whole read is refused
+
+Given
+
+- 2 presets of one variant and one regular user with no permission
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1 reads 2 presets seeded in advance together with one unknown id
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### create
 
@@ -961,6 +991,34 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching-a-user-without-read-permission-is-refused-on-search"></a>
+
+#### [a-user-without-read-permission-is-refused-on-search](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+when a user without read permission on presets in public searches, the whole search is refused
+
+Given
+
+- 2 presets of one variant and one regular user with no permission
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1 reads everything with no filter
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_update
 

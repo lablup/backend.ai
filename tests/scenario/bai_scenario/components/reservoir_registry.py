@@ -25,6 +25,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
@@ -41,6 +42,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
+from bai_scenario.components.the_failed_item_is_refused import TheFailedItemIsRefused
 from bai_scenario.seeds.artifact_registry.registry import TestSeedReservoirRegistry
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -215,7 +217,7 @@ def registry_verdicts(
         Same(f"{at}name", node.name, registry.name),
         Same(f"{at}endpoint", node.endpoint, endpoint),
         Same(f"{at}access_key", node.access_key, registry.access_key),
-        Same(f"{at}secret_key", node.secret_key, registry.secret_key),
+        Same(f"{at}secret_key", node.secret_key, SECRET_KEY_PLACEHOLDER),
         Same(f"{at}api_version", node.api_version, registry.api_version),
     ]
 
@@ -288,7 +290,18 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeReservoirRegistryPaylo
                         english="the id of the registry seeded in advance",
                     ),
                 ),
-            )
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry seeded in advance",
+                    ),
+                ),
+            ),
         ]
 
 
@@ -413,6 +426,6 @@ class NothingIsProcessed(Then[ManyRegistriesAndACaller, Any]):
                         Says("대상 레지스트리의 id", english="the id of the target registry"),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts

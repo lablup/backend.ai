@@ -33,3 +33,4 @@
 
 - `common/exception.py` defines the root hierarchy: do not add component-specific exceptions here.
 - Adding common exception base classes is allowed. Concrete domain exceptions are not.
+- Put a new exception shared by components in `common/errors/<domain>.py`, not in `common/exception.py`. Pants resolves dependencies per file, so a class added to `exception.py` selects the tests of every module that imports it.

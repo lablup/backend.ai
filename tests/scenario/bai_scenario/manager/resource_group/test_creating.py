@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
+from ai.backend.common.dto.manager.v2.resource_group.types import SchedulerTypeDTO
 from ai.backend.common.exception import ResourceGroupConflict
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -69,6 +70,41 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
 
 @dataclass(frozen=True)
+class CreatingInactivePrivateWithLifo(When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
+    """비활성·비공개 그룹을 후입선출 스케줄러로 만든다."""
+
+    named: str
+
+    @override
+    def operation(self) -> str:
+        return "create"
+
+    @override
+    def describe(self, laid: ACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 {self.named}을 비활성·비공개로, 후입선출 스케줄러로 생성합니다",
+            english=(
+                f"{laid.caller.username} creates {self.named} inactive and private, "
+                "with the lifo scheduler"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ACaller) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.create(
+                CreateResourceGroupInput(
+                    name=self.named,
+                    domain_name=laid.caller.domain_name,
+                    is_active=False,
+                    is_public=False,
+                    scheduler_type=SchedulerTypeDTO.LIFO,
+                )
+            )
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
 class TheSuperadminMakesAGroup(
     Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -101,6 +137,46 @@ class TheSuperadminMakesAGroup(
     @override
     def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
         return TheNewGroupNode(started=self.started, named="compute")
+
+
+@dataclass(frozen=True)
+class TheSuperadminMakesAnInactivePrivateGroupWithItsScheduler(
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 비활성, 비공개, 후입선출 스케줄러를 지정해 자원 그룹을 생성하면 "
+            "지정한 값으로 채워진 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin creates a resource group inactive, private and with the lifo "
+                "scheduler, the whole group comes back with those values"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACaller]:
+        return SomeoneAlone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return CreatingInactivePrivateWithLifo(named="reserved")
+
+    @override
+    def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
+        return TheNewGroupNode(
+            started=self.started,
+            named="reserved",
+            is_active=False,
+            is_public=False,
+            scheduler_type=SchedulerTypeDTO.LIFO,
+        )
 
 
 @dataclass(frozen=True)
@@ -264,6 +340,7 @@ class TheMonitorMayNotCreate(
 
 SCENARIOS: list[CreatingStep] = [
     TheSuperadminMakesAGroup(started=datetime.now(UTC)),
+    TheSuperadminMakesAnInactivePrivateGroupWithItsScheduler(started=datetime.now(UTC)),
     ADefaultGroupIsMade(started=datetime.now(UTC)),
     ANameAnotherGroupHoldsIsRefused(),
     # TODO(BA-7946): the create path maps every unique violation to a name conflict, so a

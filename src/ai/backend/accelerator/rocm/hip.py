@@ -190,10 +190,7 @@ class LibraryBase(metaclass=ABCMeta):
 
     @classmethod
     def invoke(cls, func_name: str, *args: Any, check_rc: bool = True) -> int:
-        try:
-            cls._ensure_lib()
-        except ImportError:
-            raise
+        cls._ensure_lib()
         func = getattr(cls._lib, func_name)
         rc = func(*args)
         if check_rc and rc != 0:

@@ -23,3 +23,4 @@ class RetentionCategory(enum.StrEnum):
     SESSIONS = "sessions"
     USAGE_RECORDS = "usage_records"
     USAGE_BUCKETS = "usage_buckets"
+    PROJECTS = "projects"

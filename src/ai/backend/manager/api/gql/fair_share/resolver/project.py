@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -34,6 +33,7 @@ from ai.backend.manager.api.gql.fair_share.types.project import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupProjectScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
@@ -42,7 +42,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get project fair share data (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -59,7 +59,7 @@ async def admin_project_fair_share(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List project fair shares (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_project_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: ProjectFairShareFilter | None = None,
@@ -113,7 +113,7 @@ async def admin_project_fair_shares(
         added_version="26.2.0",
         description="Get project fair share data within resource group scope.",
     )
-)  # type: ignore[misc]
+)
 async def rg_project_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
@@ -130,7 +130,7 @@ async def rg_project_fair_share(
     BackendAIGQLMeta(
         added_version="26.2.0", description="List project fair shares within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
@@ -185,7 +185,7 @@ async def rg_project_fair_shares(
         added_version="26.1.0", description="Get project fair share data (superadmin only)."
     ),
     deprecation_reason="Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -194,7 +194,7 @@ async def project_fair_share(
     """Get a single project fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     result = await info.context.adapters.fair_share.get_project(
         GetProjectFairShareInput(resource_group=resource_group_name, project_id=project_id)
@@ -207,7 +207,7 @@ async def project_fair_share(
         added_version="26.1.0", description="List project fair shares (superadmin only)."
     ),
     deprecation_reason="Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def project_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: ProjectFairShareFilter | None = None,
@@ -222,7 +222,7 @@ async def project_fair_shares(
     """Search project fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
@@ -348,7 +348,7 @@ async def bulk_upsert_project_fair_share_weight(
     """Bulk upsert project fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+        raise SuperadminRequired("Only superadmin can modify fair share data.")
 
     result = await info.context.adapters.fair_share.atomic_bulk_upsert_project(input.to_pydantic())
     return BulkUpsertProjectFairShareWeightPayload.from_pydantic(result)

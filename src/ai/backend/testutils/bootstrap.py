@@ -93,6 +93,8 @@ def flush_redis(host: str, port: int) -> None:
 # reach a developer database by accident.
 POSTGRES_USER: Final = "bai_testpool"
 POSTGRES_PASSWORD: Final = "bai_testpool_devpass"
+ETCD_USER: Final = "root"
+ETCD_PASSWORD: Final = "bai_testpool_devpass"
 POSTGRES_MAINTENANCE_DB: Final = "bai_testpool"
 
 POOL_LABEL: Final = "ai.backend.test-pool"
@@ -142,6 +144,8 @@ class PooledContainerSpec:
     command: str | None = None
     environment: dict[str, str] = field(default_factory=dict)
     tmpfs: dict[str, str] = field(default_factory=dict)
+    # Runs under the spawn lock on every acquire, so it must be idempotent.
+    prepare: Callable[[Any], None] | None = None
 
 
 class ContainerPool:
@@ -190,6 +194,8 @@ class ContainerPool:
                 container = self._create(spec)
                 self._owned.append(container)
                 self._wait_ready(container, spec)
+            if spec.prepare is not None:
+                spec.prepare(container)
         addr = HostPortPairModel(host="127.0.0.1", port=self._published_port(container, spec))
         return addr, created
 
@@ -277,6 +283,22 @@ def _etcd_ready(container: Any) -> bool:
     return b"ready to serve client requests" in container.logs()
 
 
+def _etcd_enable_auth(container: Any) -> None:
+    status = container.exec_run(["etcdctl", "auth", "status"])
+    if b"Authentication Status: false" not in status.output:
+        return
+    container.exec_run([
+        "etcdctl",
+        "user",
+        "add",
+        ETCD_USER,
+        f"--new-user-password={ETCD_PASSWORD}",
+    ])
+    result = container.exec_run(["etcdctl", "auth", "enable"])
+    if result.exit_code != 0:
+        raise RuntimeError(f"failed to enable etcd auth: {result.output.decode(errors='replace')}")
+
+
 def _redis_ready(container: Any) -> bool:
     return bool(container.exec_run(["redis-cli", "ping"]).exit_code == 0)
 
@@ -292,6 +314,7 @@ ETCD_SPEC: Final = PooledContainerSpec(
         "-listen-client-urls http://0.0.0.0:2379"
     ),
     tmpfs={"/etcd-data": ""},
+    prepare=_etcd_enable_auth,
 )
 
 # No snapshots: a long-lived server would fail its background save and reject writes.

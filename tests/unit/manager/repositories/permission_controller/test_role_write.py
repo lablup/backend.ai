@@ -15,8 +15,8 @@ from ai.backend.common.data.permission.types import RoleSource
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
+from ai.backend.manager.errors.virtual_entity import VirtualEntityNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -70,7 +70,7 @@ class TestRoleWrite:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, TABLES):
             yield database_connection
 
@@ -154,7 +154,7 @@ class TestRoleCreate:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, TABLES):
             yield database_connection
 

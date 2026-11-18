@@ -26,6 +26,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -152,12 +153,12 @@ class FairShareCalculationSnapshotGQL(PydanticOutputMixin[FairShareCalculationSn
         description="Timestamp when this fair share calculation was performed. Fair share factors are recalculated periodically by the scheduler."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="Average daily decayed resource usage during the lookback period. Calculated as total_decayed_usage divided by lookback duration in days. For each resource type, this represents the average decayed amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).",
         )
-    )  # type: ignore[misc]
+    )
     def average_daily_decayed_usage(self) -> ResourceSlotGQL | None:
         from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
             calculate_average_daily_usage,

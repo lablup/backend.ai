@@ -2,6 +2,7 @@ import logging
 
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
     GetQuotaScopeAction,
@@ -38,7 +39,7 @@ class VFSStorageService:
 
     def _ensure_storage_manager(self) -> StorageSessionManager:
         if self._storage_manager is None:
-            raise RuntimeError("Storage manager is not configured")
+            raise ServerMisconfiguredError("Storage manager is not configured")
         return self._storage_manager
 
     async def get_quota_scope(self, action: GetQuotaScopeAction) -> GetQuotaScopeActionResult:

@@ -10,7 +10,7 @@ column_keys = ["nullable", "index", "unique", "primary_key"]
 
 
 @pytest.fixture
-async def image_aliases(tmpdir: Any) -> AsyncGenerator[Path, None]:
+async def image_aliases(tmpdir: Any) -> AsyncGenerator[Path]:
     content = """
 aliases:
   - ['my-python',     'test-python:latest', 'x86_64']

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class CircuitCreationError(BackendAIError):
+class CircuitCreationError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit creation fails."""
 
     error_type = "https://api.backend.ai/probs/appproxy/circuit-creation-failed"
@@ -30,7 +32,7 @@ class CircuitCreationError(BackendAIError):
         )
 
 
-class InvalidCircuitConfigError(BackendAIError):
+class InvalidCircuitConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit configuration is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-circuit-config"
@@ -45,7 +47,7 @@ class InvalidCircuitConfigError(BackendAIError):
         )
 
 
-class InvalidCircuitStateError(BackendAIError):
+class InvalidCircuitStateError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit state is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-circuit-state"
@@ -57,4 +59,19 @@ class InvalidCircuitStateError(BackendAIError):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class HTTP2AccessControlNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a circuit on an HTTP/2 worker needs credentials or a client IP allowlist."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/http2-access-control-not-supported"
+    error_title = "An HTTP/2 worker serves only public circuits without a client IP allowlist."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

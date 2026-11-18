@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 import click
+
+from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 
 from .helpers import ProfileStore
 
@@ -13,6 +17,7 @@ CONFIGURABLE_KEYS = {
     "endpoint-type": ("config", "endpoint_type"),
     "api-version": ("config", "api_version"),
     "skip-ssl-verification": ("config", "skip_ssl_verification"),
+    "allow-insecure-http": ("config", "allow_insecure_http"),
     "access-key": ("credentials", "access_key"),
     "secret-key": ("credentials", "secret_key"),
 }
@@ -42,6 +47,19 @@ def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
         tomli_w.dump(data, f)
 
 
+def _save_credentials_toml(credentials_path: Path, data: dict[str, Any]) -> None:
+    """Write a dict to a TOML file created readable only by its owner."""
+    import tomli_w
+
+    credentials_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(
+        credentials_path,
+        "wb",
+        opener=lambda opened_path, flags: os.open(opened_path, flags, CLI_CREDENTIAL_FILE_MODE),
+    ) as credentials_file:
+        tomli_w.dump(data, credentials_file)
+
+
 @click.group()
 def config() -> None:
     """Manage v2 CLI configuration of the selected profile."""
@@ -59,6 +77,7 @@ def show() -> None:
     click.echo(f"Endpoint type:        {click.style(cfg.endpoint_type, bold=True)}")
     click.echo(f"API version:          {click.style(cfg.api_version, bold=True)}")
     click.echo(f"Skip SSL:             {click.style(str(cfg.skip_ssl_verification), bold=True)}")
+    click.echo(f"Allow insecure HTTP:  {click.style(str(cfg.allow_insecure_http), bold=True)}")
     if cfg.access_key:
         click.echo(f"Access key:           {click.style(cfg.access_key, bold=True)}")
     else:
@@ -78,25 +97,27 @@ def set_value(key: str, value: str) -> None:
     """Set a configuration value.
 
     KEY is one of: endpoint, endpoint-type, api-version, skip-ssl-verification,
-    access-key, secret-key.
+    allow-insecure-http, access-key, secret-key.
     """
     file_type, toml_key = CONFIGURABLE_KEYS[key]
 
     paths = ProfileStore().selected()
     if file_type == "config":
         path = paths.config_file
+        save_toml_file = _save_toml
     else:
         path = paths.credentials_file
+        save_toml_file = _save_credentials_toml
 
     data = _load_toml(path)
     section = data.setdefault("backend-ai", {})
 
-    if key == "skip-ssl-verification":
+    if key in ("skip-ssl-verification", "allow-insecure-http"):
         section[toml_key] = value.lower() in ("true", "1", "yes")
     else:
         section[toml_key] = value
 
-    _save_toml(path, data)
+    save_toml_file(path, data)
     click.echo(f"Set {key} = {value}")
 
 
@@ -112,6 +133,7 @@ def get_value(key: str) -> None:
         "endpoint-type": cfg.endpoint_type,
         "api-version": cfg.api_version,
         "skip-ssl-verification": str(cfg.skip_ssl_verification),
+        "allow-insecure-http": str(cfg.allow_insecure_http),
         "access-key": cfg.access_key or "(not set)",
         "secret-key": cfg.secret_key or "(not set)",
     }

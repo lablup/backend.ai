@@ -116,6 +116,7 @@ def run_cli(
             *(f"ai.backend.test.cli_integration.{pkg}" for pkg in pkgs),
             *pytest_args,
         ],
+        check=False,
         env={
             **os.environ,
             "user_file": user_file,

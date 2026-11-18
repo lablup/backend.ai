@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.json import load_json
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.base import populate_fixture
+from ai.backend.manager.models.fixture import populate_fixture
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -40,7 +40,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
         try:
             fixture = load_json(fixture_path.read_text(encoding="utf8"))
         except AttributeError:
-            log.error("no such fixture", fixture_path=fixture_path)
+            log.exception("no such fixture", fixture_path=fixture_path)
             return
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         engine = create_async_engine(bootstrap_config.db.sqlalchemy_url())

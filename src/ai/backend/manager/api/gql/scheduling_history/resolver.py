@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import strawberry
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import Connection, Edge
 
@@ -27,6 +26,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 from .types import (
     DeploymentHistory,
@@ -140,7 +140,7 @@ class RouteHistoryConnection(Connection[RouteHistory]):
         added_version="26.4.2",
         description="List session scheduling history (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -188,7 +188,7 @@ async def admin_session_scheduling_histories(
         description="List session scheduling history (superadmin only)",
     ),
     deprecation_reason="Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -202,7 +202,7 @@ async def session_scheduling_histories(
 ) -> SessionSchedulingHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
+        raise SuperadminRequired("Only superadmin can access scheduling history.")
     result = await info.context.adapters.scheduling_history.admin_search_session_history(
         AdminSearchSessionHistoriesInput(
             filter=filter.to_pydantic() if filter else None,
@@ -237,7 +237,7 @@ async def session_scheduling_histories(
         added_version="26.8.0",
         description="List kernel scheduling history (superadmin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_kernel_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: KernelSchedulingHistoryFilterGQL | None = None,
@@ -281,7 +281,7 @@ async def admin_kernel_scheduling_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.4.2", description="List deployment history (admin only)")
-)  # type: ignore[misc]
+)
 async def admin_deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -325,7 +325,7 @@ async def admin_deployment_histories(
         added_version="26.4.2", description="List deployment history (superadmin only)"
     ),
     deprecation_reason="Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -339,7 +339,7 @@ async def deployment_histories(
 ) -> DeploymentHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
+        raise SuperadminRequired("Only superadmin can access scheduling history.")
     result = await info.context.adapters.scheduling_history.admin_search_deployment_history(
         AdminSearchDeploymentHistoriesInput(
             filter=filter.to_pydantic() if filter else None,
@@ -368,7 +368,7 @@ async def deployment_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.4.2", description="List route history (admin only)")
-)  # type: ignore[misc]
+)
 async def admin_route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,
@@ -410,7 +410,7 @@ async def admin_route_histories(
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.4.2", description="List route history (superadmin only)"),
     deprecation_reason="Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,
@@ -424,7 +424,7 @@ async def route_histories(
 ) -> RouteHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
+        raise SuperadminRequired("Only superadmin can access scheduling history.")
     result = await info.context.adapters.scheduling_history.admin_search_route_history(
         AdminSearchRouteHistoriesInput(
             filter=filter.to_pydantic() if filter else None,
@@ -456,7 +456,7 @@ async def route_histories(
         added_version="26.8.0",
         description="List replica-group scheduling history (superadmin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_replica_group_histories(
     info: Info[StrawberryGQLContext],
     filter: ReplicaGroupHistoryFilterGQL | None = None,
@@ -504,7 +504,7 @@ async def admin_replica_group_histories(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific session."
     )
-)  # type: ignore[misc]
+)
 async def session_scoped_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: SessionScope,
@@ -552,7 +552,7 @@ async def session_scoped_scheduling_histories(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific deployment."
     )
-)  # type: ignore[misc]
+)
 async def deployment_scoped_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: DeploymentScope,
@@ -597,7 +597,7 @@ async def deployment_scoped_scheduling_histories(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific route."
     )
-)  # type: ignore[misc]
+)
 async def route_scoped_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: RouteScope,
@@ -643,7 +643,7 @@ async def route_scoped_scheduling_histories(
         added_version="26.8.0",
         description="Get scheduling history for a specific kernel.",
     )
-)  # type: ignore[misc]
+)
 async def scoped_kernel_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: KernelScopeGQL,
@@ -692,7 +692,7 @@ async def scoped_kernel_scheduling_histories(
         added_version="26.8.0",
         description="Get scheduling history for the replica groups of a specific deployment.",
     )
-)  # type: ignore[misc]
+)
 async def scoped_replica_group_histories(
     info: Info[StrawberryGQLContext],
     scope: ReplicaGroupHistoryScopeGQL,

@@ -85,6 +85,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
+    ResourceGroupSchedulerOptionsInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
@@ -97,13 +99,19 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -115,6 +123,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment_options import (
     DeploymentOptionsInfoGQL,
     DeploymentOptionsInputGQL,
 )
+from ai.backend.manager.api.gql.deployment.types.replica import ReplicaHealthStatusGQL
 from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
 from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
@@ -135,6 +144,7 @@ from ai.backend.manager.api.gql.session_options.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "AgentSelectionStrategyGQL",
     "FairShareResourceGroupSpecGQL",
     "PreemptionConfigGQL",
     "PreemptionConfigInput",
@@ -148,6 +158,8 @@ __all__ = (
     "ResourceGroupOrderByGQL",
     "ResourceGroupOrderFieldGQL",
     "ResourceGroupSchedulerConfigGQL",
+    "ResourceGroupSchedulerOptionsConfigGQL",
+    "ResourceGroupSchedulerOptionsGQL",
     "ResourceGroupStatusGQL",
     "ResourceInfoGQL",
     "SchedulerTypeGQL",
@@ -213,6 +225,16 @@ PreemptionVictimScopeGQL: type[PreemptionVictimScope] = gql_enum(
     ),
     PreemptionVictimScope,
     name="PreemptionVictimScope",
+)
+
+
+AgentSelectionStrategyGQL: type[AgentSelectionStrategy] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="How agents are chosen for a session's kernels.",
+    ),
+    AgentSelectionStrategy,
+    name="AgentSelectionStrategy",
 )
 
 
@@ -310,6 +332,55 @@ class ResourceGroupNetworkConfigGQL(PydanticOutputMixin[ResourceGroupNetworkConf
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The config section of a resource group's scheduler options.",
+    ),
+    model=ResourceGroupSchedulerOptionsConfigInfo,
+    name="ResourceGroupSchedulerOptionsConfig",
+)
+class ResourceGroupSchedulerOptionsConfigGQL(
+    PydanticOutputMixin[ResourceGroupSchedulerOptionsConfigInfo]
+):
+    num_retries_to_skip: int | None = gql_field(
+        description="Number of scheduling retries before a pending session is skipped."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scheduler options of a resource group, other than the preemption configuration."
+        ),
+    ),
+    model=ResourceGroupSchedulerOptionsInfo,
+    name="ResourceGroupSchedulerOptions",
+)
+class ResourceGroupSchedulerOptionsGQL(PydanticOutputMixin[ResourceGroupSchedulerOptionsInfo]):
+    allowed_session_types: list[SessionTypes] = gql_field(
+        description="Session types that may be created in the resource group."
+    )
+    pending_timeout: float = gql_field(
+        description="Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+    )
+    config: ResourceGroupSchedulerOptionsConfigGQL = gql_field(
+        description="The config section of the scheduler options."
+    )
+    agent_selection_strategy: AgentSelectionStrategyGQL = gql_field(
+        description="How agents are chosen for a session's kernels."
+    )
+    allow_fractional_resource_fragmentation: bool = gql_field(
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+        )
+    )
+    route_cleanup_target_statuses: list[ReplicaHealthStatusGQL] = gql_field(
+        description="Route health statuses whose routes are cleaned up automatically."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.2.0", description="Scheduler configuration for a resource group."
     ),
     model=ResourceGroupSchedulerConfigInfo,
@@ -324,6 +395,12 @@ class ResourceGroupSchedulerConfigGQL(PydanticOutputMixin[ResourceGroupScheduler
     preemption: PreemptionConfigGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.3.0", description="Preemption configuration for this resource group."
+        )
+    )
+    options: ResourceGroupSchedulerOptionsGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler options other than the preemption configuration.",
         )
     )
 
@@ -468,12 +545,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             ResourceGroupID(UUID(nid)) for nid in node_ids
         ])
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.1.0",
             description="Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.",
         )
-    )  # type: ignore[misc]
+    )
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
     ) -> FairShareResourceGroupSpecGQL | None:
@@ -482,24 +559,24 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         dto = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
         return FairShareResourceGroupSpecGQL.from_pydantic(dto)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.1.0",
             description="Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL | None:
         """Get resource information for this resource group."""
         ctx = info.context
         resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)
         return ResourceInfoGQL.from_pydantic(resource_info_dto)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Domains this resource group serves.",
         )
-    )  # type: ignore[misc]
+    )
     async def domains(
         self,
         info: Info[StrawberryGQLContext],
@@ -563,12 +640,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Projects this resource group serves.",
         )
-    )  # type: ignore[misc]
+    )
     async def projects(
         self,
         info: Info[StrawberryGQLContext],
@@ -635,12 +712,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this resource group.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],
@@ -1076,6 +1153,27 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
             ),
         ),
         default=False,
+    )
+    is_active: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the resource group is active.",
+        ),
+        default=True,
+    )
+    is_public: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the resource group is public.",
+        ),
+        default=True,
+    )
+    scheduler_type: SchedulerTypeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE).",
+        ),
+        default=SchedulerTypeGQL.FIFO,
     )
 
 

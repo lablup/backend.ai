@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.metric.repository import MetricRepository
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -80,6 +81,7 @@ class OrchestrationInput:
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     retention_repository: RetentionRepository
+    project_repository: ProjectRepository
     system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
@@ -197,6 +199,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             event_producer=setup_input.event_producer,
             sokovan_orchestrator=sokovan_orchestrator,
             retention_repository=setup_input.retention_repository,
+            project_repository=setup_input.project_repository,
             valkey_live=setup_input.valkey_live,
         )
         leader_election = await stack.enter_dependency(

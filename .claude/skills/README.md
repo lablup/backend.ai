@@ -45,7 +45,9 @@ For finding and defining exceptions, see `src/ai/backend/manager/errors/AGENTS.m
 
 | Skill | Purpose | Use When |
 |-------|---------|----------|
+| `/local-review` | Review the work in a separate session (direction, structure and consistency, implementation, missing pieces, follow-up work), then check each finding | Before committing or opening a PR, when the work needs a review from another session |
 | `/submit` | Quality checks, commit, PR creation, changelog, push | After finishing implementation, ready to submit PR |
+| `/backport` | Find the committed conflict markers, resolve or reapply on the release branch, verify, commit, push | CI fails on a backport pull request |
 
 ## Release
 
@@ -66,7 +68,7 @@ bep-guide → ┬→ repository-guide ─┐
 test-guide → repository, service and API layer tests
 
 **Submission Flow:**
-implement → submit (quality checks → commit → PR → changelog → push)
+implement → local-review → submit (quality checks → commit → PR → changelog → push)
 
 **Release Flow:**
 release (pre-flight → release.sh → changelog editing → RC consolidation → summary)

@@ -8,12 +8,13 @@ from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import Circuit
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAccessMode
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKeyType]):
+class H2Frontend(BaseFrontend[H2Backend]):
     api_port_pool: set[int]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -25,9 +26,22 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         self.api_port_pool = set(range(h2_config.api_port_pool[0], h2_config.api_port_pool[1] + 1))
 
     @override
-    async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
-        # We can't measure activeness of HTTP/2 circuits
-        return []
+    async def register_ingress(self, ingress: Ingress, circuit: Circuit | None = None) -> bool:
+        # nghttpx receives the requests, so the worker cannot check credentials or client addresses.
+        # A stored circuit is skipped instead of raising, which would stop the worker from starting.
+        # TODO: Read the access from the ingress alone once it carries the circuit's open_to_public.
+        open_to_public = ingress.access.mode == IngressAccessMode.PUBLIC and (
+            circuit is None or circuit.open_to_public
+        )
+        if open_to_public and not ingress.access.allowed_client_ips:
+            registered = await super().register_ingress(ingress, circuit)
+        else:
+            log.error(
+                "skipped an access-controlled HTTP/2 ingress",
+                circuit_id=circuit.id if circuit is not None else None,
+            )
+            registered = False
+        return registered
 
     @override
     def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
@@ -44,9 +58,5 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
             log.debug("nghttpx {}: {}", log_header_postfix, line.decode("utf-8"))
 
     async def _proc_monitor_task(self, proc: subprocess.Process) -> None:
-        try:
-            await proc.wait()
-        except asyncio.CancelledError:
-            raise  # process did not terminate before task cleanup
-        else:
-            log.error("E20010: nghttpx terminated unexpectedly", exit_code=proc.returncode)
+        await proc.wait()
+        log.error("E20010: nghttpx terminated unexpectedly", exit_code=proc.returncode)

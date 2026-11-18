@@ -5,8 +5,9 @@ from enum import StrEnum
 from typing import Any
 
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+from ai.backend.common.types import ClusterInfo
 
 
 class ContainerNetworkCapability(StrEnum):

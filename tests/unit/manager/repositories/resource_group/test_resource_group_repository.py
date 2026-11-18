@@ -94,7 +94,7 @@ class TestScalingGroupRepositoryDB:
     async def db_with_cleanup(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             global_entity_ids,
@@ -207,7 +207,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_groups_small(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[str], None]:
+    ) -> AsyncGenerator[list[str]]:
         """Create 5 sample scaling groups for basic testing"""
         yield await self._create_scaling_groups(db_with_cleanup, 5)
 
@@ -215,7 +215,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_groups_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[str], None]:
+    ) -> AsyncGenerator[list[str]]:
         """Create 25 sample scaling groups for pagination testing"""
         yield await self._create_scaling_groups(db_with_cleanup, 25)
 
@@ -223,7 +223,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_groups_mixed_active(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[str], None]:
+    ) -> AsyncGenerator[list[str]]:
         """Create 20 sample scaling groups (10 active, 10 inactive) for filter testing"""
         yield await self._create_scaling_groups(
             db_with_cleanup, 20, is_active_func=lambda i: i % 2 == 0
@@ -233,7 +233,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_groups_medium(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[str], None]:
+    ) -> AsyncGenerator[list[str]]:
         """Create 15 sample scaling groups for no-pagination testing"""
         yield await self._create_scaling_groups(db_with_cleanup, 15)
 
@@ -241,7 +241,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_group_for_update(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create a single scaling group for update testing"""
         sgroup_name = f"{uuid.uuid4()}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -267,7 +267,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_group_for_purge(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[tuple[ResourceGroupID, str], None]:
+    ) -> AsyncGenerator[tuple[ResourceGroupID, str]]:
         """Create a single scaling group for purge testing"""
         sgroup_id = ResourceGroupID(uuid.uuid4())
         sgroup_name = f"{uuid.uuid4()}"
@@ -295,7 +295,7 @@ class TestScalingGroupRepositoryDB:
     async def resource_group_for_update(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create a single scaling group for update testing"""
         sgroup_name = f"test-sgroup-update-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -321,7 +321,7 @@ class TestScalingGroupRepositoryDB:
     async def test_user_domain_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID], None]:
+    ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID]]:
         """Create test user, domain, and group for cascade delete testing.
 
         Returns:
@@ -407,7 +407,7 @@ class TestScalingGroupRepositoryDB:
     async def resource_group_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ResourceGroupRepository, None]:
+    ) -> AsyncGenerator[ResourceGroupRepository]:
         """Create ResourceGroupRepository instance with database"""
         repo = ResourceGroupRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
@@ -425,7 +425,7 @@ class TestScalingGroupRepositoryDB:
     async def sample_scaling_group_for_association(
         self,
         resource_group_repository: ResourceGroupRepository,
-    ) -> AsyncGenerator[tuple[ResourceGroupID, str], None]:
+    ) -> AsyncGenerator[tuple[ResourceGroupID, str]]:
         """Create a sample scaling group for association testing"""
         sgroup_name = "test-sgroup-associate-domain"
         creator = self._create_scaling_group_creator(
@@ -588,7 +588,7 @@ class TestScalingGroupRepositoryDB:
     async def existing_default_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create a scaling group that is already the default one"""
         sgroup_name = f"test-sgroup-default-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -736,7 +736,7 @@ class TestScalingGroupRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create a test keypair for association testing.
 
         Returns:

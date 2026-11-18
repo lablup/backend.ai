@@ -47,7 +47,7 @@ from .types import (
         added_version="26.4.2",
         description="List resource presets (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_resource_presets_v2(
     info: Info[StrawberryGQLContext],
     filter: ResourcePresetFilterGQL | None = None,
@@ -97,7 +97,7 @@ async def admin_resource_presets_v2(
         added_version="26.4.2",
         description="Get a single resource preset by ID (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,

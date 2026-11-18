@@ -214,7 +214,7 @@ class _NonTerminalPurger(GuardedFieldPurger[GuardedUpdateTestRow, _RowData]):
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, [GuardedUpdateTestRow]):
         yield database_connection
 

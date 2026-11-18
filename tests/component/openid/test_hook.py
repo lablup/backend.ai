@@ -104,17 +104,17 @@ class TestOIDCHookPreAuth:
         assert raw_result.email == "alice@example.com"
         assert raw_result.status == UserStatus.ACTIVE
 
-    async def test_invalid_stoken_rejects(
+    async def test_invalid_stoken_cookie_returns_none(
         self, hook_plugin: OIDCHookPlugin, request_with_invalid_stoken: MagicMock
     ) -> None:
-        with pytest.raises(Reject, match="Invalid authentication token"):
-            await hook_plugin.pre_auth_hook(request_with_invalid_stoken, {})
+        result = await hook_plugin.pre_auth_hook(request_with_invalid_stoken, {})
+        assert result is None
 
-    async def test_expired_stoken_rejects(
+    async def test_expired_stoken_cookie_returns_none(
         self, hook_plugin: OIDCHookPlugin, request_with_expired_stoken: MagicMock
     ) -> None:
-        with pytest.raises(Reject, match="Expired authentication token"):
-            await hook_plugin.pre_auth_hook(request_with_expired_stoken, {})
+        result = await hook_plugin.pre_auth_hook(request_with_expired_stoken, {})
+        assert result is None
 
     async def test_valid_stoken_user_not_found_rejects(
         self,
@@ -199,7 +199,7 @@ class TestOIDCHookLifecycle:
     def test_get_handlers_returns_authorize(self, hook_plugin: OIDCHookPlugin) -> None:
         handlers = hook_plugin.get_handlers()
         assert len(handlers) == 1
-        name, handler = handlers[0]
+        name, _handler = handlers[0]
         assert name == "AUTHORIZE"
 
     async def test_init_and_cleanup(self, hook_plugin: OIDCHookPlugin) -> None:

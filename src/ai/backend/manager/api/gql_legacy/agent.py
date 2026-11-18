@@ -172,6 +172,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
+        if graphene_ctx.user["role"] != UserRole.SUPERADMIN:
+            return None
         _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
         condition = [QueryConditions.by_ids([AgentId(raw_agent_id)])]
         agent_list = await graphene_ctx.agent_repository.list_data(condition)
@@ -682,20 +684,17 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select[Any]:
+    async with graph_ctx.db.begin_readonly() as conn:
+        domain_name, user_id, group_ids = await _query_domain_groups_by_ak(
+            conn, access_key, domain_name
+        )
+    domain_id = await graph_ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
+    allowed = await graph_ctx.scheduler_repository.query_allowed_resource_groups(
+        domain_id=domain_id, project_ids=group_ids, user_id=user_id
+    )
+    query = query.where(AgentRow.scaling_group.in_([rg.name for rg in allowed]))
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)
-    else:
-        async with graph_ctx.db.begin_readonly() as conn:
-            domain_name, user_id, group_ids = await _query_domain_groups_by_ak(
-                conn, access_key, domain_name
-            )
-        domain_id = await graph_ctx.scheduler_repository.get_domain_id_by_name(
-            DomainName(domain_name)
-        )
-        allowed = await graph_ctx.scheduler_repository.query_allowed_resource_groups(
-            domain_id=domain_id, project_ids=group_ids, user_id=user_id
-        )
-        query = query.where(AgentRow.scaling_group.in_([rg.name for rg in allowed]))
     return query
 
 

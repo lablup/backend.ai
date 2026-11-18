@@ -2,7 +2,7 @@ import os
 import signal
 import sys
 from collections.abc import Callable
-from typing import Any, override
+from typing import Any, overload, override
 
 import click
 from click.exceptions import Abort, ClickException
@@ -81,11 +81,23 @@ class AliasGroupMixin(click.Group):
         self._commands: dict[str, click.Command] = {}
         self._aliases: dict[str, str] = {}
 
+    @overload
+    def command(self, __func: Callable[..., Any]) -> click.Command: ...
+
+    @overload
+    def command(
+        self, *args: Any, **kwargs: Any
+    ) -> Callable[[Callable[..., Any]], click.Command]: ...
+
     @override
-    def command(self, *args: Any, **kwargs: Any) -> Any:
+    def command(
+        self, *args: Any, **kwargs: Any
+    ) -> Callable[[Callable[..., Any]], click.Command] | click.Command:
         aliases = kwargs.pop("aliases", [])
-        decorator = super().command(*args, **kwargs)
-        if not aliases:
+        decorator: Callable[[Callable[..., Any]], click.Command] | click.Command = super().command(
+            *args, **kwargs
+        )
+        if not aliases or isinstance(decorator, click.Command):
             return decorator
 
         def _decorator(f: Callable[..., Any]) -> click.Command:
@@ -98,14 +110,24 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
+    @overload
+    def group(self, __func: Callable[..., Any]) -> click.Group: ...
+
+    @overload
+    def group(self, *args: Any, **kwargs: Any) -> Callable[[Callable[..., Any]], click.Group]: ...
+
     @override
-    def group(self, *args: Any, **kwargs: Any) -> Any:
+    def group(
+        self, *args: Any, **kwargs: Any
+    ) -> Callable[[Callable[..., Any]], click.Group] | click.Group:
         aliases = kwargs.pop("aliases", [])
         # keep the same class type unless explicitly specified
         if "cls" not in kwargs:
             kwargs["cls"] = type(self)
-        decorator = super().group(*args, **kwargs)
-        if not aliases:
+        decorator: Callable[[Callable[..., Any]], click.Group] | click.Group = super().group(
+            *args, **kwargs
+        )
+        if not aliases or isinstance(decorator, click.Group):
             return decorator
 
         def _decorator(f: Callable[..., Any]) -> click.Group:
@@ -143,7 +165,7 @@ class AliasGroupMixin(click.Group):
             commands.append((subcommand, cmd))
 
         # allow for 3 times the default spacing
-        if len(commands):
+        if commands:
             limit = formatter.width - 6 - max(len(cmd[0]) for cmd in commands)
             rows = []
             for subcommand, cmd in commands:

@@ -2,21 +2,15 @@
 
 [background](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-Scenario: incomplete 8 / 48
+Scenario: incomplete 1 / 44
 
-- built from ops (23)
-  - LoginHistoryAdapter.admin_search: representative success ✓ · representative rejection ✓
-  - LoginHistoryAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - LoginHistoryAdapter.my_search: representative success ✓ · representative rejection ✓
-  - LoginSessionAdapter.admin_search: representative success ✓ · representative rejection ✓
-  - LoginSessionAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - LoginSessionAdapter.my_search: representative success ✓ · representative rejection ✓
+- built from ops (20)
   - UserAdapter.admin_search: representative success ✓ · representative rejection ✓
   - UserAdapter.admin_search_keypairs: representative success ✓ · representative rejection ✓
   - UserAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
   - UserAdapter.batch_lookup_by_emails: representative success ✓ · representative rejection ✓
-  - UserAdapter.bulk_get_keypair_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - UserAdapter.bulk_lookup_keypair_access_keys: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.bulk_get_keypair_ids: representative success ✓ · representative rejection ✓
+  - UserAdapter.bulk_lookup_keypair_access_keys: representative success ✓ · representative rejection ✓
   - UserAdapter.domain_search: representative success ✓ · representative rejection ✓
   - UserAdapter.gql_admin_search: representative success ✓ · representative rejection ✓
   - UserAdapter.gql_admin_search_keypairs: representative success ✓ · representative rejection ✓
@@ -24,65 +18,39 @@ Scenario: incomplete 8 / 48
   - UserAdapter.gql_search_by_domain: representative success ✓ · representative rejection ✓
   - UserAdapter.gql_search_by_project: representative success ✓ · representative rejection ✓
   - UserAdapter.project_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.resolve_domain_id: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.resolve_domain_id: representative success ✓ · representative rejection ✓
   - UserAdapter.role_search: representative success ✓ · representative rejection ✓
   - UserAdapter.scoped_search: representative success ✓ · representative rejection ✓
   - UserAdapter.search_my_keypairs: representative success ✓ · representative rejection ✓
-- ops + direct implementation (7)
-  - UserAdapter.bulk_create_users: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
-  - UserAdapter.bulk_create_users_with_keypair: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
+  - UserConfigAdapter.delete_default_auto_generated_file: representative success ✓ · representative rejection ✓
+  - UserConfigAdapter.get_default_auto_generated_file: representative success ✓ · representative rejection ✓
+  - UserConfigAdapter.get_default_auto_generated_files: representative success ✓ · representative rejection ✓
+- ops + direct implementation (13)
+  - UserAdapter.admin_create_keypair: success absent · rejection present 3 (atomic_bulk_scoped_search_ops, single_entity): SCENARIO-GAP
+  - UserAdapter.admin_get_keypair: success present 1 · rejection present 1 (atomic_bulk_scoped_search_ops, single_field)
+  - UserAdapter.admin_update_keypair: success present 1 · rejection present 3 (atomic_bulk_scoped_search_ops, single_field)
+  - UserAdapter.bulk_create_users: success present 1 · rejection present 1 (atomic_bulk_get_ops, global_scope)
+  - UserAdapter.bulk_create_users_with_keypair: success present 1 · rejection present 1 (atomic_bulk_get_ops, atomic_bulk_scoped_search_ops, global_scope)
   - UserAdapter.bulk_update_users: success present 3 · rejection present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user: success absent · rejection present 2 (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - UserAdapter.create_user: success present 1 · rejection present 2 (atomic_bulk_get_ops, atomic_bulk_scoped_search_ops, scope)
   - UserAdapter.delete_user_by_id: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.get: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.issue_my_keypair: success present 1 · rejection present 2 (atomic_bulk_scoped_search_ops, single_entity)
+  - UserAdapter.update_my_keypair: success present 1 · rejection present 3 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
-- direct implementation (18)
-  - LoginSessionAdapter.admin_revoke: success present 1 · rejection present 2 (global_scope)
-  - LoginSessionAdapter.admin_unblock_user: success present 2 · rejection present 1 (global_scope)
-  - LoginSessionAdapter.my_revoke: success present 1 · rejection present 3 (single_field)
-  - UserAdapter.admin_create_keypair: success present 1 · rejection present 2 (single_entity)
+  - UserConfigAdapter.update_default_auto_generated_file: success present 1 · rejection present 2 (scope_search_ops, single_entity)
+- direct implementation (11)
   - UserAdapter.admin_delete_keypair: success present 1 · rejection present 3 (single_field)
   - UserAdapter.admin_delete_ssh_keypair: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.admin_get_keypair: success present 1 · rejection present 1 (single_field)
   - UserAdapter.admin_get_ssh_keypair: success present 1 · rejection present 1 (single_entity)
   - UserAdapter.admin_register_ssh_keypair: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.admin_update_keypair: success present 1 · rejection present 3 (single_field)
   - UserAdapter.bulk_purge_users: success present 2 · rejection present 1 (global_scope)
-  - UserAdapter.issue_my_keypair: success present 2 · rejection present 1 (single_entity)
   - UserAdapter.purge_user_by_id: success present 1 · rejection present 2 (single_entity)
   - UserAdapter.restore_user_by_id: success present 1 · rejection present 2 (single_entity)
   - UserAdapter.revoke_my_keypair: success present 1 · rejection present 4 (single_field)
   - UserAdapter.switch_default_access_key: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.update_my_keypair: success present 1 · rejection present 3 (single_field)
   - UserAdapter.update_user: success present 1 · rejection present 1 (single_entity)
-
-**LoginHistoryAdapter.admin_search**
-
-| scenario | verdict |
-|---|---|
-| [when the superadmin searches in a history search gated by the global role, every record seeded in advance comes back in descending creation time regardless of the user](#login_history-the-superadmin-searches-every-users-login-history) | answered |
-| [a user holding the permission is rejected by the global role gate when searching every history record](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | rejected |
-
-**LoginHistoryAdapter.my_search**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ in their own scope searches, the history of other users is left out](#login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history) | answered |
-| [a user holding no role who tries to search their own history is rejected by the scope permission gate even for themselves](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | rejected |
-
-**LoginSessionAdapter.admin_search**
-
-| scenario | verdict |
-|---|---|
-| [when the superadmin searches without page arguments in a session search gated by the global role, every session seeded in advance comes back in descending creation time regardless of the user](#login_sessions-the-superadmin-searches-every-users-login-sessions) | answered |
-| [a user holding the permission is rejected by the global role gate when searching every login session](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | rejected |
-
-**LoginSessionAdapter.my_search**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ in their own scope searches, the sessions of other users are left out](#login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions) | answered |
-| [a user holding no role who tries to search their own sessions is rejected by the scope permission gate even for themselves](#login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions) | rejected |
+  - UserConfigAdapter.create_auto_generated_file: success present 1 · rejection present 2 (scope)
 
 **UserAdapter.admin_search**
 
@@ -113,6 +81,20 @@ Scenario: incomplete 8 / 48
 | [when a user granted the user read permission in the target user scope looks up that user's email, the id of that user comes back](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | answered |
 | [when a user holding no permission gives an empty email list, no action is called and an empty list comes back](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | answered |
 | [when a user granted read on only one user looks up a readable user, an unreadable user, and a missing email at once, the first comes back as an id and the other two come back with the same rejection in input order](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | rejected |
+
+**UserAdapter.bulk_get_keypair_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted the user read permission in the target user scope reads that user's key and a missing id at once, the whole key and an empty value come back in that order](#loading_keypairs-a-user-granted-read-on-another-loads-their-key-by-id) | answered |
+| [when a user holding no permission reads another user's key and a missing id at once, that key entry is rejected for lack of permission and the missing id entry is empty](#loading_keypairs-a-user-granted-nothing-gets-a-rejection-for-anothers-key) | rejected |
+
+**UserAdapter.bulk_lookup_keypair_access_keys**
+
+| scenario | verdict |
+|---|---|
+| [when a user looks up an access key and an access key nobody holds at once, the first comes back as that keypair's id and the second as an empty value](#loading_keypairs-a-user-looks-up-the-keypair-an-access-key-names) | answered |
+| [looking up a key by an access key without a login context is rejected as user not found](#loading_keypairs-looking-up-an-access-key-without-login-is-refused) | rejected |
 
 **UserAdapter.domain_search**
 
@@ -164,6 +146,13 @@ Scenario: incomplete 8 / 48
 | [when a user granted user READ in the project scope searches by that project, only the users on its roster come back](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | answered |
 | [a project search from a user holding no role is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
+**UserAdapter.resolve_domain_id**
+
+| scenario | verdict |
+|---|---|
+| [when a user in a domain resolves its name, the id of that domain comes back](#resolving_domain-a-user-resolves-the-id-of-a-domain-by-its-name) | answered |
+| [resolving a name no domain answers to is rejected as not found](#resolving_domain-resolving-a-domain-name-nothing-answers-to-is-not-found) | rejected |
+
 **UserAdapter.role_search**
 
 | scenario | verdict |
@@ -188,16 +177,65 @@ Scenario: incomplete 8 / 48
 | [when a user holding the permission searches without page arguments, ten keys in descending creation time and the next page flag come back](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | answered |
 | [a user holding no role who tries to search their own keys is rejected by the scope permission gate](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | rejected |
 
+**UserConfigAdapter.delete_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone](#config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one) | answered |
+| [a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file) | rejected |
+| [when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found](#config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
+
+**UserConfigAdapter.get_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ reads an auto-generated file set as default, the content of its last revision comes back](#config_files-a-user-granted-read-on-their-auto-generated-files-reads-the-default-one) | answered |
+| [a user holding no permission who tries to read their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-read-an-auto-generated-file) | rejected |
+| [when a user holding READ reads an auto-generated file not set as default, it is rejected as not found](#config_files-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
+
+**UserConfigAdapter.get_default_auto_generated_files**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ lists their auto-generated files, only the ones set as default come back, with their last revision's content](#config_files-a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones) | answered |
+| [a user holding no permission who tries to list their own auto-generated files is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files) | rejected |
+
+**UserAdapter.admin_create_keypair**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding the permission gives a policy name that does not exist, input validation rejects it](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | rejected |
+| [a user holding no role who tries to create a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | rejected |
+| [when a user granted UPDATE in the target user scope, not the superadmin, creates a key under a policy, a new key that is not the default and its secret come back](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | rejected |
+
+**UserAdapter.admin_get_keypair**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted READ in the target scope reads a key, that whole key node comes back](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | answered |
+| [a user holding no role who tries to read a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | rejected |
+
+**UserAdapter.admin_update_keypair**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted READ and UPDATE in the target scope gives only a rate limit, the key node comes back with everything else unchanged and only the rate limit changed](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | answered |
+| [a user holding no role who tries to change a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | rejected |
+| [a user holding only READ who tries to change a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | rejected |
+| [when a user holding the permission gives a policy name that does not exist, input validation rejects it](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | rejected |
+
 **UserAdapter.bulk_create_users**
 
 | scenario | verdict |
 |---|---|
+| [when the superadmin bulk creates one user, the user just created comes back and none failed](#creating-the-superadmin-bulk-creates-a-user) | answered |
 | [even a user granted CREATE in the domain scope is rejected by the global role gate when bulk creating users](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | rejected |
 
 **UserAdapter.bulk_create_users_with_keypair**
 
 | scenario | verdict |
 |---|---|
+| [when the superadmin bulk creates one user through the keypair-returning call, the user just created and its default keypair with the secret key come back and none failed](#creating-the-superadmin-bulk-creates-a-user-and-gets-its-keypair) | answered |
 | [a user holding the permission is rejected by the global role gate when calling this bulk create](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | rejected |
 
 **UserAdapter.bulk_update_users**
@@ -213,6 +251,7 @@ Scenario: incomplete 8 / 48
 
 | scenario | verdict |
 |---|---|
+| [when a user granted the read and create permissions on users in the domain scope creates a user in that domain, the whole user just created and its default keypair with the secret key come back](#creating-a-user-granted-create-on-a-domain-makes-a-user-in-it) | answered |
 | [a user holding no role who tries to create a user is rejected by the domain scope permission gate](#creating-a-user-granted-nothing-may-not-create-a-user) | rejected |
 | [when a user holding the permission gives a domain name nothing answers to, the domain name lookup step rejects it as not found](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | rejected |
 
@@ -229,6 +268,23 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [when a user granted the user read permission in the target user scope reads the user, the whole node with the default key filled comes back](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | answered |
 | [a user holding no role who tries to read another user is rejected by the entity permission gate](#reading-a-user-granted-nothing-may-not-read-another-user) | rejected |
+
+**UserAdapter.issue_my_keypair**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding the permission issues a key, moves the default key to it, and revokes the original default key, all three calls pass in turn and only the issued key is left](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | answered |
+| [a user holding no role who tries to issue their own key is rejected by the entity permission gate even for themselves](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | rejected |
+| [when a user granted UPDATE in their own user scope issues a key, the key follows the admin flag, policy, and rate limit of the default key, holds no default flag, and comes back with its secret](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | rejected |
+
+**UserAdapter.update_my_keypair**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted READ and UPDATE in their own scope turns an extra key inactive, the key node comes back with only the active flag changed](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | answered |
+| [a user holding no role who tries to turn a key inactive is rejected at the owner lookup step](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | rejected |
+| [a user holding only READ who tries to turn a key inactive is rejected by the entity permission gate](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | rejected |
+| [when a user holding the permission tries to turn their own default key inactive, input validation rejects it](#own_keypairs-the-default-key-may-not-be-turned-off) | rejected |
 
 **UserAdapter.update_user_by_id**
 
@@ -248,38 +304,13 @@ Scenario: incomplete 8 / 48
 | [when a user granted only UPDATE and READ in the target user scope gives DELETED in an edit, the entity permission gate of the delete rejects it](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | rejected |
 | [when only DELETED is given in an edit of a deleted user, nothing changes and that user comes back](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | rejected |
 
-**LoginSessionAdapter.admin_revoke**
+**UserConfigAdapter.update_default_auto_generated_file**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin revokes another user's session in an admin revoke gated by the global role, success comes back, the session leaves the whole session search, and a history record says an admin revoked it](#login_sessions-the-superadmin-revokes-another-users-login-session) | answered |
-| [a user holding the permission is rejected by the global role gate when revoking a session as admin](#login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin) | rejected |
-| [when the superadmin gives a session id that does not exist, input validation rejects it](#login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist) | rejected |
-
-**LoginSessionAdapter.admin_unblock_user**
-
-| scenario | verdict |
-|---|---|
-| [when the superadmin gives a username in an unblock gated by the global role, success comes back and the block record of that name is gone](#login_sessions-the-superadmin-unblocks-a-user) | answered |
-| [when the superadmin gives a username nobody holds, success comes back without checking that it exists](#login_sessions-unblocking-a-username-nobody-holds-still-succeeds) | answered |
-| [a user holding the permission is rejected by the global role gate when unblocking a user](#login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user) | rejected |
-
-**LoginSessionAdapter.my_revoke**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ and UPDATE in their own scope revokes their own session, success comes back, the session is no longer searched, and a history record says the user revoked it](#login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session) | answered |
-| [a user holding no role who tries to revoke a session is rejected at the owner lookup step](#login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session) | rejected |
-| [when a user granted READ and UPDATE only in their own scope gives another user's session, the lookup step on its owner rejects it](#login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session) | rejected |
-| [a user holding only READ who tries to revoke a session is rejected by the entity permission gate](#login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session) | rejected |
-
-**UserAdapter.admin_create_keypair**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted UPDATE in the target user scope, not the superadmin, creates a key under a policy, a new key that is not the default and its secret come back](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | answered |
-| [when a user holding the permission gives a policy name that does not exist, input validation rejects it](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | rejected |
-| [a user holding no role who tries to create a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | rejected |
+| [when a user holding READ and UPDATE changes an auto-generated file set as default, an empty response comes back, the file's permission changes and the new content is added as revision 2](#config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one) | answered |
+| [a user holding no permission who tries to change their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file) | rejected |
+| [when a user holding READ and UPDATE changes an auto-generated file not set as default, it is rejected as not found](#config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
 
 **UserAdapter.admin_delete_keypair**
 
@@ -298,13 +329,6 @@ Scenario: incomplete 8 / 48
 | [a user holding no role who tries to delete a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | rejected |
 | [a user holding only READ who tries to delete a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | rejected |
 
-**UserAdapter.admin_get_keypair**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ in the target scope reads a key, that whole key node comes back](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | answered |
-| [a user holding no role who tries to read a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | rejected |
-
 **UserAdapter.admin_get_ssh_keypair**
 
 | scenario | verdict |
@@ -316,18 +340,9 @@ Scenario: incomplete 8 / 48
 
 | scenario | verdict |
 |---|---|
-| [when a user granted READ and UPDATE in the target scope gives a public key and a private key, they overwrite the stored one without a format check and the access key comes back](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | answered |
+| [when a user granted READ and UPDATE in the target scope gives a public key, it overwrites the stored public key without a format check and the access key comes back](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | answered |
 | [a user holding no role who tries to register an SSH key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | rejected |
 | [a user holding only READ who tries to register an SSH key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | rejected |
-
-**UserAdapter.admin_update_keypair**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ and UPDATE in the target scope gives only a rate limit, the key node comes back with everything else unchanged and only the rate limit changed](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | answered |
-| [a user holding no role who tries to change a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | rejected |
-| [a user holding only READ who tries to change a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | rejected |
-| [when a user holding the permission gives a policy name that does not exist, input validation rejects it](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | rejected |
 
 **UserAdapter.bulk_purge_users**
 
@@ -336,14 +351,6 @@ Scenario: incomplete 8 / 48
 | [when the superadmin gives an existing user and a missing id together, one is purged and the missing id comes back as failed](#retiring-a-bulk-purge-records-a-missing-id-as-a-failure) | answered |
 | [when the superadmin gives two users in a bulk purge gated by the global role, the two ids and a count of two come back](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | answered |
 | [even a user granted HARD_DELETE in the domain scope is rejected by the global role gate when purging in bulk](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | rejected |
-
-**UserAdapter.issue_my_keypair**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted UPDATE in their own user scope issues a key, the key follows the admin flag, policy, and rate limit of the default key, holds no default flag, and comes back with its secret](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | answered |
-| [when a user holding the permission issues a key, moves the default key to it, and revokes the original default key, all three calls pass in turn and only the issued key is left](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | answered |
-| [a user holding no role who tries to issue their own key is rejected by the entity permission gate even for themselves](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | rejected |
 
 **UserAdapter.purge_user_by_id**
 
@@ -379,15 +386,6 @@ Scenario: incomplete 8 / 48
 | [a user holding no role who tries to move the default key is rejected by the entity permission gate](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | rejected |
 | [when a user holding the permission gives another user's key, input validation rejects it](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | rejected |
 
-**UserAdapter.update_my_keypair**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ and UPDATE in their own scope turns an extra key inactive, the key node comes back with only the active flag changed](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | answered |
-| [a user holding no role who tries to turn a key inactive is rejected at the owner lookup step](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | rejected |
-| [a user holding only READ who tries to turn a key inactive is rejected by the entity permission gate](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | rejected |
-| [when a user holding the permission tries to turn their own default key inactive, input validation rejects it](#own_keypairs-the-default-key-may-not-be-turned-off) | rejected |
-
 **UserAdapter.update_user**
 
 | scenario | verdict |
@@ -395,333 +393,13 @@ Scenario: incomplete 8 / 48
 | [when a user granted UPDATE in the target user scope sends an edit holding only the allowed IP, a success flag comes back and the allowed IP of that user changes](#editing-a-user-granted-update-changes-the-allowed-client-ip) | answered |
 | [when an allowed IP edit comes from a user holding no role, the entity permission gate rejects it](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | rejected |
 
-### LoginHistoryAdapter.admin_search
-
-<a id="login_history-the-superadmin-searches-every-users-login-history"></a>
-
-#### [the-superadmin-searches-every-users-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-when the superadmin searches in a history search gated by the global role, every record seeded in advance comes back in descending creation time regardless of the user
-
-Given
-
-- one domain, one superadmin, and two users who each hold one success record
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-  - regular user user-1: has one successful login record
-  - regular user user-2: has one successful login record
-
-When
-
-- LoginHistoryAdapter.admin_search: user-3 searches every login history record
-
-Then
-
-- every record seeded in advance comes back in order
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 2
-  - items[0].id: same as the record seeded in advance
-  - items[0].user_id: same as the record owner
-  - items[0].domain_name = 'home-1'
-  - items[0].result = 'success'
-  - items[0].fail_reason = None
-  - items[0].client_ip = None
-  - items[0].created_at: the time this run wrote
-  - items[1].id: same as the record seeded in advance
-  - items[1].user_id: same as the record owner
-  - items[1].domain_name = 'home-1'
-  - items[1].result = 'success'
-  - items[1].fail_reason = None
-  - items[1].client_ip = None
-  - items[1].created_at: the time this run wrote
-
-<a id="login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-a user holding the permission is rejected by the global role gate when searching every history record
-
-Given
-
-- one domain, and the caller holds the user READ permission in the domain scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginHistoryAdapter.admin_search: user-1 searches every login history record
-
-Then
-
-- the call is rejected
-  - rejected: InsufficientPrivilege
-
-### LoginHistoryAdapter.my_search
-
-<a id="login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history"></a>
-
-#### [a-user-granted-read-on-themselves-searches-only-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-when a user granted READ in their own scope searches, the history of other users is left out
-
-Given
-
-- one domain and two users, the caller holds the READ permission on their own user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - regular user user-1: has one successful login record
-  - regular user user-2: has one successful login record
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginHistoryAdapter.my_search: user-1 searches their own login history
-
-Then
-
-- only their own record comes back
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 1
-  - items[0].id: same as the record seeded in advance
-  - items[0].user_id: same as the record owner
-  - items[0].domain_name = 'home-1'
-  - items[0].result = 'success'
-  - items[0].fail_reason = None
-  - items[0].client_ip = None
-  - items[0].created_at: the time this run wrote
-
-<a id="login_history-a-user-granted-nothing-may-not-search-their-own-login-history"></a>
-
-#### [a-user-granted-nothing-may-not-search-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-a user holding no role who tries to search their own history is rejected by the scope permission gate even for themselves
-
-Given
-
-- one domain and two users, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - regular user user-1: has one successful login record
-
-When
-
-- LoginHistoryAdapter.my_search: user-1 searches their own login history
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-### LoginSessionAdapter.admin_search
-
-<a id="login_sessions-the-superadmin-searches-every-users-login-sessions"></a>
-
-#### [the-superadmin-searches-every-users-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when the superadmin searches without page arguments in a session search gated by the global role, every session seeded in advance comes back in descending creation time regardless of the user
-
-Given
-
-- one domain, one superadmin, and two users who each hold one session
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-5: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - Keypair policy keypair-policy-4: up to 5 concurrent sessions
-  - regular user user-2: has one more active keypair besides the default one
-  - regular user user-2: has one active login session
-
-When
-
-- LoginSessionAdapter.admin_search: user-3 searches every login session
-
-Then
-
-- every session seeded in advance comes back in order
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 2
-  - items[0].id: same as the session seeded in advance
-  - items[0].user_id: same as the session owner
-  - items[0].access_key: same as the key that opened the session
-  - items[0].status = 'active'
-  - items[0].created_at: the time this run wrote
-  - items[0].last_accessed_at = None
-  - items[0].invalidated_at = None
-  - items[1].id: same as the session seeded in advance
-  - items[1].user_id: same as the session owner
-  - items[1].access_key: same as the key that opened the session
-  - items[1].status = 'active'
-  - items[1].created_at: the time this run wrote
-  - items[1].last_accessed_at = None
-  - items[1].invalidated_at = None
-
-<a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-a user holding the permission is rejected by the global role gate when searching every login session
-
-Given
-
-- one domain and one user holding a session, and the caller holds the user READ permission in the domain scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- LoginSessionAdapter.admin_search: user-2 searches every login session
-
-Then
-
-- the call is rejected
-  - rejected: InsufficientPrivilege
-
-### LoginSessionAdapter.my_search
-
-<a id="login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions"></a>
-
-#### [a-user-granted-read-on-themselves-searches-only-their-own-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when a user granted READ in their own scope searches, the sessions of other users are left out
-
-Given
-
-- one domain and two users, the caller holds the READ permission on their own user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - Keypair policy keypair-policy-4: up to 5 concurrent sessions
-  - regular user user-2: has one more active keypair besides the default one
-  - regular user user-2: has one active login session
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginSessionAdapter.my_search: user-1 searches their own login sessions
-
-Then
-
-- only their own session comes back
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 1
-  - items[0].id: same as the session seeded in advance
-  - items[0].user_id: same as the session owner
-  - items[0].access_key: same as the key that opened the session
-  - items[0].status = 'active'
-  - items[0].created_at: the time this run wrote
-  - items[0].last_accessed_at = None
-  - items[0].invalidated_at = None
-
-<a id="login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions"></a>
-
-#### [a-user-granted-nothing-may-not-search-their-own-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-a user holding no role who tries to search their own sessions is rejected by the scope permission gate even for themselves
-
-Given
-
-- one domain and two users, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-
-When
-
-- LoginSessionAdapter.my_search: user-1 searches their own login sessions
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
+**UserConfigAdapter.create_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding CREATE on their own auto-generated files writes one, an empty response comes back, and the file holds its content as revision 1 and is set as the default of its path](#config_files-a-user-granted-create-on-their-auto-generated-files-writes-one) | answered |
+| [a user holding no permission who tries to write their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file) | rejected |
+| [when a user holding CREATE tries to write an auto-generated file where the manager keeps its own, input validation rejects it](#config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused) | rejected |
 
 ### UserAdapter.admin_search
 
@@ -828,7 +506,7 @@ Then
   - items[0].is_default = True
   - items[0].rate_limit = 10000
   - items[0].resource_policy = 'keypair-policy-1'
-  - items[0].ssh_public_key = ''
+  - items[0].ssh_public_key = None
   - items[0].num_queries = 0
   - items[0].last_used = None
   - items[0].user_id: same as the key owner
@@ -841,7 +519,7 @@ Then
   - items[1].is_default = True
   - items[1].rate_limit = 10000
   - items[1].resource_policy = 'keypair-policy-2'
-  - items[1].ssh_public_key = ''
+  - items[1].ssh_public_key = None
   - items[1].num_queries = 0
   - items[1].last_used = None
   - items[1].user_id: same as the key owner
@@ -854,7 +532,7 @@ Then
   - items[2].is_default = True
   - items[2].rate_limit = 10000
   - items[2].resource_policy = 'keypair-policy-3'
-  - items[2].ssh_public_key = ''
+  - items[2].ssh_public_key = None
   - items[2].num_queries = 0
   - items[2].last_used = None
   - items[2].user_id: same as the key owner
@@ -1134,6 +812,152 @@ Then
   - rejected: GenericBadRequest
   - rejected: GenericBadRequest
 
+### UserAdapter.bulk_get_keypair_ids
+
+<a id="loading_keypairs-a-user-granted-read-on-another-loads-their-key-by-id"></a>
+
+#### [a-user-granted-read-on-another-loads-their-key-by-id](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+when a user granted the user read permission in the target user scope reads that user's key and a missing id at once, the whole key and an empty value come back in that order
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds the user read permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.bulk_get_keypair_ids: user-2 batch reads the key of user-1 and a missing id
+
+Then
+
+- the key read comes back as a node and the missing id as an empty value
+  - length = 2
+  - id: same as the keypair seeded in advance
+  - access_key: same as the keypair seeded in advance
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'keypair-policy-2'
+  - num_queries = 0
+  - last_used = None
+  - user_id: same as the keypair owner
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+  - field_id: same as the keypair seeded in advance
+  - [1] = None
+
+<a id="loading_keypairs-a-user-granted-nothing-gets-a-rejection-for-anothers-key"></a>
+
+#### [a-user-granted-nothing-gets-a-rejection-for-anothers-key](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+when a user holding no permission reads another user's key and a missing id at once, that key entry is rejected for lack of permission and the missing id entry is empty
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.bulk_get_keypair_ids: user-2 batch reads the key of user-1 and a missing id
+
+Then
+
+- the unreadable key is rejected for lack of permission and the missing id comes back empty
+  - length = 2
+  - rejected: NotEnoughPermission
+  - [1] = None
+
+### UserAdapter.bulk_lookup_keypair_access_keys
+
+<a id="loading_keypairs-a-user-looks-up-the-keypair-an-access-key-names"></a>
+
+#### [a-user-looks-up-the-keypair-an-access-key-names](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+when a user looks up an access key and an access key nobody holds at once, the first comes back as that keypair's id and the second as an empty value
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.bulk_lookup_keypair_access_keys: user-2 looks up the access key of user-1 and an access key nobody holds
+
+Then
+
+- the key found comes back as its id and the access key nobody holds is empty
+  - length = 2
+  - [0]: same as the keypair seeded in advance
+  - [1] = None
+
+<a id="loading_keypairs-looking-up-an-access-key-without-login-is-refused"></a>
+
+#### [looking-up-an-access-key-without-login-is-refused](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+looking up a key by an access key without a login context is rejected as user not found
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.bulk_lookup_keypair_access_keys: without a login context, looks up an access key
+
+Then
+
+- the call is rejected
+  - rejected: UserNotFound
+
 ### UserAdapter.domain_search
 
 <a id="searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users"></a>
@@ -1362,7 +1186,7 @@ Then
   - items[0].is_default = True
   - items[0].rate_limit = 10000
   - items[0].resource_policy = 'keypair-policy-1'
-  - items[0].ssh_public_key = ''
+  - items[0].ssh_public_key = None
   - items[0].num_queries = 0
   - items[0].last_used = None
   - items[0].user_id: same as the key owner
@@ -1681,6 +1505,58 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### UserAdapter.resolve_domain_id
+
+<a id="resolving_domain-a-user-resolves-the-id-of-a-domain-by-its-name"></a>
+
+#### [a-user-resolves-the-id-of-a-domain-by-its-name](/tests/scenario/bai_scenario/manager/user/test_resolving_domain.py): pass
+
+when a user in a domain resolves its name, the id of that domain comes back
+
+Given
+
+- one domain and one user in it
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.resolve_domain_id: user-1 resolves the id of home-1
+
+Then
+
+- the id of that domain comes back
+  - id: same as the id of the domain seeded in advance
+
+<a id="resolving_domain-resolving-a-domain-name-nothing-answers-to-is-not-found"></a>
+
+#### [resolving-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/user/test_resolving_domain.py): pass
+
+resolving a name no domain answers to is rejected as not found
+
+Given
+
+- one domain and one user in it
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.resolve_domain_id: user-1 resolves the id of no-such-domain
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
 ### UserAdapter.role_search
 
 <a id="searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"></a>
@@ -1947,7 +1823,6 @@ Then
   - items[the extra key].is_default = False
   - items[the extra key].rate_limit = 10000
   - items[the extra key].resource_policy = 'keypair-policy-1'
-  - items[the extra key].ssh_public_key = ''
   - items[the extra key].num_queries = 0
   - items[the extra key].last_used = None
   - items[the extra key].user_id: same as the keypair owner
@@ -1960,7 +1835,6 @@ Then
   - items[the default key].is_default = True
   - items[the default key].rate_limit = 10000
   - items[the default key].resource_policy = 'keypair-policy-1'
-  - items[the default key].ssh_public_key = ''
   - items[the default key].num_queries = 0
   - items[the default key].last_used = None
   - items[the default key].user_id: same as the key owner
@@ -2038,7 +1912,625 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### UserConfigAdapter.delete_default_auto_generated_file
+
+<a id="config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one"></a>
+
+#### [a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- a response saying it was deleted comes back
+  - response = {'success': True}
+
+<a id="config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-delete-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
+### UserConfigAdapter.get_default_auto_generated_file
+
+<a id="config_files-a-user-granted-read-on-their-auto-generated-files-reads-the-default-one"></a>
+
+#### [a-user-granted-read-on-their-auto-generated-files-reads-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ reads an auto-generated file set as default, the content of its last revision comes back
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own auto-generated files
+
+Then
+
+- the default file of the path comes back with its last revision's content
+  - response = {'path': '.vimrc', 'perm': '644', 'data': 'set number\n'}
+
+<a id="config_files-a-user-granted-nothing-may-not-read-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-read-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to read their own auto-generated file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ reads an auto-generated file not set as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
+### UserConfigAdapter.get_default_auto_generated_files
+
+<a id="config_files-a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones"></a>
+
+#### [a-user-granted-read-on-their-auto-generated-files-lists-only-the-default-ones](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ lists their auto-generated files, only the ones set as default come back, with their last revision's content
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds a .bashrc auto-generated file not set as default (permission 644, revision 1 holding 'export EDITOR=vim\n'), the user holds the READ permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - Auto-generated file .bashrc: permission 644
+  - Auto-generated file .bashrc: has one revision whose content is 'export EDITOR=vim\n'
+  - a role assignment granting the READ permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the auto-generated files of theirs set as default
+
+Then
+
+- only the .vimrc file set as default is listed, with its last revision's content
+  - files = [('.vimrc', '644', 'set number\n')]
+
+<a id="config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files"></a>
+
+#### [a-user-granted-nothing-may-not-list-their-auto-generated-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to list their own auto-generated files is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the auto-generated files of theirs set as default
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### UserAdapter.admin_create_keypair
+
+<a id="managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist"></a>
+
+#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+when a user holding the permission gives a policy name that does not exist, input validation rejects it
+
+Given
+
+- one domain and one target user, the caller holds the user UPDATE permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - a role assignment granting the user the UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.admin_create_keypair: user-2 creates a key for user-1 under a policy that does not exist
+
+Then
+
+- the call is rejected
+  - rejected: KeypairResourcePolicyNotFound
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another"></a>
+
+#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+a user holding no role who tries to create a key is rejected by the entity permission gate
+
+Given
+
+- one domain and one target user, the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+
+When
+
+- UserAdapter.admin_create_keypair: user-2 creates a key for user-1 under granted-policy-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
+
+#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+when a user granted UPDATE in the target user scope, not the superadmin, creates a key under a policy, a new key that is not the default and its secret come back
+
+Given
+
+- one domain and one target user, the caller holds the user UPDATE permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - a role assignment granting the user the UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.admin_create_keypair: user-2 creates a key for user-1 under granted-policy-1
+
+Then
+
+- the whole key created and its secret come back
+  - rejected: NotEnoughPermission
+
+### UserAdapter.admin_get_keypair
+
+<a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
+
+#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+when a user granted READ in the target scope reads a key, that whole key node comes back
+
+Given
+
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.admin_get_keypair: user-2 reads the key of user-1 by access key
+
+Then
+
+- the whole key seeded in advance comes back
+  - id: same as the key seeded in advance
+  - access_key: same as the key seeded in advance
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key = None
+  - num_queries = 0
+  - last_used = None
+  - user_id: same as the key owner
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+a user holding no role who tries to read a key is rejected at the owner lookup step
+
+Given
+
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.admin_get_keypair: user-2 reads the key of user-1 by access key
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### UserAdapter.admin_update_keypair
+
+<a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
+
+#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+when a user granted READ and UPDATE in the target scope gives only a rate limit, the key node comes back with everything else unchanged and only the rate limit changed
+
+Given
+
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.admin_update_keypair: user-2 gives a rate limit to the key of user-1
+
+Then
+
+- the whole key with only the rate limit changed comes back
+  - id: same as the key seeded in advance
+  - access_key: same as the key seeded in advance
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 45000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key = None
+  - num_queries = 0
+  - last_used = None
+  - user_id: same as the key owner
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+a user holding no role who tries to change a key is rejected at the owner lookup step
+
+Given
+
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.admin_update_keypair: user-2 gives a rate limit to the key of user-1
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+<a id="managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key"></a>
+
+#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+a user holding only READ who tries to change a key is rejected by the entity permission gate
+
+Given
+
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.admin_update_keypair: user-2 gives a rate limit to the key of user-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist"></a>
+
+#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+when a user holding the permission gives a policy name that does not exist, input validation rejects it
+
+Given
+
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy granted-policy-1: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.admin_update_keypair: user-2 gives a rate limit and a policy that does not exist to the key of user-1
+
+Then
+
+- the call is rejected
+  - rejected: KeypairResourcePolicyNotFound
+
 ### UserAdapter.bulk_create_users
+
+<a id="creating-the-superadmin-bulk-creates-a-user"></a>
+
+#### [the-superadmin-bulk-creates-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+when the superadmin bulk creates one user, the user just created comes back and none failed
+
+Given
+
+- one domain and one superadmin, and the caller holds no permission
+  - Domain home-1
+  - User resource policy user-policy-1: up to 10 folders per user
+  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.bulk_create_users: user-1 bulk creates made in home-1
+
+Then
+
+- the user just created comes back and none failed
+  - created_users.length = 1
+  - failed = []
+  - user.id: skipped: the database generates it
+  - user.entity_id: same as the user's own id
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: same as the id of the domain seeded in advance
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: the user's main access key is filled
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: the time this run wrote
+  - user.timestamps.modified_at: the time this run wrote
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users"></a>
 
@@ -2070,6 +2562,73 @@ Then
   - rejected: InsufficientPrivilege
 
 ### UserAdapter.bulk_create_users_with_keypair
+
+<a id="creating-the-superadmin-bulk-creates-a-user-and-gets-its-keypair"></a>
+
+#### [the-superadmin-bulk-creates-a-user-and-gets-its-keypair](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+when the superadmin bulk creates one user through the keypair-returning call, the user just created and its default keypair with the secret key come back and none failed
+
+Given
+
+- one domain and one superadmin, and the caller holds no permission
+  - Domain home-1
+  - User resource policy user-policy-1: up to 10 folders per user
+  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.bulk_create_users_with_keypair: user-1 bulk creates made in home-1
+
+Then
+
+- the user just created and its default keypair with the secret key come back and none failed
+  - created.length = 1
+  - failed = []
+  - user.id: skipped: the database generates it
+  - user.entity_id: same as the user's own id
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: same as the id of the domain seeded in advance
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: same as the keypair this call made
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: the time this run wrote
+  - user.timestamps.modified_at: the time this run wrote
+  - created[0].keypair.id: skipped: it is the access key the manager made
+  - created[0].keypair.field_id: skipped: the database generates it
+  - created[0].keypair.access_key: skipped: the manager creates it
+  - created[0].keypair.is_active = True
+  - created[0].keypair.is_admin = False
+  - created[0].keypair.is_default = True
+  - created[0].keypair.rate_limit = 10000
+  - created[0].keypair.resource_policy = 'default-keypair-policy-1'
+  - created[0].keypair.ssh_public_key = None
+  - created[0].keypair.num_queries = 0
+  - created[0].keypair.last_used = None
+  - created[0].keypair.user_id: same as the user just created
+  - created[0].keypair.created_at: the time this run wrote
+  - created[0].keypair.modified_at: the time this run wrote
+  - created[0].secret_key: the secret key the manager made is filled
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs"></a>
 
@@ -2327,6 +2886,76 @@ Then
 
 ### UserAdapter.create_user
 
+<a id="creating-a-user-granted-create-on-a-domain-makes-a-user-in-it"></a>
+
+#### [a-user-granted-create-on-a-domain-makes-a-user-in-it](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+when a user granted the read and create permissions on users in the domain scope creates a user in that domain, the whole user just created and its default keypair with the secret key come back
+
+Given
+
+- one domain and one user, and the caller holds the READ and CREATE permissions on users in the domain scope
+  - Domain home-1
+  - User resource policy user-policy-1: up to 10 folders per user
+  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the READ, CREATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: CREATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.create_user: user-1 creates made in home-1
+
+Then
+
+- the whole user just created and its default keypair with the secret key come back
+  - user.id: skipped: the database generates it
+  - user.entity_id: same as the user's own id
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: same as the id of the domain seeded in advance
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: same as the keypair this call made
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: the time this run wrote
+  - user.timestamps.modified_at: the time this run wrote
+  - keypair.id: skipped: it is the access key the manager made
+  - keypair.field_id: skipped: the database generates it
+  - keypair.access_key: skipped: the manager creates it
+  - keypair.is_active = True
+  - keypair.is_admin = False
+  - keypair.is_default = True
+  - keypair.rate_limit = 10000
+  - keypair.resource_policy = 'default-keypair-policy-1'
+  - keypair.ssh_public_key = None
+  - keypair.num_queries = 0
+  - keypair.last_used = None
+  - keypair.user_id: same as the user just created
+  - keypair.created_at: the time this run wrote
+  - keypair.modified_at: the time this run wrote
+  - secret_key: the secret key the manager made is filled
+
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 
 #### [a-user-granted-nothing-may-not-create-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
@@ -2548,6 +3177,252 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+### UserAdapter.issue_my_keypair
+
+<a id="own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked"></a>
+
+#### [an-issued-key-made-default-lets-the-original-default-key-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+when a user holding the permission issues a key, moves the default key to it, and revokes the original default key, all three calls pass in turn and only the issued key is left
+
+Given
+
+- one domain and one user holding 0 extra keys that are not the default, and the user holds the READ, UPDATE permission on their own user
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.issue_my_keypair: user-1 finds the default key through their own key search, issues a key, moves the default key to it, revokes the original default key, and searches their own keys again
+
+Then
+
+- all three calls pass and only the issued key is left
+  - issued.id: skipped: it is the access key the manager created
+  - issued.access_key: skipped: the manager creates it
+  - issued.is_active = True
+  - issued.is_admin = False
+  - issued.is_default = False
+  - issued.rate_limit = 10000
+  - issued.resource_policy = 'keypair-policy-1'
+  - issued.ssh_public_key: skipped: it is the RSA key the manager created
+  - issued.num_queries = 0
+  - issued.last_used = None
+  - issued.user_id: same as the keypair owner
+  - issued.created_at: the time this run wrote
+  - issued.modified_at: the time this run wrote
+  - issued.secret_key: skipped: the manager makes it anew every time
+  - switched = True
+  - revoked = True
+  - after.total_count = 1
+  - after.has_next_page = False
+  - after.has_previous_page = False
+  - after.items.access_key: same as the key issued
+  - after.items[0].is_active = True
+  - after.items[0].is_admin = False
+  - after.items[0].is_default = True
+  - after.items[0].rate_limit = 10000
+  - after.items[0].resource_policy = 'keypair-policy-1'
+  - after.items[0].ssh_public_key: skipped: it is the RSA key the manager created
+  - after.items[0].num_queries = 0
+  - after.items[0].last_used = None
+  - after.items[0].user_id: same as the key owner
+  - after.items[0].created_at: the time this run wrote
+  - after.items[0].modified_at: the time this run wrote
+
+<a id="own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key"></a>
+
+#### [a-user-granted-nothing-may-not-issue-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+a user holding no role who tries to issue their own key is rejected by the entity permission gate even for themselves
+
+Given
+
+- one domain and one user holding 0 extra keys that are not the default, and the user holds no permission
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.issue_my_keypair: user-1 issues their own key
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
+
+#### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+when a user granted UPDATE in their own user scope issues a key, the key follows the admin flag, policy, and rate limit of the default key, holds no default flag, and comes back with its secret
+
+Given
+
+- one domain and one user holding 0 extra keys that are not the default, and the user holds the UPDATE permission on their own user
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.issue_my_keypair: user-1 issues their own key
+
+Then
+
+- a new key that is not the default, following the default key, and its secret come back
+  - rejected: NotEnoughPermission
+
+### UserAdapter.update_my_keypair
+
+<a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
+
+#### [a-user-granted-read-and-update-turns-off-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+when a user granted READ and UPDATE in their own scope turns an extra key inactive, the key node comes back with only the active flag changed
+
+Given
+
+- one domain and one user holding 1 extra keys that are not the default, and the user holds the READ, UPDATE permission on their own user
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.update_my_keypair: user-1 turns their own extra key inactive
+
+Then
+
+- the whole key node with only the active flag changed comes back
+  - id: same as the keypair seeded in advance
+  - access_key: same as the keypair seeded in advance
+  - is_active = False
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'keypair-policy-1'
+  - num_queries = 0
+  - last_used = None
+  - user_id: same as the keypair owner
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+
+<a id="own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key"></a>
+
+#### [a-user-granted-nothing-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+a user holding no role who tries to turn a key inactive is rejected at the owner lookup step
+
+Given
+
+- one domain and one user holding 1 extra keys that are not the default, and the user holds no permission
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.update_my_keypair: user-1 turns their own extra key inactive
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+<a id="own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key"></a>
+
+#### [a-user-granted-only-read-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+a user holding only READ who tries to turn a key inactive is rejected by the entity permission gate
+
+Given
+
+- one domain and one user holding 1 extra keys that are not the default, and the user holds the READ permission on their own user
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.update_my_keypair: user-1 turns their own extra key inactive
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="own_keypairs-the-default-key-may-not-be-turned-off"></a>
+
+#### [the-default-key-may-not-be-turned-off](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+when a user holding the permission tries to turn their own default key inactive, input validation rejects it
+
+Given
+
+- one domain and one user holding 0 extra keys that are not the default, and the user holds the READ, UPDATE permission on their own user
+  - Domain home-1
+  - Prepare one user whose key policy is known
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.update_my_keypair: user-1 finds the default key through their own key search and turns it inactive
+
+Then
+
+- the call is rejected
+  - rejected: KeyPairForbidden
 
 ### UserAdapter.update_user_by_id
 
@@ -3153,461 +4028,97 @@ Then
 - the whole user still in the deleted state comes back
   - rejected: NotEnoughPermission
 
-### LoginSessionAdapter.admin_revoke
+### UserConfigAdapter.update_default_auto_generated_file
 
-<a id="login_sessions-the-superadmin-revokes-another-users-login-session"></a>
+<a id="config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one"></a>
 
-#### [the-superadmin-revokes-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
+#### [a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-when the superadmin revokes another user's session in an admin revoke gated by the global role, success comes back, the session leaves the whole session search, and a history record says an admin revoked it
+when a user holding READ and UPDATE changes an auto-generated file set as default, an empty response comes back, the file's permission changes and the new content is added as revision 2
 
 Given
 
-- one domain, one superadmin, and one user holding one session
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, UPDATE permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ, UPDATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: UPDATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
-- LoginSessionAdapter.admin_revoke: user-2 revokes the login session of user-1 through the admin path
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes their .vimrc auto-generated file to permission 600 and content 'set nonumber\n'
 
 Then
 
-- the revoke succeeds and the session is gone from the search that follows
-  - revoked.success = True
-  - after.items = []
-  - after.total_count = 0
-  - after.has_next_page = False
-  - after.has_previous_page = False
+- the legacy API has no response body, so an empty response comes back
+  - response = {}
 
-<a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin"></a>
+<a id="config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
+#### [a-user-granted-nothing-may-not-update-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-a user holding the permission is rejected by the global role gate when revoking a session as admin
+a user holding no permission who tries to change their own auto-generated file is rejected for lack of permission
 
 Given
 
-- one domain and one user holding a session, and the caller holds the user UPDATE permission in the domain scope
+- one domain and one user, the user holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-2: holds Role user-role-1
 
 When
 
-- LoginSessionAdapter.admin_revoke: user-2 revokes the login session of user-1 through the admin path
-
-Then
-
-- the call is rejected
-  - rejected: InsufficientPrivilege
-
-<a id="login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist"></a>
-
-#### [even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when the superadmin gives a session id that does not exist, input validation rejects it
-
-Given
-
-- one domain, one superadmin, and one user holding one session
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-
-When
-
-- LoginSessionAdapter.admin_revoke: user-2 revokes a login session that does not exist through the admin path
-
-Then
-
-- the call is rejected
-  - rejected: LoginSessionNotFoundError
-
-### LoginSessionAdapter.admin_unblock_user
-
-<a id="login_sessions-the-superadmin-unblocks-a-user"></a>
-
-#### [the-superadmin-unblocks-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when the superadmin gives a username in an unblock gated by the global role, success comes back and the block record of that name is gone
-
-Given
-
-- one domain, one superadmin, and one user holding one session
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-
-When
-
-- LoginSessionAdapter.admin_unblock_user: user-2 unblocks user-1
-
-Then
-
-- the unblock succeeds
-  - success = True
-
-<a id="login_sessions-unblocking-a-username-nobody-holds-still-succeeds"></a>
-
-#### [unblocking-a-username-nobody-holds-still-succeeds](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when the superadmin gives a username nobody holds, success comes back without checking that it exists
-
-Given
-
-- one domain, one superadmin, and one user holding one session
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-
-When
-
-- LoginSessionAdapter.admin_unblock_user: user-2 unblocks a username nobody holds
-
-Then
-
-- the unblock succeeds
-  - success = True
-
-<a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-unblock-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-a user holding the permission is rejected by the global role gate when unblocking a user
-
-Given
-
-- one domain and one user holding a session, and the caller holds the user UPDATE permission in the domain scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- LoginSessionAdapter.admin_unblock_user: user-2 unblocks user-1
-
-Then
-
-- the call is rejected
-  - rejected: InsufficientPrivilege
-
-### LoginSessionAdapter.my_revoke
-
-<a id="login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session"></a>
-
-#### [a-user-granted-update-on-themselves-revokes-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when a user granted READ and UPDATE in their own scope revokes their own session, success comes back, the session is no longer searched, and a history record says the user revoked it
-
-Given
-
-- one domain and two users, the caller holds the READ, UPDATE permission on their own user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginSessionAdapter.my_revoke: user-1 revokes their own login session
-
-Then
-
-- the revoke succeeds and the session is gone from the search that follows
-  - revoked.success = True
-  - after.items = []
-  - after.total_count = 0
-  - after.has_next_page = False
-  - after.has_previous_page = False
-
-<a id="login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session"></a>
-
-#### [a-user-granted-nothing-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-a user holding no role who tries to revoke a session is rejected at the owner lookup step
-
-Given
-
-- one domain and two users, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-
-When
-
-- LoginSessionAdapter.my_revoke: user-1 revokes their own login session
-
-Then
-
-- the call is rejected
-  - rejected: GenericBadRequest
-
-<a id="login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session"></a>
-
-#### [a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-when a user granted READ and UPDATE only in their own scope gives another user's session, the lookup step on its owner rejects it
-
-Given
-
-- one domain and two users, the caller holds the READ, UPDATE permission on their own user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-  - regular user user-2: has one more active keypair besides the default one
-  - regular user user-2: has one active login session
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginSessionAdapter.my_revoke: user-1 revokes the login session of user-2
-
-Then
-
-- the call is rejected
-  - rejected: GenericBadRequest
-
-<a id="login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session"></a>
-
-#### [a-user-granted-only-read-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
-
-a user holding only READ who tries to revoke a session is rejected by the entity permission gate
-
-Given
-
-- one domain and two users, the caller holds the READ permission on their own user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - regular user user-1: has one active login session
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginSessionAdapter.my_revoke: user-1 revokes their own login session
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes their .vimrc auto-generated file to permission 600 and content 'set nonumber\n'
 
 Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_create_keypair
+<a id="config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
 
-<a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
+#### [updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
 
-#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-when a user granted UPDATE in the target user scope, not the superadmin, creates a key under a policy, a new key that is not the default and its secret come back
+when a user holding READ and UPDATE changes an auto-generated file not set as default, it is rejected as not found
 
 Given
 
-- one domain and one target user, the caller holds the user UPDATE permission on the target
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, UPDATE permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-2: holds Role user-role-1
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ, UPDATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: UPDATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
 
 When
 
-- UserAdapter.admin_create_keypair: user-2 creates a key for user-1 under granted-policy-1
-
-Then
-
-- the whole key created and its secret come back
-  - id: skipped: it is the access key the manager created
-  - access_key: skipped: the manager creates it
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 30000
-  - resource_policy = 'granted-policy-1'
-  - ssh_public_key: skipped: it is the RSA key the manager created
-  - num_queries = 0
-  - last_used = None
-  - user_id: same as the keypair owner
-  - created_at: the time this run wrote
-  - modified_at: the time this run wrote
-  - secret_key: skipped: the manager creates it
-
-<a id="managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist"></a>
-
-#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-when a user holding the permission gives a policy name that does not exist, input validation rejects it
-
-Given
-
-- one domain and one target user, the caller holds the user UPDATE permission on the target
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- UserAdapter.admin_create_keypair: user-2 creates a key for user-1 under a policy that does not exist
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes their .vimrc auto-generated file to permission 600 and content 'set nonumber\n'
 
 Then
 
 - the call is rejected
-  - rejected: KeypairResourcePolicyNotFound
-
-<a id="managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another"></a>
-
-#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-a user holding no role who tries to create a key is rejected by the entity permission gate
-
-Given
-
-- one domain and one target user, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-
-When
-
-- UserAdapter.admin_create_keypair: user-2 creates a key for user-1 under granted-policy-1
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: DotfileNotFound
 
 ### UserAdapter.admin_delete_keypair
 
@@ -3855,84 +4366,6 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_get_keypair
-
-<a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
-
-#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-when a user granted READ in the target scope reads a key, that whole key node comes back
-
-Given
-
-- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- UserAdapter.admin_get_keypair: user-2 reads the key of user-1 by access key
-
-Then
-
-- the whole key seeded in advance comes back
-  - id: same as the key seeded in advance
-  - access_key: same as the key seeded in advance
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 10000
-  - resource_policy = 'granted-policy-1'
-  - ssh_public_key = ''
-  - num_queries = 0
-  - last_used = None
-  - user_id: same as the key owner
-  - created_at: the time this run wrote
-  - modified_at: the time this run wrote
-
-<a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key"></a>
-
-#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-a user holding no role who tries to read a key is rejected at the owner lookup step
-
-Given
-
-- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-
-When
-
-- UserAdapter.admin_get_keypair: user-2 reads the key of user-1 by access key
-
-Then
-
-- the call is rejected
-  - rejected: GenericBadRequest
-
 ### UserAdapter.admin_get_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only"></a>
@@ -3970,7 +4403,7 @@ Then
 
 - only the access key and the public key come back
   - keypair.access_key: same as the default key of the target
-  - keypair.ssh_public_key = ''
+  - keypair.ssh_public_key = None
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key"></a>
 
@@ -4010,7 +4443,7 @@ Then
 
 #### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
-when a user granted READ and UPDATE in the target scope gives a public key and a private key, they overwrite the stored one without a format check and the access key comes back
+when a user granted READ and UPDATE in the target scope gives a public key, it overwrites the stored public key without a format check and the access key comes back
 
 Given
 
@@ -4112,154 +4545,6 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_update_keypair
-
-<a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
-
-#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-when a user granted READ and UPDATE in the target scope gives only a rate limit, the key node comes back with everything else unchanged and only the rate limit changed
-
-Given
-
-- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- UserAdapter.admin_update_keypair: user-2 gives a rate limit to the key of user-1
-
-Then
-
-- the whole key with only the rate limit changed comes back
-  - id: same as the key seeded in advance
-  - access_key: same as the key seeded in advance
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 45000
-  - resource_policy = 'granted-policy-1'
-  - ssh_public_key = ''
-  - num_queries = 0
-  - last_used = None
-  - user_id: same as the key owner
-  - created_at: the time this run wrote
-  - modified_at: the time this run wrote
-
-<a id="managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key"></a>
-
-#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-a user holding no role who tries to change a key is rejected at the owner lookup step
-
-Given
-
-- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-
-When
-
-- UserAdapter.admin_update_keypair: user-2 gives a rate limit to the key of user-1
-
-Then
-
-- the call is rejected
-  - rejected: GenericBadRequest
-
-<a id="managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key"></a>
-
-#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-a user holding only READ who tries to change a key is rejected by the entity permission gate
-
-Given
-
-- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- UserAdapter.admin_update_keypair: user-2 gives a rate limit to the key of user-1
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-<a id="managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist"></a>
-
-#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-when a user holding the permission gives a policy name that does not exist, input validation rejects it
-
-Given
-
-- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Keypair policy granted-policy-1: up to 5 concurrent sessions
-  - regular user user-1: has one more active keypair besides the default one
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-2: holds Role user-role-1
-
-When
-
-- UserAdapter.admin_update_keypair: user-2 gives a rate limit and a policy that does not exist to the key of user-1
-
-Then
-
-- the call is rejected
-  - rejected: KeypairResourcePolicyNotFound
-
 ### UserAdapter.bulk_purge_users
 
 <a id="retiring-a-bulk-purge-records-a-missing-id-as-a-failure"></a>
@@ -4357,135 +4642,6 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
-
-### UserAdapter.issue_my_keypair
-
-<a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
-
-#### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-when a user granted UPDATE in their own user scope issues a key, the key follows the admin flag, policy, and rate limit of the default key, holds no default flag, and comes back with its secret
-
-Given
-
-- one domain and one user holding 0 extra keys that are not the default, and the user holds the UPDATE permission on their own user
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserAdapter.issue_my_keypair: user-1 issues their own key
-
-Then
-
-- a new key that is not the default, following the default key, and its secret come back
-  - id: skipped: it is the access key the manager created
-  - access_key: skipped: the manager creates it
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 10000
-  - resource_policy = 'keypair-policy-1'
-  - ssh_public_key: skipped: it is the RSA key the manager created
-  - num_queries = 0
-  - last_used = None
-  - user_id: same as the keypair owner
-  - created_at: the time this run wrote
-  - modified_at: the time this run wrote
-  - secret_key: skipped: the manager makes it anew every time
-
-<a id="own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked"></a>
-
-#### [an-issued-key-made-default-lets-the-original-default-key-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-when a user holding the permission issues a key, moves the default key to it, and revokes the original default key, all three calls pass in turn and only the issued key is left
-
-Given
-
-- one domain and one user holding 0 extra keys that are not the default, and the user holds the READ, UPDATE permission on their own user
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserAdapter.issue_my_keypair: user-1 finds the default key through their own key search, issues a key, moves the default key to it, revokes the original default key, and searches their own keys again
-
-Then
-
-- all three calls pass and only the issued key is left
-  - issued.id: skipped: it is the access key the manager created
-  - issued.access_key: skipped: the manager creates it
-  - issued.is_active = True
-  - issued.is_admin = False
-  - issued.is_default = False
-  - issued.rate_limit = 10000
-  - issued.resource_policy = 'keypair-policy-1'
-  - issued.ssh_public_key: skipped: it is the RSA key the manager created
-  - issued.num_queries = 0
-  - issued.last_used = None
-  - issued.user_id: same as the keypair owner
-  - issued.created_at: the time this run wrote
-  - issued.modified_at: the time this run wrote
-  - issued.secret_key: skipped: the manager makes it anew every time
-  - switched = True
-  - revoked = True
-  - after.total_count = 1
-  - after.has_next_page = False
-  - after.has_previous_page = False
-  - after.items.access_key: same as the key issued
-  - after.items[0].is_active = True
-  - after.items[0].is_admin = False
-  - after.items[0].is_default = True
-  - after.items[0].rate_limit = 10000
-  - after.items[0].resource_policy = 'keypair-policy-1'
-  - after.items[0].ssh_public_key: skipped: it is the RSA key the manager created
-  - after.items[0].num_queries = 0
-  - after.items[0].last_used = None
-  - after.items[0].user_id: same as the key owner
-  - after.items[0].created_at: the time this run wrote
-  - after.items[0].modified_at: the time this run wrote
-
-<a id="own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key"></a>
-
-#### [a-user-granted-nothing-may-not-issue-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-a user holding no role who tries to issue their own key is rejected by the entity permission gate even for themselves
-
-Given
-
-- one domain and one user holding 0 extra keys that are not the default, and the user holds no permission
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- UserAdapter.issue_my_keypair: user-1 issues their own key
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
 
 ### UserAdapter.purge_user_by_id
 
@@ -4749,7 +4905,6 @@ Then
   - after.items[0].is_default = True
   - after.items[0].rate_limit = 10000
   - after.items[0].resource_policy = 'keypair-policy-1'
-  - after.items[0].ssh_public_key = ''
   - after.items[0].num_queries = 0
   - after.items[0].last_used = None
   - after.items[0].user_id: same as the key owner
@@ -4986,137 +5141,6 @@ Then
 - the call is rejected
   - rejected: KeyPairForbidden
 
-### UserAdapter.update_my_keypair
-
-<a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
-
-#### [a-user-granted-read-and-update-turns-off-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-when a user granted READ and UPDATE in their own scope turns an extra key inactive, the key node comes back with only the active flag changed
-
-Given
-
-- one domain and one user holding 1 extra keys that are not the default, and the user holds the READ, UPDATE permission on their own user
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one more active keypair besides the default one
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserAdapter.update_my_keypair: user-1 turns their own extra key inactive
-
-Then
-
-- the whole key node with only the active flag changed comes back
-  - id: same as the keypair seeded in advance
-  - access_key: same as the keypair seeded in advance
-  - is_active = False
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 10000
-  - resource_policy = 'keypair-policy-1'
-  - ssh_public_key = ''
-  - num_queries = 0
-  - last_used = None
-  - user_id: same as the keypair owner
-  - created_at: the time this run wrote
-  - modified_at: the time this run wrote
-
-<a id="own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key"></a>
-
-#### [a-user-granted-nothing-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-a user holding no role who tries to turn a key inactive is rejected at the owner lookup step
-
-Given
-
-- one domain and one user holding 1 extra keys that are not the default, and the user holds no permission
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one more active keypair besides the default one
-
-When
-
-- UserAdapter.update_my_keypair: user-1 turns their own extra key inactive
-
-Then
-
-- the call is rejected
-  - rejected: GenericBadRequest
-
-<a id="own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key"></a>
-
-#### [a-user-granted-only-read-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-a user holding only READ who tries to turn a key inactive is rejected by the entity permission gate
-
-Given
-
-- one domain and one user holding 1 extra keys that are not the default, and the user holds the READ permission on their own user
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - regular user user-1: has one more active keypair besides the default one
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserAdapter.update_my_keypair: user-1 turns their own extra key inactive
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-<a id="own_keypairs-the-default-key-may-not-be-turned-off"></a>
-
-#### [the-default-key-may-not-be-turned-off](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-when a user holding the permission tries to turn their own default key inactive, input validation rejects it
-
-Given
-
-- one domain and one user holding 0 extra keys that are not the default, and the user holds the READ, UPDATE permission on their own user
-  - Domain home-1
-  - Prepare one user whose key policy is known
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the READ, UPDATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - Role user-role-1: UPDATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserAdapter.update_my_keypair: user-1 finds the default key through their own key search and turns it inactive
-
-Then
-
-- the call is rejected
-  - rejected: KeyPairForbidden
-
 ### UserAdapter.update_user
 
 <a id="editing-a-user-granted-update-changes-the-allowed-client-ip"></a>
@@ -5206,4 +5230,89 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+### UserConfigAdapter.create_auto_generated_file
+
+<a id="config_files-a-user-granted-create-on-their-auto-generated-files-writes-one"></a>
+
+#### [a-user-granted-create-on-their-auto-generated-files-writes-one](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding CREATE on their own auto-generated files writes one, an empty response comes back, and the file holds its content as revision 1 and is set as the default of its path
+
+Given
+
+- one domain and one user, the user holds the CREATE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the CREATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: CREATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own auto-generated files
+
+Then
+
+- the legacy API has no response body, so an empty response comes back
+  - response = {}
+
+<a id="config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-write-an-auto-generated-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to write their own auto-generated file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused"></a>
+
+#### [an-auto-generated-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding CREATE tries to write an auto-generated file where the manager keeps its own, input validation rejects it
+
+Given
+
+- one domain and one user, the user holds the CREATE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the CREATE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: CREATE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 tries to write an auto-generated file where the manager keeps its own
+
+Then
+
+- the call is rejected
+  - rejected: InvalidDotfilePath
 

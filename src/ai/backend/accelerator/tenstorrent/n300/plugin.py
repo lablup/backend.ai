@@ -8,24 +8,17 @@ from typing import (
 )
 
 import aiodocker
+import trafaret as t
 from aiodocker import Docker
-
-from ai.backend.accelerator.tenstorrent import __version__
-from ai.backend.accelerator.tenstorrent.utils import resolve_pci_sysfs_path
-
-from .types import TTn300Device
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
 from tt_smi.tt_smi_backend import TTSMIBackend
 from tt_tools_common.utils_common.tools_utils import (
     PciChip,
     detect_chips_with_callback,
 )
 
+from ai.backend.accelerator.tenstorrent import __version__
+from ai.backend.accelerator.tenstorrent.utils import resolve_pci_sysfs_path
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -53,6 +46,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 
+from .types import TTn300Device
+
 PREFIX = "tt-n300"
 VALID_CARD_TYPE = "n300"
 
@@ -70,11 +65,13 @@ class TTn300Plugin(AbstractComputePlugin):
     enabled: bool = True
 
     _all_devices: list[TTn300Device] | None
+    _host_ipc: bool
 
     _tt_devices: list[PciChip]
     _tt_backend: TTSMIBackend
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -121,8 +118,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
             numa_node_idx_path = Path(pci_base_path) / "device" / "numa_node"
             numa_node_idx = int(numa_node_idx_path.read_text())
-            if numa_node_idx < 0:
-                numa_node_idx = 0
+            numa_node_idx = max(numa_node_idx, 0)
 
             device = TTn300Device(
                 model_name="Tenstorrent n300",
@@ -279,7 +275,7 @@ class TTn300Plugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",

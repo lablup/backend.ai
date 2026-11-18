@@ -13,7 +13,7 @@ class AbstractSubscriber(ABC):
     """
 
     @abstractmethod
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload]:
         """
         Subscribe to broadcast messages.
 

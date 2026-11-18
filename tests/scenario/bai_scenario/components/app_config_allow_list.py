@@ -8,6 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
@@ -15,6 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 )
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
@@ -32,7 +34,11 @@ from ai.backend.testutils.scenario_steps import (
     in_language,
 )
 from bai_scenario.components.answers import MissingResponse
-from bai_scenario.components.app_config import UNREGISTERED
+from bai_scenario.components.app_config import (
+    UNREGISTERED,
+    SomeoneGrantedInGlobal,
+    names_of,
+)
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, TestSeedAllowListEntry
 from bai_scenario.seeds.app_config.definition import TestSeedDefinition
@@ -195,17 +201,32 @@ class TwoEntriesAndACaller:
 
 @dataclass(frozen=True)
 class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
-    """한 설정 이름에 속한 allow_list 둘과 호출자를 준비한다."""
+    """한 설정 이름에 속한 allow_list 둘과 호출자를 준비한다.
+
+    ``granted``가 있으면 호출자가 global 스코프에서 그 권한을 받는다.
+    """
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
+        if self.granted:
+            who = Says(
+                f"global 스코프에서 허용 목록 항목에 대한 {names_of(self.granted)} 권한을 "
+                "받은 일반 사용자 한 명",
+                english=(
+                    "one regular user granted the "
+                    f"{names_of(self.granted)} permission on allow-list entries in the global scope"
+                ),
+            )
+        else:
+            who = _who(self.role)
         return Says(
-            f"한 설정 이름의 PUBLIC, USER allow_list 와 {_who(self.role)}",
+            f"한 설정 이름의 PUBLIC, USER allow_list 와 {who}",
             english=(
                 "the PUBLIC and USER allow-list entries of one config name, and "
-                f"{in_language(_who(self.role), Language.ENGLISH)}"
+                f"{in_language(who, Language.ENGLISH)}"
             ),
         )
 
@@ -221,7 +242,12 @@ class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
             TestSeedAllowListEntry(scope_type=AppConfigScopeType.USER, name_hint="second"),
             definition,
         )
-        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.granted:
+            caller = await seeding.within(
+                SomeoneGrantedInGlobal(home, AppConfigAllowListEntityType(), granted=self.granted)
+            )
+        else:
+            caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoEntriesAndACaller(
             caller=seeding.made(caller), first=seeding.made(first), second=seeding.made(second)
         )

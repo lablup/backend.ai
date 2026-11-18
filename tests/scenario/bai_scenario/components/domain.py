@@ -158,14 +158,27 @@ class ManyDomainsAndACaller:
 
 @dataclass(frozen=True)
 class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
-    """도메인 여럿과 그중 한 도메인에 속한 사용자 한 명."""
+    """도메인 여럿과 그중 한 도메인에 속한 사용자 한 명.
+
+    ``targets_inactive`` 면 호출자가 살지 않는 대상 도메인들이 비활성 상태다.
+    """
 
     role: UserRole = UserRole.USER
     besides: int = 2
+    targets_inactive: bool = False
 
     @override
     def describe(self) -> str:
         role = self.role.value
+        if self.targets_inactive:
+            return Says(
+                f"도메인 {self.besides + 2}개와, 그중 하나에 속한 {role} 한 명, "
+                "호출자가 살지 않는 대상 도메인들은 비활성 상태입니다",
+                english=(
+                    f"{self.besides + 2} domains and one {role} in one of them, and the target "
+                    "domains the caller does not live in are inactive"
+                ),
+            )
         return Says(
             f"도메인 {self.besides + 2}개와, 그중 하나에 속한 {role} 한 명",
             english=f"{self.besides + 2} domains and one {role} in one of them",
@@ -174,9 +187,17 @@ class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyDomainsAndACaller:
         home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
-        wanted = await seeding.creating(TestSeedDomain(name_hint="wanted", description=WAS_HERE))
+        wanted = await seeding.creating(
+            TestSeedDomain(
+                name_hint="wanted", description=WAS_HERE, is_active=not self.targets_inactive
+            )
+        )
         others = [
-            await seeding.creating(TestSeedDomain(name_hint="other", description=WAS_HERE))
+            await seeding.creating(
+                TestSeedDomain(
+                    name_hint="other", description=WAS_HERE, is_active=not self.targets_inactive
+                )
+            )
             for _ in range(self.besides)
         ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))

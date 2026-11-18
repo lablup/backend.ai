@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -34,13 +33,14 @@ from ai.backend.manager.api.gql.fair_share.types.user import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupUserScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Get user fair share data (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_user_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -62,7 +62,7 @@ async def admin_user_fair_share(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List user fair shares (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_user_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: UserFairShareFilter | None = None,
@@ -115,7 +115,7 @@ async def admin_user_fair_shares(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get user fair share data within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_user_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
@@ -136,7 +136,7 @@ async def rg_user_fair_share(
     BackendAIGQLMeta(
         added_version="26.2.0", description="List user fair shares within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_user_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
@@ -192,7 +192,7 @@ async def rg_user_fair_shares(
         added_version="26.1.0", description="Get user fair share data (superadmin only)."
     ),
     deprecation_reason="Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def user_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -202,7 +202,7 @@ async def user_fair_share(
     """Get a single user fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     result = await info.context.adapters.fair_share.get_user(
         GetUserFairShareInput(
@@ -219,7 +219,7 @@ async def user_fair_share(
         added_version="26.1.0", description="List user fair shares (superadmin only)."
     ),
     deprecation_reason="Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def user_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: UserFairShareFilter | None = None,
@@ -234,7 +234,7 @@ async def user_fair_shares(
     """Search user fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
@@ -360,7 +360,7 @@ async def bulk_upsert_user_fair_share_weight(
     """Bulk upsert user fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+        raise SuperadminRequired("Only superadmin can modify fair share data.")
 
     result = await info.context.adapters.fair_share.atomic_bulk_upsert_user(input.to_pydantic())
     return BulkUpsertUserFairShareWeightPayload.from_pydantic(result)

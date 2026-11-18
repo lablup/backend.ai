@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -38,7 +40,7 @@ from bai_scenario.components.app_config_definition import (
     TwoDefinitionsAndACaller,
     TwoDefinitionsAndSomeone,
 )
-from bai_scenario.components.domain import Mentions
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -201,6 +203,87 @@ class TheSuperadminPurgesBothAndIsToldOfTheMissing(
 
 
 @dataclass(frozen=True)
+class BothArePurged(Then[TwoDefinitionsAndACaller, Purged]):
+    """둘은 처리된 목록에 오고, 실패 목록은 비어 있다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "설정 정의 둘은 처리된 목록에 오고, 실패한 것은 없습니다",
+            english="both config definitions come back in the succeeded list and none failed",
+        )
+
+    @override
+    def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            raise AssertionError(
+                f"the call was refused ({type(answered.raised).__name__}) "
+                "but this row guarantees the success shape"
+            )
+        written = WrittenByThisRun(self.started)
+        targets = (laid.first, laid.second)
+        verdicts: list[Verdict] = [
+            Same("successes count", len(payload.successes), len(targets)),
+            Same("failed", payload.failed, []),
+        ]
+        for i, (node, definition) in enumerate(zip(payload.successes, targets, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(definition.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
+                Held[UUID](
+                    f"successes[{i}].entity_id",
+                    node.entity_id,
+                    SameAs(definition.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
+                Same(f"successes[{i}].config_name", node.config_name, definition.config_name),
+                Held(f"successes[{i}].created_at", node.created_at, written),
+                Held(f"successes[{i}].updated_at", node.updated_at, written),
+            ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class AWriterPurgesBoth(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-purge-in-global-purges-both-definitions-at-once"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "global 스코프에서 설정 정의에 대한 영구 삭제 권한을 받은 일반 사용자가 설정 정의 둘을 "
+            "한 번에 영구 삭제하면, 둘 다 처리된 목록에 오고 실패한 것은 없습니다",
+            english=(
+                "when a regular user granted the purge permission on config definitions in the "
+                "global scope purges two config definitions at once, both come back in the "
+                "succeeded list and none failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone(granted=(Permission.HARD_DELETE,))
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]:
+        return PurgingBoth()
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Purged]:
+        return BothArePurged(started=self.started)
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingPurgesNone(
     Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
@@ -235,6 +318,7 @@ class AUserGrantedNothingPurgesNone(
 
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesBothAndIsToldOfTheMissing(),
+    AWriterPurgesBoth(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
 ]
 

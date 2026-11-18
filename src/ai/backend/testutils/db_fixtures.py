@@ -28,7 +28,7 @@ from ai.backend.testutils.bootstrap import (
     POSTGRES_PASSWORD,
     POSTGRES_USER,
 )
-from ai.backend.testutils.db import with_global_entities
+from ai.backend.testutils.db_global import with_global_entities
 
 # The server already answered pg_isready; a longer wait would not change the outcome.
 CONNECT_TIMEOUT = 30.0

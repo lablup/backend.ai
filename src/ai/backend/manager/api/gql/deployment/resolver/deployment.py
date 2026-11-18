@@ -54,6 +54,7 @@ from ai.backend.manager.api.gql.deployment.types.scopes import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.user import UserNotFound
 
 # Query resolvers
@@ -64,7 +65,7 @@ from ai.backend.manager.errors.user import UserNotFound
         added_version="25.16.0",
         description="List all deployments (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_deployments(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -125,7 +126,7 @@ async def admin_deployments(
             "Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_deployments(
     info: Info[StrawberryGQLContext],
     scope: DeploymentScopeGQL,
@@ -182,7 +183,7 @@ async def scoped_deployments(
         added_version="25.19.0",
         description="List deployments within a specific project.",
     )
-)  # type: ignore[misc]
+)
 async def project_deployments(
     info: Info[StrawberryGQLContext],
     scope: ProjectDeploymentScopeGQL,
@@ -241,7 +242,7 @@ async def project_deployments(
         added_version="25.19.0",
         description="List deployments owned by the current user.",
     )
-)  # type: ignore[misc]
+)
 async def my_deployments(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -299,7 +300,7 @@ async def my_deployments(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="25.16.0", description="Get a specific deployment by ID.")
-)  # type: ignore[misc]
+)
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
     deployment_id = resolve_entity_id(id, DeploymentID)
@@ -421,8 +422,8 @@ async def admin_refresh_deployment_revisions(
 )
 async def deployment_status_changed(
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
+) -> AsyncGenerator[DeploymentStatusChangedPayload]:
     """Subscribe to deployment status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

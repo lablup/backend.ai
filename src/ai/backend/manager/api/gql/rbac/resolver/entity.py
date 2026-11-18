@@ -28,7 +28,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         "Deprecated since 26.9.0. The scope-entity association is removed;"
         " this connection is always empty."
     ),
-)  # type: ignore[misc]
+)
 async def admin_entities(
     info: Info[StrawberryGQLContext],
     filter: EntityFilterGQL | None = None,

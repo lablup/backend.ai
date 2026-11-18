@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from pydantic import AnyUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
 from typeguard import check_type
@@ -43,6 +44,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -51,6 +53,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -74,7 +77,7 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import AliasResolutionFailed, UserNotFound
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
@@ -102,7 +105,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.draft import (
@@ -123,8 +126,8 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import verify_vfolder_name
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
     BootstrapScriptRevisionSearchableFields,
@@ -132,32 +135,35 @@ from ai.backend.manager.models.bootstrap_script_revision.searchable_fields impor
 from ai.backend.manager.models.bootstrap_script_revision.searchers import (
     DefaultBootstrapScriptRevisionSearcher,
 )
+from ai.backend.manager.models.condition_utils import combine_conditions_or
 from ai.backend.manager.models.domain.row import domains
-from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageSearcher,
     ReferenceImageSearcher,
 )
 from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.session.row import (
     PRIVATE_SESSION_TYPES,
-    KernelLoadingStrategy,
     SessionRow,
     handle_session_exception,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
@@ -173,8 +179,10 @@ from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
     InvalidKernelConfig,
+    MainKernelNotFound,
     SessionAlreadyExists,
     SessionNotFound,
+    TooManyKernelsFound,
     TooManySessionsMatched,
 )
 from .errors.resource import (
@@ -349,6 +357,37 @@ class AgentRegistry:
             raise ImageNotFound()
         return result.items[0]
 
+    @staticmethod
+    async def _live_session_named(
+        r: V2ReadOps, session_name: str, access_key: AccessKey
+    ) -> SessionEntityData | None:
+        """The live session of ``access_key`` named ``session_name``, if there is one."""
+        fields = SessionSearchableFields.own
+        named = [
+            fields.name.filter.equals(
+                StringMatchSpec(session_name, case_insensitive=False, negated=False)
+            )
+        ]
+        try:
+            named_id = uuid.UUID(session_name)
+        except ValueError:
+            pass
+        else:
+            named.append(fields.id.filter.equals(UUIDEqualMatchSpec(value=named_id, negated=False)))
+        result = await r.search_in_global(
+            SessionSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    fields.access_key.filter.equals(
+                        StringMatchSpec(access_key, case_insensitive=False, negated=False)
+                    ),
+                    combine_conditions_or(named),
+                    fields.status.filter.not_in(SessionStatus.terminal_statuses()),
+                ],
+            )
+        )
+        return result.items[0] if result.items else None
+
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
         self.session_creation_tracker = {}
@@ -436,7 +475,7 @@ class AgentRegistry:
                                 raise SessionNotFound("Session terminated during scheduling")
             except TimeoutError as e:
                 if max_wait > 0:
-                    raise e
+                    raise
                 async with self.db.begin_readonly_session() as db_session:
                     query = sa.select(SessionRow.status).where(SessionRow.id == session_id)
                     result = await db_session.execute(query)
@@ -507,7 +546,7 @@ class AgentRegistry:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_folders:
                 raise InvalidAPIParameters(
@@ -544,47 +583,64 @@ class AgentRegistry:
             raise ImageNotFound("unknown alias or disallowed registry") from e
 
         # Check existing (access_key, session_name) instance
-        try:
-            # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-            # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_session:
-                sess = await SessionRow.get_session(
-                    db_session,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-                if sess.main_kernel.image is None:
-                    raise InvalidKernelConfig("Session main kernel has no image specified")
-                if sess.main_kernel.architecture is None:
-                    raise InvalidKernelConfig("Session main kernel has no architecture specified")
-                running_image_ref = (
-                    await self._first_image(
-                        self._canonical_image_searcher(
-                            sess.main_kernel.image, sess.main_kernel.architecture
-                        )
+        # NOTE: We can reuse the session IDs of TERMINATED sessions only.
+        # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
+        main_kernels: list[KernelInfo] = []
+        async with self._ops_provider.read_ops() as r:
+            existing = await self._live_session_named(r, session_name, owner_access_key)
+            if existing is not None:
+                main_kernels = (
+                    await r.search_with_scopes(
+                        [SessionKernelTarget(session_id=existing.id)],
+                        KernelSearcher(
+                            pagination=NoPagination(),
+                            conditions=[
+                                KernelSearchableFields.own.cluster_role.filter.equals(
+                                    StringMatchSpec(
+                                        value=DEFAULT_ROLE, case_insensitive=False, negated=False
+                                    )
+                                )
+                            ],
+                        ),
                     )
-                ).image_ref
+                ).items
+        if existing is not None:
+            if len(main_kernels) > 1:
+                raise TooManyKernelsFound(
+                    f"Session (id: {existing.id}) has more than 1 main kernel."
+                )
+            if not main_kernels:
+                raise MainKernelNotFound(f"Session (id={existing.id}) has no main kernel.")
+            main_kernel = main_kernels[0]
+            if main_kernel.image.identifier is None:
+                raise InvalidKernelConfig("Session main kernel has no image specified")
+            if not main_kernel.image.identifier.architecture:
+                raise InvalidKernelConfig("Session main kernel has no architecture specified")
+            running_image_ref = (
+                await self._first_image(
+                    self._canonical_image_searcher(
+                        main_kernel.image.identifier.canonical,
+                        main_kernel.image.identifier.architecture,
+                    )
+                )
+            ).image_ref
             if running_image_ref != image_ref:
                 # The image must be same if get_or_create() called multiple times
                 # against an existing (non-terminated) session
-                raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
+                raise SessionAlreadyExists(extra_data={"existingSessionId": str(existing.id)})
             if not reuse:
                 # Respond as error since the client did not request to reuse,
                 # but provide the overlapping session ID for later use.
-                raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
+                raise SessionAlreadyExists(extra_data={"existingSessionId": str(existing.id)})
             # Respond as success with the reused session's information.
             return {
-                "sessionId": str(sess.id),
-                "sessionName": str(sess.name),
-                "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,  # deprecated, left for compatibility.
-                "servicePorts": sess.main_kernel.service_ports,
+                "sessionId": str(existing.id),
+                "sessionName": str(existing.name),
+                "status": existing.status.name,
+                "service_ports": main_kernel.network.service_ports,  # deprecated, left for compatibility.
+                "servicePorts": main_kernel.network.service_ports,
                 "created": False,
             }
-        except SessionNotFound:
-            # It's time to create a new session.
-            pass
 
         if session_type == SessionTypes.BATCH and not startup_command:
             raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
@@ -747,8 +803,6 @@ class AgentRegistry:
                     # Always unregister propagator
                     self._event_hub.unregister_event_propagator(propagator.id())
             return resp
-        except asyncio.CancelledError:
-            raise
         finally:
             self.pending_waits.discard(current_task)
             # Clean up old tracker if exists (for backward compatibility)
@@ -777,18 +831,11 @@ class AgentRegistry:
             raise NoCurrentTaskContext("No current task context")
 
         # Check existing (access_key, session) kernel instance
-        try:
-            # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-            # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_sess:
-                await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                )
-        except SessionNotFound:
-            pass
-        else:
+        # NOTE: We can reuse the session IDs of TERMINATED sessions only.
+        # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
+        async with self._ops_provider.read_ops() as r:
+            existing = await self._live_session_named(r, session_name, owner_access_key)
+        if existing is not None:
             raise TooManySessionsMatched
 
         mounts = []
@@ -986,8 +1033,6 @@ class AgentRegistry:
                     # Always unregister propagator
                     self._event_hub.unregister_event_propagator(propagator.id())
             return resp
-        except asyncio.CancelledError:
-            raise
         finally:
             self.pending_waits.discard(current_task)
             # Clean up old tracker if exists (for backward compatibility)
@@ -1306,7 +1351,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.user_uuid == user_id,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.current_resource_usage_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1334,7 +1379,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.access_key == access_key,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.current_resource_usage_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1362,7 +1407,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.domain_name == domain_name,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.current_resource_usage_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1390,7 +1435,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.group_id == group_id,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.current_resource_usage_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1691,7 +1736,7 @@ class AgentRegistry:
                 .select_from(kernels)
                 .where(
                     (kernels.c.agent == agent_id)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (kernels.c.status.in_(KernelStatus.current_resource_usage_statuses()))
                 )
             )
             result = await db_conn.execute(query)
@@ -1802,7 +1847,7 @@ class AgentRegistry:
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = (session.name or "")[:SESSION_NAME_LEN_LIMIT]
         registry, _, filtered = kernel.image.partition("/")
-        img_path, _, image_name = filtered.partition("/")
+        _img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
         async with handle_session_exception("commit_session_to_file"):
@@ -1908,14 +1953,14 @@ class AgentRegistry:
             service_name=endpoint.name,
             tags=TagsModel(
                 session=SessionTagsModel(
-                    user_uuid=str(endpoint.session_owner_id),
-                    project_id=str(endpoint.project),
-                    domain_name=endpoint.domain,
+                    user_uuid=UserID(endpoint.session_owner_id),
+                    project_id=ProjectID(endpoint.project),
+                    domain_name=DomainName(endpoint.domain),
                 ),
                 endpoint=EndpointTagsModel(
-                    id=str(endpoint.id),
+                    id=DeploymentID(endpoint.id),
                     runtime_variant=variant_name,
-                    existing_url=str(endpoint.url) if endpoint.url else None,
+                    existing_url=AnyUrl(endpoint.url) if endpoint.url else None,
                 ),
             ),
             open_to_public=endpoint.open_to_public,
@@ -1923,23 +1968,6 @@ class AgentRegistry:
         )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
         return cast(str, endpoint_json["endpoint"])
-
-    async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
-        query = (
-            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
-            .select_from(resource_groups)
-            .where(resource_groups.c.name == endpoint.resource_group)
-        )
-
-        result = await db_sess.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise InvalidAPIParameters(f"Scaling group not found: {endpoint.resource_group}")
-        wsproxy_addr = sgroup.wsproxy_addr
-        wsproxy_api_token = sgroup.wsproxy_api_token
-
-        wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
-        await wsproxy_client.delete_endpoint(endpoint.id)
 
 
 def check_resource_group(

@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.data.vfolder.types import VFolderData
+from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOperationStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -403,12 +403,227 @@ class RestoringBringsSeveralBack(
         )
 
 
+@dataclass(frozen=True)
+class RestoringBothWithOneStillPurging(When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]):
+    """휴지통에 있는 폴더와 삭제가 진행 중인 폴더를 한 번에 되살린다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
+        return Says(
+            f"{laid.caller.username}이 휴지통에 있는 자기 vfolder 와 삭제가 진행 중인 자기 "
+            "vfolder 를 한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} restores their trashed vfolder and their vfolder whose "
+                "deletion is still in progress in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: VFolderAdapter, laid: TwoOwnFoldersAndAnothers) -> Processed:
+        ids: list[UUID] = [laid.own[0].id, laid.own[1].id]
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(PartialBulkRestoreVFoldersInput(ids=ids))
+
+
+@dataclass(frozen=True)
+class OnlyTheTrashedFolderComesBack(Then[TwoOwnFoldersAndAnothers, Processed]):
+    """휴지통에 있던 폴더만 되살아나고, 삭제 중인 폴더는 실패 목록에 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "휴지통에 있던 폴더만 사용할 수 있는 상태로 오고, 삭제가 진행 중인 폴더는 실패 "
+            "목록에 옵니다",
+            english=(
+                "only the trashed folder comes back ready for use, and the folder whose "
+                "deletion is in progress comes back in the failed list"
+            ),
+        )
+
+    @override
+    def look(self, laid: TwoOwnFoldersAndAnothers, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), 1)]
+        if payload.successes:
+            verdicts.extend(
+                VFolderNodeLook(self.started).verdicts(
+                    payload.successes[0], laid.own[0], at="successes[0]."
+                )
+            )
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        if payload.failed:
+            failure = payload.failed[0]
+            verdicts.extend([
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        laid.own[1].id,
+                        Says(
+                            "삭제가 진행 중인 vfolder",
+                            english="the vfolder whose deletion is in progress",
+                        ),
+                    ),
+                ),
+                Held("failed[0].message", failure.message, Mentions("being purged")),
+            ])
+        return verdicts
+
+
+@dataclass(frozen=True)
+class ARestoreLeavesThePurgingFolderOut(
+    Scenario[TestSeedingSession, TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "restoring-several-folders-leaves-the-purging-one-out"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 폴더와 삭제가 진행 중인 "
+            "폴더를 한 번에 restore 하면, 휴지통에 있던 폴더만 되살아나고 삭제 중인 폴더는 "
+            "실패 목록에 옵니다",
+            english=(
+                "when a user granted vfolder soft delete restores a trashed vfolder and a folder "
+                "whose deletion is in progress in one call, only the trashed folder comes back "
+                "and the other comes back in the failed list"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoOwnFoldersAndAnothers]:
+        return SomeoneWithTwoFoldersAndAnothers(
+            permissions=(Permission.SOFT_DELETE,),
+            first_status=VFolderOperationStatus.DELETE_PENDING,
+            second_status=VFolderOperationStatus.DELETE_ONGOING,
+        )
+
+    @override
+    def when(self) -> When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]:
+        return RestoringBothWithOneStillPurging()
+
+    @override
+    def then(self) -> Then[TwoOwnFoldersAndAnothers, Processed]:
+        return OnlyTheTrashedFolderComesBack(started=self.started)
+
+
+@dataclass(frozen=True)
+class RestoringOwnAndAnothers(When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]):
+    """휴지통에 있는 자기 폴더 하나와 남의 폴더 하나를 한 번에 되살린다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
+        return Says(
+            f"{laid.caller.username}이 휴지통에 있는 자기 vfolder 하나와 다른 사용자의 vfolder "
+            "하나를 한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} restores their trashed vfolder and another user's "
+                "vfolder in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: VFolderAdapter, laid: TwoOwnFoldersAndAnothers) -> Processed:
+        ids: list[UUID] = [laid.own[0].id, laid.others.id]
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(PartialBulkRestoreVFoldersInput(ids=ids))
+
+
+@dataclass(frozen=True)
+class TheRestoredFolderAlone(Then[TwoOwnFoldersAndAnothers, Processed]):
+    """휴지통에 있던 자기 폴더만 되살아나고, 남의 폴더는 권한 부족으로 실패 목록에 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "휴지통에 있던 자기 폴더만 사용할 수 있는 상태로 오고, 다른 사용자의 폴더는 권한이 "
+            "없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "only their trashed folder comes back ready for use, and the other user's folder "
+                "comes back in the failed list for lack of permission"
+            ),
+        )
+
+    @override
+    def look(self, laid: TwoOwnFoldersAndAnothers, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), 1)]
+        if payload.successes:
+            verdicts.extend(
+                VFolderNodeLook(self.started).verdicts(
+                    payload.successes[0], laid.own[0], at="successes[0]."
+                )
+            )
+        return [*verdicts, *DeniedLook((laid.others,)).verdicts(payload)]
+
+
+@dataclass(frozen=True)
+class ARestoreLeavesAnothersFolderOut(
+    Scenario[TestSeedingSession, TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "restoring-several-folders-leaves-anothers-out"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 자기 폴더와 다른 사용자의 "
+            "폴더를 한 번에 restore 하면, 자기 폴더만 되살아나고 다른 사용자의 폴더는 권한 부족 "
+            "으로 실패 목록에 옵니다",
+            english=(
+                "when a user granted vfolder soft delete restores their trashed folder and another "
+                "user's folder in one call, only their folder comes back and the other user's "
+                "folder comes back in the failed list for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoOwnFoldersAndAnothers]:
+        return SomeoneWithTwoFoldersAndAnothers(
+            permissions=(Permission.SOFT_DELETE,),
+            first_status=VFolderOperationStatus.DELETE_PENDING,
+            second_status=VFolderOperationStatus.DELETE_PENDING,
+        )
+
+    @override
+    def when(self) -> When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]:
+        return RestoringOwnAndAnothers()
+
+    @override
+    def then(self) -> Then[TwoOwnFoldersAndAnothers, Processed]:
+        return TheRestoredFolderAlone(started=self.started)
+
+
 SCENARIOS: list[FolderStep] = [
     AGrantedOwnerUpdatesTheirsOnly(started=datetime.now(UTC)),
     AUserGrantedNothingUpdatesNone(),
     AGrantedOwnerSoftDeletesTheirsOnly(started=datetime.now(UTC)),
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
+    ARestoreLeavesThePurgingFolderOut(started=datetime.now(UTC)),
+    ARestoreLeavesAnothersFolderOut(started=datetime.now(UTC)),
 ]
 
 

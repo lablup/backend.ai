@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, verify_vfolder_name
+import pytest
+
+from ai.backend.manager.data.vfolder.types import (
+    VFolderOperationStatus,
+    verify_mount_destination,
+    verify_vfolder_name,
+)
 
 
 def test_vfolder_name_validator() -> None:
@@ -21,6 +27,36 @@ def test_vfolder_name_validator() -> None:
     # Mounting exactly at /home/work collides with the agent's intrinsic
     # scratch mount and makes dockerd reject container creation.
     assert not verify_vfolder_name("/home/work")
+
+
+@pytest.mark.parametrize(
+    "destination",
+    ["data", "/home/work/data", "/home/work/.local", "/data", "/data/sub"],
+)
+def test_mount_destination_allows_unreserved_path(destination: str) -> None:
+    assert verify_mount_destination(destination)
+
+
+@pytest.mark.parametrize(
+    "destination",
+    [
+        "/opt",
+        "/opt/container",
+        "/opt/backend.ai/bin",
+        "//opt/container",
+        "/usr/local/bin",
+        "/home/work",
+        "/home/other",
+        "/",
+        "/home/work/../../opt/container",
+        "../../opt/container",
+        "/home/work/.ssh",
+        "/home/work/.ssh/authorized_keys",
+        ".bashrc",
+    ],
+)
+def test_mount_destination_rejects_reserved_path_and_subpath(destination: str) -> None:
+    assert not verify_mount_destination(destination)
 
 
 class TestVFolderOperationStatusSets:

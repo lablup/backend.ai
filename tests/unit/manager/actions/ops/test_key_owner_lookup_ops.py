@@ -156,7 +156,7 @@ async def target(ops_db: ExtendedAsyncSAEngine, actors: Actors) -> _Target:
 
 
 @pytest.fixture
-async def rule_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def rule_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """The auto-scaling rule table, which the base tables leave out."""
     async with with_tables(
         ops_db,

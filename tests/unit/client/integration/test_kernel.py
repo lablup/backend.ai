@@ -103,7 +103,7 @@ def test_kernel_execution_query_mode(py3_kernel: Any) -> None:
 def test_kernel_execution_query_mode_user_input(py3_kernel: Any) -> None:
     name = secrets.token_hex(8)
     code = 'name = input("your name? "); print(f"hello, {name}!")'
-    console, n = exec_loop(py3_kernel, "query", code, None, user_inputs=[name])
+    console, _n = exec_loop(py3_kernel, "query", code, None, user_inputs=[name])
     assert "your name?" in console["stdout"]
     assert f"hello, {name}!" in console["stdout"]
 
@@ -174,7 +174,7 @@ def test_kernel_execution_with_vfolder_mounts() -> None:
                 vfolder.upload([f.name])  # type: ignore[unused-coroutine]
             kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04", mounts=[vfname])
             try:
-                console, n = exec_loop(
+                console, _n = exec_loop(
                     kernel,
                     "batch",
                     "",

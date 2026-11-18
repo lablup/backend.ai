@@ -1,11 +1,4 @@
 """Fair Share CLI package."""
 
-import click
-
-
-@click.group()
-def fair_share() -> None:
-    """Fair share scheduler operations (superadmin only)."""
-
-
-from . import commands  # noqa
+from . import commands as commands
+from .group import fair_share as fair_share

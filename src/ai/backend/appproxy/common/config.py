@@ -3,7 +3,7 @@ import pwd
 import types
 import typing
 from pathlib import Path
-from typing import Annotated, Any, override
+from typing import Annotated, Any, cast, override
 
 from pydantic import (
     BaseModel,
@@ -771,7 +771,9 @@ def generate_example_json(
                 alternative_example = info.default
             if name not in res:
                 try:
-                    res[name] = generate_example_json(info.annotation, parent=config_key)
+                    res[name] = generate_example_json(
+                        cast(type[Any], info.annotation), parent=config_key
+                    )
                 except RuntimeError:
                     if alternative_example != Undefined and alternative_example is not None:
                         res[name] = alternative_example

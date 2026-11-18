@@ -59,6 +59,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -126,6 +127,8 @@ __all__ = (
     "SearchDeploymentPoliciesInput",
     "SearchReplicasInput",
     "SearchRoutesInput",
+    "ServiceArgumentInterpolationDelimiterInput",
+    "ServiceArgumentInterpolationInput",
     "SyncReplicaInput",
     "UpdateAutoScalingRuleInput",
     "UpdateDeploymentInput",
@@ -137,7 +140,7 @@ __all__ = (
 class ModelHealthCheckInput(BaseRequestModel):
     enable: bool = False
     interval: float | None = None
-    path: str | None = None
+    path: HealthCheckPath | None = None
     max_retries: int | None = None
     max_wait_time: float | None = None
     expected_status_code: int | None = None
@@ -160,6 +163,18 @@ class ModelMetadataInput(BaseRequestModel):
     min_resource: dict[str, Any] | None = None
 
 
+class ServiceArgumentInterpolationDelimiterInput(BaseRequestModel):
+    start: str = Field(min_length=1, description="Opening delimiter, e.g. `{{`.")
+    end: str = Field(min_length=1, description="Closing delimiter, e.g. `}}`.")
+
+
+class ServiceArgumentInterpolationInput(BaseRequestModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInput] = Field(
+        min_length=1,
+        description="Delimiters that mark the variables to fill in the service arguments.",
+    )
+
+
 class ModelServiceConfigInput(BaseRequestModel):
     pre_start_actions: list[PreStartAction] | None = None
     command: str | None = None
@@ -173,6 +188,13 @@ class ModelServiceConfigInput(BaseRequestModel):
     )
     port: int | None = None
     health_check: ModelHealthCheckInput | None = None
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit to inherit it; the default is `${{ }}` and `{ }`."
+        ),
+    )
 
 
 class ModelConfigInput(BaseRequestModel):
@@ -428,6 +450,13 @@ class ModelDeploymentMetadataInput(BaseRequestModel):
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
     resource_group_name: ResourceGroupName = Field(description="Resource group name")
+    designated_agent_ids: list[UUID] | None = Field(
+        default=None,
+        description=(
+            "UUIDs of the agents the route sessions are placed on. Each must belong to the"
+            " resource group."
+        ),
+    )
     name: str | None = Field(
         default=None,
         min_length=1,
@@ -549,6 +578,13 @@ class UpdateDeploymentInput(BaseRequestModel):
     )
     default_deployment_strategy: DeploymentStrategyInput | None | Unset = Field(
         default=UNSET, description="Updated deployment strategy. Omit to leave unchanged."
+    )
+    designated_agent_ids: list[UUID] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Replaces the designated agent UUIDs; an empty list clears them. Each must belong"
+            " to the deployment's resource group. Omit to leave unchanged."
+        ),
     )
 
     @field_validator("name")

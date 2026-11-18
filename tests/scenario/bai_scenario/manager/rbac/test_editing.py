@@ -27,7 +27,11 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.domain import TheCallIsRefused
-from bai_scenario.components.rbac import RoleLook, RolesAndACaller, RolesAndSomeone
+from bai_scenario.components.rbac import (
+    RoleLook,
+    RolesAndACaller,
+    RolesAndSomeone,
+)
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -100,7 +104,7 @@ class TheSoftDeletedRole(Then[RolesAndACaller, RoleNode]):
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return RoleLook(self.started, status=RoleStatusDTO.DELETED).verdicts(
-            "", node, laid.role, laid.domain
+            "", node, laid.role, laid.domain.id
         )
 
 
@@ -122,7 +126,9 @@ class TheEditedRole(Then[RolesAndACaller, RoleNode]):
         node = answered.response
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return RoleLook(self.started, described=EDITED).verdicts("", node, laid.role, laid.domain)
+        return RoleLook(self.started, described=EDITED).verdicts(
+            "", node, laid.role, laid.domain.id
+        )
 
 
 @dataclass(frozen=True)

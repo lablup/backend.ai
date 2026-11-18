@@ -26,7 +26,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -62,7 +61,7 @@ class TestDomainPurgersIntegration:
     @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -81,7 +80,6 @@ class TestDomainPurgersIntegration:
                 KeyPairResourcePolicyRow,
                 ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionRow,
                 AgentRow,

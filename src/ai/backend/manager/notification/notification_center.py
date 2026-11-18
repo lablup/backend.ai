@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 
 import jinja2
+import jinja2.sandbox
 
 from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
 from ai.backend.common.data.notification import (
@@ -39,7 +40,7 @@ class NotificationCenter:
     """
 
     _http_client_pool: ClientPool
-    _template_env: jinja2.Environment
+    _template_env: jinja2.sandbox.ImmutableSandboxedEnvironment
 
     def __init__(self) -> None:
         """Initialize the notification center with HTTP client pool and template environment."""
@@ -47,7 +48,8 @@ class NotificationCenter:
             factory=tcp_client_session_factory,
             cleanup_interval_seconds=600,
         )
-        self._template_env = jinja2.Environment(
+        # Sandboxed: rule templates come from the notification API.
+        self._template_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
             loader=jinja2.BaseLoader(),
             autoescape=False,
         )

@@ -60,6 +60,7 @@ from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
@@ -88,6 +89,10 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=DeploymentRepository)
 
     @pytest.fixture
+    def mock_agent_repository(self) -> MagicMock:
+        return MagicMock(spec=AgentRepository)
+
+    @pytest.fixture
     def mock_deployment_controller(self) -> MagicMock:
         """Mock DeploymentController for testing."""
         return MagicMock(spec=DeploymentController)
@@ -102,12 +107,14 @@ class DeploymentServiceBaseFixtures:
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            agent_repository=mock_agent_repository,
             appproxy_client_pool=mock_appproxy_client_pool,
         )
 
@@ -550,11 +557,13 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            agent_repository=mock_agent_repository,
             appproxy_client_pool=mock_appproxy_client_pool,
         )
 

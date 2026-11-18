@@ -141,7 +141,7 @@ class TestReachableSearch:
     @pytest.fixture
     async def reach_db(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [

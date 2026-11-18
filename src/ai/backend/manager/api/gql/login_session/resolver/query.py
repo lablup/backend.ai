@@ -40,7 +40,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Query login sessions with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_login_sessions_v2(
     info: Info[StrawberryGQLContext],
     filter: LoginSessionFilterGQL | None = None,
@@ -84,7 +84,7 @@ async def admin_login_sessions_v2(
         added_version="26.4.2",
         description="Query login sessions of the current user with pagination and filtering.",
     )
-)  # type: ignore[misc]
+)
 async def my_login_sessions_v2(
     info: Info[StrawberryGQLContext],
     filter: LoginSessionFilterGQL | None = None,

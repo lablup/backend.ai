@@ -6,6 +6,8 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelDefinitionInputGQL,
     ModelHealthCheckInputGQL,
     ModelServiceConfigInputGQL,
+    ServiceArgumentInterpolationDelimiterInputGQL,
+    ServiceArgumentInterpolationInputGQL,
 )
 
 
@@ -45,7 +47,7 @@ class TestModelDefinitionInputGQL:
                         health_check=ModelHealthCheckInputGQL(
                             enable=True,
                             interval=1.0,
-                            path="1",
+                            path="/1",
                             max_retries=1,
                             max_wait_time=1.0,
                             expected_status_code=101,
@@ -69,5 +71,32 @@ class TestModelDefinitionInputGQL:
         assert service.port == 8000
         assert service.start_command == "/models/start.sh"
         assert service.health_check is not None
-        assert service.health_check.path == "1"
+        assert service.health_check.path == "/1"
         assert service.health_check.expected_status_code == 101
+
+    def test_interpolation_reaches_resolved_service(self) -> None:
+        baseline = ModelDefinitionDraft.model_validate({
+            "models": [
+                {"name": "demo", "model_path": "/models", "service": {"port": 8000}},
+            ]
+        })
+        gql_patch = ModelDefinitionInputGQL(
+            models=[
+                ModelConfigInputGQL(
+                    service=ModelServiceConfigInputGQL(
+                        interpolation=ServiceArgumentInterpolationInputGQL(
+                            delimiters=[
+                                ServiceArgumentInterpolationDelimiterInputGQL(start="{{", end="}}")
+                            ]
+                        )
+                    )
+                )
+            ]
+        )
+
+        resolved = baseline.merge(gql_patch.to_pydantic().to_draft()).to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.interpolation is not None
+        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("{{", "}}")]

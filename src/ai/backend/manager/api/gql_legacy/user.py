@@ -39,6 +39,9 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     ACTIVE_USER_STATUSES,
@@ -69,6 +72,7 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )
 from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
+from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 from ai.backend.manager.services.user.actions.update_user import (
     UpdateUserAction,
     UpdateUserActionResult,
@@ -228,8 +232,10 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
+        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+            return None
 
         user_id = resolve_entity_id(id, UserID)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
@@ -258,7 +264,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     # External table filter specifications
@@ -289,7 +294,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     @staticmethod
@@ -498,7 +502,9 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
                 result.append(GroupNode.from_data(ProjectSearchableFields.own.to_data(prj_row)))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> UserNode | None:
         return await UserNode.get_node(info, self.id)
 
 
@@ -1113,7 +1119,19 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         action: CreateUserAction = props.to_action(email, graph_ctx, domain_id)
 
         action_result = await graph_ctx.processors.user.create_user.run(action)
-        keypair = KeyPair.from_data(action_result.data.keypair)
+        ssh_keypairs = await graph_ctx.processors.user.search_ssh_keypairs.run(
+            SearchSSHKeypairsAction(
+                user_ids=[UserID(action_result.data.user.id)],
+                searcher=SSHKeypairSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                ),
+            )
+        )
+        keypair = KeyPair.from_data(
+            action_result.data.keypair,
+            ssh_keypairs.items[0].public_key if ssh_keypairs.items else None,
+        )
 
         return cls(
             ok=True,

@@ -76,7 +76,7 @@ def mock_agent_client_pool() -> MagicMock:
     mock_client.check_running = AsyncMock(return_value=False)
 
     @asynccontextmanager
-    async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock, None]:
+    async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock]:
         yield mock_client
 
     pool.acquire = MagicMock(side_effect=acquire)
@@ -336,18 +336,5 @@ def valkey_one_stale_response(
             mock_status.presence = HealthCheckStatus.STALE
         else:
             mock_status.presence = HealthCheckStatus.HEALTHY
-        response[KernelId(kernel.id)] = mock_status
-    return response
-
-
-@pytest.fixture
-def valkey_all_stale_response(
-    running_kernels_multiple: list[KernelInfo],
-) -> dict[KernelId, MagicMock]:
-    """Valkey response showing all kernels as stale."""
-    response = {}
-    for kernel in running_kernels_multiple:
-        mock_status = MagicMock()
-        mock_status.presence = HealthCheckStatus.STALE
         response[KernelId(kernel.id)] = mock_status
     return response

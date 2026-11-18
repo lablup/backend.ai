@@ -13,6 +13,7 @@ import jwt
 import jwt.exceptions
 from aiohttp import web
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging.structured import StructuredLogger
@@ -65,7 +66,9 @@ class OIDCHookPlugin(HookPlugin):
         auth_repository = cast(AuthRepository, root_app["_auth_repository"])
         secret = self._config.secret
 
-        stoken = params.get("stoken") or params.get("sToken") or request.cookies.get("sToken")
+        stoken_in_params = params.get("stoken") or params.get("sToken")
+        stoken_from_cookie = not stoken_in_params
+        stoken = request.cookies.get("sToken") if stoken_from_cookie else stoken_in_params
         if not stoken:
             log.debug("openid auth token not found, proceeding with normal auth")
             return None
@@ -73,9 +76,15 @@ class OIDCHookPlugin(HookPlugin):
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
             user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
-        except jwt.ExpiredSignatureError:
-            raise Reject("Expired authentication token") from None
-        except (jwt.PyJWTError, KeyError, ValueError):
+        except (jwt.PyJWTError, KeyError, ValueError) as e:
+            if stoken_from_cookie:
+                # Only a client calling the manager directly sends the cookie without the token in params, and it
+                # may be left from an earlier login and come with a password login that auth_keypair leaves
+                # unhandled, so an expired or invalid cookie leaves the login to password verification.
+                log.debug("openid auth cookie unusable, proceeding with password verification")
+                return None
+            if isinstance(e, jwt.ExpiredSignatureError):
+                raise Reject("Expired authentication token") from None
             raise Reject("Invalid authentication token") from None
 
         log.debug("openid auth token decoded", user_id=user_id)
@@ -87,7 +96,9 @@ class OIDCHookPlugin(HookPlugin):
             raise Reject("user is inactivated")
 
         if payload.get("force", False):
-            await auth_repository.invalidate_active_login_sessions(user_id)
+            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(user_id)
+            valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
+            await valkey_session.delete_login_sessions(invalidated_tokens)
             log.trace("openid login sessions force-invalidated", user_email=email)
 
         log.trace("openid user authenticated by auth token", user_email=email)

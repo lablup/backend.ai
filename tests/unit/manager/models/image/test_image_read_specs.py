@@ -19,7 +19,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.queriers import ImageQuerier
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -68,7 +67,7 @@ class ResolveReference(Protocol):
 @pytest.fixture
 async def image_db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [
@@ -77,7 +76,6 @@ async def image_db(
             UserResourcePolicyRow,
             KeyPairResourcePolicyRow,
             UserRow,
-            KeyPairRow,
             ContainerRegistryRow,
             ImageRow,
             ImageAliasRow,

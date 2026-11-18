@@ -749,7 +749,7 @@ class TestProjectExportExecuteStreamingDB:
     async def db_engine(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Engine with all required tables created."""
         async with with_tables(
             database_connection,
@@ -771,7 +771,7 @@ class TestProjectExportExecuteStreamingDB:
     async def project_with_rg_and_registry(
         self,
         db_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[_ProjectWithRgAndRegistry, None]:
+    ) -> AsyncGenerator[_ProjectWithRgAndRegistry]:
         """Create a project associated with a scaling group and a container registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -1093,7 +1093,7 @@ class TestGlobalContainerRegistryExport:
     async def db_engine(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -1114,7 +1114,7 @@ class TestGlobalContainerRegistryExport:
     async def project_with_mixed_registries(
         self,
         db_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[_ProjectWithMixedRegistries, None]:
+    ) -> AsyncGenerator[_ProjectWithMixedRegistries]:
         """Create two projects: one with both global and scoped registries, one with no associations.
 
         project_id: associated with the scoped registry (and implicitly the global registry)

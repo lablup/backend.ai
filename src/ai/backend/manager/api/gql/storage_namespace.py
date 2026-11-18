@@ -28,11 +28,11 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
     gql_connection_type,
-    gql_field,
     gql_mutation,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -89,7 +89,7 @@ StorageNamespaceEdge = Edge[StorageNamespace]
     ),
 )
 class StorageNamespaceConnection(Connection[StorageNamespace]):
-    @gql_field(description="The count of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The count of this entity.")
     def count(self) -> int:
         return len(self.edges)
 

@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Final, override
 
 import aiofiles
 import aiotools
@@ -33,7 +33,9 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
+from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
@@ -66,6 +68,7 @@ from .types import (
     PackageSource,
     Platform,
     PrerequisiteError,
+    ProxyBackend,
     ServerAddr,
     ServiceConfig,
     SftpAgentOptions,
@@ -73,6 +76,18 @@ from .types import (
 from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
+
+# Must match the entrypoints in configs/traefik/traefik.halfstack.yml.
+TRAEFIK_API_PORT: Final[int] = 8080
+TRAEFIK_PORT_RANGE: Final[tuple[int, int]] = (10205, 10300)
+# The coordinator emits wildcard routers on the fixed "domainproxy"
+# entrypoint; the installer swaps the portproxy_* entrypoints for it when the
+# wildcard traffic pattern is selected (same port the builtin wildcard
+# frontend binds).
+TRAEFIK_DOMAINPROXY_PORT: Final[int] = 10250
+APPPROXY_TRAEFIK_PLUGIN_VERSION: Final[str] = "0.0.5"
+APPPROXY_TRAEFIK_PLUGIN_REPO: Final[str] = "lablup/backend.ai-appproxy-worker-traefik"
+TRAEFIK_MARKER_DIR_PLACEHOLDER: Final[str] = "/__APPPROXY_MARKER_DIR__"
 
 
 class PostGuide(enum.Enum):
@@ -134,8 +149,8 @@ class Context(metaclass=ABCMeta):
             redis_sentinel_addrs=[],
             redis_password=None,
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
+            etcd_user="root",
+            etcd_password="develove",
         )
         service_config = ServiceConfig(
             webserver_addr=ServerAddr(
@@ -181,6 +196,8 @@ class Context(metaclass=ABCMeta):
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
             harbor=harbor,
             sftp_agent=sftp_agent,
+            frontend_mode=self.install_variable.frontend_mode,
+            proxy_backend=self.install_variable.proxy_backend,
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -425,23 +442,25 @@ class Context(metaclass=ABCMeta):
     @actxmgr
     async def etcd_ctx(self) -> AsyncIterator[AsyncEtcd]:
         halfstack = self.install_info.halfstack_config
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-        }
-        creds: dict[str, str] | None = None
-        if halfstack.etcd_user is not None:
-            if halfstack.etcd_password is None:
-                raise ValueError("etcd_password must be set when etcd_user is provided")
-            creds = {
-                "user": halfstack.etcd_user,
-                "password": halfstack.etcd_password,
-            }
-        async with AsyncEtcd(
-            [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
-            "local",
-            scope_prefix_map,
-            credentials=creds,
-        ) as etcd:
+        etcd_config = EtcdConfigData(
+            namespace="local",
+            addrs=[
+                HostPortPairModel(host=addr.face.host, port=addr.face.port)
+                for addr in halfstack.etcd_addr
+            ],
+            user=halfstack.etcd_user,
+            password=halfstack.etcd_password,
+            keep_alive_interval=halfstack.etcd_keep_alive_interval,
+            keep_alive_timeout=halfstack.etcd_keep_alive_timeout,
+            tls=EtcdTLSConfigData(
+                enabled=False,
+                ca_cert=None,
+                client_cert=None,
+                client_key=None,
+                handshake_timeout=None,
+            ),
+        )
+        async with AsyncEtcd.create_from_config(etcd_config) as etcd:
             yield etcd
 
     async def etcd_put_json(
@@ -521,6 +540,7 @@ class Context(metaclass=ABCMeta):
         self.log_header("Installing halfstack...")
         await self._prepare_halfstack_files()
         await self._start_halfstack()
+        await self._enable_etcd_auth()
 
     async def _prepare_halfstack_files(self) -> None:
         base_path = self.install_info.base_path
@@ -624,6 +644,8 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
+        if self.install_variable.proxy_backend == ProxyBackend.TRAEFIK:
+            await self.prepare_traefik_assets(dst_compose_path)
 
     def _halfstack_profile_args(self) -> list[str]:
         profile_args_list: list[str] = []
@@ -634,6 +656,8 @@ class Context(metaclass=ABCMeta):
             profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
+        if self.install_variable.proxy_backend == ProxyBackend.TRAEFIK:
+            profile_args_list.append("--profile traefik")
         return profile_args_list
 
     async def _start_halfstack(self) -> None:
@@ -654,6 +678,84 @@ class Context(metaclass=ABCMeta):
         """,
             cwd=self.install_info.base_path,
         )
+
+    @property
+    def traefik_marker_dir(self) -> Path:
+        return self.install_info.base_path / "volumes" / "traefik" / "marker"
+
+    async def prepare_traefik_assets(self, compose_path: Path) -> None:
+        """Prepare the Traefik static config, appproxy plugin, and marker
+        directory before ``compose up`` starts the "traefik" profile."""
+        self.log_header("Preparing the Traefik assets (app-proxy traefik backend)...")
+        marker_dir = self.traefik_marker_dir
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        src_config_path = self.copy_config("traefik.yml")
+        dst_config_path = src_config_path.with_name("traefik.halfstack.current.yml")
+        src_config_path.rename(dst_config_path)
+        self.sed_in_place(dst_config_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        self.sed_in_place(compose_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        if self.install_variable.frontend_mode == FrontendMode.WILDCARD:
+            # The static config ships port-flavored (portproxy_* entrypoints).
+            # For the wildcard traffic pattern the coordinator emits routers on
+            # the fixed "domainproxy" entrypoint instead, and portproxy_10250
+            # would collide with it on :10250 -- so swap the entrypoint set.
+            yaml = YAML()
+            with dst_config_path.open("r") as fp:
+                static_conf = yaml.load(fp)
+            entrypoints = static_conf["entryPoints"]
+            for name in [k for k in entrypoints if k.startswith("portproxy_")]:
+                del entrypoints[name]
+            entrypoints["domainproxy"] = {
+                "address": f":{TRAEFIK_DOMAINPROXY_PORT}",
+            }
+            with dst_config_path.open("w") as fp:
+                yaml.dump(static_conf, fp)
+        plugin_root = marker_dir.parent
+        plugin_url = (
+            f"https://github.com/{APPPROXY_TRAEFIK_PLUGIN_REPO}/releases/download/"
+            f"{APPPROXY_TRAEFIK_PLUGIN_VERSION}/appproxy-traefik-plugin.tar.gz"
+        )
+        exit_code = await self.run_shell(
+            f'curl -fsSL "{plugin_url}" | tar xz -C "{plugin_root}"',
+        )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to download and extract the appproxy Traefik plugin "
+                f"(exit {exit_code}); URL: {plugin_url}"
+            )
+
+    def _halfstack_compose_cmd(self) -> list[str]:
+        compose_path = self.install_info.base_path / "docker-compose.halfstack.current.yml"
+        return [*self.docker_sudo, "docker", "compose", "-f", str(compose_path)]
+
+    async def _enable_etcd_auth(self) -> None:
+        """Create the halfstack etcd root user and enable authentication, unless already enabled."""
+        halfstack = self.install_info.halfstack_config
+        # The etcd image has no shell, so etcdctl runs through `docker compose exec`.
+        etcdctl = [*self._halfstack_compose_cmd(), "exec", "-T", "backendai-half-etcd", "etcdctl"]
+        proc = await asyncio.create_subprocess_exec(
+            *etcdctl,
+            "auth",
+            "status",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await proc.communicate()
+        if b"Authentication Status: false" not in stdout:
+            return
+        self.log_header("Enabling etcd authentication...")
+        # The root user remains from an earlier run that stopped before `auth enable`.
+        await self.run_exec([
+            *etcdctl,
+            "user",
+            "add",
+            halfstack.etcd_user,
+            f"--new-user-password={halfstack.etcd_password}",
+        ])
+        exit_code = await self.run_exec([*etcdctl, "auth", "enable"])
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to enable etcd authentication (exit {exit_code})")
 
     async def load_seeds(self) -> None:
         with (
@@ -748,7 +850,7 @@ class Context(metaclass=ABCMeta):
         self.os_info = await detect_os()
         text = Text()
         text.append("Detected OS info: ")
-        text.append(self.os_info.__rich__())  # type: ignore
+        text.append(self.os_info.__rich__())
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
@@ -903,10 +1005,22 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         accelerator = self.install_info.accelerator
+        base_path = self.install_info.base_path
         toml_path = self.copy_config("agent.toml")
+        (base_path / "fixtures" / "agent").mkdir(parents=True, exist_ok=True)
+        await self.run_manager_cli(["mgr", "generate-rpc-keypair", "fixtures/agent", "agent"])
         self.sed_in_place_multi(
             toml_path,
             [
+                (
+                    re.compile("^rpc-auth-manager-public-key = .*", flags=re.MULTILINE),
+                    "rpc-auth-manager-public-key = "
+                    f'"{base_path / "fixtures" / "manager" / "manager.key"}"',
+                ),
+                (
+                    re.compile("^rpc-auth-agent-keypair = .*", flags=re.MULTILINE),
+                    f'rpc-auth-agent-keypair = "{base_path / "fixtures" / "agent" / "agent.key_secret"}"',
+                ),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
@@ -928,14 +1042,8 @@ class Context(metaclass=ABCMeta):
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
-            elif accelerator in (
-                Accelerator.CUDA_MOCK,
-                Accelerator.CUDA_MIG_MOCK,
-                Accelerator.ROCM_MOCK,
-            ):
-                plugin_list = ['"ai.backend.accelerator.mock"']
             else:
-                plugin_list = []
+                plugin_list = ['"ai.backend.accelerator.mock"']
 
             await self._configure_mock_accelerator(accelerator)
         else:
@@ -1110,42 +1218,36 @@ class Context(metaclass=ABCMeta):
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
         with toml_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             etcd_table = tomlkit.table()
             etcd_addr_table = tomlkit.inline_table()
             etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
             etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
             etcd_table["addr"] = etcd_addr_table
             etcd_table["namespace"] = "local"
-            if halfstack.etcd_user:
-                etcd_table["user"] = halfstack.etcd_user
-            else:
-                etcd_table.pop("user", None)
-            if halfstack.etcd_password:
-                etcd_table["password"] = halfstack.etcd_password
-            else:
-                etcd_table.pop("password", None)
+            etcd_table["user"] = halfstack.etcd_user
+            etcd_table["password"] = halfstack.etcd_password
             data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
+            data["storage-proxy"]["secret"] = service.storage_proxy_random
+            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path
             client_facing_addr_table = tomlkit.inline_table()
             client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
             client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
+            data["api"]["client"]["service-addr"] = client_facing_addr_table
             manager_facing_addr_table = tomlkit.inline_table()
             manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
             manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
+            data["api"]["manager"]["service-addr"] = manager_facing_addr_table
+            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key
             announce_addr_table = tomlkit.inline_table()
             announce_addr_table["host"] = self.install_variable.public_facing_address
             announce_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["announce-addr"] = announce_addr_table  # type: ignore
+            data["api"]["manager"]["announce-addr"] = announce_addr_table
             announce_internal_table = tomlkit.inline_table()
             announce_internal_table["host"] = self.install_variable.public_facing_address
             announce_internal_table["port"] = 16023
-            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table  # type: ignore
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table
+            data["volume"]["volume1"]["path"] = service.vfolder_relpath
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -1182,12 +1284,12 @@ class Context(metaclass=ABCMeta):
         )
 
         with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
-            data["api"][  # type: ignore
-                "endpoint"
-            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value
+            data["api"]["endpoint"] = (
+                f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+            )
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -1211,9 +1313,9 @@ class Context(metaclass=ABCMeta):
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table  # type: ignore
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+            data["session"]["redis"] = redis_table
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -1313,6 +1415,7 @@ class Context(metaclass=ABCMeta):
         tls_advertised = self.install_variable.tls_advertised
         advertised_port = self.install_variable.advertised_port
         wildcard_domain = self.install_variable.wildcard_domain
+        proxy_backend = self.install_variable.proxy_backend
         public_facing_address = self.install_variable.public_facing_address
         apphub_address = self.install_variable.apphub_address
         app_address = self.install_variable.app_address
@@ -1353,6 +1456,20 @@ class Context(metaclass=ABCMeta):
             announce_addr_table["host"] = public_facing_address
             announce_addr_table["port"] = service.appproxy_coordinator_addr.bind.port
             data["proxy_coordinator"]["announce_addr"] = announce_addr_table  # type: ignore[index]
+            if proxy_backend == ProxyBackend.TRAEFIK:
+                # Publish routing rules to etcd for the Traefik dataplane.
+                data["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+                traefik_etcd_addr_table = tomlkit.inline_table()
+                traefik_etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+                traefik_etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+                traefik_etcd_table = tomlkit.table()
+                traefik_etcd_table["namespace"] = "traefik"
+                traefik_etcd_table["addr"] = traefik_etcd_addr_table
+                traefik_etcd_table["user"] = halfstack.etcd_user
+                traefik_etcd_table["password"] = halfstack.etcd_password
+                traefik_table = tomlkit.table()
+                traefik_table["etcd"] = traefik_etcd_table
+                data["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -1390,11 +1507,44 @@ class Context(metaclass=ABCMeta):
             if tls_advertised:
                 data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
 
-            # set frontend mode (port or wildcard)
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
-
-            # configure based on frontend_mode
-            if frontend_mode == FrontendMode.WILDCARD:
+            # Configure based on (traffic pattern, dataplane backend).
+            if proxy_backend == ProxyBackend.TRAEFIK:
+                # Delegate the dataplane to the halfstack Traefik container;
+                # the traffic pattern becomes Traefik's internal sub-mode.
+                data["proxy_worker"]["frontend_mode"] = "traefik"  # type: ignore[index]
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+                traefik_table = tomlkit.table()
+                traefik_table["api_port"] = TRAEFIK_API_PORT
+                traefik_table["last_used_time_marker_directory"] = str(self.traefik_marker_dir)
+                if frontend_mode == FrontendMode.WILDCARD:
+                    if not wildcard_domain:
+                        raise RuntimeError(
+                            "The wildcard traffic pattern with the Traefik backend"
+                            " requires a wildcard domain -- pass --fqdn-prefix (or"
+                            " --app-base-domain) so the installer can derive it."
+                        )
+                    traefik_table["frontend_mode"] = "wildcard"
+                    traefik_wildcard_table = tomlkit.table()
+                    traefik_wildcard_table["domain"] = wildcard_domain
+                    traefik_wildcard_table["advertised_port"] = advertised_port
+                    traefik_wildcard_table["tls_advertised"] = tls_advertised
+                    traefik_table["wildcard_domain"] = traefik_wildcard_table
+                    # Advertise app URLs the same way as the builtin wildcard
+                    # frontend does.
+                    api_advertised_addr_table = tomlkit.inline_table()
+                    api_advertised_addr_table["host"] = app_address
+                    api_advertised_addr_table["port"] = advertised_port
+                    data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+                else:
+                    traefik_table["frontend_mode"] = "port"
+                    traefik_port_proxy_table = tomlkit.table()
+                    traefik_port_proxy_table["advertised_host"] = public_facing_address
+                    traefik_port_proxy_table["port_range"] = list(TRAEFIK_PORT_RANGE)
+                    traefik_table["port_proxy"] = traefik_port_proxy_table
+                data["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
+            elif frontend_mode == FrontendMode.WILDCARD:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
                 # Remove port_proxy section for wildcard mode
                 if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
                     del data["proxy_worker"]["port_proxy"]
@@ -1411,12 +1561,13 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["domain"] = wildcard_domain
                     bind_addr_table = tomlkit.inline_table()
                     bind_addr_table["host"] = "0.0.0.0"
-                    bind_addr_table["port"] = 10250
+                    bind_addr_table["port"] = TRAEFIK_DOMAINPROXY_PORT
                     wildcard_table["bind_addr"] = bind_addr_table
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())  # Add newline before next section
                     data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
             else:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
                 # update port_proxy.advertised_host
                 data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
             data["proxy_worker"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
@@ -2471,6 +2622,11 @@ class DockerContext(Context):
         compose_path = await self.generate_services_compose()
         self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
         await self._start_halfstack()
+        await self._enable_etcd_auth()
+
+    @override
+    def _halfstack_compose_cmd(self) -> list[str]:
+        return [*self.docker_sudo, *self._services_compose_args()]
 
     @override
     async def _start_halfstack(self) -> None:

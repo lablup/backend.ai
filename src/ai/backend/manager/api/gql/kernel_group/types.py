@@ -86,6 +86,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.image.types import ImageV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
@@ -358,7 +359,7 @@ class KernelGroupGQL(PydanticNodeMixin[KernelGroupNodeDTO]):
     )
     batch_timeout: int | None = gql_field(description="Batch execution timeout in seconds.")
 
-    @gql_field(description="The session the group belongs to.")  # type: ignore[misc]
+    @gql_resolver(description="The session the group belongs to.")
     async def session(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -366,13 +367,13 @@ class KernelGroupGQL(PydanticNodeMixin[KernelGroupNodeDTO]):
     ):
         return await info.context.data_loaders.session_loader.load(SessionID(self.session_id))
 
-    @gql_field(description="The image the group's kernels run.")  # type: ignore[misc]
+    @gql_resolver(description="The image the group's kernels run.")
     async def image(self, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
         if self.image_id is None:
             return None
         return await info.context.data_loaders.image_loader.load(ImageID(self.image_id))
 
-    @gql_field(description="Environment variables requested on the group.")  # type: ignore[misc]
+    @gql_resolver(description="Environment variables requested on the group.")
     async def environ(
         self,
         info: Info[StrawberryGQLContext],
@@ -416,7 +417,7 @@ class KernelGroupGQL(PydanticNodeMixin[KernelGroupNodeDTO]):
             count=payload.total_count,
         )
 
-    @gql_field(description="Resource slots requested on each kernel of the group.")  # type: ignore[misc]
+    @gql_resolver(description="Resource slots requested on each kernel of the group.")
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],

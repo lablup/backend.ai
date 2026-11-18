@@ -1,0 +1,207 @@
+"""배포가 걸린 복제본 라우트 훑기."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import override
+
+import pytest
+
+from ai.backend.common.data.model_deployment.types import RouteTrafficStatus
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteFilter,
+    RouteOrder,
+    SearchRoutesInput,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import SearchRoutesPayload
+from ai.backend.common.dto.manager.v2.deployment.types import OrderDirection, RouteOrderField
+from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
+from ai.backend.manager.data.deployment.types import RouteOperationScope
+from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Same,
+    Says,
+    Scenario,
+    Then,
+    Verdict,
+    When,
+)
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
+from bai_scenario.components.deployment_route import (
+    ADeploymentWithRoutes,
+    ARoutedDeploymentAndACaller,
+    TheRouteNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type Answer = SearchRoutesPayload
+type RouteStep = Scenario[
+    TestSeedingSession, ARoutedDeploymentAndACaller, DeploymentAdapter, Answer
+]
+
+
+@dataclass(frozen=True)
+class SearchingTheRoutesOfTheDeployment(
+    When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
+):
+    """트래픽이 꺼진 라우트만 남기고, 생성 시각순으로 한 페이지를 훑는다."""
+
+    @override
+    def operation(self) -> str:
+        return "search_routes"
+
+    @override
+    def describe(self, laid: ARoutedDeploymentAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 라우트를 하나의 "
+            f"기준으로 걸러 순서와 함께 조회합니다",
+            english=(
+                f"{laid.caller.username} searches the routes of "
+                f"{laid.deployment.metadata.name} with one filter, one order and pagination"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.search_routes(
+                RouteOperationScope(deployment_id=laid.deployment.id),
+                SearchRoutesInput(
+                    filter=RouteFilter(traffic_status=[RouteTrafficStatus.INACTIVE]),
+                    order=[
+                        RouteOrder(field=RouteOrderField.CREATED_AT, direction=OrderDirection.ASC)
+                    ],
+                    limit=10,
+                    offset=0,
+                ),
+            )
+
+
+@dataclass(frozen=True)
+class TheRoutePageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
+    """심은 라우트가 양과 함께 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "기준이 제외하는 라우트와 다른 배포에 걸린 라우트는 오지 않고, "
+            "심은 라우트가 양과 함께 옵니다",
+            english=(
+                "the route the filter excludes and the route on another deployment do not "
+                "come back, and the routes seeded in advance come back with their count"
+            ),
+        )
+
+    @override
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [MissingResponse(answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("total_count", page.total_count, len(laid.routes)),
+            Same("items count", len(page.items), len(laid.routes)),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]
+        by_id = {route.id: route for route in laid.routes}
+        for i, node in enumerate(page.items):
+            route = by_id.get(node.id)
+            if route is None:
+                verdicts.append(Same(f"items[{i}].id", node.id, "a route the deployment holds"))
+            else:
+                verdicts += TheRouteNode(self.started, revision_id=laid.revision_id).verdicts(
+                    node, route, f"items[{i}]."
+                )
+        return verdicts
+
+
+@dataclass(frozen=True)
+class AUserGrantedDeploymentReadSearchesTheRoutes(
+    Scenario[TestSeedingSession, ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-deployment-read-searches-the-routes"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "배포 조회 권한을 받은 사용자가 배포의 라우트를 기준으로 걸러 조회하면, "
+            "심은 라우트가 옵니다",
+            english=(
+                "when a user granted deployment read searches the routes of the deployment "
+                "with a filter, the routes seeded in advance come back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARoutedDeploymentAndACaller]:
+        return ADeploymentWithRoutes(granted=(Permission.READ,), excluded_active=True, outside=True)
+
+    @override
+    def when(self) -> When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]:
+        return SearchingTheRoutesOfTheDeployment()
+
+    @override
+    def then(self) -> Then[ARoutedDeploymentAndACaller, Answer]:
+        return TheRoutePageComesBack(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingSearchesNoRoute(
+    Scenario[TestSeedingSession, ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-searches-no-route"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 배포의 라우트를 조회하려 하면, 권한이 없다는 "
+            "이유로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to search the routes of the deployment, "
+                "the search is rejected because the user lacks permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARoutedDeploymentAndACaller]:
+        return ADeploymentWithRoutes()
+
+    @override
+    def when(self) -> When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]:
+        return SearchingTheRoutesOfTheDeployment()
+
+    @override
+    def then(self) -> Then[ARoutedDeploymentAndACaller, Answer]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+STARTED = datetime.now(UTC)
+
+SCENARIOS: list[RouteStep] = [
+    AUserGrantedDeploymentReadSearchesTheRoutes(started=STARTED),
+    AUserGrantedNothingSearchesNoRoute(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_searching_routes(
+    scenario: RouteStep,
+    adapter: DeploymentAdapter,
+    engine: ExtendedAsyncSAEngine,
+) -> None:
+    await run_scenario(scenario, adapter, engine)

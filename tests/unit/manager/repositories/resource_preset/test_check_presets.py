@@ -126,7 +126,7 @@ class TestCheckPresetsOccupiedSlots:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -192,7 +192,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -221,7 +221,7 @@ class TestCheckPresetsOccupiedSlots:
         test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name"""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -262,7 +262,7 @@ class TestCheckPresetsOccupiedSlots:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policies and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -314,7 +314,7 @@ class TestCheckPresetsOccupiedSlots:
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
         test_user_uuid: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID"""
         group_id = uuid.uuid4()
 
@@ -346,7 +346,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Get group name from group ID"""
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
@@ -365,7 +365,7 @@ class TestCheckPresetsOccupiedSlots:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -402,7 +402,7 @@ class TestCheckPresetsOccupiedSlots:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key"""
         access_key = AccessKey(f"test-ak-{uuid.uuid4().hex[:8]}")
 
@@ -562,7 +562,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         mock_config_provider: MagicMock,
-    ) -> AsyncGenerator[ResourcePresetRepository, None]:
+    ) -> AsyncGenerator[ResourcePresetRepository]:
         """Create ResourcePresetRepository instance"""
         repo = ResourcePresetRepository(
             db=db_with_cleanup,
@@ -1328,7 +1328,7 @@ class TestCheckPresetsZeroValues:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -1393,7 +1393,7 @@ class TestCheckPresetsZeroValues:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-zero-{uuid.uuid4().hex[:8]}"
 
@@ -1421,7 +1421,7 @@ class TestCheckPresetsZeroValues:
         test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-zero-{uuid.uuid4().hex[:8]}"
 
@@ -1461,7 +1461,7 @@ class TestCheckPresetsZeroValues:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policies and return policy name."""
         policy_name = f"test-policy-zero-{uuid.uuid4().hex[:8]}"
 
@@ -1511,7 +1511,7 @@ class TestCheckPresetsZeroValues:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -1548,7 +1548,7 @@ class TestCheckPresetsZeroValues:
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
         test_user_uuid: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -1580,7 +1580,7 @@ class TestCheckPresetsZeroValues:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"test-ak-{uuid.uuid4().hex[:8]}")
 
@@ -1622,7 +1622,7 @@ class TestCheckPresetsZeroValues:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         mock_config_provider: MagicMock,
-    ) -> AsyncGenerator[ResourcePresetRepository, None]:
+    ) -> AsyncGenerator[ResourcePresetRepository]:
         """Create ResourcePresetRepository instance with real cache."""
         repo = ResourcePresetRepository(
             db=db_with_cleanup,

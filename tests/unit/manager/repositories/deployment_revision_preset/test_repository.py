@@ -113,7 +113,7 @@ def _slots(*entries: tuple[str, str]) -> list[PresetResourceSlotCreator]:
 @pytest.fixture
 async def database(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         global_entity_ids,
         [

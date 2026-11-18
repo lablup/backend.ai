@@ -2,19 +2,19 @@
 
 [배경](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
 
-시나리오: 미완성 3 / 10
+시나리오: 완성
 
 - ops 구성 (5)
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - get: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✓
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (5)
   - admin_preview: 성공 있음 2 · 거부 있음 2 (global_scope)
   - create: 성공 있음 4 · 거부 있음 4 (global_scope)
   - execute_preset: 성공 있음 3 · 거부 있음 4 (single_entity)
-  - partial_bulk_update: 성공 있음 3 · 거부 없음 (partial_bulk): SCENARIO-GAP
+  - partial_bulk_update: 성공 있음 4 · 거부 있음 1 (partial_bulk)
   - update: 성공 있음 6 · 거부 있음 3 (single_entity)
 
 **batch_load_by_ids**
@@ -23,6 +23,7 @@
 |---|---|
 | [프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다](#loading-loading-an-empty-id-list-answers-an-empty-list) | 성공 |
 | [프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같습니다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | 성공 |
+| [아무 권한도 없는 사용자가 프리셋 id 를 한 번에 조회하면, 권한 부족으로 거부됩니다](#loading-a-user-granted-nothing-may-not-load-presets-by-ids) | 거부 |
 
 **get**
 
@@ -37,7 +38,9 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
+| [purge 권한을 받은 사용자가 프리셋 하나와 없는 id 하나를 한 번에 purge 하면, 프리셋은 삭제되기 전 모습으로 오고 없는 id 는 권한 검사의 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-purge-purges-only-what-it-may) | 성공 |
 | [superadmin 이 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+| [프리셋이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging-a-call-carrying-no-user-may-not-purge-several-presets) | 거부 |
 
 **purge**
 
@@ -98,7 +101,9 @@
 |---|---|
 | [superadmin 이 프리셋 여럿을 한 번에 수정하며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 수정됩니다](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
+| [update 권한을 받은 사용자가 프리셋 하나와 없는 id 하나를 한 번에 수정하면, 프리셋은 새 설명으로 오고 없는 id 는 권한 검사의 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-update-edits-only-what-it-may) | 성공 |
 | [superadmin 이 프리셋 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
+| [프리셋이 있고 사용자 컨텍스트 없이 설명을 한 번에 수정하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_editing-a-call-carrying-no-user-may-not-edit-several-presets) | 거부 |
 
 **update**
 
@@ -179,6 +184,33 @@ Then
   - [0]: 1번째로 요청한 id 의 프리셋 전체와 같다
   - [1]: 2번째로 요청한 id 의 프리셋 전체와 같다
   - [2] = None
+
+<a id="loading-a-user-granted-nothing-may-not-load-presets-by-ids"></a>
+
+#### [a-user-granted-nothing-may-not-load-presets-by-ids](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_loading.py): pass
+
+아무 권한도 없는 사용자가 프리셋 id 를 한 번에 조회하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 프리셋 2개와, user 한 명
+  - 질의 프리셋 wanted-1
+  - 질의 프리셋 other-1
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- PrometheusQueryPresetAdapter.batch_load_by_ids: user-1이 미리 저장한 프리셋 2개의 id 와 없는 id 하나를 한 번에 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### get
 
@@ -311,6 +343,40 @@ Then
   - failed[1].id: 대상 프리셋의 id 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
+<a id="partial_bulk_purging-a-user-granted-purge-purges-only-what-it-may"></a>
+
+#### [a-user-granted-purge-purges-only-what-it-may](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
+
+purge 권한을 받은 사용자가 프리셋 하나와 없는 id 하나를 한 번에 purge 하면, 프리셋은 삭제되기 전 모습으로 오고 없는 id 는 권한 검사의 이유로 실패 목록에 옵니다
+
+Given
+
+- 프리셋 1개와, 프리셋에 HARD_DELETE 권한을 받은 user 한 명
+  - 질의 프리셋 wanted-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_purge: user-1이 프리셋 1개 와 없는 id 하나를 한 번에 purge 합니다
+
+Then
+
+- 권한을 받은 프리셋은 삭제되기 전 모습으로 오고, 권한이 없는 항목은 권한 검사의 이유로 실패 목록에 옵니다
+  - successes count = 1
+  - failed count = 1
+  - successes[0]: 대상 프리셋 전체와 같다
+  - failed[0].id: 요청에 넣은 없는 id 와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+
 <a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
 
 #### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
@@ -346,6 +412,36 @@ Then
   - successes[1]: 대상 프리셋 전체와 같다
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-a-call-carrying-no-user-may-not-purge-several-presets"></a>
+
+#### [a-call-carrying-no-user-may-not-purge-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
+
+프리셋이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 프리셋 1개와, user 한 명
+  - 질의 프리셋 wanted-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_purge: 사용자 컨텍스트 없이 프리셋을 한 번에 purge 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### purge
 
@@ -1330,6 +1426,41 @@ Then
   - failed[1].id: 대상 프리셋의 id 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
+<a id="partial_bulk_editing-a-user-granted-update-edits-only-what-it-may"></a>
+
+#### [a-user-granted-update-edits-only-what-it-may](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
+
+update 권한을 받은 사용자가 프리셋 하나와 없는 id 하나를 한 번에 수정하면, 프리셋은 새 설명으로 오고 없는 id 는 권한 검사의 이유로 실패 목록에 옵니다
+
+Given
+
+- 프리셋 1개와, 프리셋에 UPDATE 권한을 받은 user 한 명
+  - 질의 프리셋 wanted-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 1개의 설명을 한 번에 수정합니다 와 없는 id 하나
+
+Then
+
+- 수정된 프리셋은 새 설명을 실어 오고, 권한이 없는 항목은 권한 검사의 이유로 실패 목록에 옵니다
+  - successes count = 1
+  - successes[0]: 새 설명을 실은 대상 프리셋 전체와 같다
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id 와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
@@ -1365,6 +1496,36 @@ Then
   - successes[1]: 새 설명을 실은 대상 프리셋 전체와 같다
   - successes[1].updated_at: 이 실행이 쓴 시각
   - failed = []
+
+<a id="partial_bulk_editing-a-call-carrying-no-user-may-not-edit-several-presets"></a>
+
+#### [a-call-carrying-no-user-may-not-edit-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
+
+프리셋이 있고 사용자 컨텍스트 없이 설명을 한 번에 수정하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 프리셋 1개와, user 한 명
+  - 질의 프리셋 wanted-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update: 사용자 컨텍스트 없이 프리셋 설명을 한 번에 수정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### update
 

@@ -28,7 +28,9 @@ class ReservoirRegistryNode(BaseResponseModel):
     name: str = Field(description="Registry name")
     endpoint: str = Field(description="Reservoir endpoint URL")
     access_key: str = Field(description="Access key for authentication")
-    secret_key: str = Field(description="Secret key for authentication")
+    secret_key: str = Field(
+        description="Secret key for authentication. Masked unless the caller is a superadmin."
+    )
     api_version: str = Field(description="API version string")
 
 

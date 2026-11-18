@@ -7,17 +7,10 @@ from pprint import pformat
 from typing import Any
 
 import aiodocker
+import trafaret as t
 
 from ai.backend.accelerator.furiosa import __version__
-from ai.backend.common.asyncio import run_in_executor_with_context
-
-from .warboy_api import WarboyAPI
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -32,6 +25,7 @@ from ai.backend.agent.stats import (
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -42,6 +36,8 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
+
+from .warboy_api import WarboyAPI
 
 PREFIX = "warboy"
 
@@ -78,8 +74,10 @@ class WarboyPlugin(AbstractComputePlugin):
 
     _rbln_stat_path: str
     _all_devices: list[WarboyDevice] | None
+    _host_ipc: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -186,7 +184,7 @@ class WarboyPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [{"Name": "memlock", "Hard": -1, "Soft": -1}],
                 "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "0"},
                 "Devices": [

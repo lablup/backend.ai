@@ -79,7 +79,7 @@ class TestVfolderSearchUserVfolders:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -115,7 +115,7 @@ class TestVfolderSearchUserVfolders:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
@@ -370,7 +370,7 @@ class TestVfolderSearchUserVfolders:
     async def mixed_ownership_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create a user with both USER-owned and GROUP-owned vfolders."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
@@ -601,7 +601,7 @@ class TestVfolderSearchUserVfolders:
     async def permission_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create two users where user_a owns vfolders and user_b has permission on one of them.
 
         - vfolder_owned: owned by user_a

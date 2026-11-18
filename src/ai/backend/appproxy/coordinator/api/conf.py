@@ -1,4 +1,5 @@
 import logging
+import secrets
 import uuid
 from collections.abc import Iterable
 
@@ -34,7 +35,9 @@ async def conf_v2(
     root_ctx: RootContext = request.app["_root.context"]
     if not root_ctx.local_config.proxy_coordinator.allow_unauthorized_configure_request:
         token_to_evaluate = request.headers.get("X-BackendAI-Token")
-        if token_to_evaluate != root_ctx.local_config.secrets.api_secret:
+        if not token_to_evaluate or not secrets.compare_digest(
+            token_to_evaluate.encode(), root_ctx.local_config.secrets.api_secret.encode()
+        ):
             raise AuthorizationFailed("Unauthorized access")
 
     if not params.session.id or not params.session.access_key:
@@ -44,7 +47,6 @@ async def conf_v2(
         token_id = uuid.uuid4()
         token = Token.create(
             token_id,
-            params.login_session_token,
             params.kernel_host,
             params.kernel_port,
             params.session.id,
@@ -54,7 +56,7 @@ async def conf_v2(
             params.session.domain_name,
         )
         sess.add(token)
-        log.debug("build token with body {}", params.model_dump())
+        log.debug("built a token for session {}", params.session.id)
 
         return PydanticResponse(TokenResponseModel(token=str(token_id)))
 

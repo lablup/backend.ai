@@ -2,8 +2,6 @@ from pydantic import Field
 
 from ai.backend.common.types import BackendAISchema
 
-_DEFAULT_TOKEN_SECRET = "BACKEND_AI_TOKEN_SECRET"
-
 
 class TOTPConfig(BackendAISchema):
     issuer: str = Field(
@@ -24,8 +22,11 @@ class TOTPConfig(BackendAISchema):
         ),
     )
     token_secret: str = Field(
-        default=_DEFAULT_TOKEN_SECRET,
-        description=("Secret used when creating TOTP registration token for anonymous users."),
+        min_length=32,
+        description=(
+            "Secret used when creating TOTP registration token for anonymous users. "
+            "Must contain at least 32 characters."
+        ),
     )
     token_lifetime: int = Field(
         default=300,

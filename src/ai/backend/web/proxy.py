@@ -27,7 +27,7 @@ from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
-from ai.backend.common.middlewares.exception import is_client_disconnect
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.config.unified import WebServerUnifiedConfig
@@ -45,7 +45,6 @@ from .auth import (
     get_anonymous_session,
     get_api_session,
 )
-from .stats import WebStats
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -219,12 +218,17 @@ def _strip_route_prefix(request: web.Request, *, prefix: str) -> str | None:
     routes without a captured name fall back to stripping the URL prefix.
     """
     path = request.match_info.get("path", None)
-    if path is not None:
-        return path
-    request_path = request.path
-    if request_path.startswith(prefix):
-        return request_path.removeprefix(prefix)
-    return None
+    if path is None and request.path.startswith(prefix):
+        path = request.path.removeprefix(prefix)
+    _reject_dot_segments(path)
+    return path
+
+
+def _reject_dot_segments(path: str | None) -> None:
+    # The route matched the still-encoded path, but `path` is decoded: a `..` here makes the
+    # upstream URL collapse onto a path the route never allowed.
+    if path is not None and any(segment in (".", "..") for segment in path.split("/")):
+        raise InvalidAPIParameters("The path must not contain '.' or '..' segments.")
 
 
 def _reject_disabled_signup(request: web.Request, path: str | None) -> None:
@@ -285,8 +289,6 @@ async def _run_proxy_request(
     Exactly one of ``endpoint_pool`` / ``static_endpoint`` is given; see :func:`_send_upstream`.
     ``jwt_token`` is sent as ``X-BackendAI-Token``.
     """
-    stats: WebStats = frontend_rqst.app["stats"]
-    stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     open_session = get_anonymous_session if is_anonymous else get_api_session
     http_headers_to_forward_extra = http_headers_to_forward_extra or []
 
@@ -347,15 +349,21 @@ async def _run_proxy_request(
                     reason=backend_resp.reason,
                     headers=frontend_resp_hdrs,
                 )
-                await frontend_resp.prepare(frontend_rqst)
                 try:
-                    while True:
-                        chunk = await backend_resp.read(CHUNK_SIZE)
-                        if not chunk:
-                            break
-                        await frontend_resp.write(chunk)
-                finally:
-                    await frontend_resp.write_eof()
+                    await frontend_resp.prepare(frontend_rqst)
+                    try:
+                        while True:
+                            chunk = await backend_resp.read(CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            await frontend_resp.write(chunk)
+                    finally:
+                        await frontend_resp.write_eof()
+                except ConnectionResetError as e:
+                    # Not raised, so the endpoint pool does not count a client disconnect.
+                    if is_client_disconnect(frontend_rqst, e):
+                        return client_closed_response()
+                    raise
                 return frontend_resp
 
     try:
@@ -543,9 +551,8 @@ async def web_plugin_handler(
     It also configures the domain in the json body for "auth/signup" requests.
     """
     path = frontend_rqst.match_info["path"]
+    _reject_dot_segments(path)
     _reject_disabled_signup(frontend_rqst, path)
-    stats: WebStats = frontend_rqst.app["stats"]
-    stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
     config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     open_session = get_anonymous_session if is_anonymous else get_api_session
 
@@ -577,15 +584,21 @@ async def web_plugin_handler(
                     reason=backend_resp.reason,
                     headers=frontend_resp_hdrs,
                 )
-                await frontend_resp.prepare(frontend_rqst)
                 try:
-                    while True:
-                        chunk = await backend_resp.read(CHUNK_SIZE)
-                        if not chunk:
-                            break
-                        await frontend_resp.write(chunk)
-                finally:
-                    await frontend_resp.write_eof()
+                    await frontend_resp.prepare(frontend_rqst)
+                    try:
+                        while True:
+                            chunk = await backend_resp.read(CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            await frontend_resp.write(chunk)
+                    finally:
+                        await frontend_resp.write_eof()
+                except ConnectionResetError as e:
+                    # Not raised, so the endpoint pool does not count a client disconnect.
+                    if is_client_disconnect(frontend_rqst, e):
+                        return client_closed_response()
+                    raise
                 return frontend_resp
 
     try:
@@ -653,13 +666,7 @@ async def websocket_handler(
     # Exactly one of endpoint_pool / static_endpoint must be provided. The
     # Apollo Router and pipeline upstreams are not (yet) managed by a
     # healthy-endpoint pool, so their callers hand a chosen URL directly.
-    stats: WebStats = request.app["stats"]
-    stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info.get("path", None)
-    if path is None:
-        request_path = request.path
-        if request_path.startswith("/func"):
-            path = request_path.removeprefix("/func")
+    path = _strip_route_prefix(request, prefix="/func")
     session = await get_session(request)
     app = request.query.get("app")
 

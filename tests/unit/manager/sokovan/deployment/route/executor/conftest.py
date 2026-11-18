@@ -225,16 +225,6 @@ def provisioning_route_with_session() -> RouteData:
 
 
 @pytest.fixture
-def provisioning_routes_multiple() -> list[RouteData]:
-    """Multiple PROVISIONING routes."""
-    endpoint_id = DeploymentID(uuid4())
-    return [
-        _create_route_data(deployment_id=endpoint_id, status=RouteStatus.PROVISIONING),
-        _create_route_data(deployment_id=endpoint_id, status=RouteStatus.PROVISIONING),
-    ]
-
-
-@pytest.fixture
 def running_route() -> RouteData:
     """Single RUNNING route."""
     return _create_route_data(
@@ -373,12 +363,4 @@ def cleanup_config_unhealthy_only() -> MagicMock:
     """Cleanup config that targets UNHEALTHY routes."""
     config = MagicMock()
     config.cleanup_target_statuses = [RouteHealthStatus.UNHEALTHY]
-    return config
-
-
-@pytest.fixture
-def cleanup_config_unhealthy_and_degraded() -> MagicMock:
-    """Cleanup config that targets UNHEALTHY and DEGRADED routes."""
-    config = MagicMock()
-    config.cleanup_target_statuses = [RouteHealthStatus.UNHEALTHY, RouteHealthStatus.DEGRADED]
     return config

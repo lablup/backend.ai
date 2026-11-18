@@ -37,7 +37,7 @@ class TestReservoirRegistryRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -52,7 +52,7 @@ class TestReservoirRegistryRepository:
     async def sample_registry_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample Reservoir registry directly in DB and return its ID"""
         registry_id = uuid.uuid4()
 
@@ -83,7 +83,7 @@ class TestReservoirRegistryRepository:
     async def sample_registries_for_ordering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample Reservoir registries with predictable names for ordering tests"""
         registry_ids = []
         names = ["alpha-registry", "beta-registry", "gamma-registry", "delta-registry"]
@@ -117,7 +117,7 @@ class TestReservoirRegistryRepository:
     async def sample_registries_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample Reservoir registries for pagination testing"""
         registry_ids = []
 
@@ -150,7 +150,7 @@ class TestReservoirRegistryRepository:
     async def reservoir_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ReservoirRegistryRepository, None]:
+    ) -> AsyncGenerator[ReservoirRegistryRepository]:
         """Create ReservoirRegistryRepository instance with database"""
         repo = ReservoirRegistryRepository(
             db=db_with_cleanup,

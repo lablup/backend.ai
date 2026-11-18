@@ -14,6 +14,7 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.write import (
     V2ResourcePolicyWriteOps,
 )
@@ -29,8 +30,8 @@ class FullDomainCreatorResult:
     model_store_project: ProjectData
 
 
-class V2DomainWriteOps(V2ResourcePolicyWriteOps):
-    """The resource policy write ops plus provisioning a domain."""
+class V2DomainWriteOps(V2RelationWriteOps, V2ResourcePolicyWriteOps):
+    """The resource policy and relation write ops plus provisioning a domain."""
 
     async def create_domain(self, creator: DomainCreator) -> FullDomainCreatorResult:
         """Provision a domain: the row, the roles its scope's presets call for, and the

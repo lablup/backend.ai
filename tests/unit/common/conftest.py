@@ -2,37 +2,25 @@ from __future__ import annotations
 
 import random
 import secrets
-import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
-    ValkeyArtifactDownloadTrackingClient,
-)
-from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.defs import (
-    REDIS_LIVE_DB,
-    REDIS_RATE_LIMIT_DB,
-    REDIS_STATISTICS_DB,
-    REDIS_STREAM_DB,
-)
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import RedisTarget, ValkeyTarget
+from ai.backend.common.types import RedisTarget
 
 if TYPE_CHECKING:
-    from ai.backend.testutils.bootstrap import EtcdContainerFixture, RedisContainerFixture
+    from ai.backend.testutils.bootstrap import RedisContainerFixture
 
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    ETCD_PASSWORD,
+    ETCD_USER,
     etcd_container,
     redis_container,
-    sync_file_lock,
 )
 
 pytest_plugins = [
@@ -75,83 +63,6 @@ def test_node_id() -> str:
 
 
 @pytest.fixture
-async def test_valkey_live(
-    redis_container: RedisContainerFixture,  # noqa: F811
-) -> AsyncIterator[ValkeyLiveClient]:
-    hostport_pair: HostPortPairModel = redis_container[1]
-    valkey_target = ValkeyTarget(
-        addr=hostport_pair.address,
-    )
-    client = await ValkeyLiveClient.create(
-        valkey_target,
-        human_readable_name="test.live",
-        db_id=REDIS_LIVE_DB,
-    )
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@pytest.fixture
-async def test_valkey_stream(
-    redis_container: RedisContainerFixture,  # noqa: F811
-) -> AsyncIterator[ValkeyStreamClient]:
-    hostport_pair: HostPortPairModel = redis_container[1]
-    valkey_target = ValkeyTarget(
-        addr=hostport_pair.address,
-    )
-    client = await ValkeyStreamClient.create(
-        valkey_target,
-        human_readable_name="event_producer.stream",
-        db_id=REDIS_STREAM_DB,
-        pubsub_channels={"test-broadcast"},
-    )
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@pytest.fixture
-async def test_valkey_rate_limit(
-    redis_container: RedisContainerFixture,  # noqa: F811
-) -> AsyncIterator[ValkeyRateLimitClient]:
-    hostport_pair: HostPortPairModel = redis_container[1]
-    valkey_target = ValkeyTarget(
-        addr=hostport_pair.address,
-    )
-    client = await ValkeyRateLimitClient.create(
-        valkey_target,
-        human_readable_name="test.rate_limit",
-        db_id=REDIS_RATE_LIMIT_DB,
-    )
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@pytest.fixture
-async def test_valkey_artifact(
-    redis_container: RedisContainerFixture,  # noqa: F811
-) -> AsyncIterator[ValkeyArtifactDownloadTrackingClient]:
-    hostport_pair: HostPortPairModel = redis_container[1]
-    valkey_target = ValkeyTarget(
-        addr=hostport_pair.address,
-    )
-    client = await ValkeyArtifactDownloadTrackingClient.create(
-        valkey_target,
-        human_readable_name="test.artifact",
-        db_id=REDIS_STATISTICS_DB,
-    )
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@pytest.fixture
 async def test_valkey_stream_mq(
     redis_container: RedisContainerFixture,  # noqa: F811
     test_node_id: str,
@@ -189,45 +100,24 @@ def test_ns() -> str:
 
 
 @pytest.fixture
-async def gateway_etcd(
-    etcd_container: EtcdContainerFixture,  # noqa: F811
+async def etcd(
+    etcd_container: tuple[str, HostPortPairModel],  # noqa: F811
     test_ns: str,
 ) -> AsyncIterator[AsyncEtcd]:
     async with AsyncEtcd(
         addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={
-            ConfigScopes.GLOBAL: "",
+            ConfigScopes.GLOBAL: "global",
+            ConfigScopes.SGROUP: "sgroup/testing",
+            ConfigScopes.NODE: "node/i-test",
         },
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
     ) as etcd:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
+        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         yield etcd
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-
-
-@pytest.fixture
-def allow_and_block_list() -> tuple[set[str], ...]:
-    return {"cuda"}, {"cuda_mock"}
-
-
-@pytest.fixture
-def allow_and_block_list_has_union() -> tuple[set[str], ...]:
-    return {"cuda"}, {"cuda"}
-
-
-@pytest.fixture
-def mock_authenticated_request() -> MagicMock:
-    mock_request = MagicMock()
-    mock_request["user"] = {
-        "uuid": uuid.uuid4(),
-        "role": "user",
-        "email": "test@email.com",
-        "domain_name": "default",
-    }
-    mock_request["keypair"] = {
-        "access_key": "TESTKEY",
-        "resource_policy": {"allowed_vfolder_hosts": ["local"]},
-    }
-    vfolder_id = str(uuid.uuid4())
-    mock_request.match_info = {"vfolder_id": vfolder_id}
-    return mock_request
+        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
+        await etcd.delete_prefix("", scope=ConfigScopes.NODE)

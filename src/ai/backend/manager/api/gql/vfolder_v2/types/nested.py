@@ -31,6 +31,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
@@ -175,7 +176,9 @@ class VFolderOwnershipInfoGQL:
         description="Email of the user who originally created this virtual folder.",
     )
 
-    @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")  # type: ignore[misc]
+    @gql_resolver(
+        description="The user who owns this virtual folder. Null for project-owned folders."
+    )
     async def user(
         self,
         info: Info[StrawberryGQLContext],
@@ -190,9 +193,9 @@ class VFolderOwnershipInfoGQL:
             return None
         return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
-    @gql_field(
+    @gql_resolver(
         description="The project that owns this virtual folder. Null for user-owned folders."
-    )  # type: ignore[misc]
+    )
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -207,7 +210,7 @@ class VFolderOwnershipInfoGQL:
             return None
         return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
-    @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
+    @gql_resolver(description="The user who originally created this virtual folder.")
     async def creator(
         self,
         info: Info[StrawberryGQLContext],

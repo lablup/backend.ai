@@ -122,7 +122,7 @@ def _keypair(access_key: str, policy: str, *, is_default: bool, is_active: bool)
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [

@@ -1,8 +1,8 @@
 [etcd]
 namespace = "local"
 addr = { host = "127.0.0.1", port = 8120 }
-user = ""
-password = ""
+user = "root"
+password = "develove"
 
 
 [agent]
@@ -10,6 +10,8 @@ mode = "docker"
 # SFTP agent uses a distinct RPC port (primary is 6001 in the template,
 # rewritten to 6011 by the dev installer).
 rpc-listen-addr = { host = "127.0.0.1", port = 6013 }
+rpc-auth-manager-public-key = "fixtures/manager/manager.key"
+rpc-auth-agent-keypair = "fixtures/agent/agent.key_secret"
 # metric API service address — must not collide with the primary agent's 6003.
 service-addr = { host = "0.0.0.0", port = 6023 }
 ssl-enabled = false

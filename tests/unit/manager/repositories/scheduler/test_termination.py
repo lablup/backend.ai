@@ -74,7 +74,7 @@ class TestKernelTermination:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -122,7 +122,7 @@ class TestKernelTermination:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -145,7 +145,7 @@ class TestKernelTermination:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name"""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -172,7 +172,7 @@ class TestKernelTermination:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -192,7 +192,7 @@ class TestKernelTermination:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test user resource policy and return policy name"""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -213,7 +213,7 @@ class TestKernelTermination:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test keypair resource policy and return policy name"""
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
 
@@ -242,7 +242,7 @@ class TestKernelTermination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -268,7 +268,7 @@ class TestKernelTermination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key"""
         access_key = AccessKey(f"AKTEST{uuid.uuid4().hex[:14]}")
         secret_key = SecretKey(f"SK{uuid.uuid4().hex[:38]}")
@@ -293,7 +293,7 @@ class TestKernelTermination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID"""
         group_id = uuid.uuid4()
 
@@ -320,7 +320,7 @@ class TestKernelTermination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[AgentId, None]:
+    ) -> AsyncGenerator[AgentId]:
         """Create test agent and return agent ID"""
         agent_id = AgentId(f"test-agent-{uuid.uuid4().hex[:8]}")
 
@@ -350,7 +350,7 @@ class TestKernelTermination:
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
-    ) -> AsyncGenerator[SessionId, None]:
+    ) -> AsyncGenerator[SessionId]:
         """Create test session in TERMINATING status and return session ID"""
         session_id = SessionId(uuid.uuid4())
 
@@ -391,7 +391,7 @@ class TestKernelTermination:
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test kernel in TERMINATING status and return kernel ID"""
         kernel_id = uuid.uuid4()
 
@@ -442,7 +442,7 @@ class TestKernelTermination:
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test kernel in CANCELLED status and return kernel ID"""
         kernel_id = uuid.uuid4()
 
@@ -493,7 +493,7 @@ class TestKernelTermination:
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test kernel in TERMINATED status with cluster_idx=1 and return kernel ID"""
         kernel_id = uuid.uuid4()
 
@@ -611,7 +611,7 @@ class TestKernelTermination:
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test kernel in RUNNING status and return kernel ID"""
         kernel_id = uuid.uuid4()
 

@@ -40,6 +40,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import ArtifactAvailability
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
@@ -103,7 +104,7 @@ from .types import (
         added_version="25.14.0",
         description="Query artifacts with optional filtering, ordering, and pagination. Returns artifacts that are available in the system, discovered through scanning external registries like HuggingFace or Reservoir. By default, only shows ALIVE (non-deleted) artifacts. Use filters to narrow down results by type, name, registry, or availability. Supports cursor-based pagination for efficient browsing of large datasets.",
     )
-)  # type: ignore[misc]
+)
 async def artifacts(
     info: Info[StrawberryGQLContext],
     filter: ArtifactFilter | None = None,
@@ -162,7 +163,7 @@ async def artifacts(
         added_version="25.14.0",
         description="Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.",
     )
-)  # type: ignore[misc]
+)
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
     artifact_id = parse_uuid(id)
     artifact_node = await info.context.adapters.artifact.get(artifact_id)
@@ -185,7 +186,7 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
         added_version="25.14.0",
         description="Query artifact revisions with optional filtering, ordering, and pagination. Returns specific versions/revisions of artifacts. Each revision represents a specific version of an artifact with its own status, file data, and metadata. Use filters to find revisions by status, version, or artifact ID. Supports cursor-based pagination for efficient browsing.",
     )
-)  # type: ignore[misc]
+)
 async def artifact_revisions(
     info: Info[StrawberryGQLContext],
     filter: ArtifactRevisionFilter | None = None,
@@ -237,7 +238,7 @@ async def artifact_revisions(
         added_version="25.14.0",
         description="Retrieve a specific artifact revision by its ID. Returns detailed information about the revision including its status, version, file size, and README content.",
     )
-)  # type: ignore[misc]
+)
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
     revision_node = await info.context.adapters.artifact.get_revision(parse_uuid(id))
     return make_artifact_revision_from_node(revision_node)
@@ -755,9 +756,9 @@ async def scan_artifact_models(
 )
 async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
-) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
+) -> AsyncGenerator[ArtifactStatusChangedPayload]:
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator
 
 
@@ -773,7 +774,7 @@ async def artifact_status_changed(
 )
 async def artifact_import_progress_updated(
     artifact_revision_id: ID,
-) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:
+) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload]:
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

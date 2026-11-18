@@ -8,6 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     AppConfigDefinitionNode,
@@ -15,6 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 )
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
@@ -30,6 +32,10 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
     in_language,
+)
+from bai_scenario.components.app_config import (
+    SomeoneGrantedInGlobal,
+    names_of,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import TestSeedAllowListEntry
@@ -146,17 +152,30 @@ class TwoDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
-    """설정 정의 둘과 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명."""
+    """설정 정의 둘과 호출자를 준비한다.
+
+    ``granted``가 있으면 호출자가 global 스코프에서 그 권한을 받는다.
+    """
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
+        if self.granted:
+            who = Says(
+                f"global 스코프에서 설정 정의에 대한 {names_of(self.granted)} 권한을 "
+                "받은 일반 사용자 한 명",
+                english=(
+                    "one regular user granted the "
+                    f"{names_of(self.granted)} permission on config definitions in the global scope"
+                ),
+            )
+        else:
+            who = _who(self.role)
         return Says(
-            f"설정 정의 둘과, {_who(self.role)}",
-            english=(
-                f"two config definitions, and {in_language(_who(self.role), Language.ENGLISH)}"
-            ),
+            f"설정 정의 둘과, {who}",
+            english=(f"two config definitions, and {in_language(who, Language.ENGLISH)}"),
         )
 
     @override
@@ -164,7 +183,12 @@ class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
         home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         first = await seeding.creating(TestSeedDefinition(name_hint="first"))
         second = await seeding.creating(TestSeedDefinition(name_hint="second"))
-        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.granted:
+            caller = await seeding.within(
+                SomeoneGrantedInGlobal(home, AppConfigDefinitionEntityType(), granted=self.granted)
+            )
+        else:
+            caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoDefinitionsAndACaller(
             caller=seeding.made(caller),
             first=seeding.made(first),

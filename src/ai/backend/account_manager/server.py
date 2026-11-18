@@ -30,7 +30,7 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.http import (
     SystemMetricUpdater,
     build_api_metric_middleware,
@@ -41,7 +41,6 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -112,13 +111,13 @@ async def exception_middleware(
             ) from ex
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest from ex
-    except asyncio.CancelledError as e:
+    except asyncio.CancelledError:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
         log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
-        raise e
+        raise
     except Exception as e:
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+        log.exception("Uncaught exception in HTTP request handlers")
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc()) from e
         raise InternalServerError() from e
@@ -201,22 +200,7 @@ def build_root_app(
         ]
     )
 
-    etcd_credentials = None
-    if local_config.etcd.user:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-    etcd = AsyncEtcd(
-        HostPortPair(host=local_config.etcd.addr.host, port=local_config.etcd.addr.port),
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
-    )
+    etcd = AsyncEtcd.create_from_config(local_config.etcd.to_dataclass())
     root_ctx = RootContext()
     root_ctx.etcd = etcd
     root_ctx.local_config = local_config
@@ -248,7 +232,9 @@ def build_root_app(
                 yield
         except Exception as e:
             exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+            log.exception(
+                "Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info
+            )
 
     async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
         for cctx in app["_cctx_instances"]:

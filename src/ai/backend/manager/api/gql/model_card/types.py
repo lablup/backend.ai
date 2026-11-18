@@ -111,12 +111,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -274,7 +276,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         description="Timestamp of the last modification to this model card."
     )
 
-    @gql_field(  # type: ignore[misc]
+    @gql_resolver(
         description="The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches."
     )
     async def vfolder(
@@ -289,12 +291,12 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     ):
         return await info.context.data_loaders.vfolder_loader.load(VFolderUUID(self.vfolder_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The domain this model card belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def domain(
         self,
         info: Info[StrawberryGQLContext],
@@ -310,12 +312,12 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
             return None
         return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The project this model card belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -328,12 +330,12 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     ):
         return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The user who created this model card.",
         )
-    )  # type: ignore[misc]
+    )
     async def creator(
         self,
         info: Info[StrawberryGQLContext],
@@ -346,7 +348,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     ):
         return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))
 
-    @gql_field(  # type: ignore[misc]
+    @gql_resolver(
         description="Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card."
     )
     async def available_presets(

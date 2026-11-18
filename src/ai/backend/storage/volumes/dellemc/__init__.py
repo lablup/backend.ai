@@ -199,6 +199,7 @@ class DellEMCOneFSVolume(BaseVolume):
                 password=str(self.config["dell_password"]),
                 api_version=self.config["dell_api_version"],
                 system_name=self.config["dell_system_name"],
+                ssl_context=self.config["dell_verify_ssl"],
             )
         )
 

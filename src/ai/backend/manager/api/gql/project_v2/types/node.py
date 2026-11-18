@@ -20,10 +20,12 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_federation_type,
     gql_field,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
@@ -130,9 +132,9 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         description="Lifecycle information including activation status and timestamps."
     )
 
-    @gql_field(
+    @gql_resolver(
         description="Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
-    )  # type: ignore[misc]
+    )
     async def fair_share(
         self,
         info: Info,
@@ -149,12 +151,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
         return ProjectFairShareGQL.from_pydantic(payload.item)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.0",
             description="Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.",
         )
-    )  # type: ignore[misc]
+    )
     async def active_resource_overview(
         self,
         info: Info,
@@ -164,9 +166,9 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         )
         return ActiveResourceOverviewGQL.from_pydantic(dto)
 
-    @gql_field(
+    @gql_resolver(
         description="Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time."
-    )  # type: ignore[misc]
+    )
     async def usage_buckets(
         self,
         info: Info,
@@ -216,7 +218,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
-    @gql_field(description="The domain this project belongs to.")  # type: ignore[misc]
+    @gql_resolver(description="The domain this project belongs to.")
     async def domain(
         self,
         info: Info,
@@ -241,7 +243,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             raise DomainNotFound(self.organization.domain_name)
         return domain
 
-    @gql_field(description="Users who are members of this project.")  # type: ignore[misc]
+    @gql_resolver(description="Users who are members of this project.")
     async def users(
         self,
         info: Info,
@@ -305,12 +307,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Resource groups this project may schedule on.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_groups(
         self,
         info: Info[StrawberryGQLContext],
@@ -379,12 +381,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Model cards belonging to this project.",
         )
-    )  # type: ignore[misc]
+    )
     async def model_cards(
         self,
         info: Info,
@@ -451,12 +453,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="VFolders auto-mounted into every session created in this project.",
         )
-    )  # type: ignore[misc]
+    )
     async def vfolder_auto_mounts(
         self,
         info: Info,
@@ -511,12 +513,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         )
         return build_vfolder_auto_mount_connection(payload)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="System session environ rows registered in this project, soft-deleted ones included.",
         )
-    )  # type: ignore[misc]
+    )
     async def system_session_environs(
         self,
         info: Info[StrawberryGQLContext],

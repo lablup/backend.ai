@@ -170,7 +170,7 @@ class TestUserCRUD:
         result = await uc.search(request)
 
         assert isinstance(result, SearchUsersResponse)
-        method, url, body = _last_request_call(mock_session)
+        method, _url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert body is not None
         assert body["filter"]["email"]["contains"] == "test"

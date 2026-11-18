@@ -18,8 +18,10 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
 from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant_preset import (
     VALID_AT,
     ManyPresetsAndACaller,
@@ -253,11 +255,43 @@ class OmittingThePageSizeGivesTen(
         return TheFirstPageOfPresets(size=DEFAULT_PAGE)
 
 
+@dataclass(frozen=True)
+class AUserWithoutReadPermissionIsRefused(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-without-read-permission-is-refused-on-search"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "public 에서 런타임 파라미터 조회 권한이 없는 사용자가 검색하면 검색 전체가 거부됩니다",
+            english=(
+                "when a user without read permission on presets in public searches, the whole "
+                "search is refused"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone(reading_in_public=False)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
+        return SearchingEveryPreset()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEveryPreset(),
     AVariantFilterNarrows(),
     AVersionFilterKeepsWhatIsValidThen(),
     OmittingThePageSizeGivesTen(),
+    AUserWithoutReadPermissionIsRefused(),
 ]
 
 

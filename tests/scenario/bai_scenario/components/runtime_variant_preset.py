@@ -49,6 +49,7 @@ from bai_scenario.components.runtime_variant import AVariantAndACaller
 from bai_scenario.components.system import (
     KEPT,
     Kept,
+    lay_a_caller,
     lay_a_public_reader,
     role_named,
 )
@@ -98,6 +99,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     """변형 하나, 해당 변형의 프리셋 하나, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    reading_in_public: bool = True
     preset_target: PresetTarget = PresetTarget.ENV
     value_type: PresetValueType = PresetValueType.STR
     default_value: str | None = None
@@ -105,6 +107,14 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     @override
     def describe(self) -> str:
         who = role_named(self.role)
+        if not self.reading_in_public:
+            return Says(
+                f"변형 하나와 해당 변형의 프리셋 하나, 그리고 아무 권한도 없는 {who} 한 명",
+                english=(
+                    "one variant, one preset of that variant, "
+                    f"and one {in_language(who, Language.ENGLISH)} with no permission"
+                ),
+            )
         return Says(
             f"변형 하나와 해당 변형의 프리셋 하나, 그리고 {who} 한 명",
             english=(
@@ -124,7 +134,11 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
             ),
             variant,
         )
-        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+        caller = (
+            await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
         return APresetAndACaller(seeding.made(variant), seeding.made(preset), seeding.made(caller))
 
 
@@ -161,11 +175,20 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
     """한 변형의 프리셋 여러 개와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    reading_in_public: bool = True
     besides: int = 1
 
     @override
     def describe(self) -> str:
         who = role_named(self.role)
+        if not self.reading_in_public:
+            return Says(
+                f"한 변형의 프리셋 {self.besides + 1}개와 아무 권한도 없는 {who} 한 명",
+                english=(
+                    f"{self.besides + 1} presets of one variant "
+                    f"and one {in_language(who, Language.ENGLISH)} with no permission"
+                ),
+            )
         return Says(
             f"한 변형의 프리셋 {self.besides + 1}개와 {who} 한 명",
             english=(
@@ -181,7 +204,11 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
             await seeding.creating_from(TestSeedRuntimeVariantPreset(), variant)
             for _ in range(self.besides + 1)
         ]
-        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+        caller = (
+            await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
         return ManyPresetsAndACaller(
             variant=seeding.made(variant),
             laid=tuple(seeding.made(one) for one in presets),

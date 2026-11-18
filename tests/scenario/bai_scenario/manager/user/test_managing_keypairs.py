@@ -77,7 +77,6 @@ CREATED_RATE_LIMIT = 30000
 """키를 만드는 요청이 요청 한도를 생략했을 때의 값."""
 
 SSH_PUBLIC_KEY = "ssh-rsa scenario-public-key"
-SSH_PRIVATE_KEY = "scenario-private-key"
 
 
 # ------------------------------------------------------------------ situations
@@ -444,7 +443,6 @@ class RegisteringAnSSHKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
                 AdminRegisterSSHKeypairInput(
                     access_key=key,
                     ssh_public_key=SSH_PUBLIC_KEY,
-                    ssh_private_key=SSH_PRIVATE_KEY,
                 )
             )
             after = await adapter.admin_get_ssh_keypair(key)
@@ -587,7 +585,7 @@ class TestSeededKeyLook:
             Same("is_default", node.is_default, False),
             Same("rate_limit", node.rate_limit, rate_limit),
             Same("resource_policy", node.resource_policy, laid.policy.name),
-            Same("ssh_public_key", node.ssh_public_key, ""),
+            Same("ssh_public_key", node.ssh_public_key, None),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
             Held("user_id", node.user_id, SameAs(laid.target.id, owner)),
@@ -617,7 +615,7 @@ class TestSeededKeyLook:
             Same(f"{at}is_default", node.is_default, True),
             Same(f"{at}rate_limit", node.rate_limit, SERVER_RATE_LIMIT),
             Same(f"{at}resource_policy", node.resource_policy, policy.name),
-            Same(f"{at}ssh_public_key", node.ssh_public_key, ""),
+            Same(f"{at}ssh_public_key", node.ssh_public_key, None),
             Same(f"{at}num_queries", node.num_queries, 0),
             Same(f"{at}last_used", node.last_used, None),
             Held(f"{at}user_id", node.user_id, SameAs(owner.id, owner_says)),
@@ -790,7 +788,7 @@ class TheSSHPublicKey(Then[AKeyOwnerAndACaller, Answer]):
                     Says("대상의 기본 키", english="the default key of the target"),
                 ),
             ),
-            Same("keypair.ssh_public_key", read.payload.keypair.ssh_public_key, ""),
+            Same("keypair.ssh_public_key", read.payload.keypair.ssh_public_key, None),
         ]
 
 
@@ -1299,11 +1297,11 @@ class AGrantedUserRegistersAnothersSSHKey(
     @override
     def describe(self) -> str:
         return Says(
-            "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키와 개인키를 주면, "
-            "형식 검사 없이 덮어쓰고 access key 가 응답으로 옵니다",
+            "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키를 주면, "
+            "형식 검사 없이 공개키를 덮어쓰고 access key 가 응답으로 옵니다",
             english=(
-                "when a user granted READ and UPDATE in the target scope gives a public key "
-                "and a private key, they overwrite the stored one without a format check and "
+                "when a user granted READ and UPDATE in the target scope gives a public key, "
+                "it overwrites the stored public key without a format check and "
                 "the access key comes back"
             ),
         )

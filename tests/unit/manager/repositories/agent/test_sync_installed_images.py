@@ -30,7 +30,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -78,7 +77,7 @@ class TestSyncInstalledImagesIntegration:
     async def valkey_image_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyImageClient, None]:
+    ) -> AsyncGenerator[ValkeyImageClient]:
         """Create ValkeyImageClient with real Redis container."""
         _, redis_addr = redis_container
 
@@ -103,7 +102,7 @@ class TestSyncInstalledImagesIntegration:
     async def valkey_live_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyLiveClient, None]:
+    ) -> AsyncGenerator[ValkeyLiveClient]:
         """Create ValkeyLiveClient with real Redis container."""
         _, redis_addr = redis_container
 
@@ -126,7 +125,7 @@ class TestSyncInstalledImagesIntegration:
     async def valkey_stat_client(
         self,
         redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyStatClient, None]:
+    ) -> AsyncGenerator[ValkeyStatClient]:
         """Create ValkeyStatClient with real Redis container."""
         _, redis_addr = redis_container
 
@@ -159,7 +158,7 @@ class TestSyncInstalledImagesIntegration:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -173,7 +172,6 @@ class TestSyncInstalledImagesIntegration:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,

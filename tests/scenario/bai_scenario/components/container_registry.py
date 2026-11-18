@@ -15,13 +15,20 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
 )
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import AllowedGroupsInput
-from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.common.dto.manager.v2.container_registry.response import (
+    ContainerRegistryNode,
+    ScopedSearchContainerRegistriesPayload,
+)
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
@@ -32,7 +39,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Same,
+    SameAs,
     Says,
     Skipped,
     Then,
@@ -43,6 +52,7 @@ from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.image.registry import (
+    AllowDomain,
     AllowProject,
     AllowProjectAsDefault,
     TestSeedContainerRegistry,
@@ -111,6 +121,8 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
     name_hint: str = "host"
     with_project: bool = False
     allowed: bool = False
+    keeps_registry: bool = False
+    keeps_public: bool = False
 
     @override
     def describe(self) -> str:
@@ -118,9 +130,46 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
         project_en = ", one project" if self.with_project or self.allowed else ""
         allowed_ko = "가 이미 허용돼 있음" if self.allowed else ""
         allowed_en = " already allowed to it" if self.allowed else ""
+        kept_ko = [
+            place
+            for place, given in (("레지스트리", self.keeps_registry), ("public", self.keeps_public))
+            if given
+        ]
+        missed_ko = [
+            place
+            for place, given in (("레지스트리", self.keeps_registry), ("public", self.keeps_public))
+            if not given
+        ]
+        kept_en = [
+            place
+            for place, given in (
+                ("the registry", self.keeps_registry),
+                ("public", self.keeps_public),
+            )
+            if given
+        ]
+        missed_en = [
+            place
+            for place, given in (
+                ("the registry", self.keeps_registry),
+                ("public", self.keeps_public),
+            )
+            if not given
+        ]
+        if not kept_ko:
+            keeping_ko = ""
+            keeping_en = ""
+        elif not missed_ko:
+            keeping_ko = ", 레지스트리와 public 두 범위에 수정 권한을 받은"
+            keeping_en = ", granted update on the registry and on public"
+        else:
+            keeping_ko = f", {kept_ko[0]}에 수정 권한을 받고 {missed_ko[0]}에는 받지 않은"
+            keeping_en = f", granted update on {kept_en[0]} and not on {missed_en[0]}"
         return Says(
-            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명",
-            english=f"one registry{project_en}{allowed_en}, and one {self.role.value}",
+            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명{keeping_ko}",
+            english=(
+                f"one registry{project_en}{allowed_en}, and one {self.role.value}{keeping_en}"
+            ),
         )
 
     @override
@@ -135,11 +184,82 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
             if self.allowed:
                 await seeding.linking(AllowProject(), project, registry)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        if self.keeps_registry or self.keeps_public:
+            await seeding.within(
+                SomeoneKeepingRegistries(
+                    registry, caller, on_registry=self.keeps_registry, on_public=self.keeps_public
+                )
+            )
         return ARegistryAndACaller(
             registry=seeding.made(registry),
             caller=seeding.made(caller),
             project=project_data,
         )
+
+
+@dataclass(frozen=True)
+class SomeoneKeepingRegistries(TestSeedNest[Laid[None]]):
+    """그 사용자에게 지정한 범위에서 레지스트리 수정 권한을 준다."""
+
+    registry: Laid[ContainerRegistryData]
+    someone: Laid[UserData]
+    on_registry: bool = True
+    on_public: bool = True
+
+    @override
+    def kind(self) -> str:
+        held_ko = [
+            place
+            for place, given in (("레지스트리", self.on_registry), ("public", self.on_public))
+            if given
+        ]
+        held_en = [
+            place
+            for place, given in (
+                ("the registry", self.on_registry),
+                ("public", self.on_public),
+            )
+            if given
+        ]
+        return Says(
+            f"{', '.join(held_ko)} 범위에 수정 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted update permission on {', '.join(held_en)}",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        granted: Laid[None] | None = None
+        if self.on_registry:
+            on_registry = seed.creating_from(
+                TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="registry-keeper"),
+                self.registry,
+            )
+            seed.adding(
+                TestSeedPermission(
+                    entity_type=ContainerRegistryEntityType(), permission=Permission.UPDATE
+                ),
+                on_registry,
+            )
+            granted = seed.granting(
+                on_registry, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+            )
+        if self.on_public:
+            in_public = seed.creating_from(
+                TestSeedRole(
+                    lambda _: global_entity_id(GlobalEntityName.PUBLIC),
+                    name_hint="public-registry-keeper",
+                ),
+                self.someone,
+            )
+            seed.adding(
+                TestSeedPermission(entity_type=GlobalEntityType(), permission=Permission.UPDATE),
+                in_public,
+            )
+            granted = seed.granting(
+                in_public, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+            )
+        assert granted is not None
+        return granted
 
 
 @dataclass(frozen=True)
@@ -293,6 +413,90 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
         )
 
 
+@dataclass(frozen=True)
+class RelationsAndACaller:
+    """`home`과 `wanted` 사이의 relation이 검색이 찾는 행이다.
+
+    `wanted`는 만든 순서와 이름순이 어긋나게 심어, 이름순이 id의 어느 방향과도 다르다.
+
+    `outside`는 `home`과 relation이 없어, `home`에서 받은 권한으로는 읽히지 않는다.
+    """
+
+    home: DomainData
+    other_domain: DomainData
+    wanted: tuple[ContainerRegistryData, ...]
+    other_registry: ContainerRegistryData
+    outside: ContainerRegistryData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class RelationsInTwoDomains(Given[TestSeedingSession, RelationsAndACaller]):
+    """도메인 둘과 레지스트리 다섯 사이에 relation 여섯.
+
+    relation은 도메인이 그 레지스트리를 READ로 govern하게 하므로, 검색할 도메인에서 레지스트리
+    조회 권한을 받은 사용자는 그 도메인과 relation이 있는 레지스트리만 읽는다.
+    """
+
+    role: UserRole = UserRole.USER
+    reads_in_domain: bool = True
+
+    @override
+    def describe(self) -> str:
+        if self.reads_in_domain:
+            holds_ko = "그 도메인에서 레지스트리 조회 권한을 받은"
+            holds_en = "granted permission to read registries in that domain"
+        else:
+            holds_ko = "아무 권한도 받지 않은"
+            holds_en = "granted nothing"
+        return Says(
+            "도메인 둘과 레지스트리 다섯 사이에 relation 여섯이 있고, 한 도메인에 속해 "
+            f"{holds_ko} {self.role.value} 한 명이 있습니다. 레지스트리 하나는 그 도메인과 "
+            "relation이 없습니다",
+            english=(
+                "six relations between two domains and five registries, and one "
+                f"{self.role.value} in one of the domains {holds_en}. One registry is not "
+                "related to that domain"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RelationsAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home"))
+        other_domain = await seeding.creating(TestSeedDomain(name_hint="other"))
+        wanted = [
+            await seeding.creating(TestSeedContainerRegistry(name_hint=hint))
+            for hint in ("beta", "alpha", "gamma")
+        ]
+        other_registry = await seeding.creating(TestSeedContainerRegistry(name_hint="other"))
+        outside = await seeding.creating(TestSeedContainerRegistry(name_hint="outside"))
+        for registry in wanted:
+            await seeding.linking(AllowDomain(), home, registry)
+        await seeding.linking(AllowDomain(), home, other_registry)
+        await seeding.linking(AllowDomain(), other_domain, wanted[0])
+        await seeding.linking(AllowDomain(), other_domain, outside)
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.reads_in_domain:
+            await seeding.within(
+                SomeoneAllowingIn(
+                    home,
+                    caller,
+                    scope_of=lambda one: DomainID(one.id),
+                    entity_type=ContainerRegistryEntityType(),
+                    name_hint="read-registries-in-domain",
+                    permissions=(Permission.READ,),
+                )
+            )
+        return RelationsAndACaller(
+            home=seeding.made(home),
+            other_domain=seeding.made(other_domain),
+            wanted=tuple(seeding.made(registry) for registry in wanted),
+            other_registry=seeding.made(other_registry),
+            outside=seeding.made(outside),
+            caller=seeding.made(caller),
+        )
+
+
 async def allowed_project_count(engine: ExtendedAsyncSAEngine) -> int:
     async with engine.begin_readonly_session() as session:
         query = sa.select(sa.func.count()).select_from(AssociationContainerRegistriesGroupsRow)
@@ -335,6 +539,14 @@ class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
         if node is None:
             return [MissingResponse(answered.raised)]
         return [
+            Held[uuid.UUID](
+                "entity_id",
+                node.entity_id,
+                SameAs(
+                    node.id,
+                    Says("응답의 id", english="the id in the response"),
+                ),
+            ),
             Same("url", node.url, self.url),
             Same("registry_name", node.registry_name, self.registry_name),
             Same("type", node.type, self.registry_type),
@@ -371,6 +583,17 @@ class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
         if node.id != laid.registry.id:
             return [Same("id_matches_seeded_registry", node.id == laid.registry.id, True)]
         return [
+            Held[uuid.UUID](
+                "entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry seeded in advance",
+                    ),
+                ),
+            ),
             Same("url", node.url, self.url if self.url is not None else laid.registry.url),
             Same("registry_name", node.registry_name, laid.registry.registry_name),
             Same("type", node.type, laid.registry.type),
@@ -524,3 +747,63 @@ class AddMissingProject(AllowedProjectChange):
     @override
     def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
         return AllowedGroupsModel(add=[str(MISSING_ENTITY_ID)], remove=[])
+
+
+@dataclass(frozen=True)
+class TheWantedRegistriesAreListedByName(
+    Then[RelationsAndACaller, ScopedSearchContainerRegistriesPayload]
+):
+    """검색할 도메인과 relation이 있는 레지스트리 가운데 필터에 맞는 셋이 이름순으로 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "검색할 도메인과 relation이 있는 레지스트리 가운데 필터에 맞는 셋이 이름순으로 각각 "
+            "전체가 반환되고, 필터에 맞지 않는 레지스트리와 검색할 도메인과 relation이 없는 "
+            "레지스트리는 반환되지 않습니다",
+            english=(
+                "the three registries related to the domain to search that match the filter come "
+                "back whole in name order, and neither the registry the filter excludes nor the "
+                "registry not related to the domain to search does"
+            ),
+        )
+
+    @override
+    def look(
+        self,
+        laid: RelationsAndACaller,
+        answered: Answered[ScopedSearchContainerRegistriesPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        expected = sorted(laid.wanted, key=lambda one: one.registry_name)
+        seen: list[Verdict] = [
+            Same("total_count", payload.total_count, len(expected)),
+            Same("items count", len(payload.items), len(expected)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+        came_from = Says(
+            "이름순으로 읽은 찾는 레지스트리", english="the wanted registry in name order"
+        )
+        for i, (node, registry) in enumerate(zip(payload.items, expected, strict=False)):
+            seen += [
+                Held[uuid.UUID](f"items[{i}].id", node.id, SameAs(registry.id, came_from)),
+                Held[uuid.UUID](
+                    f"items[{i}].entity_id", node.entity_id, SameAs(registry.id, came_from)
+                ),
+                Held[str](f"items[{i}].url", node.url, SameAs(registry.url, came_from)),
+                Held[str](
+                    f"items[{i}].registry_name",
+                    node.registry_name,
+                    SameAs(registry.registry_name, came_from),
+                ),
+                Same(f"items[{i}].type", node.type, registry.type),
+                Same(f"items[{i}].project", node.project, registry.project),
+                Same(f"items[{i}].username", node.username, registry.username),
+                Same(f"items[{i}].ssl_verify", node.ssl_verify, registry.ssl_verify),
+                Same(f"items[{i}].is_global", node.is_global, registry.is_global),
+                Same(f"items[{i}].extra", node.extra, registry.extra),
+            ]
+        return seen

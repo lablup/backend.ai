@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
     GetQuotaScopeAction,
@@ -143,7 +144,7 @@ class TestVFSStorageServiceQuotaScope:
             quota_scope_id="scope-1",
         )
 
-        with pytest.raises(RuntimeError, match="Storage manager is not configured"):
+        with pytest.raises(ServerMisconfiguredError, match="Storage manager is not configured"):
             await service_without_storage_manager.get_quota_scope(action)
 
     # =========================================================================
@@ -238,7 +239,7 @@ class TestVFSStorageServiceQuotaScope:
             quota_scope_id="scope-1",
         )
 
-        with pytest.raises(RuntimeError, match="Storage manager is not configured"):
+        with pytest.raises(ServerMisconfiguredError, match="Storage manager is not configured"):
             await service_without_storage_manager.unset_quota_scope(action)
 
     # =========================================================================
@@ -332,5 +333,5 @@ class TestVFSStorageServiceQuotaScope:
         """Test no storage_manager raises RuntimeError."""
         action = SearchQuotaScopesAction()
 
-        with pytest.raises(RuntimeError, match="Storage manager is not configured"):
+        with pytest.raises(ServerMisconfiguredError, match="Storage manager is not configured"):
             await service_without_storage_manager.search_quota_scopes(action)

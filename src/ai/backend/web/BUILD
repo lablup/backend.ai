@@ -84,6 +84,8 @@ resources(
     sources=[
         "**/py.typed",
         "static/**/*",
+        "!static/**/*.js.map",
+        "!static/**/*.css.map",
         "templates/**/*",
     ],
 )

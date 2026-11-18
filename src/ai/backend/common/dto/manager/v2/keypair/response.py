@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SecretKey
 
 __all__ = (
@@ -61,7 +62,13 @@ class KeypairNode(BaseResponseModel):
         description="Name of the resource policy assigned to this keypair."
     )
     ssh_public_key: str | None = Field(
-        default=None, description="The SSH public key associated with this keypair."
+        default=None,
+        description=(
+            "The public key of the owner's default SSH keypair, the same for every keypair "
+            f"of one user. Deprecated since {NEXT_RELEASE_VERSION}. An SSH keypair belongs "
+            "to the user, not to a keypair."
+        ),
+        deprecated=True,
     )
     user_id: UUID = Field(description="UUID of the user who owns this keypair.")
 

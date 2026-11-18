@@ -74,7 +74,7 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, No
                     message=str(e),
                 )
             )
-            raise e
+            raise
         else:
             await self._event_producer.anycast_event(
                 VFolderCloneSuccessEvent(

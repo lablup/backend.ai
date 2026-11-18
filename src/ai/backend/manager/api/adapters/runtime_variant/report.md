@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/runtime_variant/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/runtime_variant/adapter.py)
 
-Scenario: incomplete 4 / 10
+Scenario: incomplete 3 / 10
 
 - built from ops (7)
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
@@ -10,7 +10,7 @@ Scenario: incomplete 4 / 10
   - get: representative success ✓ · representative rejection ✓
   - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - resolve_by_name: representative success ✓ · representative rejection ✓
-  - search: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (3)
   - bulk_delete: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
@@ -62,6 +62,7 @@ Scenario: incomplete 4 / 10
 | [when one of several runtime variants is named in a filter, only the runtime variant of that name is left in the response](#searching-a-name-filter-narrows-the-answer-to-the-variant-it-names) | answered |
 | [when two runtime variants exist and a user granted nothing reads with no filter, both are counted](#searching-a-user-granted-nothing-counts-every-variant-laid) | answered |
 | [when eleven runtime variants exist and the read gives no size, ten come back and the response says there is a next page](#searching-omitting-the-page-size-answers-ten-variants-and-a-next-page) | answered |
+| [when a user who can read runtime variants reads with a deployment they cannot read as the use filter, it is rejected for lack of permission](#searching-naming-a-deployment-the-caller-cannot-read-is-refused) | rejected |
 
 **update**
 
@@ -649,6 +650,46 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching-naming-a-deployment-the-caller-cannot-read-is-refused"></a>
+
+#### [naming-a-deployment-the-caller-cannot-read-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant/test_searching.py): pass
+
+when a user who can read runtime variants reads with a deployment they cannot read as the use filter, it is rejected for lack of permission
+
+Given
+
+- two runtime variants, one deployment of another project, and one user who cannot read that deployment
+  - Runtime variant wanted-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant other-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant
+    - regular user user-1: holds Role public-reader-1
+  - Domain home-2
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-2: up to 10 folders per user
+      - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+      - regular user user-2: has their own keypair and personal project
+  - Deployment theirs-1: replica count 1, has no revision yet
+
+When
+
+- RuntimeVariantAdapter.search: user-1 reads with a deployment they cannot read as the use filter
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### update
 

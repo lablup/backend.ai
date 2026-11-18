@@ -23,6 +23,7 @@ class SchedulerRepositories:
             args.config_provider,
             args.storage_manager,
             RbacPermissionCheckRepository(PermissionOpsProvider(args.db), args.config_provider),
+            args.key_provider_pool,
         )
 
         return cls(

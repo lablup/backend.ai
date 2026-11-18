@@ -36,12 +36,13 @@ from ai.backend.manager.actions.types import ActionOperationType, OperationStatu
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
-from ai.backend.manager.errors.permission import NotEnoughPermission, VirtualEntityNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.errors.resource import ModelCardConflict
+from ai.backend.manager.errors.virtual_entity import VirtualEntityNotFound
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -86,7 +87,7 @@ _ENTRIES = (
 
 
 @pytest.fixture
-async def card_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def card_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [ResourceSlotTypeRow, ModelCardResourceRequirementRow]):
         async with ops_db.begin_session() as sess:
             sess.add_all([

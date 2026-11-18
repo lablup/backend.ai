@@ -108,6 +108,7 @@ from ai.backend.agent.types import (
     VolumeInfo,
 )
 from ai.backend.agent.utils import (
+    SECRET_MASK,
     ContainerSSHFileWriter,
     closing_async,
     container_pid_to_host_pid,
@@ -145,6 +146,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -159,7 +161,6 @@ from ai.backend.common.types import (
     ImageCanonical,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
@@ -191,6 +192,7 @@ LIBC_BANNER_GLIBC_REGEX = re.compile(r"^GNU C Library .*release version (\d+\.\d
 # Upper bound for one libc probe container (start, run, exit). The probe executes paths
 # from an untrusted image, so a hang must not stall session creation.
 _LIBC_PROBE_TIMEOUT_SEC: Final[float] = 30.0
+_KERNEL_WORK_DIR: Final[Path] = Path("/home/work")
 # Docker reports these when the probe command does not exist or cannot be executed in the
 # image; anything else from the daemon is a real error and must surface as such.
 _LIBC_PROBE_EXEC_FAILURE_MARKERS: Final[tuple[str, ...]] = (
@@ -564,6 +566,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     log.exception("chown failed", file_path=p, uid=int_uid, gid=int_gid)
 
     @override
+    async def destroy_scratch(self) -> None:
+        """Take back what `prepare_scratch` made, through the same path a teardown uses."""
+        await _clean_scratch(
+            self.local_config.container.scratch_type,
+            self.local_config.container.scratch_root,
+            self.kernel_id,
+        )
+
+    @override
     async def prepare_scratch(self) -> None:
         # Create the scratch, config, and work directories.
         scratch_type = self.local_config.container.scratch_type
@@ -650,12 +661,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 if do_override:
                     chown_scratch(ouid, ogid)
-                else:
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        chown_scratch(
-                            self.local_config.container.kernel_uid,
-                            self.local_config.container.kernel_gid,
-                        )
+                elif KernelFeatures.UID_MATCH in self.kernel_features:
+                    chown_scratch(
+                        self.local_config.container.kernel_uid,
+                        self.local_config.container.kernel_gid,
+                    )
 
             await run_in_executor_with_context(None, _clone_dotfiles)
 
@@ -945,6 +955,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
+        await run_in_executor_with_context(None, self._create_mount_points_in_work_dir, mounts)
+
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:
                 # TODO: enforce readable/writable but not deletable
@@ -969,6 +981,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
         self.container_configs.append(container_config)
+
+    def _create_mount_points_in_work_dir(self, mounts: Sequence[Mount]) -> None:
+        # With Docker running as root and the agent as a non-root user, runc creates a missing
+        # mount point below /home/work as root inside the scratch work directory, and the agent
+        # cannot remove a nested one (e.g. /home/work/a/b) when it cleans the scratch.
+        for mount in mounts:
+            if mount.type != MountTypes.BIND or _KERNEL_WORK_DIR not in mount.target.parents:
+                continue
+            if mount.source is None or not mount.source.is_dir():
+                continue
+            mount_point = self.work_dir / mount.target.relative_to(_KERNEL_WORK_DIR)
+            mount_point.mkdir(parents=True, exist_ok=True)
 
     @override
     async def apply_accelerator_allocation(
@@ -1013,13 +1037,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
-                    else:
-                        if KernelFeatures.UID_MATCH in self.kernel_features:
-                            self._chown_paths_if_root(
-                                [self.work_dir / "bootstrap.sh"],
-                                self.local_config.container.kernel_uid,
-                                self.local_config.container.kernel_gid,
-                            )
+                    elif KernelFeatures.UID_MATCH in self.kernel_features:
+                        self._chown_paths_if_root(
+                            [self.work_dir / "bootstrap.sh"],
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
+                        )
 
                 await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
@@ -1067,7 +1090,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 pubkey = self.internal_data["ssh_keypair"]["public_key"].encode("ascii")
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
 
-                def _populate_ssh_config() -> None:
+                def _populate_ssh_config(pubkey: bytes = pubkey, privkey: bytes = privkey) -> None:
                     paths = ContainerSSHFileWriter(self.work_dir, pubkey, privkey).write()
 
                     def chown_idfile(uid: int | None, gid: int | None) -> None:
@@ -1075,12 +1098,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                     if ouid is not None or ogid is not None:
                         chown_idfile(ouid, ogid)
-                    else:
-                        if KernelFeatures.UID_MATCH in self.kernel_features:
-                            chown_idfile(
-                                self.local_config.container.kernel_uid,
-                                self.local_config.container.kernel_gid,
-                            )
+                    elif KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_idfile(
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
+                        )
 
                 await run_in_executor_with_context(None, _populate_ssh_config)
 
@@ -1104,13 +1126,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 tmp.chmod(int(dotfile["perm"], 8))
             if ouid is not None or ogid is not None:
                 self._chown_paths_if_root(tmp_paths, ouid, ogid)
-            else:
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    self._chown_paths_if_root(
-                        tmp_paths,
-                        self.local_config.container.kernel_uid,
-                        self.local_config.container.kernel_gid,
-                    )
+            elif KernelFeatures.UID_MATCH in self.kernel_features:
+                self._chown_paths_if_root(
+                    tmp_paths,
+                    self.local_config.container.kernel_uid,
+                    self.local_config.container.kernel_gid,
+                )
 
         return DockerKernel(
             self.ownership_data,
@@ -1172,6 +1193,67 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         container_config["HostConfig"]["SecurityOpt"] = [security_opt]
 
+    async def _provision_or_name_the_container(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        cid: str,
+        cluster_info: ClusterInfo,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """`_provision_started_container`, raising every failure as a `ContainerCreationError`
+        that names the already-running container.
+        """
+        try:
+            await self._provision_started_container(
+                docker, container, cid, cluster_info, resource_spec
+            )
+        except ContainerCreationError:
+            raise
+        except Exception as e:
+            raise ContainerCreationError(
+                container_id=cid,
+                message=f"failed after the container was started: {e!r}",
+            ) from e
+
+    async def _provision_started_container(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        cid: str,
+        cluster_info: ClusterInfo,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """Everything done to a container that is already running.
+
+        The caller turns anything raised here into a `ContainerCreationError` naming the container.
+        """
+        if self.internal_data.get("sudo_session_enabled", False):
+            exec = await container.exec(
+                [
+                    # file ownership is guaranteed to be set as root:root since command is
+                    # executed on behalf of root user
+                    "sh",
+                    "-c",
+                    'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >'
+                    " /etc/sudoers.d/01-bai-work",
+                ],
+                user="root",
+            )
+            shell_response = await exec.start(detach=True)
+            if shell_response:
+                raise ContainerCreationError(
+                    container_id=cid,
+                    message=f"sudoers provision failed: {shell_response.decode()}",
+                )
+
+        additional_network_names: set[str] = set()
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
+            additional_network_names |= set(n)
+
+        await self._attach_additional_networks(docker, container, additional_network_names)
+
     async def _attach_additional_networks(
         self,
         docker: Docker,
@@ -1229,7 +1311,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 f"(remaining ports: {self.port_pool.remaining()})"
             )
         exposed_ports = [*self.repl_ports]
-        host_ports = [self.port_pool.acquire() for _ in self.repl_ports]
+        # Recorded as they are taken: the kernel's CLEAN is the only path that gives them back.
+        host_ports: list[int] = []
+        kernel_obj["host_ports"] = host_ports
+        for _ in self.repl_ports:
+            host_ports.append(self.port_pool.acquire())
         host_ips = []
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
@@ -1378,15 +1464,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # The final container config is settled down here.
         if self.local_config.debug.log_kernel_config:
-            log.debug("full container config: {!r}", pretty(container_config))
+            # Env carries the session's environ, so only the variable names are logged.
+            dumped = {
+                **container_config,
+                "Env": [
+                    f"{env.split('=', 1)[0]}={SECRET_MASK}"
+                    for env in container_config.get("Env", [])
+                ],
+            }
+            log.debug("full container config: {!r}", pretty(dumped))
 
         async def _rollback_container_creation() -> None:
-            await _clean_scratch(
-                self.local_config.container.scratch_type,
-                self.local_config.container.scratch_root,
-                self.kernel_id,
-            )
-            self.port_pool.release_many(host_ports)
+            """Free the devices of a container that was never created.
+
+            Scratch and ports are given back once, by the kernel's CLEAN.
+            """
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():
                     self.computers[dev_name].alloc_map.free(device_alloc)
@@ -1395,15 +1487,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         async with closing_async(Docker()) as docker:
             container: DockerContainer | None = None
             try:
-                container = await docker.containers.create(
-                    config=container_config, name=kernel_name
-                )
-                if container is None:
+                created = await docker.containers.create(config=container_config, name=kernel_name)
+                if created is None or not created._id:
+                    # Treated as no container: there is no id to record or destroy by.
                     raise ContainerCreationError(
                         container_id="",
-                        message="Docker API returned None when creating container",
+                        message="Docker API returned no container id when creating container",
                     )
+                container = created
                 cid = container._id
+                # Recorded at once: the agent's failure handler destroys the kernel by this id.
+                kernel_obj.set_container_id(ContainerId(cid))
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
@@ -1418,9 +1512,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ) from e
                 raise
             except Exception as e:
-                # Oops, we have to restore the allocated resources!
-                await _rollback_container_creation()
-                if container is not None:
+                if container is None:
+                    await _rollback_container_creation()
+                else:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
                         message=f"Unexpected error during container creation: {e!r}",
@@ -1430,44 +1524,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             try:
                 await container.start()
             except asyncio.CancelledError as e:
-                await _rollback_container_creation()
+                # A cancelled `docker start` may still have started the container.
                 raise ContainerCreationError(
                     container_id=cid,
                     message="Container start was cancelled",
                 ) from e
             except Exception as e:
-                await _rollback_container_creation()
                 raise ContainerCreationError(
                     container_id=cid,
                     message=f"Unexpected error during container start: {e!r}",
                 ) from e
 
-            if self.internal_data.get("sudo_session_enabled", False):
-                exec = await container.exec(
-                    [
-                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
-                        "sh",
-                        "-c",
-                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
-                    ],
-                    user="root",
-                )
-                shell_response = await exec.start(detach=True)
-                if shell_response:
-                    await _rollback_container_creation()
-                    raise ContainerCreationError(
-                        container_id=cid,
-                        message=f"sudoers provision failed: {shell_response.decode()}",
-                    )
+            await self._provision_or_name_the_container(
+                docker, container, cid, cluster_info, resource_spec
+            )
 
-            additional_network_names: set[str] = set()
-            for dev_name, device_alloc in resource_spec.allocations.items():
-                n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
-                additional_network_names |= set(n)
-
-            await self._attach_additional_networks(docker, container, additional_network_names)
-
-            kernel_obj.set_container_id(ContainerId(cid))
             container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
@@ -1522,7 +1593,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         )
                     host_port = int(ports[0]["HostPort"])
                     if host_port != host_ports[idx]:
-                        await _rollback_container_creation()
                         raise ContainerCreationError(
                             container_id=cid,
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
@@ -2314,7 +2384,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if container_id is not None:
                 container = docker.containers.container(container_id)
 
-                async def log_iter() -> AsyncGenerator[bytes, None]:
+                async def log_iter() -> AsyncGenerator[bytes]:
                     it = container.log(
                         stdout=True,
                         stderr=True,
@@ -2414,7 +2484,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]

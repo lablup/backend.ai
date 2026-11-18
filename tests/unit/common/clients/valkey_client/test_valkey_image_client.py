@@ -21,7 +21,7 @@ class TestValkeyImageClient:
     async def valkey_image_client(
         self,
         redis_container: tuple[str, HostPortPairModel],
-    ) -> AsyncGenerator[ValkeyImageClient, None]:
+    ) -> AsyncGenerator[ValkeyImageClient]:
         """Valkey client that auto-cleans installed image data after each test"""
         hostport_pair: HostPortPairModel = redis_container[1]
         valkey_target = ValkeyTarget(

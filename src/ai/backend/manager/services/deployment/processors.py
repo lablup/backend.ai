@@ -475,11 +475,15 @@ class DeploymentProcessors:
         self.destroy_deployment = group.single_entity(
             DestroyDeploymentAction, service.destroy_deployment
         )
-        self.global_search = group.global_searcher_ops(GlobalSearchDeploymentsAction)
+        self.global_search = group.global_scope(
+            GlobalSearchDeploymentsAction, service.global_search_deployments
+        )
         self.global_search_legacy = group.global_scope(
             GlobalSearchLegacyDeploymentsAction, service.search_legacy_deployments
         )
-        self.scoped_search = group.scoped_search_ops(ScopedSearchDeploymentsAction)
+        self.scoped_search = group.scope(
+            ScopedSearchDeploymentsAction, service.scoped_search_deployments
+        )
         self.get_deployment_by_id = group.single_entity(
             GetDeploymentByIdAction, service.get_deployment_by_id
         )

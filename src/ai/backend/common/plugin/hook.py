@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import enum
-import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Final, Protocol
 
 import attrs
 
-from ai.backend.logging.structured import StructuredLogger
-
-from . import AbstractPlugin, BasePluginContext
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
+from . import AbstractPlugin
 
 __all__ = (
     "ALL_COMPLETED",
@@ -22,7 +17,6 @@ __all__ = (
     "REJECTED",
     "HookHandler",
     "HookPlugin",
-    "HookPluginContext",
     "HookResult",
     "HookResults",
     "HookReturnTiming",
@@ -32,10 +26,8 @@ __all__ = (
 
 class HookHandler(Protocol):
     """
-    The handler should accept a single argument containing
-    a tuple of parameters passed to the handler.
-    If it decides to cancel the ongoing event, it should raise
-    :class:`HookDenied` exception.
+    Returns None when the handler does not handle the event, and a non-None result when it does.
+    Raises :class:`Reject` to reject the event.
     """
 
     async def __call__(self, *args: Any) -> Any:
@@ -89,102 +81,3 @@ class HookResult:
     src_plugin: str | Sequence[str] | None = None
     reason: str | None = None
     result: Any | None = None
-
-
-class HookPluginContext(BasePluginContext[HookPlugin]):
-    """
-    A manager for hook plugins with convenient handler invocation.
-    """
-
-    plugin_group = "backendai_hook_v20"
-
-    def _get_handlers(
-        self,
-        event_name: str,
-        order: Sequence[str] | None = None,
-    ) -> Sequence[tuple[str, HookHandler]]:
-        handlers = []
-        for plugin_name, plugin_instance in self.plugins.items():
-            for hooked_event_name, hook_handler in plugin_instance.get_handlers():
-                if event_name != hooked_event_name:
-                    continue
-                handlers.append((plugin_name, hook_handler))
-        if order is not None:
-            non_empty_order = order
-            handlers.sort(key=lambda item: non_empty_order.index(item))
-        else:
-            # the default is alphabetical order with plugin names
-            handlers.sort(key=lambda item: item[0])
-        return handlers
-
-    async def dispatch(
-        self,
-        event_name: str,
-        args: tuple[Any, ...],
-        *,
-        return_when: HookReturnTiming = ALL_COMPLETED,
-        success_if_no_hook: bool = True,
-        order: Sequence[str] | None = None,
-    ) -> HookResult:
-        """
-        Invoke the handlers that matches with the given ``event_name``.
-        If any of the handlers raises :class:`HookDenied`,
-        the event caller should seize the processing.
-        """
-        executed_plugin_names = []
-        results: list[Any] = []
-        for plugin_name, hook_handler in self._get_handlers(event_name, order=order):
-            try:
-                executed_plugin_names.append(plugin_name)
-                result = await hook_handler(*args)
-            except Reject as e:
-                return HookResult(
-                    status=REJECTED,
-                    src_plugin=plugin_name,
-                    reason=e.reason,
-                )
-            except Exception as e:
-                return HookResult(
-                    status=ERROR,
-                    src_plugin=plugin_name,
-                    reason=repr(e),
-                )
-            else:
-                if return_when == FIRST_COMPLETED:
-                    return HookResult(
-                        status=PASSED,
-                        src_plugin=plugin_name,
-                        result=result,
-                    )
-                results.append(result)
-        if not success_if_no_hook and not executed_plugin_names:
-            return HookResult(
-                status=REJECTED,
-                src_plugin=executed_plugin_names,  # empty
-                result=results,  # empty
-            )
-        return HookResult(
-            status=PASSED,
-            src_plugin=executed_plugin_names,
-            result=results,
-        )
-
-    async def notify(
-        self,
-        event_name: str,
-        args: tuple[Any, ...],
-    ) -> None:
-        """
-        Invoke the handlers that matches with the given ``event_name``.
-        Regardless of the handler results, the processing continues.
-        """
-        for plugin_name, hook_handler in self._get_handlers(event_name):
-            try:
-                await hook_handler(*args)
-            except Exception:
-                log.exception(
-                    "hook handler failed, skipped",
-                    event_name=event_name,
-                    plugin_name=plugin_name,
-                )
-                continue

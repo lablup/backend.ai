@@ -89,7 +89,7 @@ def mock_timeout_checker() -> ServiceHealthChecker:
 
 
 @pytest.fixture
-async def health_probe() -> AsyncGenerator[HealthProbe, None]:
+async def health_probe() -> AsyncGenerator[HealthProbe]:
     """HealthProbe instance for testing."""
     probe = HealthProbe(HealthProbeOptions(check_interval=0.1))
     yield probe

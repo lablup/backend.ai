@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -30,7 +32,12 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupSearchPayload
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
@@ -38,6 +45,7 @@ from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.resource_group.types import NUM_RETRIES_TO_SKIP_CONFIG_KEY
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -54,6 +62,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, role_named
+from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -63,12 +72,16 @@ from bai_scenario.seeds.resource_group.resource_group import (
     TestSeedResourceGroup,
 )
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.agent_resource import TestSeedReportedSlot
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type Loaded = list[ResourceGroupDetailNode | Exception | None]
 type Processed = PartialBulkPayload[ResourceGroupDetailNode]
 
 SCHEDULER = "fifo"
+REPORTED_CAPACITY = Decimal("10")
+REPORTED_USED = Decimal("0")
 
 
 # ------------------------------------------------------------------ situations
@@ -76,10 +89,14 @@ SCHEDULER = "fifo"
 
 @dataclass(frozen=True)
 class AGroupAndACaller:
-    """리소스 그룹 하나와, 그것을 호출할 사용자."""
+    """리소스 그룹 하나와, 그것을 호출할 사용자.
+
+    ``slot_name``은 그룹의 에이전트가 보고한 슬롯 종류다. 보고하는 에이전트가 없으면 비어 있다.
+    """
 
     group: ResourceGroupData
     caller: UserData
+    slot_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -172,13 +189,17 @@ class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
 
 @dataclass(frozen=True)
 class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
-    """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다."""
+    """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다.
+
+    ``reports_a_slot``이면 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 함께 보고한다.
+    """
 
     role: UserRole = UserRole.USER
     granted: Permission | None = None
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
+    reports_a_slot: bool = False
 
     @override
     def describe(self) -> str:
@@ -190,6 +211,15 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
                 english=(
                     f"{in_language(named, Language.ENGLISH)} granted the "
                     f"{self.granted.name} role in the group scope"
+                ),
+            )
+        if self.reports_a_slot:
+            return Says(
+                f"리소스 그룹 하나와, {who} 한 명. 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 "
+                "함께 보고합니다",
+                english=(
+                    f"one resource group and one {in_language(who, Language.ENGLISH)}. "
+                    "the group's agent reports one resource slot type with its capacity"
                 ),
             )
         return Says(
@@ -205,10 +235,24 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
                 description=self.description, is_active=self.is_active, is_default=self.is_default
             )
         )
+        slot_name = ""
+        if self.reports_a_slot:
+            slot_type = await seeding.creating(TestSeedResourceSlotType(name_hint="slot"))
+            agent = await seeding.creating_from(TestSeedAgent(), group)
+            slot_name = slot_type.name
+            await seeding.adding(
+                TestSeedReportedSlot(
+                    agent_id=agent.name,
+                    slot_name=slot_name,
+                    capacity=REPORTED_CAPACITY,
+                    used=REPORTED_USED,
+                ),
+                agent,
+            )
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         if self.granted is not None:
             await seeding.within(SomeoneGrantedOnTheGroup(group, caller, self.granted))
-        return AGroupAndACaller(seeding.made(group), seeding.made(caller))
+        return AGroupAndACaller(seeding.made(group), seeding.made(caller), slot_name)
 
 
 @dataclass(frozen=True)
@@ -414,6 +458,12 @@ class GroupLook:
     preemption_mode: PreemptionModeDTO | Kept = KEPT
     preemption_min_runtime: float | Kept = KEPT
     victim_scope: PreemptionVictimScope | Kept = KEPT
+    allowed_session_types: list[SessionTypes] | Kept = KEPT
+    pending_timeout: float | Kept = KEPT
+    num_retries_to_skip: int | None | Kept = KEPT
+    agent_selection_strategy: AgentSelectionStrategy | Kept = KEPT
+    allow_fractional_resource_fragmentation: bool | Kept = KEPT
+    route_cleanup_target_statuses: list[RouteHealthStatus] | Kept = KEPT
 
     def verdicts(
         self, prefix: str, node: ResourceGroupDetailNode, seed: ResourceGroupData
@@ -495,6 +545,45 @@ class GroupLook:
                 node.scheduler.preemption.victim_scope,
                 _or(self.victim_scope, preemption.victim_scope),
             ),
+            Same(
+                f"{prefix}scheduler.options.allowed_session_types",
+                node.scheduler.options.allowed_session_types,
+                _or(self.allowed_session_types, seed.scheduler.options.allowed_session_types),
+            ),
+            Same(
+                f"{prefix}scheduler.options.pending_timeout",
+                node.scheduler.options.pending_timeout,
+                _or(self.pending_timeout, seed.scheduler.options.pending_timeout.total_seconds()),
+            ),
+            Same(
+                f"{prefix}scheduler.options.config.num_retries_to_skip",
+                node.scheduler.options.config.num_retries_to_skip,
+                _or(
+                    self.num_retries_to_skip,
+                    seed.scheduler.options.config.get(NUM_RETRIES_TO_SKIP_CONFIG_KEY),
+                ),
+            ),
+            Same(
+                f"{prefix}scheduler.options.agent_selection_strategy",
+                node.scheduler.options.agent_selection_strategy,
+                _or(self.agent_selection_strategy, seed.scheduler.options.agent_selection_strategy),
+            ),
+            Same(
+                f"{prefix}scheduler.options.allow_fractional_resource_fragmentation",
+                node.scheduler.options.allow_fractional_resource_fragmentation,
+                _or(
+                    self.allow_fractional_resource_fragmentation,
+                    seed.scheduler.options.allow_fractional_resource_fragmentation,
+                ),
+            ),
+            Same(
+                f"{prefix}scheduler.options.route_cleanup_target_statuses",
+                node.scheduler.options.route_cleanup_target_statuses,
+                _or(
+                    self.route_cleanup_target_statuses,
+                    seed.scheduler.options.route_cleanup_target_statuses,
+                ),
+            ),
             Skipped(
                 f"{prefix}default_deployment_options",
                 Says(
@@ -523,6 +612,19 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
     started: datetime
     named: str
     is_default: bool = False
+    is_active: bool = True
+    is_public: bool = True
+    scheduler_type: SchedulerTypeDTO = SchedulerTypeDTO.FIFO
+    allowed_session_types: tuple[SessionTypes, ...] = (
+        SessionTypes.INTERACTIVE,
+        SessionTypes.BATCH,
+        SessionTypes.INFERENCE,
+    )
+    pending_timeout: float = 0.0
+    num_retries_to_skip: int | None = None
+    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
+    allow_fractional_resource_fragmentation: bool = True
+    route_cleanup_target_statuses: tuple[RouteHealthStatus, ...] = (RouteHealthStatus.UNHEALTHY,)
 
     @override
     def says(self) -> str:
@@ -539,14 +641,14 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
         return [
             Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Same("name", node.name, self.named),
-            Same("status.is_active", node.status.is_active, True),
-            Same("status.is_public", node.status.is_public, True),
+            Same("status.is_active", node.status.is_active, self.is_active),
+            Same("status.is_public", node.status.is_public, self.is_public),
             Same("status.is_default", node.status.is_default, self.is_default),
             Same("metadata.description", node.metadata.description, None),
             Held("metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)),
             Same("network.wsproxy_addr", node.network.wsproxy_addr, None),
             Same("network.use_host_network", node.network.use_host_network, False),
-            Same("scheduler.type", node.scheduler.type, SchedulerTypeDTO.FIFO),
+            Same("scheduler.type", node.scheduler.type, self.scheduler_type),
             Same("scheduler.preemption.enabled", node.scheduler.preemption.enabled, False),
             Same(
                 "scheduler.preemption.preemptible_priority",
@@ -572,6 +674,36 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
                 "scheduler.preemption.victim_scope",
                 node.scheduler.preemption.victim_scope,
                 PreemptionVictimScope.USER,
+            ),
+            Same(
+                "scheduler.options.allowed_session_types",
+                node.scheduler.options.allowed_session_types,
+                list(self.allowed_session_types),
+            ),
+            Same(
+                "scheduler.options.pending_timeout",
+                node.scheduler.options.pending_timeout,
+                self.pending_timeout,
+            ),
+            Same(
+                "scheduler.options.config.num_retries_to_skip",
+                node.scheduler.options.config.num_retries_to_skip,
+                self.num_retries_to_skip,
+            ),
+            Same(
+                "scheduler.options.agent_selection_strategy",
+                node.scheduler.options.agent_selection_strategy,
+                self.agent_selection_strategy,
+            ),
+            Same(
+                "scheduler.options.allow_fractional_resource_fragmentation",
+                node.scheduler.options.allow_fractional_resource_fragmentation,
+                self.allow_fractional_resource_fragmentation,
+            ),
+            Same(
+                "scheduler.options.route_cleanup_target_statuses",
+                node.scheduler.options.route_cleanup_target_statuses,
+                list(self.route_cleanup_target_statuses),
             ),
             Skipped(
                 "default_deployment_options",
@@ -865,10 +997,9 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
-                Same(
-                    f"items[{i}]",
-                    type(got).__name__ if got is not None else None,
-                    NotEnoughPermission.__name__,
+                Refused(
+                    NotEnoughPermission,
+                    got if isinstance(got, BaseException) else None,
                 )
             )
         return seen

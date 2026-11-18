@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.common import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput,
     PresetValueInput,
+    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
@@ -33,6 +34,7 @@ from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNes
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 
 
 class PresetModelHealthCheckInput(BaseRequestModel):
@@ -42,7 +44,7 @@ class PresetModelHealthCheckInput(BaseRequestModel):
         "immediately and the remaining fields are ignored.",
     )
     interval: float = Field(default=10.0, description="Interval in seconds between health checks.")
-    path: str = Field(default="/health", description="Path to check for health status.")
+    path: HealthCheckPath = Field(default="/health", description="Path to check for health status.")
     max_retries: int = Field(default=10, description="Maximum number of retries for health check.")
     max_wait_time: float = Field(
         default=15.0, description="Maximum time in seconds to wait for a health check response."
@@ -100,6 +102,13 @@ class PresetModelServiceConfigInput(BaseRequestModel):
     )
     health_check: PresetModelHealthCheckInput | None = Field(
         default=None, description="Health check configuration for the model service."
+    )
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit to inherit it; the default is `${{ }}` and `{ }`."
+        ),
     )
 
 
@@ -188,7 +197,7 @@ class UpdatePresetModelHealthCheckInput(BaseRequestModel):
 
     enable: bool | None | Unset = Field(default=UNSET)
     interval: float | None | Unset = Field(default=UNSET)
-    path: str | None | Unset = Field(default=UNSET)
+    path: HealthCheckPath | None | Unset = Field(default=UNSET)
     max_retries: int | None | Unset = Field(default=UNSET)
     max_wait_time: float | None | Unset = Field(default=UNSET)
     expected_status_code: Annotated[int, Field(gt=100)] | None | Unset = Field(default=UNSET)
@@ -221,6 +230,13 @@ class UpdatePresetModelServiceConfigInput(BaseRequestModel):
     shell: str | None | Unset = Field(default=UNSET)
     port: Annotated[int, Field(gt=1)] | None | Unset = Field(default=UNSET)
     health_check: UpdatePresetModelHealthCheckInput | None | Unset = Field(default=UNSET)
+    interpolation: ServiceArgumentInterpolationInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit or null to keep the current value."
+        ),
+    )
 
 
 class UpdatePresetModelConfigInput(BaseRequestModel):

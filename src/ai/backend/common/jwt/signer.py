@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import jwt
 
 from .config import JWTConfig
-from .exceptions import JWTError
+from .exceptions import JWTGenerationError
 from .types import JWTClaims, JWTUserContext
 
 
@@ -64,7 +64,7 @@ class JWTSigner:
             Encoded JWT token string
 
         Raises:
-            JWTError: If token generation fails
+            JWTGenerationError: If token generation fails
         """
         now = datetime.now(UTC)
 
@@ -82,4 +82,4 @@ class JWTSigner:
                 algorithm=self._config.algorithm,
             )
         except Exception as e:
-            raise JWTError(f"JWT generation failed: {e}") from e
+            raise JWTGenerationError(f"JWT generation failed: {e}") from e

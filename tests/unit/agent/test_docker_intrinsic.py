@@ -67,9 +67,7 @@ class BaseDockerIntrinsicTest:
         return ctx
 
     @pytest.fixture
-    def mock_fetch_api_stats(
-        self, docker_stats_response: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    def mock_fetch_api_stats(self, docker_stats_response: dict[str, Any]) -> Generator[MagicMock]:
         with patch(
             "ai.backend.agent.docker.intrinsic.fetch_api_stats",
             return_value=docker_stats_response,
@@ -151,9 +149,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         return plugin
 
     @pytest.fixture
-    def memory_cgroup_context(
-        self, cgroup_stat_context: MagicMock
-    ) -> Generator[MagicMock, None, None]:
+    def memory_cgroup_context(self, cgroup_stat_context: MagicMock) -> Generator[MagicMock]:
         """CGROUP stat context with memory/io cgroup v2 path mocks and related patches."""
         ctx = cgroup_stat_context
         ctx.agent.get_cgroup_version = MagicMock(return_value="2")
@@ -259,7 +255,7 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
         self,
         cgroup_stat_context: MagicMock,
         container_pid: int,
-    ) -> Generator[tuple[MagicMock, MagicMock], None, None]:
+    ) -> Generator[tuple[MagicMock, MagicMock]]:
         """Build a CGROUP stat context with configurable container PID.
 
         PID=0 means container not running (skips read_proc_net_dev).
@@ -392,7 +388,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         return plugin
 
     @pytest.fixture
-    def sysfs_mocks(self, cgroup_stat_context: MagicMock) -> Generator[_SysfsMocks, None, None]:
+    def sysfs_mocks(self, cgroup_stat_context: MagicMock) -> Generator[_SysfsMocks]:
         """Fully patched sysfs_impl environment with default happy-path behavior.
 
         Tests override specific mock side_effects before calling the target function.

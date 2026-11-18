@@ -20,7 +20,6 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
     Slot,
 )
-from ai.backend.appproxy.common.types import SerializableToken as Token
 from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.logging.structured import StructuredLogger
 
@@ -230,11 +229,3 @@ async def ping_worker(root_ctx: RootContext, request_id: str) -> None:
                 "coordinator": str(worker_config.coordinator_endpoint),
             }
         ) from e
-
-
-async def get_token_data(root_ctx: RootContext, request_id: str, token_id: str) -> Token:
-    sess = _get_coordinator_session(root_ctx)
-    headers = _get_request_headers(root_ctx, request_id)
-    async with sess.get(f"/api/worker/token/{token_id}", headers=headers) as resp:
-        resp.raise_for_status()
-        return Token(**(await resp.json()))

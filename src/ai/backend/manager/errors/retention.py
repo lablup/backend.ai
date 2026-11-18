@@ -18,12 +18,13 @@ from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.repository import RepositoryError
 
 
-class RetentionCategoryNotSupportedError(RepositoryError):
+class RetentionCategoryNotSupportedError(RepositoryError, web.HTTPInternalServerError):
     """Raised when a retention category has no code-side cleanup wired.
 
-    A defensive guard: every :class:`RetentionCategory` is mapped in the
-    repository catalog, so an unmapped category fails loudly instead of
-    silently deleting nothing.
+    A defensive guard: every category the drain catalog serves is mapped, so an
+    unmapped one fails loudly instead of silently deleting nothing. ``projects``
+    is not in the catalog; the leader task clears it through the project
+    repository.
     """
 
     error_type = "https://api.backend.ai/probs/retention-category-not-supported"

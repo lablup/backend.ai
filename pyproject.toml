@@ -13,7 +13,7 @@ filename = "CHANGELOG.md"
 directory = "changes/"
 title_format = ""  # embedded inside the template
 template = "changes/template.md"
-ignore = ["KNOWLEDGE.md", "KNOWLEDGE.ko.md"]
+ignore = ["KNOWLEDGE.md", "KNOWLEDGE.ko.md", "epics"]
 start_string = "<!-- towncrier release notes start -->\n"
 issue_format = "([#{issue}](https://github.com/lablup/backend.ai/issues/{issue}))"
 underlines = ["", "", ""]
@@ -90,14 +90,27 @@ src = ["src"]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
 select = [
     "E",      # pycodestyle errors: PEP8 style violations
+    "PLR5501",  # collapsible-else-if: `else: if` can be `elif`
+    "PLR1730",  # if-stmt-min-max: `if` assignment can be `min`/`max`
+    "PLW0120",  # useless-else-on-loop: `else` on a loop without `break`
+    "PLW1510",  # subprocess-run-without-check: explicit `check=` for `subprocess.run`
+    "PLR1711",  # useless-return: bare `return None` at the end of a function
+    "PLC1802",  # len-test: `len(x)` as a truth test
+    "FAST",   # fastapi: FastAPI route misuse
+    "ICN",    # flake8-import-conventions: conventional import aliases
+    "YTT",    # flake8-2020: `sys.version` misuse
     "W",      # pycodestyle warnings: PEP8 style warnings
     "F",      # pyflakes: detects unused imports, undefined names, and other logical errors
     "I",      # isort: enforces consistent import ordering
     "T10",    # flake8-debugger: prevents debugger statements (pdb, breakpoint) in production code
+    "TRY400", # tryceratops: use logging.exception instead of logging.error inside except
+    "TRY401", # tryceratops: do not repeat the exception object in logging.exception
     "FA",     # flake8-future-annotations: enforces `from __future__ import annotations`
     "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
     "EXE",    # flake8-executable: validates shebang and file permissions consistency
     "LOG",    # flake8-logging: enforces logging best practices (warn -> warning, etc.)
+    "TRY201", # tryceratops: use bare `raise` to re-raise
+    "TRY203", # tryceratops: remove except blocks that only re-raise
     "FLY",    # flynt: converts old-style string formatting to f-strings
     "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
     "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
@@ -106,10 +119,12 @@ select = [
     "SIM",    # flake8-simplify: suggests code simplification
     "RUF",    # ruff-specific: Ruff's own linting rules
     "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
+    "PGH004", # pygrep-hooks: requires specific rule codes in noqa
     "B",      # flake8-bugbear: detects likely bugs and design issues
     "UP",     # pyupgrade: modernizes Python syntax to latest version
     "A",      # flake8-builtins: prevents shadowing Python builtins
     "RET",    # flake8-return: enforces consistent return statement usage
+    "PGH003", # pygrep-hooks: forbids blanket type: ignore without rule codes
     "T20",    # flake8-print: detects print statements (should use logging)
     "TID251", # flake8-tidy-imports: enforce banned imports (pytest.mark.asyncio)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
@@ -157,7 +172,6 @@ ignore = [
     "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())
     "RUF022", # unsorted-dunder-all - semantic ordering may be preferred over alphabetical
     "RUF032", # decimal-from-float-literal - intentional float to Decimal conversion
-    "RUF059", # unused-unpacked-variable - _ convention not always followed
     # C4
     "C408",  # unnecessary-collection-call - dict()/tuple()/list() can be clearer than literals in some cases
     "C416",  # unnecessary-comprehension - explicit comprehension can be clearer
@@ -167,13 +181,10 @@ ignore = [
     "B010",  # set-attr-with-constant - setattr with constant needed for mypy compatibility on dynamic attributes
     "B012",  # return-in-finally - intentional pattern in some response handlers
     "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
-    "B023",  # function-uses-loop-variable - many false positives with for-else, nested functions
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
-    # UP (pyupgrade) - defer large-scale changes for gradual adoption
-    "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
     # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
     "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)
@@ -204,6 +215,12 @@ ignore = [
 "ai.backend.common.logging.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
 "ai.backend.common.logging_utils.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
 "ai.backend.logging.utils.with_log_context_fields" = {msg = "Deprecated; use ai.backend.logging.structured.with_log_context."}
+"pydantic.validator" = {msg = "Pydantic v1 API; use pydantic.field_validator."}
+"pydantic.root_validator" = {msg = "Pydantic v1 API; use pydantic.model_validator."}
+"sqlalchemy.ext.declarative" = {msg = "Deprecated; use sqlalchemy.orm.declarative_base."}
+"pydantic_core.MISSING" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
+"pydantic.experimental.missing_sentinel.MISSING" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
+"typing_extensions.Sentinel" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend", "bai_scenario"]
@@ -212,6 +229,10 @@ known-third-party = ["alembic", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
+# unset.py defines UNSET and Unset from pydantic MISSING
+"src/ai/backend/common/tristate/unset.py" = ["TID251"]
+# released migration cannot be edited in place
+"src/ai/backend/manager/models/alembic/versions/305e3ddc20a7_update_auditlog_table.py" = ["TRY400", "TRY401"]
 # decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
 "src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
 # schema.py defines GQL schema roots (Query, Mutation, Subscription) using @strawberry.type
@@ -230,6 +251,7 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
 "src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
+"src/ai/backend/manager/models/alembic/versions/b5be363ab05c_.py" = ["RUF059"]  # a released migration cannot be edited in place
 # UP040 (type alias) exceptions - cannot use `type` statement when used as callable or base class
 "src/ai/backend/storage/volumes/netapp/netappclient.py" = ["UP040"]  # StorageID/VolumeID/QTreeID used as callables
 "src/ai/backend/manager/api/utils.py" = ["UP040"]  # LegacyBaseRequestModel used as base class
@@ -299,7 +321,7 @@ split-on-trailing-comma = true
 "tests/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
 # domain_factory imports the domains table lazily to avoid registering DomainRow
 # on the global SQLAlchemy registry for tests that never use a domain.
-"tests/unit/manager/conftest.py" = ["PLC0415"]
+"tests/unit/manager/repositories/conftest.py" = ["PLC0415"]
 "src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
 # - GraphQL legacy and modern resolvers may have unused parameters for GraphQL interface compatibility
 "src/ai/backend/manager/api/gql_legacy/**/*.py" = ["ARG"]

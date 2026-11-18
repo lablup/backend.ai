@@ -8,15 +8,9 @@ from typing import (
 )
 
 import aiodocker
+import trafaret as t
 
-from . import __version__, lpu_api
-from .types import LPUDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -42,6 +36,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 
+from . import __version__, lpu_api
+from .types import LPUDevice
+
 PREFIX = "hyperaccel-lpu"
 SLOT_NAME = "hyperaccel-lpu.device"
 
@@ -58,8 +55,10 @@ class LPUPlugin(AbstractComputePlugin):
     enabled: bool = True
 
     _all_devices: list[LPUDevice] | None
+    _host_ipc: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -194,7 +193,7 @@ class LPUPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",

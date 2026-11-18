@@ -123,12 +123,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessToken,
@@ -282,12 +284,12 @@ class ModelDeploymentMetadata:
         )
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="The resource group this deployment runs in.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -299,21 +301,21 @@ class ModelDeploymentMetadata:
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
-    @gql_field(
+    @gql_resolver(
         description="The project of this entity.",
         deprecation_reason="Use project_v2 instead.",
-    )  # type: ignore[misc]
+    )
     async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
         # Federated GroupNode stub is a relay.Node; pass the inner id so Strawberry
         # re-encodes the same global ID the graphene subgraph expects.
         return Project(id=ID(str(UUID(str(self.project_id)))))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The project this deployment belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def project_v2(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -327,21 +329,21 @@ class ModelDeploymentMetadata:
             ProjectID(UUID(str(self.project_id)))
         )
 
-    @gql_field(
+    @gql_resolver(
         description="The domain of this entity.",
         deprecation_reason="Use domain_v2 instead.",
-    )  # type: ignore[misc]
+    )
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
         # Federated DomainNode stub is a relay.Node; pass the inner id so Strawberry
         # re-encodes the same global ID the graphene subgraph expects.
         return Domain(id=ID(str(self.domain_name)))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The domain this deployment belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def domain_v2(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -406,12 +408,12 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         )
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The current active revision of this deployment.",
         )
-    )  # type: ignore[misc]
+    )
     async def current_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
         if self.current_revision_id is None:
             return None
@@ -419,12 +421,12 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             DeploymentRevisionID(UUID(str(self.current_revision_id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The revision currently being deployed (in progress, not yet active).",
         )
-    )  # type: ignore[misc]
+    )
     async def deploying_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
         if self.deploying_revision_id is None:
             return None
@@ -432,12 +434,12 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             DeploymentRevisionID(UUID(str(self.deploying_revision_id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The user who created this deployment.",
         )
-    )  # type: ignore[misc]
+    )
     async def creator(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -451,9 +453,9 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             UserID(UUID(str(self.created_user_id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")
-    )  # type: ignore[misc]
+    )
     async def deployment_policy(
         self, info: Info[StrawberryGQLContext]
     ) -> DeploymentPolicyGQL | None:
@@ -465,7 +467,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             return None
         return policy_data
 
-    @gql_field(description="The revision history of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The revision history of this entity.")
     async def revision_history(
         self,
         info: Info[StrawberryGQLContext],
@@ -506,7 +508,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_field(description="The replicas of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The replicas of this entity.")
     async def replicas(
         self,
         info: Info[StrawberryGQLContext],
@@ -547,7 +549,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description=(
@@ -556,7 +558,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
                 " field points to."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def replica_group_histories(
         self,
         info: Info[StrawberryGQLContext],
@@ -626,7 +628,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_field(description="The auto scaling rules of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The auto scaling rules of this entity.")
     async def auto_scaling_rules(
         self,
         info: Info[StrawberryGQLContext],
@@ -669,7 +671,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_field(description="The access tokens of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The access tokens of this entity.")
     async def access_tokens(
         self,
         info: Info[StrawberryGQLContext],
@@ -710,12 +712,12 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this deployment.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],
@@ -991,6 +993,16 @@ class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInp
     resource_group_name: str
     name: str | None = None
     tags: list[str] | None = None
+    designated_agent_ids: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUIDs of the agents the route sessions are placed on. Each must belong to"
+                " the resource group."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -1043,6 +1055,16 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET
+    designated_agent_ids: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Replaces the designated agent UUIDs; an empty list clears them. Each must"
+                " belong to the deployment's resource group. Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_input(

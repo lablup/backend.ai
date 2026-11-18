@@ -174,3 +174,4 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+/fixtures/agent/

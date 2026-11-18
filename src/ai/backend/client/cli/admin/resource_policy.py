@@ -10,7 +10,7 @@ from ai.backend.client.cli.pretty import print_info
 from ai.backend.client.cli.types import CLIContext
 
 # from ai.backend.client.output.fields import keypair_resource_policy_fields
-from . import admin
+from ._group import admin
 
 
 @admin.group()

@@ -413,6 +413,7 @@ def channel_verdicts(
     prefix: str,
     node: NotificationChannelNode,
     *,
+    seeded_id: UUID | None,
     name: str,
     description: str | None,
     channel_type: NotificationChannelType,
@@ -421,17 +422,26 @@ def channel_verdicts(
     created_by: UUID,
     written: WrittenByThisRun,
 ) -> list[Verdict]:
-    """Every place of one channel node."""
+    """Every place of one channel node. ``seeded_id`` is None when it was just created."""
     spec: list[Verdict]
     match channel_type:
         case NotificationChannelType.WEBHOOK:
             spec = webhook_spec_verdicts(prefix, node.spec, url=url)
         case NotificationChannelType.EMAIL:
             spec = email_spec_verdicts(prefix, node.spec)
+    entity_id = (
+        SameAs[UUID](
+            seeded_id,
+            Says("미리 저장한 채널의 id", english="the id of the channel created in advance"),
+        )
+        if seeded_id is not None
+        else SameAs[UUID](node.id, Says("노드의 id", english="the node's own id"))
+    )
     return [
         Skipped(
             f"{prefix}id", Says("데이터베이스가 생성합니다", english="the database generates it")
         ),
+        Held[UUID](f"{prefix}entity_id", node.entity_id, entity_id),
         Same(f"{prefix}name", node.name, name),
         Same(f"{prefix}description", node.description, description),
         Same(f"{prefix}channel_type", node.channel_type.value, channel_type.value),
@@ -451,6 +461,7 @@ def rule_verdicts(
     prefix: str,
     node: NotificationRuleNode,
     *,
+    seeded_id: UUID | None,
     name: str,
     description: str | None,
     rule_type: NotificationRuleType,
@@ -460,11 +471,20 @@ def rule_verdicts(
     created_by: UUID,
     written: WrittenByThisRun,
 ) -> list[Verdict]:
-    """Every place of one rule node."""
+    """Every place of one rule node. ``seeded_id`` is None when it was just created."""
+    entity_id = (
+        SameAs[UUID](
+            seeded_id,
+            Says("미리 저장한 규칙의 id", english="the id of the rule created in advance"),
+        )
+        if seeded_id is not None
+        else SameAs[UUID](node.id, Says("노드의 id", english="the node's own id"))
+    )
     return [
         Skipped(
             f"{prefix}id", Says("데이터베이스가 생성합니다", english="the database generates it")
         ),
+        Held[UUID](f"{prefix}entity_id", node.entity_id, entity_id),
         Same(f"{prefix}name", node.name, name),
         Same(f"{prefix}description", node.description, description),
         Same(f"{prefix}rule_type", node.rule_type.value, rule_type.value),
@@ -513,6 +533,7 @@ class TheNewChannelNode(Then[Any, NotificationChannelNode]):
         return channel_verdicts(
             "",
             node,
+            seeded_id=None,
             name=self.named,
             description=None,
             channel_type=self.channel_type,
@@ -551,6 +572,7 @@ class TheChannelNode(Then[AChannelAndACaller, NotificationChannelNode]):
         return channel_verdicts(
             "",
             node,
+            seeded_id=seed.id,
             name=seed.name if isinstance(self.named, Kept) else self.named,
             description=seed.description if isinstance(self.described, Kept) else self.described,
             channel_type=seed.channel_type,
@@ -675,6 +697,7 @@ class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
                 channel_verdicts(
                     f"items[{i}].",
                     got,
+                    seeded_id=expected.id,
                     name=expected.name,
                     description=expected.description,
                     channel_type=expected.channel_type,
@@ -711,11 +734,7 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
-                Same(
-                    f"items[{i}]",
-                    type(got).__name__ if got is not None else None,
-                    NotEnoughPermission.__name__,
-                )
+                Refused(NotEnoughPermission, got if isinstance(got, BaseException) else None)
             )
         return seen
 
@@ -752,15 +771,10 @@ class TheDeletedChannelId(Then[AChannelAndACaller, Any]):
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
+        seeded = Says("미리 저장한 채널", english="the channel created in advance")
         return [
-            Held[UUID](
-                "id",
-                payload.id,
-                SameAs[UUID](
-                    laid.channel.id,
-                    Says("미리 저장한 채널", english="the channel created in advance"),
-                ),
-            )
+            Held[UUID]("id", payload.id, SameAs[UUID](laid.channel.id, seeded)),
+            Held[UUID]("entity_id", payload.entity_id, SameAs[UUID](laid.channel.id, seeded)),
         ]
 
 
@@ -821,6 +835,7 @@ class TheNewRuleNode(Then[AChannelAndACaller, NotificationRuleNode]):
         return rule_verdicts(
             "",
             node,
+            seeded_id=None,
             name=self.named,
             description=None,
             rule_type=self.rule_type,
@@ -860,6 +875,7 @@ class TheRuleNode(Then[ARuleAndACaller, NotificationRuleNode]):
         return rule_verdicts(
             "",
             node,
+            seeded_id=seed.id,
             name=seed.name if isinstance(self.named, Kept) else self.named,
             description=seed.description if isinstance(self.described, Kept) else self.described,
             rule_type=seed.rule_type,
@@ -961,6 +977,7 @@ class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
                 rule_verdicts(
                     f"items[{i}].",
                     got,
+                    seeded_id=expected.id,
                     name=expected.name,
                     description=expected.description,
                     rule_type=expected.rule_type,
@@ -992,15 +1009,10 @@ class TheDeletedRuleId(Then[ARuleAndACaller, Any]):
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
+        seeded = Says("미리 저장한 규칙", english="the rule created in advance")
         return [
-            Held[UUID](
-                "id",
-                payload.id,
-                SameAs[UUID](
-                    laid.rule.id,
-                    Says("미리 저장한 규칙", english="the rule created in advance"),
-                ),
-            )
+            Held[UUID]("id", payload.id, SameAs[UUID](laid.rule.id, seeded)),
+            Held[UUID]("entity_id", payload.entity_id, SameAs[UUID](laid.rule.id, seeded)),
         ]
 
 
@@ -1071,6 +1083,7 @@ class TheChannelsComeBack(
             verdicts += channel_verdicts(
                 f"successes[{i}].",
                 node,
+                seeded_id=seed.id,
                 name=seed.name,
                 description=(
                     seed.description if isinstance(self.described, Kept) else self.described
@@ -1126,6 +1139,7 @@ class TheRulesComeBack(Then[ManyRulesAndACaller, PartialBulkPayload[Notification
             verdicts += rule_verdicts(
                 f"successes[{i}].",
                 node,
+                seeded_id=seed.id,
                 name=seed.name,
                 description=(
                     seed.description if isinstance(self.described, Kept) else self.described

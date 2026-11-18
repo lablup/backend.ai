@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.10.0a5",
+    "version": "26.10.0a9",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -4646,6 +4646,23 @@
             "title": "Resource Group Name",
             "type": "string"
           },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.",
+            "title": "Designated Agent Ids"
+          },
           "name": {
             "anyOf": [
               {
@@ -5134,6 +5151,18 @@
               }
             ],
             "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`."
           }
         },
         "title": "ModelServiceConfigInput",
@@ -5325,6 +5354,46 @@
           }
         },
         "title": "RollingUpdateConfigInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationDelimiterInput": {
+        "properties": {
+          "start": {
+            "description": "Opening delimiter, e.g. `{{`.",
+            "minLength": 1,
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "description": "Closing delimiter, e.g. `}}`.",
+            "minLength": 1,
+            "title": "End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ServiceArgumentInterpolationDelimiterInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationInput": {
+        "properties": {
+          "delimiters": {
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiterInput"
+            },
+            "minItems": 1,
+            "title": "Delimiters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delimiters"
+        ],
+        "title": "ServiceArgumentInterpolationInput",
         "type": "object"
       },
       "CreateDeploymentInput": {
@@ -6743,6 +6812,22 @@
             ],
             "description": "Updated deployment strategy. Omit to leave unchanged.",
             "title": "Default Deployment Strategy"
+          },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.",
+            "title": "Designated Agent Ids"
           }
         },
         "title": "UpdateDeploymentInput",
@@ -8204,7 +8289,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8221,7 +8305,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8441,7 +8524,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8458,7 +8540,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8475,7 +8556,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8492,7 +8572,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8509,7 +8588,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8526,7 +8604,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8697,7 +8774,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8713,7 +8789,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -9653,6 +9728,18 @@
             ],
             "default": null,
             "description": "Health check configuration for the model service."
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`."
           }
         },
         "title": "PresetModelServiceConfigInput",
@@ -10238,6 +10325,18 @@
               }
             ],
             "title": "Health Check"
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit or null to keep the current value.",
+            "title": "Interpolation"
           }
         },
         "title": "UpdatePresetModelServiceConfigInput",
@@ -11398,7 +11497,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -11431,7 +11529,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -11728,7 +11825,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -11768,7 +11864,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -12091,7 +12186,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -12138,7 +12232,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -12617,7 +12710,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -15701,10 +15793,10 @@
         "type": "object"
       },
       "AdminRegisterSSHKeypairInput": {
-        "description": "Admin request to register (overwrite) a user's SSH keypair.",
+        "description": "Admin request to register (overwrite) a user's SSH public key.",
         "properties": {
           "access_key": {
-            "description": "Access key whose SSH keypair will be replaced.",
+            "description": "Access key whose SSH public key will be replaced.",
             "title": "Access Key",
             "type": "string"
           },
@@ -15712,17 +15804,11 @@
             "description": "PEM-encoded SSH public key.",
             "title": "Ssh Public Key",
             "type": "string"
-          },
-          "ssh_private_key": {
-            "description": "PEM-encoded SSH private key.",
-            "title": "Ssh Private Key",
-            "type": "string"
           }
         },
         "required": [
           "access_key",
-          "ssh_public_key",
-          "ssh_private_key"
+          "ssh_public_key"
         ],
         "title": "AdminRegisterSSHKeypairInput",
         "type": "object"
@@ -25114,6 +25200,17 @@
         "title": "AdminSearchResourceGroupsInput",
         "type": "object"
       },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "CreateResourceGroupInput": {
         "description": "Input for creating a new resource group.",
         "properties": {
@@ -25201,6 +25298,23 @@
             "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
             "title": "Is Default",
             "type": "boolean"
+          },
+          "is_active": {
+            "default": true,
+            "description": "Whether the resource group is active.",
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_public": {
+            "default": true,
+            "description": "Whether the resource group is public.",
+            "title": "Is Public",
+            "type": "boolean"
+          },
+          "scheduler_type": {
+            "$ref": "#/components/schemas/SchedulerTypeDTO",
+            "default": "fifo",
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share)."
           }
         },
         "required": [
@@ -25290,17 +25404,6 @@
           "resource-group"
         ],
         "title": "PreemptionVictimScope",
-        "type": "string"
-      },
-      "SchedulerTypeDTO": {
-        "description": "Scheduler type for resource group.",
-        "enum": [
-          "fifo",
-          "lifo",
-          "drf",
-          "fair-share"
-        ],
-        "title": "SchedulerTypeDTO",
         "type": "string"
       },
       "UpdateResourceGroupInput": {
@@ -25522,7 +25625,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -25590,7 +25692,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -29390,7 +29491,8 @@
           "deployments",
           "sessions",
           "usage_records",
-          "usage_buckets"
+          "usage_buckets",
+          "projects"
         ],
         "title": "RetentionCategory",
         "type": "string"
@@ -39241,6 +39343,18 @@
             "description": "New password. Omit to leave unchanged.",
             "title": "Password"
           },
+          "old_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current password, required for own password changes. Added in 26.10.0.",
+            "title": "Old Password"
+          },
           "full_name": {
             "anyOf": [
               {
@@ -39579,6 +39693,360 @@
         "title": "ScopedSearchUsersInput",
         "type": "object"
       },
+      "VFolderAutoMountFilter": {
+        "description": "Filter for vfolder auto-mounts.\n\nAuto-mounts marked deleted are left out unless the top-level filter gives ``deleted_at``.\nA ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.",
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by auto-mount ID."
+          },
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the kind of scope the auto-mount is set on."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the ID of the project or the user."
+          },
+          "vfolder_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by vfolder ID."
+          },
+          "mount_destination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by mount destination."
+          },
+          "mount_permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountPermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by mount permission."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation time."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by last update time."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deletion time. Setting it on the top-level filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND logical combinator.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR logical combinator.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT logical combinator.",
+            "title": "Not"
+          }
+        },
+        "title": "VFolderAutoMountFilter",
+        "type": "object"
+      },
+      "VFolderAutoMountNestedFilter": {
+        "description": "The `auto_mounts` field of a vfolder filter.\n\nEach relation matches one auto-mount at a time.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "VFolderAutoMountNestedFilter",
+        "type": "object"
+      },
+      "VFolderAutoMountPermissionFilter": {
+        "description": "Filter for the permission a vfolder is auto-mounted with.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MountPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MountPermission"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MountPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MountPermission"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderAutoMountPermissionFilter",
+        "type": "object"
+      },
+      "VFolderAutoMountScopeType": {
+        "description": "Scope whose sessions a vfolder is auto-mounted into; a personal project is a project,\nand a user scope is mapped to the user directly.",
+        "enum": [
+          "project",
+          "user"
+        ],
+        "title": "VFolderAutoMountScopeType",
+        "type": "string"
+      },
+      "VFolderAutoMountScopeTypeFilter": {
+        "description": "Filter for the kind of scope an auto-mount is set on.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderAutoMountScopeTypeFilter",
+        "type": "object"
+      },
       "VFolderFilter": {
         "description": "Filter criteria for searching virtual folders.",
         "properties": {
@@ -39666,6 +40134,18 @@
             ],
             "default": null,
             "description": "Filter by the labels on the entity"
+          },
+          "auto_mounts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the auto-mounts set on the vfolder."
           },
           "entity_id": {
             "anyOf": [
@@ -40965,15 +41445,6 @@
         "title": "VFolderAutoMountScopeRef",
         "type": "object"
       },
-      "VFolderAutoMountScopeType": {
-        "description": "Scope whose sessions a vfolder is auto-mounted into; a personal project is a project,\nand a user scope is mapped to the user directly.",
-        "enum": [
-          "project",
-          "user"
-        ],
-        "title": "VFolderAutoMountScopeType",
-        "type": "string"
-      },
       "CreateVFolderAutoMountInput": {
         "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or be owned by that user.",
         "properties": {
@@ -41013,169 +41484,6 @@
         "title": "CreateVFolderAutoMountInput",
         "type": "object"
       },
-      "VFolderAutoMountFilter": {
-        "description": "Filter for vfolder auto-mounts.\n\nAuto-mounts marked deleted are left out unless the top-level filter gives ``deleted_at``.\nA ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.",
-        "properties": {
-          "entity_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by auto-mount ID."
-          },
-          "scope_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderAutoMountScopeTypeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by the kind of scope the auto-mount is set on."
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by the ID of the project or the user."
-          },
-          "vfolder_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by vfolder ID."
-          },
-          "mount_destination": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by mount destination."
-          },
-          "mount_permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderAutoMountPermissionFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by mount permission."
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by creation time."
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by last update time."
-          },
-          "deleted_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NullableDateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by deletion time. Setting it on the top-level filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not."
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "AND logical combinator.",
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "OR logical combinator.",
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "NOT logical combinator.",
-            "title": "Not"
-          }
-        },
-        "title": "VFolderAutoMountFilter",
-        "type": "object"
-      },
       "VFolderAutoMountOrder": {
         "description": "Order specification for vfolder auto-mounts.",
         "properties": {
@@ -41205,69 +41513,6 @@
         ],
         "title": "VFolderAutoMountOrderField",
         "type": "string"
-      },
-      "VFolderAutoMountPermissionFilter": {
-        "description": "Filter for the permission a vfolder is auto-mounted with.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MountPermission"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/MountPermission"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided values.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MountPermission"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude an exact match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/MountPermission"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided values.",
-            "title": "Not In"
-          }
-        },
-        "title": "VFolderAutoMountPermissionFilter",
-        "type": "object"
       },
       "VFolderAutoMountScope": {
         "description": "Scope for the scoped vfolder auto-mount query; the items are OR'd.",
@@ -41322,69 +41567,6 @@
           }
         },
         "title": "VFolderAutoMountScope",
-        "type": "object"
-      },
-      "VFolderAutoMountScopeTypeFilter": {
-        "description": "Filter for the kind of scope an auto-mount is set on.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided values.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude an exact match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided values.",
-            "title": "Not In"
-          }
-        },
-        "title": "VFolderAutoMountScopeTypeFilter",
         "type": "object"
       },
       "ScopedSearchVFolderAutoMountsInput": {
@@ -42713,6 +42895,19 @@
             "default": null,
             "description": "Free-text account description; defaults to empty string",
             "title": "Description"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Signup token passed to the PRE_SIGNUP hook",
+            "title": "Token"
           }
         },
         "required": [
@@ -42841,22 +43036,16 @@
         "type": "object"
       },
       "UploadSSHKeypairRequest": {
-        "description": "Request to upload an SSH keypair. The pair is validated for consistency.",
+        "description": "Request to upload an SSH public key.",
         "properties": {
           "pubkey": {
             "description": "SSH public key in standard format (e.g., 'ssh-rsa AAAA...')",
             "title": "Pubkey",
             "type": "string"
-          },
-          "privkey": {
-            "description": "SSH private key in PEM format",
-            "title": "Privkey",
-            "type": "string"
           }
         },
         "required": [
-          "pubkey",
-          "privkey"
+          "pubkey"
         ],
         "title": "UploadSSHKeypairRequest",
         "type": "object"
@@ -44434,7 +44623,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44451,7 +44639,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44607,7 +44794,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44624,7 +44810,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -49975,6 +50160,17 @@
               }
             ],
             "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "ModelServiceConfigDraft",
@@ -50066,6 +50262,54 @@
           "model_mount_config"
         ],
         "title": "RevisionInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolation": {
+        "additionalProperties": true,
+        "properties": {
+          "delimiters": {
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiter"
+            },
+            "minItems": 1,
+            "title": "Delimiters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delimiters"
+        ],
+        "title": "ServiceArgumentInterpolation",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationDelimiter": {
+        "additionalProperties": true,
+        "properties": {
+          "start": {
+            "description": "Opening delimiter.",
+            "examples": [
+              "{{"
+            ],
+            "minLength": 1,
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "description": "Closing delimiter.",
+            "examples": [
+              "}}"
+            ],
+            "minLength": 1,
+            "title": "End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ServiceArgumentInterpolationDelimiter",
         "type": "object"
       },
       "CreateDeploymentRequest": {
@@ -51257,7 +51501,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -51286,7 +51529,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -51318,7 +51560,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -51456,7 +51697,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -57499,7 +57739,7 @@
           }
         },
         "parameters": [],
-        "description": "Register (overwrite) a user's SSH keypair (admin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Register (overwrite) a user's SSH public key (admin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/keypairs/{access_key}/ssh": {
@@ -69305,24 +69545,6 @@
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
-      "patch": {
-        "operationId": "auth.generate_ssh_keypair",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
-      },
       "post": {
         "operationId": "auth.upload_ssh_keypair",
         "tags": [
@@ -71301,7 +71523,7 @@
           }
         },
         "parameters": [],
-        "description": "Simple liveness probe — returns 200 OK with version."
+        "description": "Simple liveness probe — returns 200 OK."
       }
     },
     "/health/livez": {

@@ -17,7 +17,7 @@ from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission, RoleSource
 from ai.backend.manager.errors.base.field import FieldNotFoundError
-from ai.backend.manager.errors.permission import PermissionAlreadyGranted
+from ai.backend.manager.errors.permission_field import PermissionAlreadyGranted
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.lookups import RolePermissionOwnerLookup
@@ -43,7 +43,7 @@ class TestRolePermissionWrite:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, TABLES):
             yield database_connection
 

@@ -56,7 +56,7 @@ from ai.backend.manager.errors.user import UserNotFound
         added_version="26.4.3",
         description="Query a single session by ID. Returns an error if not found.",
     )
-)  # type: ignore[misc]
+)
 async def session_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -70,7 +70,7 @@ async def session_v2(
         added_version="26.3.0",
         description="Query sessions with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_sessions_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -128,7 +128,7 @@ async def admin_sessions_v2(
             "Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: SessionScopeGQL,
@@ -185,7 +185,7 @@ async def scoped_sessions_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Page through the sessions the current user owns.",
     )
-)  # type: ignore[misc]
+)
 async def my_sessions_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -243,7 +243,7 @@ async def my_sessions_v2(
         added_version="26.4.2",
         description="List sessions within a specific project. Requires project membership or higher privileges.",
     )
-)  # type: ignore[misc]
+)
 async def project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,

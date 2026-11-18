@@ -14,15 +14,7 @@ import trafaret as t
 from aiodocker import Docker
 
 from ai.backend.accelerator.rebellions import __version__
-
-from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
-from .types import AbstractATOMDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -51,6 +43,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 
+from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
+from .types import AbstractATOMDevice
+
 _atom_config_iv = t.Dict({
     "general": t.Dict({
         t.Key("rbln_stat_path"): t.Null | t.String,
@@ -78,9 +73,11 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
+    _host_ipc: bool
     _enable_rsd: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -333,7 +330,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",

@@ -42,13 +42,10 @@ would be:
    mode = "webui"
    enable_signup = false
    allow_signup_without_confirmation = false
-   always_enqueue_compute_session = false
-   allow_project_resource_monitor = false
    allow_change_signin_mode = false
    mask_user_info = false
    enable_container_commit = false
    hide_agents = true
-   directory_based_usage = false
 
    [resources]
    open_port_to_public = false
@@ -62,16 +59,12 @@ would be:
    # Maximum per-file upload size (bytes)
    max_file_upload_size = 4294967296
 
-   [environments]
-   # allowlist = ""
-
    [ui]
    menu_blocklist = "pipeline"
 
    [api]
    domain = "default"
    endpoint = "http://bai-m1:8081"
-   text = "Backend.AI"
    ssl-verify = false
 
    [session]

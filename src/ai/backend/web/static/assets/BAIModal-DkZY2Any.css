@@ -1,0 +1,1 @@
+@layer components{.bai-modal__header,.bai-modal__footer{--layout-padding-outer-y:var(--spacing-3);--layout-padding-inner-y:var(--spacing-3)}.bai-modal__header>*,.bai-modal__footer>*{min-block-size:calc(var(--size-element-md) + var(--layout-padding-outer-y,var(--spacing-4)) + var(--layout-padding-inner-y,var(--spacing-4)));align-content:center}}

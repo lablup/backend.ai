@@ -901,13 +901,13 @@ class TestHandleHarborWebhook:
             assert result is not None
             mock_scanner.scan_single_ref.assert_called_once_with("test-project/python:3.9")
 
-    async def test_no_auth_header_proceeds_when_not_required(
+    async def test_registry_without_secret_rejects_webhook(
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
         sample_registry_row: ContainerRegistryRow,
     ) -> None:
-        """No auth header proceeds if auth is not required."""
+        """A registry with no secret rejects the webhook instead of scanning."""
         sample_registry_row.extra = {}
         sample_registry_row.registry_name = "registry.example.com"
         mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
@@ -932,10 +932,10 @@ class TestHandleHarborWebhook:
             mock_scanner = AsyncMock()
             mock_scanner_cls.return_value = mock_scanner
 
-            result = await container_registry_service.handle_harbor_webhook(action)
+            with pytest.raises(ContainerRegistryWebhookAuthorizationFailed):
+                await container_registry_service.handle_harbor_webhook(action)
 
-            assert result is not None
-            mock_scanner.scan_single_ref.assert_called_once()
+            mock_scanner.scan_single_ref.assert_not_called()
 
     async def test_invalid_auth_raises_authorization_failed(
         self,
@@ -1028,7 +1028,7 @@ class TestHandleHarborWebhook:
         sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Non-PUSH_ARTIFACT events are ignored (log only)."""
-        sample_registry_row.extra = {}
+        sample_registry_row.extra = {"webhook_auth_header": "Bearer secret123"}
         sample_registry_row.registry_name = "registry.example.com"
         mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
             return_value=sample_registry_row
@@ -1043,7 +1043,7 @@ class TestHandleHarborWebhook:
             ],
             project="project",
             img_name="img",
-            auth_header=None,
+            auth_header="Bearer secret123",
         )
 
         result = await container_registry_service.handle_harbor_webhook(action)
@@ -1081,7 +1081,7 @@ class TestHandleHarborWebhook:
         sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Multiple resources are processed sequentially."""
-        sample_registry_row.extra = {}
+        sample_registry_row.extra = {"webhook_auth_header": "Bearer secret123"}
         sample_registry_row.registry_name = "registry.example.com"
         mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
             return_value=sample_registry_row
@@ -1099,7 +1099,7 @@ class TestHandleHarborWebhook:
             ],
             project="project",
             img_name="img",
-            auth_header=None,
+            auth_header="Bearer secret123",
         )
 
         with patch(

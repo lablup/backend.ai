@@ -13,8 +13,8 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryEn
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.fixture import populate_fixture
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -27,7 +27,7 @@ class TestProvisionFixtureEntities:
     async def db(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [

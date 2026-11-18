@@ -651,25 +651,25 @@ class EventDispatcher(EventDispatcherGroup):
             )
             await asyncio.sleep(0)
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def _consume_loop(self) -> None:
-        async for msg in self._msg_queue.consume_queue():  # type: ignore
+        async for msg in self._msg_queue.consume_queue():
             if self._closed:
                 return
             try:
-                await self._dispatch_consumers(cast(MQMessage, msg))
+                await self._dispatch_consumers(msg)
             except Exception:
                 log.exception("event consume loop failed")
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
+        async for msg in self._msg_queue.subscribe_queue():
             if self._closed:
                 return
             try:
-                await self._dispatch_subscribers(cast(BroadcastMessagePayload, msg))
+                await self._dispatch_subscribers(msg)
             except Exception:
                 log.exception("event subscribe loop failed")
                 # Do not raise the exception to avoid stopping the loop.

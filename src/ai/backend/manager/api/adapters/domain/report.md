@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-Scenario: incomplete 3 / 14
+Scenario: incomplete 3 / 15
 
 - built from ops (12)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
@@ -17,9 +17,10 @@ Scenario: incomplete 3 / 14
   - restore: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
-- direct implementation (2)
+- direct implementation (3)
   - create: success present 2 · rejection present 4 (global_scope)
   - purge: success present 1 · rejection present 4 (single_entity)
+  - sync_registry_relations: success present 2 · rejection present 1 (relation)
 
 **bulk_get_ids**
 
@@ -40,8 +41,8 @@ Scenario: incomplete 3 / 14
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
-| [when the superadmin soft deletes a domain, the answer says it was done](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
+| [when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done and the domain comes back inactive](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
+| [when the superadmin soft deletes a domain, the answer says it was done and the domain comes back inactive](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
 | [a user granted nothing cannot soft delete a domain](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | rejected |
 | [soft-deleting a name no domain answers to is rejected as not found](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | rejected |
 
@@ -59,6 +60,7 @@ Scenario: incomplete 3 / 14
 | scenario | verdict |
 |---|---|
 | [when several domains are searched with a filter on the name of one, only the domain of that name is left in the answer](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | answered |
+| [when the superadmin, the only caller the global role admits, searches the domains holding an active user ordered by project name and takes only the first page, the first domain alone comes back with the remaining count and the third domain holding no active user is left out](#nested_searching-a-nested-user-filter-and-project-name-order-narrow-the-first-page) | answered |
 | [when this scenario seeded four domains, a search without a filter brings back all four](#searching-the-answer-counts-every-domain-the-scenario-laid) | answered |
 | [when one of the domains seeded in advance is soft-deleted and every domain is searched without a filter, that one comes back too](#searching-the-answer-includes-soft-deleted-domains-too) | answered |
 | [when a user who is not the superadmin asks to search every domain, the role rejects it](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | rejected |
@@ -82,6 +84,7 @@ Scenario: incomplete 3 / 14
 
 | scenario | verdict |
 |---|---|
+| [when a user granted nothing restores several inactive domains at once, none is restored and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-domains) | answered |
 | [when several soft-deleted domains are restored at once, all of them come back active](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **partial_bulk_update**
@@ -96,8 +99,8 @@ Scenario: incomplete 3 / 14
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin restores a domain that is not soft-deleted, the answer says it was restored](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
-| [when a soft-deleted domain is restored, the answer says it was restored](#deleting-restoring-answers-that-it-restored) | answered |
+| [when the superadmin restores a domain that is not soft-deleted, the answer says it was restored and the domain comes back active](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
+| [when a soft-deleted domain is restored, the answer says it was restored and the domain comes back active](#deleting-restoring-answers-that-it-restored) | answered |
 | [a user granted nothing cannot restore a domain](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | rejected |
 
 **scoped_search**
@@ -139,6 +142,14 @@ Scenario: incomplete 3 / 14
 | [a domain holding a user cannot be purged even by the superadmin](#deleting-a-domain-holding-a-user-is-not-purged) | rejected |
 | [a user granted nothing cannot purge a domain even when nothing else refers to it](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | rejected |
 | [purging a name no domain answers to is rejected as not found](#deleting-purging-a-name-nothing-answers-to-is-not-found) | rejected |
+
+**sync_registry_relations**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin syncs with a registry, the domain and that registry become related](#syncing_registry_relations-giving-a-registry-links-the-domain-to-it) | answered |
+| [syncing with an empty list removes the relation to a registry left out](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | answered |
+| [a user granted nothing on the domain is refused when syncing the relations](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | rejected |
 
 ### bulk_get_ids
 
@@ -291,7 +302,7 @@ Then
 
 #### [soft-deleting-a-domain-already-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done
+when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done and the domain comes back inactive
 
 Given
 
@@ -310,14 +321,24 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back inactive
   - deleted = True
+  - domain.name = 'twice-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-the-superadmin-soft-deletes-a-domain"></a>
 
 #### [the-superadmin-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when the superadmin soft deletes a domain, the answer says it was done
+when the superadmin soft deletes a domain, the answer says it was done and the domain comes back inactive
 
 Given
 
@@ -336,8 +357,18 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back inactive
   - deleted = True
+  - domain.name = 'to-delete-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-domain"></a>
 
@@ -544,6 +575,58 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+
+<a id="nested_searching-a-nested-user-filter-and-project-name-order-narrow-the-first-page"></a>
+
+#### [a-nested-user-filter-and-project-name-order-narrow-the-first-page](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when the superadmin, the only caller the global role admits, searches the domains holding an active user ordered by project name and takes only the first page, the first domain alone comes back with the remaining count and the third domain holding no active user is left out
+
+Given
+
+- three domains: the first and second hold one project of a different name and one active user, the third holds one inactive user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Domain third-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-4: up to 10 folders per user
+    - Keypair policy keypair-policy-4: up to 5 concurrent sessions
+    - superadmin user-4: has their own keypair and personal project
+  - Prepare one inactive user in the domain
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: status inactive, has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-4 searches the domains holding an active user, ordered by project name, taking only the first page
+
+Then
+
+- only the first domain, whose project name comes first, comes back with every field, and the third domain holding no active user is left out
+  - items count = 1
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+  - items[0].name = 'first-1'
+  - items[0].description = 'a domain that already existed'
+  - items[0].integration_name = None
+  - items[0].allowed_docker_registries = []
+  - items[0].is_active = True
+  - items[0].is_default = False
+  - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the domain seeded in advance
+  - items[0].created_at: the time this run wrote
+  - items[0].modified_at: the time this run wrote
 
 <a id="searching-the-answer-counts-every-domain-the-scenario-laid"></a>
 
@@ -801,6 +884,38 @@ Then
 
 ### partial_bulk_restore
 
+<a id="partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-domains"></a>
+
+#### [a-user-granted-nothing-restores-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+when a user granted nothing restores several inactive domains at once, none is restored and every one comes back in the failed list for lack of permission
+
+Given
+
+- 3 domains and one user in one of them, and the target domains the caller does not live in are inactive
+  - Domain home-1
+  - Domain wanted-1: inactive
+  - Domain other-1: inactive
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.partial_bulk_restore: user-1 restores 2 domains at once
+
+Then
+
+- no domain is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target domain
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target domain
+  - failed[1].message: a reason containing 'Insufficient permission'
+
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
 #### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
@@ -987,7 +1102,7 @@ Then
 
 #### [restoring-a-domain-that-is-not-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when the superadmin restores a domain that is not soft-deleted, the answer says it was restored
+when the superadmin restores a domain that is not soft-deleted, the answer says it was restored and the domain comes back active
 
 Given
 
@@ -1006,14 +1121,24 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back active
   - restored = True
+  - domain.name = 'active-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-restoring-answers-that-it-restored"></a>
 
 #### [restoring-answers-that-it-restored](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when a soft-deleted domain is restored, the answer says it was restored
+when a soft-deleted domain is restored, the answer says it was restored and the domain comes back active
 
 Given
 
@@ -1032,8 +1157,18 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back active
   - restored = True
+  - domain.name = 'to-restore-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-domain"></a>
 
@@ -1654,4 +1789,85 @@ Then
 
 - the call is rejected
   - rejected: EntityNotFoundError
+
+### sync_registry_relations
+
+<a id="syncing_registry_relations-giving-a-registry-links-the-domain-to-it"></a>
+
+#### [giving-a-registry-links-the-domain-to-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+when the superadmin syncs with a registry, the domain and that registry become related
+
+Given
+
+- one domain, one registry, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to that registry
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it"></a>
+
+#### [leaving-a-linked-registry-out-unlinks-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+syncing with an empty list removes the relation to a registry left out
+
+Given
+
+- one domain and one registry already related to each other, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Domain allowing-1 allows Container registry allowed-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to an empty list
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations"></a>
+
+#### [a-user-granted-nothing-may-not-sync-registry-relations](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+a user granted nothing on the domain is refused when syncing the relations
+
+Given
+
+- one domain, one registry, and one user in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to that registry
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 

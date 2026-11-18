@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -21,13 +20,14 @@ from ai.backend.manager.api.gql.resource_usage.types.user_usage import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List user usage buckets (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_user_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: UserUsageBucketFilter | None = None,
@@ -77,7 +77,7 @@ async def admin_user_usage_buckets(
         added_version="26.1.0", description="List user usage buckets (superadmin only)."
     ),
     deprecation_reason="Use admin_user_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def user_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: UserUsageBucketFilter | None = None,
@@ -92,7 +92,7 @@ async def user_usage_buckets(
     """Search user usage buckets with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access usage bucket data.")
+        raise SuperadminRequired("Only superadmin can access usage bucket data.")
 
     payload = await info.context.adapters.resource_usage.gql_admin_search_user(
         filter=filter.to_pydantic() if filter else None,

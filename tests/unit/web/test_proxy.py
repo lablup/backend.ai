@@ -1,6 +1,6 @@
 import asyncio
 import socket
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial
@@ -9,8 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
+import yarl
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Handler, Middleware
 from multidict import CIMultiDict, CIMultiDictProxy
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
@@ -28,7 +29,6 @@ from ai.backend.web.proxy import (
     websocket_handler,
 )
 from ai.backend.web.server import client_ctx
-from ai.backend.web.stats import WebStats
 
 
 @pytest.fixture
@@ -124,7 +124,6 @@ async def test_proxy_forwards_act_as_header_upstream(
     frontend_app = web.Application()
     frontend_app["config"] = MagicMock(api=MagicMock(domain="default", ssl_verify=False))
     frontend_app["client_pool"] = client_pool
-    frontend_app["stats"] = WebStats()
     frontend_app.router.add_route("*", "/func/{path:.*}", frontend_handler)
     client = await aiohttp_client(frontend_app)
 
@@ -160,7 +159,6 @@ async def _signup_gated_client(
         service=MagicMock(enable_signup=enable_signup),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "POST",
         "/func/{path:auth/signup}",
@@ -294,15 +292,17 @@ async def _endpoint_pool(endpoints: list[str]) -> AsyncIterator[HealthyEndpointP
 
 
 async def _proxy_client(
-    aiohttp_client: Any, client_pool: ClientPool, endpoint_pool: HealthyEndpointPool
+    aiohttp_client: Any,
+    client_pool: ClientPool,
+    endpoint_pool: HealthyEndpointPool,
+    middlewares: Sequence[Middleware] = (),
 ) -> Any:
-    app = web.Application()
+    app = web.Application(middlewares=middlewares)
     app["config"] = MagicMock(
         api=MagicMock(domain="default", ssl_verify=False),
         service=MagicMock(enable_signup=True),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "*",
         "/func/{path:.*$}",
@@ -370,6 +370,54 @@ class TestResendToAnotherEndpoint:
             assert len(received) == 1
 
 
+@pytest.fixture
+async def streaming_upstream(aiohttp_server: Any) -> _Upstream:
+    """An upstream that keeps streaming the response body until its peer closes."""
+
+    async def handler(request: web.Request) -> web.StreamResponse:
+        resp = web.StreamResponse()
+        await resp.prepare(request)
+        while True:
+            await resp.write(b"x" * 1024)
+            await asyncio.sleep(0.01)
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", handler)
+    server = await aiohttp_server(app)
+    return _Upstream(url=str(server.make_url("/")))
+
+
+class TestClientDisconnect:
+    async def test_client_disconnect_is_not_counted_against_upstream(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        streaming_upstream: _Upstream,
+    ) -> None:
+        finished: asyncio.Queue[None] = asyncio.Queue()
+
+        @web.middleware
+        async def notify_finished(request: web.Request, handler: Handler) -> web.StreamResponse:
+            try:
+                return await handler(request)
+            finally:
+                finished.put_nowait(None)
+
+        async with _endpoint_pool([streaming_upstream.url]) as endpoint_pool:
+            client = await _proxy_client(
+                aiohttp_client, client_pool, endpoint_pool, middlewares=[notify_finished]
+            )
+
+            # The failure threshold is 3, so 3 disconnects would mark the endpoint unhealthy.
+            for _ in range(3):
+                resp = await client.get("/func/folders")
+                await resp.content.readany()
+                resp.close()
+                await asyncio.wait_for(finished.get(), timeout=5)
+
+            assert endpoint_pool.is_healthy(streaming_upstream.url)
+
+
 @dataclass
 class _SessionStore:
     session: Session
@@ -419,7 +467,6 @@ async def _ws_proxy_client(
         session=MagicMock(login_session_extension_sec=None),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "*",
         "/func/{path:.*$}",
@@ -525,7 +572,6 @@ async def _cookie_proxy_client(
         service=MagicMock(enable_signup=True),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "*",
         "/func/{path:.*$}",
@@ -581,3 +627,51 @@ class TestRequestCookieForwarding:
 
         assert resp.status == 200
         assert received[-1] is None
+
+
+class TestDotSegmentPath:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "/func/cloud/..%2Fauth%2Fauthorize",
+            "/func/v2/x/public/%2E%2E%2F%2E%2E%2F%2E%2E%2Fadmin%2Fgql",
+            "/func/cloud/.%2Fauth",
+            "/pipeline/cloud/..%2Fauth%2Fauthorize",
+        ],
+    )
+    async def test_dot_segment_is_rejected_before_upstream(
+        self,
+        aiohttp_client: Any,
+        server_client_pool: ClientPool,
+        cookie_upstream: tuple[str, list[str | None]],
+        url: str,
+    ) -> None:
+        endpoint, received = cookie_upstream
+        async with _endpoint_pool([endpoint]) as endpoint_pool:
+            client = await _cookie_proxy_client(
+                aiohttp_client, server_client_pool, endpoint_pool, is_anonymous=True
+            )
+            resp = await client.get(yarl.URL(url, encoded=True))
+
+        assert resp.status == 400
+        assert received == []
+
+    @pytest.mark.parametrize(
+        "url", ["/func/cloud/signup", "/func/v2/x/public/y", "/pipeline/folders/a..b"]
+    )
+    async def test_path_without_dot_segment_is_proxied(
+        self,
+        aiohttp_client: Any,
+        server_client_pool: ClientPool,
+        cookie_upstream: tuple[str, list[str | None]],
+        url: str,
+    ) -> None:
+        endpoint, received = cookie_upstream
+        async with _endpoint_pool([endpoint]) as endpoint_pool:
+            client = await _cookie_proxy_client(
+                aiohttp_client, server_client_pool, endpoint_pool, is_anonymous=True
+            )
+            resp = await client.get(url)
+
+        assert resp.status == 200
+        assert len(received) == 1

@@ -30,7 +30,7 @@ from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
-from ai.backend.manager.errors.permission import InvalidFieldPermission
+from ai.backend.manager.errors.permission_field import InvalidFieldPermission
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -64,7 +64,7 @@ class _ScopeID(EntityIdentifier):
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [RoleRow, PermissionRow, PermissionFieldRow, VirtualEntityRow, EntityMembershipRow],

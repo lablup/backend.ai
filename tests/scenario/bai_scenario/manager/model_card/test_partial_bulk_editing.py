@@ -32,7 +32,7 @@ from bai_scenario.components.model_card import (
     CardsInAProjectAndSomeone,
     ModelCardLook,
     ModelCardsAndACaller,
-    NoCardIsProcessed,
+    TheOutsideCardIsRefused,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -55,8 +55,12 @@ class EditingEveryTitle(When[ModelCardsAndACaller, ModelCardAdapter, Edited]):
     @override
     def describe(self, laid: ModelCardsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 카드 {len(laid.cards)}개의 제목을 한 번에 수정합니다",
-            english=f"{laid.caller.username} edits the titles of {len(laid.cards)} cards at once",
+            f"{laid.caller.username}이 카드 {len(laid.cards) + len(laid.outside)}개의 제목을 "
+            "한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} edits the titles of {len(laid.cards) + len(laid.outside)} "
+                "cards at once"
+            ),
         )
 
     @override
@@ -64,7 +68,10 @@ class EditingEveryTitle(When[ModelCardsAndACaller, ModelCardAdapter, Edited]):
         with ActingAs(laid.caller):
             return await adapter.partial_bulk_update(
                 PartialBulkUpdateModelCardsInput(
-                    items=[UpdateModelCardInput(id=card.id, title=EDITED) for card in laid.cards]
+                    items=[
+                        UpdateModelCardInput(id=card.id, title=EDITED)
+                        for card in (*laid.cards, *laid.outside)
+                    ]
                 )
             )
 
@@ -130,27 +137,34 @@ class AUserGrantedUpdateEditsSeveral(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingEditsNone(
+class AUserGrantedUpdateEditsNoneOutside(
     Scenario[TestSeedingSession, ModelCardsAndACaller, ModelCardAdapter, Edited]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-edits-none-of-several-model-cards"
+        return "a-card-outside-the-granted-project-is-not-edited"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면 수정된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            "프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 그 프로젝트의 카드와 권한을 "
+            "받지 않은 다른 프로젝트의 카드를 한 번에 수정하면, 그 프로젝트의 카드만 새 제목으로 "
+            "오고 다른 프로젝트의 카드는 권한이 없다는 이유로 실패 목록에 옵니다",
             english=(
-                "when a user granted nothing tries to update several cards at once, nothing "
-                "is updated and all come back in the failed list for lack of permission"
+                "when a user granted read and update permission on model cards in the project "
+                "edits a card of that project and a card of another project at once, only the "
+                "card of that project comes back with the new title and the other one comes "
+                "back in the failed list for lack of permission"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ModelCardsAndACaller]:
-        return CardsInAProjectAndSomeone(count=2)
+        return CardsInAProjectAndSomeone(
+            count=1, granted=(Permission.READ, Permission.UPDATE), outside=1
+        )
 
     @override
     def when(self) -> When[ModelCardsAndACaller, ModelCardAdapter, Edited]:
@@ -158,12 +172,12 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def then(self) -> Then[ModelCardsAndACaller, Edited]:
-        return NoCardIsProcessed(reason="Insufficient permission")
+        return TheOutsideCardIsRefused(started=self.started, title=EDITED)
 
 
 SCENARIOS: list[CardStep] = [
     AUserGrantedUpdateEditsSeveral(started=datetime.now(UTC)),
-    AUserGrantedNothingEditsNone(),
+    AUserGrantedUpdateEditsNoneOutside(started=datetime.now(UTC)),
 ]
 
 

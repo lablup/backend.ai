@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import re
+import ssl
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -50,6 +51,7 @@ class PurityClientArgs:
     endpoint: str
     api_token: str
     api_version: str = "1.8"
+    ssl_context: ssl.SSLContext | bool = False
 
 
 class PurityClient:
@@ -61,6 +63,7 @@ class PurityClient:
     _endpoint: URL
     _api_token: str
     _api_version: str
+    _ssl_context: ssl.SSLContext | bool
     _auth_token: str | None
     _lock: asyncio.Lock
     _session: aiohttp.ClientSession
@@ -69,6 +72,7 @@ class PurityClient:
         self._endpoint = URL(args.endpoint)
         self._api_token = args.api_token
         self._api_version = args.api_version
+        self._ssl_context = args.ssl_context
         self._auth_token = None
         self._lock = asyncio.Lock()
         self._session = aiohttp.ClientSession()
@@ -86,7 +90,7 @@ class PurityClient:
             async with self._session.post(
                 self._endpoint / "api" / "login",
                 headers={"api-token": self._api_token},
-                ssl=False,
+                ssl=self._ssl_context,
                 raise_for_status=True,
             ) as resp:
                 self._auth_token = resp.headers["x-auth-token"]
@@ -103,9 +107,7 @@ class PurityClient:
             raise UnauthorizedPurityClient("The auth token for Purity API is not initialized.")
         return {"x-auth-token": self._auth_token}
 
-    async def _pages(
-        self, path: str, query: PurityListQuery
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    async def _pages(self, path: str, query: PurityListQuery) -> AsyncGenerator[dict[str, Any]]:
         """Yields each page of a listing, following its continuation token."""
         pagination_token = ""
         while True:
@@ -114,7 +116,7 @@ class PurityClient:
                 self._endpoint / "api" / self._api_version / path,
                 headers=self._auth_headers(),
                 params=page_query.model_dump(mode="json", by_alias=True, exclude_none=True),
-                ssl=False,
+                ssl=self._ssl_context,
                 raise_for_status=True,
             ) as resp:
                 page: dict[str, Any] = await resp.json()
@@ -142,7 +144,7 @@ class PurityClient:
             console_url=str(self._endpoint),
         )
 
-    async def get_nfs_metric(self, fs_name: str) -> AsyncGenerator[PurityNFSMetric, None]:
+    async def get_nfs_metric(self, fs_name: str) -> AsyncGenerator[PurityNFSMetric]:
         async for page in self._pages(
             "file-systems/performance", PurityListQuery(names=fs_name, protocol="NFS")
         ):

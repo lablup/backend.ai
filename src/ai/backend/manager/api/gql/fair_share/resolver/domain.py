@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -32,13 +31,14 @@ from ai.backend.manager.api.gql.fair_share.types.domain import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Get domain fair share data (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -55,7 +55,7 @@ async def admin_domain_fair_share(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List domain fair shares (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_domain_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: DomainFairShareFilter | None = None,
@@ -109,7 +109,7 @@ async def admin_domain_fair_shares(
         added_version="26.2.0",
         description="Get domain fair share data within resource group scope.",
     )
-)  # type: ignore[misc]
+)
 async def rg_domain_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
@@ -126,7 +126,7 @@ async def rg_domain_fair_share(
     BackendAIGQLMeta(
         added_version="26.2.0", description="List domain fair shares within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_domain_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
@@ -180,7 +180,7 @@ async def rg_domain_fair_shares(
         added_version="26.1.0", description="Get domain fair share data (superadmin only)."
     ),
     deprecation_reason="Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -189,7 +189,7 @@ async def domain_fair_share(
     """Get a single domain fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     result = await info.context.adapters.fair_share.get_domain(
         GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
@@ -202,7 +202,7 @@ async def domain_fair_share(
         added_version="26.1.0", description="List domain fair shares (superadmin only)."
     ),
     deprecation_reason="Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def domain_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: DomainFairShareFilter | None = None,
@@ -217,7 +217,7 @@ async def domain_fair_shares(
     """Search domain fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
@@ -343,7 +343,7 @@ async def bulk_upsert_domain_fair_share_weight(
     """Bulk upsert domain fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+        raise SuperadminRequired("Only superadmin can modify fair share data.")
 
     result = await info.context.adapters.fair_share.atomic_bulk_upsert_domain(input.to_pydantic())
     return BulkUpsertDomainFairShareWeightPayload.from_pydantic(result)

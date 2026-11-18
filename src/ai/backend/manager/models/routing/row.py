@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -159,32 +158,7 @@ class RoutingRow(Base):
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
 
-    # The two reads below serve api/gql_legacy only; delete them together with gql_legacy.
-
-    @classmethod
-    async def list(
-        cls,
-        db_sess: AsyncSession,
-        endpoint_id: uuid.UUID,
-        project: uuid.UUID | None = None,
-        domain: str | None = None,
-        user_uuid: uuid.UUID | None = None,
-    ) -> Sequence[RoutingRow]:
-        """Used only by Routing.load_all, which nothing calls."""
-        query = (
-            sa.select(RoutingRow)
-            .filter(RoutingRow.endpoint == endpoint_id)
-            .filter(RoutingRow.status.in_(list(RouteStatus.active_route_statuses())))
-            .order_by(sa.desc(RoutingRow.created_at))
-        )
-        if project:
-            query = query.filter(RoutingRow.project == project)
-        if domain:
-            query = query.filter(RoutingRow.domain == domain)
-        if user_uuid:
-            query = query.filter(RoutingRow.session_owner == user_uuid)
-        result = await db_sess.execute(query)
-        return result.scalars().all()
+    # The read below serves api/gql_legacy only; delete it together with gql_legacy.
 
     @classmethod
     async def get(

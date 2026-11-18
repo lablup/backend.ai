@@ -29,10 +29,12 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -173,7 +175,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         )
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description=(
@@ -181,7 +183,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
                 "or when the recorded id does not name one that still exists."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def entity(
         self,
         info: Info[StrawberryGQLContext],
@@ -198,7 +200,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             RuntimeEntityID(EntityType.from_name(self.entity_type), self.target_entity_id)
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -206,7 +208,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
                 "records no scope."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def scopes(
         self,
         info: Info[StrawberryGQLContext],
@@ -250,9 +252,9 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             count=payload.total_count,
         )
 
-    @gql_field(
+    @gql_resolver(
         description="The user who triggered this audit log entry, resolved from triggered_by UUID."
-    )  # type: ignore[misc]
+    )
     async def user(
         self,
         info: Info[StrawberryGQLContext],
@@ -274,7 +276,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             return None
         return user_data
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description=(
@@ -282,7 +284,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
                 "Differs from user only while a super admin is impersonating a target."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def actor(
         self,
         info: Info[StrawberryGQLContext],

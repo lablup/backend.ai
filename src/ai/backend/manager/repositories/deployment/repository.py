@@ -76,6 +76,7 @@ from ai.backend.manager.data.deployment.types import (
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
     ModelRevisionData,
     ResourceGroupCleanupConfig,
     RevisionSearchResult,
@@ -99,6 +100,7 @@ from ai.backend.manager.models.deployment_policy.upserters import DeploymentPoli
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.searchers import (
     DeploymentAccessTokenSearcher,
     DeploymentIDSearcher,
@@ -114,6 +116,7 @@ from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
 from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
@@ -371,7 +374,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (modern, light: revision *ids* only).
+        """Get endpoint information with its revisions and policy.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -383,8 +386,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (legacy, full: includes the current/deploying
-        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        """Get endpoint information with its revisions and policy, for the REST v1 surface.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -423,17 +425,17 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def replace_designated_agents(
+    async def set_designated_agents(
         self,
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``.
+        """Make ``agent_uuids`` the agents the deployment designates.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
+        await self._db_source.set_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
     async def fetch_designated_agents_by_deployment_ids(
@@ -1585,6 +1587,20 @@ class DeploymentRepository:
         ``DeploymentSearcher``.
         """
         return await self._db_source.search_legacy_endpoints(searcher)
+
+    @deployment_repository_resilience.apply()
+    async def scoped_search_deployments(
+        self, scoped: ScopedSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of the deployments the scopes reach, each with its policy."""
+        return await self._db_source.scoped_search_deployments(scoped)
+
+    @deployment_repository_resilience.apply()
+    async def global_search_deployments(
+        self, global_searcher: GlobalSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of every deployment, each with its policy."""
+        return await self._db_source.global_search_deployments(global_searcher)
 
     # ========== Access Token Operations ==========
 

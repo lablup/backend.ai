@@ -24,6 +24,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import (
     BackendAISchema,
@@ -77,6 +78,8 @@ __all__ = (
     "RouteTrafficStatus",
     "RuntimeVariant",
     "ProjectDeploymentScope",
+    "ServiceArgumentInterpolationDelimiterInfoDTO",
+    "ServiceArgumentInterpolationInfoDTO",
 )
 
 
@@ -299,6 +302,21 @@ class ModelHealthCheckInfoDTO(BaseResponseModel):
     )
 
 
+class ServiceArgumentInterpolationDelimiterInfoDTO(BaseResponseModel):
+    start: str = Field(description="Opening delimiter.")
+    end: str = Field(description="Closing delimiter.")
+
+
+class ServiceArgumentInterpolationInfoDTO(BaseResponseModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInfoDTO] = Field(
+        default_factory=lambda: [
+            ServiceArgumentInterpolationDelimiterInfoDTO(start="${{", end="}}"),
+            ServiceArgumentInterpolationDelimiterInfoDTO(start="{", end="}"),
+        ],
+        description="Delimiters that mark the variables to fill in the service arguments.",
+    )
+
+
 class ModelServiceConfigInfoDTO(BaseResponseModel):
     """Output DTO for model service configuration."""
 
@@ -328,6 +346,13 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
     port: int = Field(description="Port number for the model service.")
     health_check: ModelHealthCheckInfoDTO | None = Field(
         default=None, description="Health check configuration for the model service."
+    )
+    interpolation: ServiceArgumentInterpolationInfoDTO = Field(
+        default_factory=ServiceArgumentInterpolationInfoDTO,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Defaults to `${{ }}` and `{ }`."
+        ),
     )
 
 

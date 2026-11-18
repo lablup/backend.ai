@@ -54,12 +54,12 @@ multidict~=6.6.4
 namedlist~=1.8
 networkx~=3.3.0
 orjson~=3.11.6
-opentelemetry-api~=1.45.1
-opentelemetry-sdk~=1.45.1
-opentelemetry-exporter-otlp-proto-grpc~=1.45.1
-opentelemetry-instrumentation-aiohttp-client~=0.66b1
-opentelemetry-instrumentation-aiohttp-server~=0.66b1
-opentelemetry-instrumentation-logging~=0.66b1
+opentelemetry-api~=1.45.2
+opentelemetry-sdk~=1.45.2
+opentelemetry-exporter-otlp-proto-grpc~=1.45.2
+opentelemetry-instrumentation-aiohttp-client~=0.66b2
+opentelemetry-instrumentation-aiohttp-server~=0.66b2
+opentelemetry-instrumentation-logging~=0.66b2
 pexpect~=4.8
 prometheus-client~=0.21.1
 psutil~=7.0
@@ -75,7 +75,8 @@ pyzmq~=26.4
 PyJWT~=2.15.1
 PyYAML~=6.0
 pyasn1>=0.6.5
-pydantic[email]~=2.13.5
+oauthlib>=4.0.1
+pydantic[email]~=2.14.3
 packaging>=24.1
 huggingface-hub~=0.34.3
 rich~=13.6
@@ -111,7 +112,7 @@ pytest-mock>=3.14.0
 testcontainers[postgres,minio]~=4.13.3
 
 # installed by pants [pytest] and [mypy] from this resolve
-mypy==1.18.2
+mypy==2.4.1
 pytest-asyncio>=0.24.0
 pytest-cov>=5.0
 pytest-custom_exit_code>=0.3.0
@@ -137,4 +138,4 @@ types-tqdm<4.70
 backend.ai-krunner-alpine==5.4.0
 backend.ai-krunner-static-gnu==4.4.0
 
-etcd-client-py~=0.5.1
+etcd-client-py~=0.6.1

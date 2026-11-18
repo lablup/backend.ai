@@ -35,6 +35,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.image import (
     ImageAccessForbiddenError,
     ImageAliasNotFound,
@@ -1027,36 +1028,36 @@ class TestPreloadImage(ImageServiceBaseFixtures):
         image_service: ImageService,
         image_data: ImageData,
     ) -> None:
-        """PreloadImageAction currently raises NotImplementedError."""
+        """PreloadImageAction currently raises NotImplementedAPI."""
         action = PreloadImageAction(
             image_ids=[image_data.id],
             agents=["agent-001"],
         )
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedAPI):
             await image_service.preload_image(action)
 
     async def test_preload_image_empty_lists_raises_not_implemented(
         self,
         image_service: ImageService,
     ) -> None:
-        """Empty image/agent lists still raises NotImplementedError."""
+        """Empty image/agent lists still raises NotImplementedAPI."""
         action = PreloadImageAction(image_ids=[], agents=[])
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedAPI):
             await image_service.preload_image(action)
 
     async def test_preload_image_multiple_images_agents_raises_not_implemented(
         self,
         image_service: ImageService,
     ) -> None:
-        """Multiple image/agent combinations raises NotImplementedError."""
+        """Multiple image/agent combinations raises NotImplementedAPI."""
         action = PreloadImageAction(
             image_ids=[ImageID(uuid.uuid4()), ImageID(uuid.uuid4())],
             agents=["agent-001", "agent-002"],
         )
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedAPI):
             await image_service.preload_image(action)
 
 

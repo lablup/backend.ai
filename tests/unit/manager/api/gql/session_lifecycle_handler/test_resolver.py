@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -77,7 +78,7 @@ class TestAdminSessionLifecycleHandlers:
         self, info: MagicMock, case: _RefusedCallerCase
     ) -> None:
         with with_user_context(case.caller), pytest.raises(InsufficientPrivilege):
-            await admin_session_lifecycle_handlers.base_resolver(info)
+            await cast(Any, admin_session_lifecycle_handlers).base_resolver(info)
 
         info.context.adapters.session_lifecycle_handler.list_session_lifecycle_handlers.assert_not_awaited()
 
@@ -88,7 +89,7 @@ class TestAdminSessionLifecycleHandlers:
         superadmin: UserData,
     ) -> None:
         with with_user_context(superadmin):
-            result = await admin_session_lifecycle_handlers.base_resolver(info)
+            result = await cast(Any, admin_session_lifecycle_handlers).base_resolver(info)
 
         assert result is not None
         assert [

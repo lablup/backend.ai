@@ -139,7 +139,7 @@ class TestCursorPaginationBugFixes:
         return mock
 
     @pytest.fixture(autouse=True)
-    def patch_resolve_global_id(self, cursor_row_id: uuid.UUID) -> Generator[None, None, None]:
+    def patch_resolve_global_id(self, cursor_row_id: uuid.UUID) -> Generator[None]:
         """Auto-apply patch for AsyncNode.resolve_global_id to all tests."""
         with patch(
             "ai.backend.manager.api.gql_legacy.base.AsyncNode.resolve_global_id",

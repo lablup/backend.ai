@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-Scenario: incomplete 15 / 17
+Scenario: incomplete 14 / 17
 
 - built from ops (10)
   - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
@@ -16,7 +16,7 @@ Scenario: incomplete 15 / 17
   - search_by_domain_name: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - search_by_user: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - ops + direct implementation (4)
-  - assign_users: success present 1 · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - assign_users: success present 1 · rejection present 2 (atomic_bulk_get_ops, scope)
   - partial_bulk_update: success present 3 · rejection absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: success absent · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: success present 2 · rejection absent (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
@@ -43,6 +43,8 @@ Scenario: incomplete 15 / 17
 | scenario | verdict |
 |---|---|
 | [when a project and a role in its scope are in place and a user is assigned, the user is put on the roster](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | answered |
+| [an assignment is guarded by the permission to add users to the project, so a user granted only the permission to read users is rejected for lack of permission](#project-a-user-who-only-reads-users-may-not-assign-a-user-to-the-project) | rejected |
+| [assigning a user with a role in another project's scope is rejected, because the role is not one of the roles of the project assigned to](#project-assigning-a-user-with-a-role-of-another-project-is-refused) | rejected |
 
 **partial_bulk_update**
 
@@ -251,6 +253,70 @@ Then
 
 - the roster holds the user assigned, and no one else
   - items: same as the one user assigned
+
+<a id="project-a-user-who-only-reads-users-may-not-assign-a-user-to-the-project"></a>
+
+#### [a-user-who-only-reads-users-may-not-assign-a-user-to-the-project](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
+
+an assignment is guarded by the permission to add users to the project, so a user granted only the permission to read users is rejected for lack of permission
+
+Given
+
+- one project, the role in its scope, the user to assign, and a regular user granted only the permission to read users in that domain
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project research-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Role project-member-1: applies only within the scope it is granted in
+  - Role user-reader-1: applies only within the scope it is granted in
+  - Role user-reader-1: READ allowed on every user
+  - regular user user-2: holds Role user-reader-1
+
+When
+
+- ProjectAdapter.assign_users: user-2 assigns user-1 to research-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="project-assigning-a-user-with-a-role-of-another-project-is-refused"></a>
+
+#### [assigning-a-user-with-a-role-of-another-project-is-refused](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
+
+assigning a user with a role in another project's scope is rejected, because the role is not one of the roles of the project assigned to
+
+Given
+
+- one project, a role in another project's scope, the user to assign, and the superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project research-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Project other-1
+  - Role project-member-1: applies only within the scope it is granted in
+
+When
+
+- ProjectAdapter.assign_users: user-2 assigns user-1 to research-1
+
+Then
+
+- the call is rejected
+  - rejected: RoleNotFound
 
 ### partial_bulk_update
 

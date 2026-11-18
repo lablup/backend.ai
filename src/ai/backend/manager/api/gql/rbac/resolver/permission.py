@@ -51,7 +51,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.3.0",
         description="List scoped permissions with filtering and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_permissions(
     info: Info[StrawberryGQLContext],
     filter: PermissionFilter | None = None,
@@ -99,7 +99,7 @@ async def admin_permissions(
     BackendAIGQLMeta(
         added_version="26.3.0", description="List valid RBAC scope-entity type combinations."
     )
-)  # type: ignore[misc]
+)
 async def rbac_scope_entity_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[ScopeEntityCombinationGQL] | None:
@@ -112,7 +112,7 @@ async def rbac_scope_entity_combinations(
         added_version="26.4.2",
         description="List valid RBAC entity-operation combinations.",
     )
-)  # type: ignore[misc]
+)
 async def rbac_entity_operation_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[EntityOperationCombinationGQL] | None:
@@ -125,7 +125,7 @@ async def rbac_entity_operation_combinations(
         added_version="26.4.2",
         description="List complete RBAC scope-entity-operation combinations (permission matrix).",
     )
-)  # type: ignore[misc]
+)
 async def rbac_permission_matrix(
     info: Info[StrawberryGQLContext],
 ) -> list[ScopeEntityOperationCombinationGQL] | None:
@@ -294,7 +294,7 @@ async def partial_bulk_remove_role_permissions(
             " the caller reaches nothing on answer alike, with no bits."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_scope_permissions(
     info: Info[StrawberryGQLContext],
     input: MyScopePermissionsInputGQL,
@@ -312,7 +312,7 @@ async def my_scope_permissions(
             " carries no failure channel and the whole query fails or none of it does."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_atomic_bulk_scope_permissions(
     info: Info[StrawberryGQLContext],
     input: MyAtomicBulkScopePermissionsInputGQL,

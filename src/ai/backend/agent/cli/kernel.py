@@ -9,10 +9,8 @@ parity-verification tool for the agent re-architecture (BEP-1057): run
 the observed container / returned kernel info / state transitions are unchanged.
 
 Connection uses the agent's own ``agent.toml`` (``-f/--config``): the RPC listen
-address and auth keypair are read from it. When the agent runs without RPC auth
-(the local-dev default, ``rpc-auth-agent-keypair`` unset) no keypair is needed.
-When auth is enabled, pass ``--manager-keypair`` pointing at the manager's
-``*.key_secret`` file.
+address and auth keypair are read from it. Pass ``--manager-keypair`` pointing at
+the manager's ``*.key_secret`` file.
 
 See ``PARITY.md`` in this directory for the per-step verification procedure.
 """
@@ -85,15 +83,12 @@ def _resolve_agent_addr(cfg: AgentUnifiedConfig) -> str:
 def _build_auth_handler(
     cfg: AgentUnifiedConfig,
     manager_keypair: Path | None,
-) -> Any | None:
-    """Build a ``ManagerAuthHandler`` when the agent has RPC auth enabled, else None."""
+) -> Any:
+    """Build the ``ManagerAuthHandler`` for the agent's RPC auth."""
     agent_keypair = cfg.agent_common.rpc_auth_agent_keypair
-    if agent_keypair is None:
-        # Agent binds RPC without CURVE auth (local-dev default).
-        return None
     if manager_keypair is None:
         raise click.ClickException(
-            "The agent has RPC auth enabled (rpc-auth-agent-keypair is set); "
+            "The agent requires RPC auth; "
             "pass --manager-keypair pointing at the manager's *.key_secret file."
         )
     from zmq.auth.certs import load_certificate

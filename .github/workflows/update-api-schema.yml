@@ -37,6 +37,8 @@ jobs:
       env:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Install the Pants launcher
+      uses: ./.github/actions/pants-launcher
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       # See: github.com/pantsbuild/actions/tree/main/init-pants/

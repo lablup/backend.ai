@@ -1,6 +1,6 @@
 """여러 id로 조회 — 검색을 id 조건으로 호출하므로 권한 경로가 검색과 같다.
 
-인증만 확인하므로 거부 원소는 생기지 않는다. 없는 id만 빈 항목으로 반환된다.
+권한이 없는 호출자는 거부된다. 없는 id만 빈 항목으로 반환된다.
 """
 
 from __future__ import annotations
@@ -15,8 +15,16 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Says,
+    Scenario,
+    Then,
+    When,
+)
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
     ManyPresetsAndACaller,
     ManyPresetsAndSomeone,
@@ -148,7 +156,42 @@ class AnEmptyListAnswersNothing(
         return NothingIsAnswered()
 
 
-SCENARIOS: list[LoadingStep] = [TheLaidAndTheUnknownComeBackInOrder(), AnEmptyListAnswersNothing()]
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotLoad(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-load-presets-by-ids"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 없는 사용자가 프리셋 id 를 한 번에 조회하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing reads presets by ids at once, it is rejected "
+                "for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone(reading_in_public=False)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]:
+        return LoadingTheLaidAndOneUnknown()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+SCENARIOS: list[LoadingStep] = [
+    TheLaidAndTheUnknownComeBackInOrder(),
+    AnEmptyListAnswersNothing(),
+    AUserGrantedNothingMayNotLoad(),
+]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())

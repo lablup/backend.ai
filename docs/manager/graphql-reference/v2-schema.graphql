@@ -255,17 +255,14 @@ type AdminRefreshDeploymentRevisionsPayload {
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.10.0.
 """
 input AdminRegisterSSHKeypairInput {
-  """Access key whose SSH keypair will be replaced."""
+  """Access key whose SSH public key will be replaced."""
   accessKey: String!
 
   """PEM-encoded SSH public key."""
   sshPublicKey: String!
-
-  """PEM-encoded SSH private key."""
-  sshPrivateKey: String!
 }
 
 """
@@ -466,6 +463,14 @@ enum AgentResourceSlotOrderField {
   RESERVED
   PRERESERVED
   USED
+}
+
+"""Added in 26.10.0. How agents are chosen for a session's kernels."""
+enum AgentSelectionStrategy {
+  DISPERSED
+  CONCENTRATED
+  ROUNDROBIN
+  LEGACY
 }
 
 """Added in 25.15.0. Aggregated resource statistics for an agent."""
@@ -3666,6 +3671,15 @@ input CreateResourceGroupInput {
   Added in 26.9.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
   """
   isDefault: Boolean! = false
+
+  """Added in 26.10.0. Whether the resource group is active."""
+  isActive: Boolean! = true
+
+  """Added in 26.10.0. Whether the resource group is public."""
+  isPublic: Boolean! = true
+
+  """Added in 26.10.0. Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE)."""
+  schedulerType: SchedulerType! = FIFO
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
@@ -6750,6 +6764,10 @@ type HuggingFaceRegistry implements Node {
   entityId: UUID!
   url: String!
   name: String!
+
+  """
+  Access token for the registry. Masked unless the caller is a superadmin.
+  """
   token: String
 }
 
@@ -8433,8 +8451,10 @@ type KeyPairV2 implements Node {
   """Name of the resource policy assigned to this keypair."""
   resourcePolicy: String!
 
-  """The SSH public key associated with this keypair."""
-  sshPublicKey: String
+  """
+  The public key of the owner's default SSH keypair, the same for every keypair of one user.
+  """
+  sshPublicKey: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
 
   """UUID of the user who owns this keypair."""
   userId: UUID!
@@ -9504,6 +9524,11 @@ input ModelDeploymentMetadataInput {
   resourceGroupName: String!
   name: String = null
   tags: [String!] = null
+
+  """
+  Added in 26.10.0. UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.
+  """
+  designatedAgentIds: [UUID!] = null
 }
 
 """
@@ -9969,6 +9994,9 @@ type ModelServiceConfig {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
+
+  """Added in 26.10.0. Variable syntax of the service arguments."""
+  interpolation: ServiceArgumentInterpolation!
 }
 
 """
@@ -9998,6 +10026,11 @@ input ModelServiceConfigInput {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheckInput = null
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`.
+  """
+  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """
@@ -10859,7 +10892,7 @@ type Mutation {
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload
 
@@ -10923,7 +10956,7 @@ type Mutation {
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload
 
-  """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
+  """Added in 26.4.2. Admin registers (overwrites) a user's SSH public key."""
   adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
@@ -12075,6 +12108,10 @@ type ObjectStorage implements Node {
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -13972,6 +14009,11 @@ type PresetModelServiceConfig {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Null when the preset omits it to inherit it at revision resolution.
+  """
+  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.9.0. Service configuration for a preset model entry."""
@@ -14001,6 +14043,11 @@ input PresetModelServiceConfigInput {
 
   """Health check configuration for the model service."""
   healthCheck: PresetModelHealthCheckInput = null
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`.
+  """
+  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """
@@ -17344,6 +17391,10 @@ type ReservoirRegistry implements Node {
   name: String!
   endpoint: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   apiVersion: String!
 
@@ -17588,6 +17639,46 @@ type ResourceGroupSchedulerConfig {
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+
+  """
+  Added in 26.10.0. Scheduler options other than the preemption configuration.
+  """
+  options: ResourceGroupSchedulerOptions!
+}
+
+"""
+Added in 26.10.0. Scheduler options of a resource group, other than the preemption configuration.
+"""
+type ResourceGroupSchedulerOptions {
+  """Session types that may be created in the resource group."""
+  allowedSessionTypes: [SessionTypes!]!
+
+  """
+  Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float!
+
+  """The config section of the scheduler options."""
+  config: ResourceGroupSchedulerOptionsConfig!
+
+  """How agents are chosen for a session's kernels."""
+  agentSelectionStrategy: AgentSelectionStrategy!
+
+  """
+  Whether an agent may start a kernel that fragments a fractional resource request.
+  """
+  allowFractionalResourceFragmentation: Boolean!
+
+  """Route health statuses whose routes are cleaned up automatically."""
+  routeCleanupTargetStatuses: [RouteHealthStatus!]!
+}
+
+"""
+Added in 26.10.0. The config section of a resource group's scheduler options.
+"""
+type ResourceGroupSchedulerOptionsConfig {
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int
 }
 
 """
@@ -18082,6 +18173,7 @@ enum RetentionCategory {
   SESSIONS
   USAGE_RECORDS
   USAGE_BUCKETS
+  PROJECTS
 }
 
 """
@@ -19303,6 +19395,11 @@ type RuntimeVariantModelServiceConfig {
 
   """Default model service health-check settings."""
   healthCheck: RuntimeVariantModelHealthCheck
+
+  """
+  Added in 26.10.0. Default variable syntax of the service arguments. Null when the runtime variant leaves it unset.
+  """
+  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.4.2. Order specification."""
@@ -19895,6 +19992,44 @@ type SecretKeyCount {
 
   """How many stored secrets that key holds."""
   count: Int!
+}
+
+"""
+Added in 26.10.0. Variable syntax of the service arguments of a model service.
+"""
+type ServiceArgumentInterpolation {
+  """Delimiters that mark the variables to fill in the service arguments."""
+  delimiters: [ServiceArgumentInterpolationDelimiter!]!
+}
+
+"""
+Added in 26.10.0. A pair of delimiters that marks a variable in the service arguments.
+"""
+type ServiceArgumentInterpolationDelimiter {
+  """Opening delimiter."""
+  start: String!
+
+  """Closing delimiter."""
+  end: String!
+}
+
+"""
+Added in 26.10.0. A pair of delimiters that marks a variable in the service arguments.
+"""
+input ServiceArgumentInterpolationDelimiterInput {
+  """Opening delimiter, e.g. `{{`."""
+  start: String!
+
+  """Closing delimiter, e.g. `}}`."""
+  end: String!
+}
+
+"""
+Added in 26.10.0. Variable syntax of the service arguments of a model service.
+"""
+input ServiceArgumentInterpolationInput {
+  """Delimiters that mark the variables to fill in the service arguments."""
+  delimiters: [ServiceArgumentInterpolationDelimiterInput!]!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""
@@ -21894,6 +22029,11 @@ input UpdateDeploymentInput {
   replicaCount: Int
   name: String
   preferredDomainName: String
+
+  """
+  Added in 26.10.0. Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.
+  """
+  designatedAgentIds: [UUID!]
 }
 
 """Added in 25.19.0. Payload for updating a model deployment."""
@@ -22519,6 +22659,11 @@ input UpdatePresetModelServiceConfigInput {
   Health check configuration for the model service. Omit to keep the current value.
   """
   healthCheck: UpdatePresetModelHealthCheckInput
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments. Omit or null to keep the current value.
+  """
+  interpolation: ServiceArgumentInterpolationInput
 }
 
 """
@@ -23036,6 +23181,11 @@ input UpdateUserV2Input {
 
   """New password."""
   password: String
+
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
 
   """New full display name."""
   fullName: String
@@ -24438,6 +24588,25 @@ input VFolderAutoMountFilter {
   NOT: [VFolderAutoMountFilter!] = null
 }
 
+"""
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Each relation matches one auto-mount at a time.
+"""
+input VFolderAutoMountNestedFilter {
+  """
+  True for a vfolder that has at least one auto-mount, false for one that has none.
+  """
+  exists: Boolean = null
+
+  """At least one auto-mount matches."""
+  some: VFolderAutoMountFilter = null
+
+  """Every auto-mount matches; true when there is none."""
+  every: VFolderAutoMountFilter = null
+
+  """No auto-mount matches."""
+  none: VFolderAutoMountFilter = null
+}
+
 """Added in 26.10.0. One ordering rule for a vfolder auto-mount search."""
 input VFolderAutoMountOrderBy {
   """Field to order by."""
@@ -24586,6 +24755,9 @@ input VFolderFilter {
 
   """Added in 26.10.0. Filter by vfolder ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
+  autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

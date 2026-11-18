@@ -8,6 +8,8 @@ from collections.abc import Iterator, Mapping
 from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
+from pydantic import ValidationError
+
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.exception import ConfigurationError
@@ -180,6 +182,8 @@ class BasePluginContext[P: AbstractPlugin]:
             try:
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
+            except ValidationError:
+                raise
             except Exception:
                 log.exception("plugin initialization failed", plugin_name=plugin_name)
                 continue
@@ -205,7 +209,10 @@ class BasePluginContext[P: AbstractPlugin]:
             new_config = await self.etcd.get_prefix(
                 f"config/plugins/{self._group_key}/{plugin_name}/",
             )
-            await self.plugins[plugin_name].update_plugin_config(new_config)
+            try:
+                await self.plugins[plugin_name].update_plugin_config(new_config)
+            except ValidationError:
+                log.exception("plugin configuration validation failed", plugin_name=plugin_name)
 
     async def watch_config_changes(self, plugin_name: str) -> None:
         wtask = asyncio.create_task(self._watcher(plugin_name))

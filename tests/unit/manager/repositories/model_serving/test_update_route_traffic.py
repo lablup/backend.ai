@@ -1,12 +1,7 @@
 """
-Regression test for issue #11372: ``ModelServingRepository.update_route_traffic``
-returning ``EndpointData`` for an endpoint that owns a persisted
-``DeploymentRevisionRow`` must not raise ``MissingGreenlet``.
-
-Without the fix, ``EndpointRow.to_data`` lazy-loads ``revisions`` outside of
-SQLAlchemy's greenlet bridge and raises ``sqlalchemy.exc.MissingGreenlet``.
-With the fix the call site eagerly loads ``revisions`` (and
-``revisions.image_row``) so the projection runs entirely on cached state.
+``ModelServingRepository.update_route_traffic`` on an endpoint that owns a persisted
+``DeploymentRevisionRow`` (issue #11372): it returns ``EndpointData`` with the revision
+fields and the new ratio, and a failed Valkey write leaves the ratio as it was.
 """
 
 from __future__ import annotations
@@ -28,6 +23,7 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.exception import ValkeySentinelMasterNotFound
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.deployment.types import RouteStatus
@@ -69,7 +65,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 @pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Provision the table set ``update_route_traffic`` exercises."""
     async with with_tables(
         database_connection,
@@ -401,29 +397,54 @@ async def test_update_route_traffic_returns_endpoint_data_when_revision_exists(
     endpoint_with_revision_and_route: tuple[uuid.UUID, uuid.UUID],
     mock_valkey_live: MagicMock,
 ) -> None:
-    """``update_route_traffic`` must return ``EndpointData`` (not raise
-    ``MissingGreenlet``) for an endpoint that already has a persisted
-    revision row.
-
-    Regression for lablup/backend.ai#11372: without the ``load_revisions=True``
-    eager-load on the post-update endpoint fetch, ``EndpointRow.to_data``
-    lazily walks ``self.revisions`` and SQLAlchemy raises
-    ``MissingGreenlet`` because ``to_data`` is sync code invoked from an
-    async coroutine without a greenlet bridge.
-    """
+    """``update_route_traffic`` returns the ``EndpointData`` of the endpoint with the
+    revision fields and the route's new ratio."""
     endpoint_id, route_id = endpoint_with_revision_and_route
 
     result = await repository.update_route_traffic(
         valkey_live=mock_valkey_live,
         route_id=route_id,
-        service_id=endpoint_id,
+        endpoint_id=endpoint_id,
         traffic_ratio=0.0,
     )
 
     assert result is not None
     assert isinstance(result, EndpointData)
     assert result.id == endpoint_id
-    # The eager-loaded revision must have flowed through to_data() —
-    # if revisions were missing the projection falls back to defaults.
+    # Without the revision the projection falls back to the defaults.
     assert result.image is not None
+    # The endpoint is read after the update is committed.
+    (route,) = result.routings
+    assert route.traffic_ratio == 0.0
     mock_valkey_live.store_live_data.assert_awaited_once()
+
+
+@pytest.fixture
+def failing_valkey_live() -> MagicMock:
+    """A Valkey client whose write fails."""
+    mock = MagicMock(spec=ValkeyLiveClient)
+    mock.store_live_data = AsyncMock(side_effect=ValkeySentinelMasterNotFound())
+    return mock
+
+
+async def test_update_route_traffic_keeps_the_ratio_when_the_valkey_write_fails(
+    repository: ModelServingRepository,
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    endpoint_with_revision_and_route: tuple[uuid.UUID, uuid.UUID],
+    failing_valkey_live: MagicMock,
+) -> None:
+    endpoint_id, route_id = endpoint_with_revision_and_route
+
+    with pytest.raises(ValkeySentinelMasterNotFound):
+        await repository.update_route_traffic(
+            valkey_live=failing_valkey_live,
+            route_id=route_id,
+            endpoint_id=endpoint_id,
+            traffic_ratio=0.0,
+        )
+
+    async with db_with_cleanup.begin_readonly_session() as sess:
+        ratio = await sess.scalar(
+            sa.select(RoutingRow.traffic_ratio).where(RoutingRow.id == route_id)
+        )
+    assert ratio == 1.0

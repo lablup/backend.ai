@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
@@ -77,7 +78,7 @@ from ai.backend.manager.repositories.rbac.relation_repository import RbacRelatio
 from ai.backend.testutils.db import with_tables
 
 
-async def _provision(db_sess: sa.ext.asyncio.AsyncSession, scope: EntityIdentifier) -> None:
+async def _provision(db_sess: AsyncSession, scope: EntityIdentifier) -> None:
     """The node every scope needs before a relation can name it."""
     node = VirtualEntityRow(entity_type=scope.entity_type(), entity_id=scope)
     db_sess.add(node)
@@ -87,7 +88,7 @@ async def _provision(db_sess: sa.ext.asyncio.AsyncSession, scope: EntityIdentifi
     await db_sess.flush()
 
 
-async def _node_id(db_sess: sa.ext.asyncio.AsyncSession, entity: EntityIdentifier) -> uuid.UUID:
+async def _node_id(db_sess: AsyncSession, entity: EntityIdentifier) -> uuid.UUID:
     node_id = await db_sess.scalar(
         sa.select(VirtualEntityRow.id).where(
             VirtualEntityRow.entity_type == entity.entity_type(),
@@ -103,7 +104,7 @@ class TestIdleCheckerAssignmentRepository:
     async def database(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [

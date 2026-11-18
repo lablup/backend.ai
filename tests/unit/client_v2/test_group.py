@@ -242,7 +242,7 @@ class TestGroupCRUD:
         result = await gc.search(request)
 
         assert isinstance(result, SearchGroupsResponse)
-        method, url, body = _last_request_call(mock_session)
+        method, _url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert body is not None
         assert body["filter"]["name"]["contains"] == "test"

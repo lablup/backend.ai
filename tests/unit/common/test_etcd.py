@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,6 +12,7 @@ from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair, QueueSentinel
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 async def test_basic_crud(etcd: AsyncEtcd) -> None:
@@ -170,6 +171,24 @@ async def test_unquote_for_get_prefix(etcd: AsyncEtcd) -> None:
 
     v = await etcd.get_prefix("obj/aa%3Acc")
     assert dict(v) == {"": "wow"}
+
+
+@pytest.fixture
+async def gateway_etcd(
+    etcd_container: tuple[str, HostPortPairModel],
+    test_ns: str,
+) -> AsyncIterator[AsyncEtcd]:
+    async with AsyncEtcd(
+        addrs=[etcd_container[1].to_legacy()],
+        namespace=test_ns,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "",
+        },
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+    ) as etcd:
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+        yield etcd
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
 
 
 async def test_scope_empty_prefix(gateway_etcd: AsyncEtcd) -> None:
@@ -528,7 +547,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -556,7 +575,7 @@ class TestWatchExponentialBackoff:
             "message": "h2 protocol error: error reading a body from connection",
         })
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -578,7 +597,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -607,7 +626,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_initial_failures:
@@ -641,7 +660,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -669,7 +688,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -715,11 +734,33 @@ async def test_etcd_not_opened_connects_per_request(
         addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={ConfigScopes.GLOBAL: "global"},
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
     )
     await etcd.put("not-opened", "1")
     assert await etcd.get("not-opened") == "1"
     await etcd.delete_prefix("")
     await etcd.close()
+
+
+class TestAuthTokenRefresh:
+    @pytest.fixture
+    def connect_options_cls(self) -> Any:
+        with (
+            patch("ai.backend.common.etcd.ConnectOptions") as connect_options_cls,
+            patch("ai.backend.common.etcd.EtcdClient"),
+        ):
+            yield connect_options_cls
+
+    def test_credentials_turn_on_auto_token_refresh(self, connect_options_cls: MagicMock) -> None:
+        AsyncEtcd(
+            addrs=HostPortPair("127.0.0.1", 2379),
+            namespace="test-auth",
+            scope_prefix_map={ConfigScopes.GLOBAL: ""},
+            credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+        )
+
+        connect_options_with_user = connect_options_cls.return_value.with_user.return_value
+        connect_options_with_user.with_auto_token_refresh.assert_called_once_with(True)
 
 
 class TestRequestRetry:

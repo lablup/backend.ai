@@ -51,12 +51,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
@@ -66,6 +68,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 from .revision import ModelRevision
 
@@ -286,10 +289,10 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
-    @gql_field(
+    @gql_resolver(
         description="The session associated with the replica. Can be null if the replica is still provisioning.",
         deprecation_reason="Use session_v2 instead.",
-    )  # type: ignore[misc]
+    )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
         if self.session_id is None:
             return None
@@ -297,12 +300,12 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         # Strawberry re-encodes the same global ID the graphene subgraph expects.
         return Session(id=ID(str(UUID(str(self.session_id)))))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The compute session running this replica.",
         )
-    )  # type: ignore[misc]
+    )
     async def session_v2(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -319,22 +322,22 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
             SessionID(UUID(str(self.session_id)))
         )
 
-    @gql_field(description="The revision of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The revision of this entity.")
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
         """Resolve revision by ID using DataLoader."""
         result = await info.context.data_loaders.revision_loader.load(
             DeploymentRevisionID(UUID(str(self.revision_id)))
         )
         if result is None:
-            raise ValueError(f"Revision not found: {self.revision_id}")
+            raise DeploymentRevisionNotFound(f"Revision not found: {self.revision_id}")
         return result
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="The model deployment this replica belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> (

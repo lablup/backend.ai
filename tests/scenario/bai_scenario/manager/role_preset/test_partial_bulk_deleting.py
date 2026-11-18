@@ -124,6 +124,28 @@ class PurgingEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]):
 
 
 @dataclass(frozen=True)
+class RestoringEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]):
+    """대상 프리셋들을 한 번에 restore 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: ManyPresetsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개를 한 번에 restore 합니다",
+            english=f"{laid.caller.username} restores {len(laid.laid)} presets at once",
+        )
+
+    @override
+    async def call(self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller) -> Deleted:
+        ids: list[UUID] = [preset.id for preset in laid.laid]
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(PartialBulkRestoreRolePresetsInput(ids=ids))
+
+
+@dataclass(frozen=True)
 class SoftDeletingAnswersForTheMissingOne(
     Scenario[TestSeedingSession, ManyPresetsAndACaller, RolePresetAdapter, Deleted]
 ):
@@ -292,10 +314,44 @@ class AUserGrantedNothingPurgesNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class AUserGrantedNothingRestoresNone(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RolePresetAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-restores-none-of-several-presets"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 restore 하려 하면, "
+            "restore 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to restore several presets at once, "
+                "none is restored and every one comes back in the failed list for "
+                "lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone()
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]:
+        return RestoringEvery()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Deleted]:
+        return NothingIsProcessed(reason="Insufficient permission")
+
+
 SCENARIOS: list[DeletingStep] = [
     SoftDeletingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
+    AUserGrantedNothingRestoresNone(),
     PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
 ]

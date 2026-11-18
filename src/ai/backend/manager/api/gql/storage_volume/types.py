@@ -57,6 +57,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -64,6 +65,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
@@ -208,7 +210,7 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         description="Deletion timestamp. Null while the volume is in use."
     )
 
-    @gql_field(  # type: ignore[misc]
+    @gql_resolver(
         description="The services this volume is attached to, one attachment per service."
     )
     async def service_attachments(
@@ -241,7 +243,7 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         ]
         | None
     ):
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     @classmethod
     @override
@@ -252,7 +254,7 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[StorageVolumeGQL | None]:
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
 
 @gql_connection_type(

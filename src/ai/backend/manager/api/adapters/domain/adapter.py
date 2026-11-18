@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import assert_never
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -90,6 +91,9 @@ from ai.backend.manager.services.domain.actions.scoped_search import (
     ScopedSearchDomainsAction,
 )
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
+from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
+    UpdateDomainContainerRegistryRelationsAction,
+)
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.types import OptionalState, TriState
@@ -312,6 +316,16 @@ class DomainAdapter(BaseAdapter):
             PartialBulkRestoreDomainsAction(ids=[DomainID(domain_id) for domain_id in input.ids])
         )
         return self._to_partial_bulk_payload(result)
+
+    async def sync_registry_relations(
+        self, domain_id: DomainID, registry_ids: Sequence[ContainerRegistryID]
+    ) -> None:
+        """Link the domain to every given registry and unlink it from the rest."""
+        await self._domain.update_container_registry_relations.run(
+            UpdateDomainContainerRegistryRelationsAction(
+                domain_id=domain_id, registry_ids=registry_ids
+            )
+        )
 
     async def _apply_deprecated_is_active(
         self, data: DomainData, is_active: bool | None | Unset

@@ -41,6 +41,7 @@ Scenario: incomplete 1 / 6
 
 | scenario | verdict |
 |---|---|
+| [when a user granted hard delete on categories in global purges several categories in one call, every one comes back as it was before deletion and nothing failed](#partial_bulk_purging-a-user-granted-hard-delete-purges-every-category-of-several) | answered |
 | [when a user granted nothing tries to purge several categories in one call, none is deleted and every one comes back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories) | answered |
 | [when the superadmin purges two categories and one missing id in one call, the two come back as they were before deletion and the missing id comes back in the failed list because there is no such target](#partial_bulk_purging-purging-several-categories-answers-for-the-missing-one) | answered |
 
@@ -372,6 +373,40 @@ Then
 
 ### partial_bulk_purge
 
+<a id="partial_bulk_purging-a-user-granted-hard-delete-purges-every-category-of-several"></a>
+
+#### [a-user-granted-hard-delete-purges-every-category-of-several](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
+
+when a user granted hard delete on categories in global purges several categories in one call, every one comes back as it was before deletion and nothing failed
+
+Given
+
+- 2 categories and one regular user granted HARD_DELETE in global
+  - Category wanted-1
+  - Category other-1
+  - Domain home-1
+  - Prepare a user granted permission on categories in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role category-keeper-1: applies only within the scope it is granted in
+    - Role category-keeper-1: HARD_DELETE allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role category-keeper-1
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1 purges 2 categories in one call
+
+Then
+
+- every target category comes back as it was before deletion and nothing failed
+  - successes count = 2
+  - successes[0]: same as the whole target category
+  - successes[1]: same as the whole target category
+  - failed = []
+
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories"></a>
 
 #### [a-user-granted-nothing-purges-none-of-several-categories](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
@@ -438,9 +473,9 @@ Then
 
 - every target category comes back as it was before deletion, and the missing id comes back in the failed list because there is no such target
   - successes count = 2
-  - failed count = 1
   - successes[0]: same as the whole target category
   - successes[1]: same as the whole target category
+  - failed count = 1
   - failed[0].id: same as the missing id in the request
   - failed[0].message: a reason containing 'not found'
 

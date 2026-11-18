@@ -12,6 +12,7 @@ from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
     StorageVolumeServiceAttachmentOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 __all__ = ("admin_storage_volume_service_attachments",)
 
@@ -21,7 +22,7 @@ __all__ = ("admin_storage_volume_service_attachments",)
         added_version=NEXT_RELEASE_VERSION,
         description="Page through every storage volume service attachment. Admin only.",
     )
-)  # type: ignore[misc]
+)
 async def admin_storage_volume_service_attachments(
     info: Info[StrawberryGQLContext],
     filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
@@ -33,4 +34,4 @@ async def admin_storage_volume_service_attachments(
     limit: int | None = None,
     offset: int | None = None,
 ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
-    raise NotImplementedError
+    raise NotImplementedAPI()

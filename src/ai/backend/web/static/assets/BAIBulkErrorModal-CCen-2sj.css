@@ -1,0 +1,1 @@
+@layer reset,theme,base,astryx-base,astryx-theme;@layer ui-common{.uic-bulk-error-modal__icon{color:var(--color-error)}}@layer components,utilities;

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import enum
+import posixpath
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import PurePosixPath
 from typing import Any, Final, override
 
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
@@ -30,6 +32,27 @@ def verify_vfolder_name(folder: str) -> bool:
         return False
     for pattern in RESERVED_VFOLDER_PATTERNS:
         if pattern.match(folder):
+            return False
+    return True
+
+
+_MOUNT_BASE: Final = PurePosixPath("/home/work")
+
+
+def verify_mount_destination(destination: str) -> bool:
+    """Return False when the mount destination is a reserved path, under one, or above one.
+
+    A relative destination is resolved under ``/home/work`` and ``..`` is normalized first.
+    """
+    joined = posixpath.normpath(posixpath.join(str(_MOUNT_BASE), destination))
+    path = PurePosixPath("/" + joined.lstrip("/"))
+    if path != _MOUNT_BASE and path.is_relative_to(_MOUNT_BASE):
+        return verify_vfolder_name(path.relative_to(_MOUNT_BASE).parts[0])
+    for reserved in RESERVED_VFOLDERS:
+        reserved_path = PurePosixPath(reserved)
+        if not reserved_path.is_absolute():
+            continue
+        if path.is_relative_to(reserved_path) or reserved_path.is_relative_to(path):
             return False
     return True
 

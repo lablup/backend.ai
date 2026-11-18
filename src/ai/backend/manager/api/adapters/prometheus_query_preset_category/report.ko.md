@@ -41,6 +41,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [global 에서 카테고리 영구 삭제 권한을 받은 사용자가 카테고리 여럿을 한 번에 purge 하면, 모두 삭제되기 전 모습으로 오고 실패한 것은 없습니다](#partial_bulk_purging-a-user-granted-hard-delete-purges-every-category-of-several) | 성공 |
 | [아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories) | 성공 |
 | [superadmin 이 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-categories-answers-for-the-missing-one) | 성공 |
 
@@ -372,6 +373,40 @@ Then
 
 ### partial_bulk_purge
 
+<a id="partial_bulk_purging-a-user-granted-hard-delete-purges-every-category-of-several"></a>
+
+#### [a-user-granted-hard-delete-purges-every-category-of-several](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
+
+global 에서 카테고리 영구 삭제 권한을 받은 사용자가 카테고리 여럿을 한 번에 purge 하면, 모두 삭제되기 전 모습으로 오고 실패한 것은 없습니다
+
+Given
+
+- 카테고리 2개와, global 에서 HARD_DELETE 권한을 받은 일반 사용자 한 명
+  - 카테고리 wanted-1
+  - 카테고리 other-1
+  - 도메인 home-1
+  - global 에서 카테고리 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 category-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 category-keeper-1: prometheus_query_preset_category 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 category-keeper-1 보유
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1이 카테고리 2개를 한 번에 purge 합니다
+
+Then
+
+- 대상 카테고리가 모두 삭제되기 전 모습으로 오고, 실패한 것은 없습니다
+  - successes count = 2
+  - successes[0]: 대상 카테고리 전체와 같다
+  - successes[1]: 대상 카테고리 전체와 같다
+  - failed = []
+
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories"></a>
 
 #### [a-user-granted-nothing-purges-none-of-several-categories](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
@@ -438,9 +473,9 @@ Then
 
 - 대상 카테고리가 모두 삭제되기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
-  - failed count = 1
   - successes[0]: 대상 카테고리 전체와 같다
   - successes[1]: 대상 카테고리 전체와 같다
+  - failed count = 1
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 

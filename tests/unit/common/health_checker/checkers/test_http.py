@@ -16,13 +16,13 @@ class TestHttpHealthChecker:
     """Test HttpHealthChecker with various HTTP scenarios."""
 
     @pytest.fixture
-    async def aiohttp_session(self) -> AsyncGenerator[aiohttp.ClientSession, None]:
+    async def aiohttp_session(self) -> AsyncGenerator[aiohttp.ClientSession]:
         """Provides an aiohttp ClientSession for testing."""
         async with aiohttp.ClientSession() as session:
             yield session
 
     @pytest.fixture
-    async def http_test_server(self) -> AsyncGenerator[str, None]:
+    async def http_test_server(self) -> AsyncGenerator[str]:
         """
         Runs a test HTTP server with various endpoints for testing HttpHealthChecker.
 

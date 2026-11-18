@@ -5,6 +5,7 @@ Request DTOs for container registry DTO v2.
 from __future__ import annotations
 
 from typing import Any, Self
+from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -12,10 +13,12 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.errors.container_registry import InvalidContainerRegistryURL
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ContainerRegistryOrderField,
+    ContainerRegistryScope,
     ContainerRegistryType,
     ContainerRegistryTypeFilter,
     OrderDirection,
@@ -28,9 +31,26 @@ __all__ = (
     "CreateContainerRegistryInput",
     "DeleteContainerRegistryInput",
     "PartialBulkPurgeContainerRegistriesInput",
+    "ScopedSearchContainerRegistriesInput",
     "AdminSearchContainerRegistriesInput",
     "UpdateContainerRegistryInput",
 )
+
+
+def _validate_registry_url(url: str) -> str:
+    """Strip ``url`` and reject it unless a host can be read from it.
+
+    A URL without a scheme is read as ``http://``.
+    """
+    stripped = url.strip()
+    with_scheme = stripped if stripped.startswith(("http://", "https://")) else f"http://{stripped}"
+    try:
+        netloc = urlparse(with_scheme).netloc
+    except ValueError as e:
+        raise InvalidContainerRegistryURL(f"Invalid URL format: {url}") from e
+    if not netloc:
+        raise InvalidContainerRegistryURL(f"Invalid URL format: {url}")
+    return stripped
 
 
 class AllowedGroupsInput(BaseRequestModel):
@@ -77,10 +97,7 @@ class CreateContainerRegistryInput(BaseRequestModel):
     @field_validator("url", mode="before")
     @classmethod
     def url_strip_and_validate(cls, v: str) -> str:
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("url must not be blank")
-        return stripped
+        return _validate_registry_url(v)
 
     @field_validator("registry_name", mode="before")
     @classmethod
@@ -127,10 +144,7 @@ class UpdateContainerRegistryInput(BaseRequestModel):
     def url_strip_and_validate(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("url must not be blank")
-        return stripped
+        return _validate_registry_url(v)
 
     @field_validator("registry_name", mode="before")
     @classmethod
@@ -200,5 +214,21 @@ class AdminSearchContainerRegistriesInput(BaseRequestModel):
     last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
     before: str | None = Field(default=None, description="Cursor to paginate backward from.")
     # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+class ScopedSearchContainerRegistriesInput(BaseRequestModel):
+    """Input for searching the container registries the named scopes reach."""
+
+    scope: ContainerRegistryScope = Field(description="Scope (OR across all items).")
+    filter: ContainerRegistryFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ContainerRegistryOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
     limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")

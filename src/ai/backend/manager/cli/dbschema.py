@@ -165,7 +165,7 @@ def apply_missing_revisions(
             with (f / f"{previous_version}.json").open() as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
-            log.error(
+            log.exception(
                 "could not find the revision history dump for the previous version; upgrade this cluster to the latest release of the prior major version first",
                 previous_version=previous_version,
             )

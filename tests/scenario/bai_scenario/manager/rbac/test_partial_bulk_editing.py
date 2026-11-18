@@ -143,7 +143,7 @@ class EveryRoleIsRestored(Then[RolesAndACaller, Edited]):
             Same("failed", payload.failed, []),
         ]
         for i, (node, role) in enumerate(zip(payload.successes, laid.roles, strict=False)):
-            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain)
+            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain.id)
         return verdicts
 
 
@@ -171,7 +171,7 @@ class EveryRoleIsEdited(Then[RolesAndACaller, Edited]):
             Same("failed", payload.failed, []),
         ]
         for i, (node, role) in enumerate(zip(payload.successes, laid.roles, strict=False)):
-            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain)
+            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain.id)
         return verdicts
 
 

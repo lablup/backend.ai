@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
 
-Scenario: incomplete 2 / 14
+Scenario: incomplete 1 / 14
 
 - built from ops (10)
   - admin_create_slot_type: representative success ✓ · representative rejection ✓
@@ -14,7 +14,7 @@ Scenario: incomplete 2 / 14
   - scoped_search_agent_resources: representative success ✓ · representative rejection ✓
   - search_agent_resources: representative success ✓ · representative rejection ✓
   - search_allocations: representative success ✓ · representative rejection ✓
-  - search_slot_types: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - search_slot_types: representative success ✓ · representative rejection ✓
 - direct implementation (4)
   - get_agent_resource: success present 2 · rejection present 6 (single_entity)
   - get_domain_resource_overview: success present 3 · rejection present 3 (scope)
@@ -123,6 +123,7 @@ Scenario: incomplete 2 / 14
 | [when the call reads with the name of one of several slot types as a filter, only the slot type of that name stays in the answer](#searching-a-name-filter-narrows-the-answer-to-the-slot-type-it-names) | answered |
 | [when two slot types exist and a user granted nothing reads without a filter, both are counted](#searching-a-user-granted-nothing-counts-every-slot-type-laid) | answered |
 | [when 11 slot types exist and the call reads without a size, 10 come back and the answer says a next page exists](#searching-omitting-the-page-size-answers-ten-slot-types-and-a-next-page) | answered |
+| [reading slot types without a login context is rejected because there is no caller to authorize against](#searching-searching-slot-types-without-login-is-refused) | rejected |
 
 **get_agent_resource**
 
@@ -2161,6 +2162,37 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching-searching-slot-types-without-login-is-refused"></a>
+
+#### [searching-slot-types-without-login-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py): pass
+
+reading slot types without a login context is rejected because there is no caller to authorize against
+
+Given
+
+- 2 resource slot types and one regular user
+  - Resource slot type wanted-1: count type
+  - Resource slot type other-1: count type
+  - Domain home-1
+  - Prepare a user granted read permission on resource_slot_type in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every resource_slot_type
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- ResourceSlotAdapter.search_slot_types: without a login context, reads everything
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### get_agent_resource
 

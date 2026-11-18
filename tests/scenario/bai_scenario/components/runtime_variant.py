@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
 )
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -41,6 +42,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     in_language,
 )
+from bai_scenario.components.deployment import lay_a_deployment, lay_a_place
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import (
     KEPT,
@@ -131,6 +133,50 @@ class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),
             caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class ManyVariantsAndAnUnreadableDeployment:
+    """변형 여럿과, 그것을 부를 사용자, 그리고 그 사용자가 읽을 수 없는 배포."""
+
+    laid: tuple[RuntimeVariantData, ...]
+    caller: UserData
+    deployment: DeploymentInfo
+
+
+@dataclass(frozen=True)
+class ManyVariantsAndADeploymentTheCallerCannotRead(
+    Given[Any, ManyVariantsAndAnUnreadableDeployment]
+):
+    """변형 여럿과, 다른 프로젝트에 있는 배포, 그 배포를 읽을 수 없는 사용자."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "인퍼런스 런타임 종류 2개와, 다른 프로젝트의 배포 하나, 그 배포를 읽을 수 없는 "
+            "사용자 한 명",
+            english=(
+                "two runtime variants, one deployment of another project, and one user who "
+                "cannot read that deployment"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyVariantsAndAnUnreadableDeployment:
+        wanted = await seeding.creating(
+            TestSeedRuntimeVariant(name_hint="wanted", description=DESCRIBED)
+        )
+        other = await seeding.creating(
+            TestSeedRuntimeVariant(name_hint="other", description=DESCRIBED)
+        )
+        caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType())
+        place = await lay_a_place(seeding)
+        deployment = await lay_a_deployment(seeding, place, name_hint="theirs")
+        return ManyVariantsAndAnUnreadableDeployment(
+            laid=(seeding.made(wanted), seeding.made(other)),
+            caller=seeding.made(caller),
+            deployment=seeding.made(deployment),
         )
 
 

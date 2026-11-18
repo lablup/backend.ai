@@ -34,9 +34,7 @@ class TestRedisConsumerDB:
             yield create
 
     @pytest.fixture
-    async def consumer(
-        self, stream_client_create: AsyncMock
-    ) -> AsyncGenerator[RedisConsumer, None]:
+    async def consumer(self, stream_client_create: AsyncMock) -> AsyncGenerator[RedisConsumer]:
         consumer = await RedisConsumer.create(
             RedisTarget(addr=HostPortPair("127.0.0.1", 6379)),
             RedisConsumerArgs(

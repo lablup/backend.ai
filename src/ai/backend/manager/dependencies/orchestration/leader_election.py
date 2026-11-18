@@ -23,6 +23,7 @@ from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.leader.tasks.retention_sweep import RetentionSweepTask
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.tasks.agent_lost_checker import AgentLostCheckerTask
@@ -41,6 +42,7 @@ class LeaderElectionInput:
     event_producer: EventProducer
     sokovan_orchestrator: SokovanOrchestrator
     retention_repository: RetentionRepository
+    project_repository: ProjectRepository
     valkey_live: ValkeyLiveClient
 
 
@@ -121,11 +123,14 @@ class LeaderElectionDependency(
         ]
 
         # Register the DB record retention sweep as a leader-only periodic task.
-        # Only the cadence lives here; batch_size/per_tick_budget are injected
-        # into the repository (from config) so sweep() stays argument-free.
+        # The retention repository drains the plain-row categories; the project
+        # repository clears dangling personal projects, which carry resources the
+        # raw drain cannot reach.
         leader_tasks.append(
             RetentionSweepTask(
                 repository=setup_input.retention_repository,
+                project_repository=setup_input.project_repository,
+                config_provider=setup_input.config_provider,
                 interval=setup_input.config_provider.config.retention.sweep_interval,
             )
         )

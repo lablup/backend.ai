@@ -1,0 +1,6 @@
+import{a as e}from"./rolldown-runtime-BWaJ3C7D.js";import{Zn as t}from"./icons-Btg1s2wy.js";import{t as n}from"./compiler-runtime-CZQb2eIb.js";/* empty css            */import{t as r}from"./jsx-runtime-BapUIyWk.js";import{_t as i,gt as a}from"./index-49VU5B_r.js";
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+*/
+var o=n(),s=e(t(),1),c=r(),l=e=>{"use memo";var t;let n=(0,o.c)(19),{items:r,activeKey:i,defaultActiveKey:l,onChange:d,className:f,size:p,type:m,tabBarExtraContent:h}=e,g=m===void 0?`card`:m,[_,v]=s.useState(l??(r==null||(t=r[0])==null?void 0:t.key)??``),y=i!==void 0,b=y?i:_,x;if(n[0]!==b||n[1]!==r){var S;x=r==null||(S=r.find(e=>e.key===b))==null?void 0:S.children,n[0]=b,n[1]=r,n[2]=x}else x=n[2];let C=x,w=b??``,T;n[3]!==y||n[4]!==d?(T=e=>{y||v(e),d==null||d(e)},n[3]=y,n[4]=d,n[5]=T):T=n[5];let E;n[6]===r?E=n[7]:(E=r==null?void 0:r.map(u),n[6]=r,n[7]=E);let D;n[8]!==f||n[9]!==p||n[10]!==w||n[11]!==T||n[12]!==E||n[13]!==h||n[14]!==g?(D=(0,c.jsx)(a,{type:g,className:f,size:p,value:w,onChange:T,tabBarExtraContent:h,children:E}),n[8]=f,n[9]=p,n[10]=w,n[11]=T,n[12]=E,n[13]=h,n[14]=g,n[15]=D):D=n[15];let O;return n[16]!==C||n[17]!==D?(O=(0,c.jsxs)(c.Fragment,{children:[D,C]}),n[16]=C,n[17]=D,n[18]=O):O=n[18],O};function u(e){return(0,c.jsx)(i,{value:e.key,label:e.label,endContent:e.endContent},e.key)}export{l as t};

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 630" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="960" height="630" fill="#ffffff"/>
+
+  <text x="20" y="18" fill="#64748b" font-size="11" font-weight="bold">REQUEST</text>
+  <text x="250" y="18" fill="#64748b" font-size="11" font-weight="bold">ACTION, DECLARATION</text>
+  <text x="600" y="18" fill="#64748b" font-size="11" font-weight="bold">RESULT</text>
+
+  <!-- request inputs, in request order -->
+  <g fill="#f1f5f9" stroke="#94a3b8">
+    <rect x="20" y="40" width="190" height="46" rx="4"/>
+    <rect x="20" y="110" width="190" height="46" rx="4"/>
+    <rect x="20" y="240" width="190" height="46" rx="4"/>
+    <rect x="20" y="377" width="190" height="46" rx="4"/>
+    <rect x="20" y="492" width="190" height="46" rx="4"/>
+  </g>
+  <g fill="#0f172a">
+    <text x="32" y="59" font-weight="bold">scope</text>
+    <text x="32" y="76" fill="#475569">SessionSearchScope, one field</text>
+    <text x="32" y="129" font-weight="bold">filter</text>
+    <text x="32" y="146" fill="#475569">row condition, time range</text>
+    <text x="32" y="259" font-weight="bold">groupBy</text>
+    <text x="32" y="276" fill="#475569">group input per field</text>
+    <text x="32" y="396" font-weight="bold">values</text>
+    <text x="32" y="413" fill="#475569">GQL selection</text>
+    <text x="32" y="511" font-weight="bold">orderBy, limit</text>
+    <text x="32" y="528" fill="#475569">order of groups</text>
+  </g>
+
+  <!-- existing -->
+  <rect x="250" y="110" width="310" height="46" rx="4" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="5 4"/>
+  <text x="262" y="129" fill="#475569" font-weight="bold">search filter (existing)</text>
+  <text x="262" y="146" fill="#64748b">applied to rows before grouping</text>
+
+  <!-- added by this BEP -->
+  <g fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5">
+    <rect x="250" y="30" width="310" height="66" rx="4"/>
+    <rect x="250" y="206" width="310" height="114" rx="4"/>
+    <rect x="250" y="350" width="310" height="100" rx="4"/>
+    <rect x="250" y="488" width="310" height="54" rx="4"/>
+  </g>
+  <g fill="#1e1b4b">
+    <text x="262" y="50" font-weight="bold">Scope aggregate action</text>
+    <text x="262" y="68">partial bulk: a result or an error per scope</text>
+    <text x="262" y="86">same scope input as search</text>
+
+    <text x="262" y="226" font-weight="bold">Group input per value type</text>
+    <text x="262" y="246">EnumGroup { includeEmpty }</text>
+    <text x="262" y="264">DateTimeGroup { interval, timezone }</text>
+    <text x="262" y="282">UUIDGroup, StringGroup { includeNull }</text>
+    <text x="262" y="300">ToManyGroup: a row can be in several groups</text>
+
+    <text x="262" y="370" font-weight="bold">Aggregate value declaration (per entity)</text>
+    <text x="262" y="390">field, source table, value type</text>
+    <text x="262" y="410">value types: AggregateDecimal,</text>
+    <text x="262" y="426">AggregateDateTime, AggregateBoolean</text>
+    <text x="262" y="442">child rows summed per entity row first</text>
+
+    <text x="262" y="508" font-weight="bold">Aggregate orderBy</text>
+    <text x="262" y="527">@oneOf list: key field, count, value metric</text>
+  </g>
+
+  <!-- result -->
+  <rect x="600" y="30" width="340" height="535" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
+  <text x="614" y="52" fill="#0f172a" font-weight="bold">Scope result, one per requested id</text>
+  <text x="614" y="70" fill="#475569">scope { kind, id }, error (request order)</text>
+  <text x="614" y="88" fill="#475569">rows: in the scope and matching filter</text>
+
+  <rect x="620" y="100" width="300" height="72" rx="4" fill="#f8fafc" stroke="#64748b"/>
+  <text x="634" y="120" fill="#0f172a" font-weight="bold">total: the whole scope</text>
+  <text x="634" y="140" fill="#334155">count = search totalCount</text>
+  <text x="634" y="158" fill="#334155">exact when groups are cut by limit</text>
+
+  <rect x="620" y="186" width="300" height="364" rx="4" fill="#f8fafc" stroke="#64748b"/>
+  <text x="634" y="206" fill="#0f172a" font-weight="bold">groups[]</text>
+
+  <rect x="640" y="222" width="262" height="78" rx="4" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="652" y="242" fill="#0f172a" font-weight="bold">key: API field names of filter</text>
+  <text x="652" y="262" fill="#334155">status, resourceGroupName</text>
+  <text x="652" y="280" fill="#334155">createdAt { start, end }</text>
+  <text x="652" y="295" fill="#64748b" font-size="11">null for fields not in groupBy</text>
+
+  <rect x="640" y="314" width="262" height="176" rx="4" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="652" y="334" fill="#0f172a" font-weight="bold">values (total has the same)</text>
+  <text x="652" y="354" fill="#334155">count</text>
+  <text x="652" y="376" fill="#334155">createdAt: AggregateDateTime</text>
+  <text x="664" y="392" fill="#64748b">{ count, min, max }</text>
+  <text x="652" y="416" fill="#334155">occupiedSlots[]: slotName +</text>
+  <text x="664" y="432" fill="#334155">AggregateDecimal</text>
+  <text x="664" y="448" fill="#64748b">{ count, sum, min, max }</text>
+  <text x="652" y="474" fill="#64748b" font-size="11">max: the largest single session</text>
+
+  <text x="652" y="519" fill="#334155">sorted by orderBy, cut by limit</text>
+
+  <!-- arrows: request to action, declaration -->
+  <g stroke="#475569" stroke-width="1.3" fill="none" marker-end="url(#arrow)">
+    <path d="M210,63 H248"/>
+    <path d="M210,133 H248"/>
+    <path d="M210,263 H248"/>
+    <path d="M210,400 H248"/>
+    <path d="M210,515 H248"/>
+  </g>
+  <!-- arrows: to result layers -->
+  <g stroke="#4f46e5" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <path d="M560,63 H598"/>
+    <path d="M560,263 H638"/>
+    <path d="M560,400 H638"/>
+    <path d="M560,515 H638"/>
+  </g>
+  <path d="M560,133 H580 V84 H598" stroke="#94a3b8" stroke-width="1.3" stroke-dasharray="5 4" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- admin form, legend -->
+  <text x="20" y="590" fill="#334155">adminSessionAggregate (superadmin): the same total and groups, without the scope input and layer.</text>
+  <rect x="20" y="604" width="22" height="14" rx="2" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="50" y="615" fill="#334155">added by this BEP</text>
+  <rect x="180" y="604" width="22" height="14" rx="2" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="5 4"/>
+  <text x="210" y="615" fill="#334155">existing</text>
+</svg>

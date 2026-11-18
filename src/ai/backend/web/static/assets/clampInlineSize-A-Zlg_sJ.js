@@ -1,0 +1,1 @@
+var e=new Set([`auto`,`contain`,`fit-content`,`inherit`,`initial`,`max-content`,`min-content`,`revert`,`revert-layer`,`stretch`,`unset`]);function t(t){let n=t.trim().toLowerCase();return e.has(n)||n.startsWith(`fit-content(`)}function n(e,t){return`min(${typeof e==`number`?`${e}px`:e.trim()}, ${t})`}export{t as n,n as t};

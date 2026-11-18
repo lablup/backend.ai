@@ -21,8 +21,8 @@ from pydantic import (
 from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
-from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .meta.meta import NEXT_RELEASE_VERSION
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
@@ -35,7 +35,6 @@ __all__ = (
     "merge",
     "override_key",
     "override_with_env",
-    "read_from_etcd",
     "read_from_file",
     "redis_config_iv",
     "redis_helper_config_iv",
@@ -109,6 +108,8 @@ etcd_config_iv = t.Dict({
         t.Key("addrs", optional=True): t.List(tx.HostPortPair, min_length=1),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
+        t.Key("keep-alive-interval", default=5.0): t.ToFloat(gt=0),
+        t.Key("keep-alive-timeout", default=3.0): t.ToFloat(gt=0),
     }).allow_extra("*")
     & _align_etcd_addr_and_addrs,
 }).allow_extra("*")
@@ -195,6 +196,18 @@ class PreStartAction(BaseConfigModel):
         default_factory=dict,
         description="Arguments for the pre-start action.",
         examples=[{"arg1": "value1", "arg2": "value2"}],
+    )
+
+
+class ServiceArgumentInterpolationDelimiter(BaseConfigModel):
+    start: str = Field(min_length=1, description="Opening delimiter.", examples=["{{"])
+    end: str = Field(min_length=1, description="Closing delimiter.", examples=["}}"])
+
+
+class ServiceArgumentInterpolation(BaseConfigModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiter] = Field(
+        min_length=1,
+        description="Delimiters that mark the variables to fill in the service arguments.",
     )
 
 
@@ -303,6 +316,18 @@ class ModelServiceConfig(BaseConfigModel):
     health_check: ModelHealthCheck | None = Field(
         default=None,
         description="Health check configuration for the model service.",
+    )
+    interpolation: ServiceArgumentInterpolation = Field(
+        default_factory=lambda: ServiceArgumentInterpolation(
+            delimiters=[
+                ServiceArgumentInterpolationDelimiter(start="${{", end="}}"),
+                ServiceArgumentInterpolationDelimiter(start="{", end="}"),
+            ]
+        ),
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Defaults to ``${{ }}`` and ``{ }``."
+        ),
     )
 
     @model_validator(mode="before")
@@ -456,6 +481,7 @@ def _merge_service_config(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick(base.port, override.port, "port" in s),
         health_check=health_check,
+        interpolation=_pick(base.interpolation, override.interpolation, "interpolation" in s),
     )
 
 
@@ -599,6 +625,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -687,6 +714,9 @@ def _merge_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
+        interpolation=_pick_non_null_override(
+            base.interpolation, override.interpolation, "interpolation" in s
+        ),
     )
 
 
@@ -794,6 +824,7 @@ class DefaultModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int = Field(gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -833,6 +864,7 @@ class PresetModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -870,6 +902,7 @@ class PresetModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -919,6 +952,9 @@ def _merge_preset_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
+        interpolation=_pick_non_null_override(
+            base.interpolation, override.interpolation, "interpolation" in s
+        ),
     )
 
 
@@ -1020,11 +1056,10 @@ def find_config_file(daemon_name: str) -> Path:
     for _path in toml_paths:
         if _path.is_file():
             return _path
-    else:
-        searched_paths = ",".join(map(str, toml_paths))
-        raise ConfigurationError({
-            "find_config_file()": f"Could not read config from: {searched_paths}",
-        })
+    searched_paths = ",".join(map(str, toml_paths))
+    raise ConfigurationError({
+        "find_config_file()": f"Could not read config from: {searched_paths}",
+    })
 
 
 def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:
@@ -1042,18 +1077,6 @@ def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict
         }) from e
     else:
         return config, discovered_path
-
-
-async def read_from_etcd(
-    etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
-) -> dict[str, Any] | None:
-    async with AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map) as etcd:
-        raw_value = await etcd.get("daemon/config")
-    if raw_value is None:
-        return None
-    config: dict[str, Any]
-    config = tomli.loads(raw_value)
-    return config
 
 
 def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:

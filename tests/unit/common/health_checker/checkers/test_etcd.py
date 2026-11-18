@@ -8,6 +8,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 class TestEtcdHealthChecker:
@@ -18,9 +19,9 @@ class TestEtcdHealthChecker:
         self,
         etcd_container: tuple[str, HostPortPairModel],
         test_ns: str,
-    ) -> AsyncGenerator[AsyncEtcd, None]:
+    ) -> AsyncGenerator[AsyncEtcd]:
         """Create an AsyncEtcd client connected to the test container."""
-        container_id, etcd_addr = etcd_container
+        _container_id, etcd_addr = etcd_container
 
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
@@ -31,6 +32,7 @@ class TestEtcdHealthChecker:
             [HostPortPair(etcd_addr.host, etcd_addr.port)],
             namespace=test_ns,
             scope_prefix_map=scope_prefix_map,
+            credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
         ) as etcd:
             yield etcd
 

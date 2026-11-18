@@ -156,7 +156,7 @@ def build_api_routes(
 
     # 2. Build all handlers
     acl_handler = AclHandler()
-    auth_handler = AuthHandler(auth=processors.auth)
+    auth_handler = AuthHandler(auth=processors.auth, adapter=adapters.auth)
     agent_handler = AgentHandler(agent=processors.agent)
     resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)
     artifact_handler = ArtifactHandler(

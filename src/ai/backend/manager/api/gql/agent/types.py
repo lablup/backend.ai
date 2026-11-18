@@ -41,6 +41,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFi
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -441,12 +442,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         description="Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this agent.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],
@@ -472,11 +473,11 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             offset=offset,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.1.0", description="Load the container count for this agent."
         )
-    )  # type: ignore[misc]
+    )
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],
@@ -486,12 +487,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         """
         return await info.context.data_loaders.container_count_loader.load(AgentId(self.id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="List of kernels running on this agent with pagination support.",
         )
-    )  # type: ignore[misc]
+    )
     async def kernels(
         self,
         info: Info[StrawberryGQLContext],
@@ -548,12 +549,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0",
             description="List of sessions running on this agent with pagination support.",
         )
-    )  # type: ignore[misc]
+    )
     async def sessions(
         self,
         info: Info[StrawberryGQLContext],
@@ -614,12 +615,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0",
             description="Per-slot resource capacity and usage for this agent.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],

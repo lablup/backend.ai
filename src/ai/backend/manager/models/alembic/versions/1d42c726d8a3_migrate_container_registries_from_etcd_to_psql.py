@@ -234,14 +234,13 @@ def migrate_data_etcd_to_psql() -> None:
         else:
             if registry_type == ContainerRegistryType.DOCKER and hostname == "index.docker.io":
                 input_config_template["project"] = "library"
+            # ContainerRegistryRow with empty project is allowed only if local registry.
+            elif registry_type == ContainerRegistryType.LOCAL:
+                input_config_template["project"] = None
             else:
-                # ContainerRegistryRow with empty project is allowed only if local registry.
-                if registry_type == ContainerRegistryType.LOCAL:
-                    input_config_template["project"] = None
-                else:
-                    raise Exception(
-                        f'ContainerRegistryRow.project is required! Please put the value to "{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/project" before migration.'
-                    )
+                raise Exception(
+                    f'ContainerRegistryRow.project is required! Please put the value to "{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/project" before migration.'
+                )
 
             input_configs.append(input_config_template)
 

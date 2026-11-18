@@ -39,7 +39,6 @@ from ai.backend.manager.data.permission.virtual_entity import OwnCheckKey
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -82,7 +81,7 @@ type _Run = Callable[[], Awaitable[Mapping[uuid.UUID, Permission]]]
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [
@@ -92,7 +91,6 @@ async def database(
             RoleRow,
             UserRoleRow,
             UserRow,
-            KeyPairRow,
             PermissionRow,
             PermissionFieldRow,
             VirtualEntityRow,
@@ -774,14 +772,16 @@ async def test_benchmark_at_scale(database: ExtendedAsyncSAEngine) -> None:
     for name, (entity_type, entity_ids) in cases.items():
         keys = [OwnCheckKey(user_id=seed.user_id, entity=e) for e in entity_ids]
 
-        async def current() -> Mapping[uuid.UUID, Permission]:
+        async def current(keys: list[OwnCheckKey] = keys) -> Mapping[uuid.UUID, Permission]:
             async with provider.read_ops() as r:
                 answered = await r.owned_permissions(keys)
             # The previous query left unreached entities out; the current one maps
             # them to NONE. Compare what is reached.
             return {key.entity: bits for key, bits in answered.items() if bits}
 
-        async def previous() -> Mapping[uuid.UUID, Permission]:
+        async def previous(
+            entity_type: Any = entity_type, entity_ids: Any = entity_ids
+        ) -> Mapping[uuid.UUID, Permission]:
             async with database.begin_readonly_session() as sess:
                 return dict(await _previous_query(sess, seed.user_id, entity_type, entity_ids))
 

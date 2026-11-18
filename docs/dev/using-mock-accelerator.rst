@@ -76,5 +76,6 @@ Here are the description of each field:
 Activating the mock-accelerator plugin
 --------------------------------------
 
-Add ``"ai.backend.accelerator.mock"`` to the ``agent.toml``'s ``[agent].allowed-compute-plugins`` field.
+Add ``"ai.backend.accelerator.mock"`` to the ``agent.toml``'s ``[agent].allow-compute-plugins`` field.
 Then restart the agent.
+The agent does not load this plugin while the field is unset.

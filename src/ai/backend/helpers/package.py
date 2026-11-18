@@ -38,7 +38,7 @@ def install(pkgname: str, force_install: bool = False) -> None:
     if force_install:
         cmdargs.append("-I")
     cmdargs.append(pkgname)
-    subprocess.run(cmdargs)
+    subprocess.run(cmdargs, check=False)
     sys.stdout.flush()
 
     # Ensure the user site directory to be in sys.path

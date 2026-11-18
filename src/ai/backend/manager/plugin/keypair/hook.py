@@ -82,12 +82,12 @@ class KeypairAuthHookPlugin(HookPlugin):
             if hash_type not in hashlib.algorithms_guaranteed:
                 raise InvalidAuthParameters("Unsupported signing method (hash type)")
 
+            if params["date"] is None:
+                raise InvalidAuthParameters("Request date is missing")
             date_obj = dateutil_parse(params["date"])
             date = date_obj.isoformat()
             endpoint = params["endpoint"]
             api_version = params["api_version"]
-            if date is None:
-                raise InvalidAuthParameters("Request date is missing")
             if endpoint is None:
                 raise InvalidAuthParameters("Request endpoint is missing")
             if api_version is None:
@@ -163,7 +163,7 @@ class KeypairAuthHookPlugin(HookPlugin):
                         signing_material.secret_key,
                         sign_params,
                     )
-                    if generated_token != signature:
+                    if not hmac.compare_digest(generated_token, signature):
                         raise Reject("Invalid auth token")
                     user_id = signing_material.user_id
 

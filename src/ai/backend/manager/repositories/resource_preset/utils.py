@@ -16,7 +16,7 @@ def suppress_with_log(
     exceptions: list[type[BaseException]],
     message: str | None = None,
     log_level: int = logging.WARNING,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """
     Context manager that suppresses specified exceptions and logs them.
 
@@ -29,7 +29,7 @@ def suppress_with_log(
         yield
     except tuple(exceptions) as e:
         if log_level >= logging.ERROR:
-            log.error("exception suppressed", failure_reason=message, exc_info=e)
+            log.exception("exception suppressed", failure_reason=message)
         elif log_level >= logging.WARNING:
             log.warning("exception suppressed", failure_reason=message, exc_info=e)
         else:

@@ -274,11 +274,11 @@ async def exception_middleware(
                 http_status=ex.status_code,
             )
             raise GenericBadRequest from ex
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             # The server is closing or the client has disconnected in the middle of
             # request.  Atomic requests are still executed to their ends.
             log.trace("request cancelled", http_method=method, route_path=endpoint)
-            raise e
+            raise
         except Exception as e:
             if is_client_disconnect(request, e):
                 log.trace(
@@ -848,7 +848,7 @@ def _init_subapp(
         subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
     prefix = subapp["prefix"]
     root_app.add_subapp("/" + prefix, subapp)
-    root_app.middlewares.extend(global_middlewares)  # type: ignore
+    root_app.middlewares.extend(cast(Iterable[Any], global_middlewares))
 
 
 def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCreator) -> None:
@@ -996,7 +996,7 @@ async def server_main(
     loop.set_debug(local_config.debug.asyncio)
 
     @asynccontextmanager
-    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None, None]:
+    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None]:
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
@@ -1024,7 +1024,7 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx() -> AsyncGenerator[None, None]:
+    async def webapp_ctx() -> AsyncGenerator[None]:
         ssl_ctx = None
         if local_config.proxy_coordinator.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

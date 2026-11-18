@@ -347,18 +347,17 @@ class TemplateDBSource:
                 })
             return entries
 
-    async def list_accessible_cluster_templates(
+    async def list_accessible_templates(
         self,
+        template_type: TemplateType,
         user_uuid: uuid.UUID,
         user_role: UserRole,
         domain_name: str,
         allowed_types: Iterable[str],
         group_id_filter: uuid.UUID | None = None,
     ) -> list[dict[str, Any]]:
-        """List cluster templates accessible to a user based on role.
-
-        Reimplements query_accessible_session_templates for TemplateType.CLUSTER.
-        """
+        """The templates of ``template_type`` the user may see: their own, and those of
+        the projects they are in (every project of the domain for an admin)."""
         extra_conds = None
         if group_id_filter is not None:
             extra_conds = SessionTemplateRow.group_id == group_id_filter
@@ -374,13 +373,15 @@ class TemplateDBSource:
                         SessionTemplateRow.created_at,
                         SessionTemplateRow.user_uuid,
                         SessionTemplateRow.group_id,
+                        SessionTemplateRow.type,
+                        SessionTemplateRow.template,
                         users.c.email,
                     )
                     .select_from(j)
                     .where(
                         (SessionTemplateRow.user_uuid == user_uuid)
                         & SessionTemplateRow.is_active
-                        & (SessionTemplateRow.type == TemplateType.CLUSTER),
+                        & (SessionTemplateRow.type == template_type),
                     )
                 )
                 if extra_conds is not None:
@@ -396,6 +397,8 @@ class TemplateDBSource:
                         "group": str(row.group_id) if row.group_id else None,
                         "user_email": row.email,
                         "group_name": None,
+                        "type": row.type,
+                        "template": row.template,
                     })
 
             if "group" in allowed_types:
@@ -421,6 +424,8 @@ class TemplateDBSource:
                         SessionTemplateRow.created_at,
                         SessionTemplateRow.user_uuid,
                         SessionTemplateRow.group_id,
+                        SessionTemplateRow.type,
+                        SessionTemplateRow.template,
                         groups.c.name,
                     )
                     .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
@@ -428,7 +433,7 @@ class TemplateDBSource:
                     .where(
                         SessionTemplateRow.group_id.in_(group_ids)
                         & SessionTemplateRow.is_active
-                        & (SessionTemplateRow.type == TemplateType.CLUSTER),
+                        & (SessionTemplateRow.type == template_type),
                     )
                 )
                 if extra_conds is not None:
@@ -455,6 +460,8 @@ class TemplateDBSource:
                         ),
                         "user_email": None,
                         "group_name": row.groups_name,
+                        "type": row.session_templates_type,
+                        "template": row.session_templates_template,
                     })
         return entries
 

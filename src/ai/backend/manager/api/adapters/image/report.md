@@ -81,21 +81,24 @@ Scenario: incomplete 3 / 17
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing tries to soft delete several images at once, nothing is deleted and all come back in the failed list for lack of permission](#partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images) | answered |
-| [soft deleting two alive images and one unknown id at once brings the two back as deleted, and the unknown id comes back in the failed list as not found](#partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one) | answered |
+| [when a user granted soft delete on the registry's images soft deletes several images at once, they all come back as deleted and nothing failed](#partial_bulk_forgetting-a-user-granted-soft-delete-forgets-several-images-at-once) | answered |
+| [when a user granted soft delete in their own personal project soft deletes their own image and another user's image at once, only their own comes back as deleted and the other comes back in the failed list for lack of permission](#partial_bulk_forgetting-a-user-granted-soft-delete-is-denied-on-another-users-image) | answered |
+| [soft deleting an alive image and an already deleted image at once brings the alive one back as deleted, and the already deleted one comes back in the failed list as not found](#partial_bulk_forgetting-forgetting-several-leaves-the-already-deleted-one) | answered |
 
 **partial_bulk_restore**
 
 | scenario | verdict |
 |---|---|
-| [restoring several soft-deleted images at once brings them all back alive](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | answered |
+| [when a user granted soft delete in their own personal project restores their own image and another user's image at once, only their own comes back alive and the other comes back in the failed list for lack of permission](#partial_bulk_forgetting-a-user-granted-soft-delete-restores-only-their-own-image) | answered |
+| [when a user granted soft delete on the registry's images restores several deleted images at once, they all come back alive and nothing failed](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | answered |
+| [restoring a deleted image and an image being purged at once brings the deleted one back alive, and the one being purged comes back in the failed list as not found](#partial_bulk_forgetting-restoring-several-leaves-the-one-being-purged) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing tries to update several images at once, nothing is updated and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images) | answered |
-| [when the superadmin changes the tags of several images at once, they all come back with the new tag and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-images-at-once) | answered |
+| [when a user granted update on images changes the tags of several images at once, they all come back with the new tag and nothing failed](#partial_bulk_editing-a-user-granted-update-edits-several-images-at-once) | answered |
+| [when a user granted update in their own personal project changes the tags of their own image and another user's image at once, only their own comes back with the new tag and the other comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-update-is-denied-on-another-users-image) | answered |
 
 **restore**
 
@@ -190,7 +193,7 @@ when the superadmin searches with only a cursor and no size or offset, only the 
 
 Given
 
-- one registry and 3 images in it, one superadmin
+- one registry and 3 images in it (statuses ALIVE, ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -290,7 +293,7 @@ when the superadmin searches by the name of one image, only that image comes bac
 
 Given
 
-- one registry and 3 images in it, one superadmin
+- one registry and 3 images in it (statuses ALIVE, ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -386,7 +389,7 @@ when the superadmin searches with the page size omitted, only 50 come back and t
 
 Given
 
-- one registry and 51 images in it, one superadmin
+- one registry and 51 images in it (statuses ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -466,7 +469,7 @@ ordering by name descending and skipping the first item brings back the second a
 
 Given
 
-- one registry and 4 images in it, one superadmin
+- one registry and 4 images in it (statuses ALIVE, ALIVE, ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -499,7 +502,7 @@ when the superadmin searches without a filter, every image seeded in advance com
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -530,7 +533,7 @@ naming both a size and a cursor is rejected as invalid input
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -558,7 +561,7 @@ when a user who is not the superadmin tries to search images, the call is reject
 
 Given
 
-- one registry and 2 images in it, one user
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one user
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -588,7 +591,7 @@ when the superadmin reads from the front by cursor, only the requested count com
 
 Given
 
-- one registry and 3 images in it, one superadmin
+- one registry and 3 images in it (statuses ALIVE, ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -620,7 +623,7 @@ naming a cursor value that cannot be read is rejected as an invalid cursor
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -648,7 +651,7 @@ naming both a size and a cursor is rejected as invalid input. It happens while t
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -767,7 +770,7 @@ reading with an empty id list brings back an empty list
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -795,7 +798,7 @@ reading the same image id twice brings the same image back in both positions
 
 Given
 
-- one registry and 1 images in it, one superadmin
+- one registry and 1 images in it (statuses ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -823,7 +826,7 @@ when the superadmin reads two images seeded in advance and one id that points at
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -854,7 +857,7 @@ when a user granted nothing reads several ids at once, a rejection for lack of p
 
 Given
 
-- one registry and 2 images in it, one user
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one user
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -1187,15 +1190,15 @@ Then
 
 ### partial_bulk_delete
 
-<a id="partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images"></a>
+<a id="partial_bulk_forgetting-a-user-granted-soft-delete-forgets-several-images-at-once"></a>
 
-#### [a-user-granted-nothing-forgets-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+#### [a-user-granted-soft-delete-forgets-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
-when a user granted nothing tries to soft delete several images at once, nothing is deleted and all come back in the failed list for lack of permission
+when a user granted soft delete on the registry's images soft deletes several images at once, they all come back as deleted and nothing failed
 
 Given
 
-- one registry and 2 images in it, one user
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one user, granted image permission on the registry
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -1205,6 +1208,10 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted permission to handle images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: SOFT_DELETE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
 
 When
 
@@ -1212,40 +1219,7 @@ When
 
 Then
 
-- no image is processed and every target comes back in the failed list
-  - successes = []
-  - failed count = 2
-  - failed[0].id: same as the id of the target image
-  - failed[0].message: a reason containing 'Insufficient permission'
-  - failed[1].id: same as the id of the target image
-  - failed[1].message: a reason containing 'Insufficient permission'
-
-<a id="partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one"></a>
-
-#### [forgetting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
-
-soft deleting two alive images and one unknown id at once brings the two back as deleted, and the unknown id comes back in the failed list as not found
-
-Given
-
-- one registry and 2 images in it, one superadmin
-  - Domain home-1
-  - Container registry host-1: image source
-  - Image image-0-1: x86_64 image
-  - Image image-1-1: x86_64 image
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ImageAdapter.partial_bulk_delete: user-1 soft deletes 2 images and one missing id at once
-
-Then
-
-- every target image comes back with status DELETED and an unknown id comes back in the failed list because no target answers to it
+- every target image comes back with status DELETED and nothing failed
   - successes count = 2
   - id: same as the id of the image created in advance
   - name = 'image-0-1'
@@ -1305,6 +1279,75 @@ Then
   - identity.namespace = 'image-1-1'
   - identity.architecture = 'x86_64'
   - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: the time this run wrote
+  - metadata.last_used_at: same as the node's last_used_at field
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed = []
+
+<a id="partial_bulk_forgetting-a-user-granted-soft-delete-is-denied-on-another-users-image"></a>
+
+#### [a-user-granted-soft-delete-is-denied-on-another-users-image](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+
+when a user granted soft delete in their own personal project soft deletes their own image and another user's image at once, only their own comes back as deleted and the other comes back in the failed list for lack of permission
+
+Given
+
+- one custom image the caller committed (status ALIVE) and one custom image another user committed (status ALIVE), with image permission only in the caller's personal project
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Committed image mine-1: custom image with an owner, belongs to that user's personal project
+  - Committed image theirs-1: custom image with an owner, belongs to that user's personal project
+  - Prepare a user granted permission to handle the project's images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: SOFT_DELETE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
+
+When
+
+- ImageAdapter.partial_bulk_delete: user-1 soft deletes 2 images at once
+
+Then
+
+- only one target comes back processed and the other one in the failed list
+  - successes count = 1
+  - id: same as the id of the image created in advance
+  - name = 'mine-1'
+  - image = 'mine-1'
+  - registry = 'host-1'
+  - registry_id: same as the id of the registry created in advance
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - is_local = False
+  - customized = True
+  - creator_id: same as the id of the user who committed the image
+  - created_at: the time this run wrote
+  - last_used_at: skipped: a session records it, so this run cannot know it
+  - identity.canonical_name = 'mine-1'
+  - identity.namespace = 'mine-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
   - metadata.size_bytes = 0
   - metadata.created_at: the time this run wrote
   - metadata.last_used_at: same as the node's last_used_at field
@@ -1314,33 +1357,176 @@ Then
   - requirements.supported_accelerators = ['*']
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
   - failed count = 1
-  - failed[0].id: same as the unknown id put in the request
+  - failed[0].id: same as the id of the target image left unprocessed
+  - failed[0].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_forgetting-forgetting-several-leaves-the-already-deleted-one"></a>
+
+#### [forgetting-several-leaves-the-already-deleted-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+
+soft deleting an alive image and an already deleted image at once brings the alive one back as deleted, and the already deleted one comes back in the failed list as not found
+
+Given
+
+- one registry and 2 images in it (statuses ALIVE, DELETED), one user, granted image permission on the registry
+  - Domain home-1
+  - Container registry host-1: image source
+  - Image image-0-1: x86_64 image
+  - Image image-1-1: x86_64 image, status DELETED
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted permission to handle images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: SOFT_DELETE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
+
+When
+
+- ImageAdapter.partial_bulk_delete: user-1 soft deletes 2 images at once
+
+Then
+
+- only one target comes back processed and the other one in the failed list
+  - successes count = 1
+  - id: same as the id of the image created in advance
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: same as the id of the registry created in advance
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: the time this run wrote
+  - last_used_at: skipped: a session records it, so this run cannot know it
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: the time this run wrote
+  - metadata.last_used_at: same as the node's last_used_at field
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: same as the id of the target image left unprocessed
   - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_restore
+
+<a id="partial_bulk_forgetting-a-user-granted-soft-delete-restores-only-their-own-image"></a>
+
+#### [a-user-granted-soft-delete-restores-only-their-own-image](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
+
+when a user granted soft delete in their own personal project restores their own image and another user's image at once, only their own comes back alive and the other comes back in the failed list for lack of permission
+
+Given
+
+- one custom image the caller committed (status DELETED) and one custom image another user committed (status ALIVE), with image permission only in the caller's personal project
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Committed image mine-1: custom image with an owner, belongs to that user's personal project, status DELETED
+  - Committed image theirs-1: custom image with an owner, belongs to that user's personal project
+  - Prepare a user granted permission to handle the project's images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: SOFT_DELETE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
+
+When
+
+- ImageAdapter.partial_bulk_restore: user-1 restores 2 images at once
+
+Then
+
+- only one target comes back processed and the other one in the failed list
+  - successes count = 1
+  - id: same as the id of the image created in advance
+  - name = 'mine-1'
+  - image = 'mine-1'
+  - registry = 'host-1'
+  - registry_id: same as the id of the registry created in advance
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - is_local = False
+  - customized = True
+  - creator_id: same as the id of the user who committed the image
+  - created_at: the time this run wrote
+  - last_used_at: skipped: a session records it, so this run cannot know it
+  - identity.canonical_name = 'mine-1'
+  - identity.namespace = 'mine-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: the time this run wrote
+  - metadata.last_used_at: same as the node's last_used_at field
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: same as the id of the target image left unprocessed
+  - failed[0].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_forgetting-restoring-several-brings-them-back-alive"></a>
 
 #### [restoring-several-brings-them-back-alive](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
-restoring several soft-deleted images at once brings them all back alive
+when a user granted soft delete on the registry's images restores several deleted images at once, they all come back alive and nothing failed
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses DELETED, DELETED), one user, granted image permission on the registry
   - Domain home-1
   - Container registry host-1: image source
-  - Image image-0-1: x86_64 image
-  - Image image-1-1: x86_64 image
+  - Image image-0-1: x86_64 image, status DELETED
+  - Image image-1-1: x86_64 image, status DELETED
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted permission to handle images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: SOFT_DELETE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
 
 When
 
-- ImageAdapter.partial_bulk_restore: user-1 soft deletes 2 images at once and then restores them at once
+- ImageAdapter.partial_bulk_restore: user-1 restores 2 images at once
 
 Then
 
@@ -1414,17 +1600,85 @@ Then
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
   - failed = []
 
-### partial_bulk_update
+<a id="partial_bulk_forgetting-restoring-several-leaves-the-one-being-purged"></a>
 
-<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images"></a>
+#### [restoring-several-leaves-the-one-being-purged](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
-#### [a-user-granted-nothing-edits-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
-
-when a user granted nothing tries to update several images at once, nothing is updated and every one comes back in the failed list for lack of permission
+restoring a deleted image and an image being purged at once brings the deleted one back alive, and the one being purged comes back in the failed list as not found
 
 Given
 
-- one registry and 2 images in it, one user
+- one registry and 2 images in it (statuses DELETED, PURGING), one user, granted image permission on the registry
+  - Domain home-1
+  - Container registry host-1: image source
+  - Image image-0-1: x86_64 image, status DELETED
+  - Image image-1-1: x86_64 image, status PURGING
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted permission to handle images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: SOFT_DELETE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
+
+When
+
+- ImageAdapter.partial_bulk_restore: user-1 restores 2 images at once
+
+Then
+
+- only one target comes back processed and the other one in the failed list
+  - successes count = 1
+  - id: same as the id of the image created in advance
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: same as the id of the registry created in advance
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: the time this run wrote
+  - last_used_at: skipped: a session records it, so this run cannot know it
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: the time this run wrote
+  - metadata.last_used_at: same as the node's last_used_at field
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: same as the id of the target image left unprocessed
+  - failed[0].message: a reason containing 'not found'
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-update-edits-several-images-at-once"></a>
+
+#### [a-user-granted-update-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
+
+when a user granted update on images changes the tags of several images at once, they all come back with the new tag and nothing failed
+
+Given
+
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one user, granted image permission on the registry
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -1434,39 +1688,10 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-
-When
-
-- ImageAdapter.partial_bulk_update: user-1 changes the tags of 2 images at once
-
-Then
-
-- no image is processed and every target comes back in the failed list
-  - successes = []
-  - failed count = 2
-  - failed[0].id: same as the id of the target image
-  - failed[0].message: a reason containing 'Insufficient permission'
-  - failed[1].id: same as the id of the target image
-  - failed[1].message: a reason containing 'Insufficient permission'
-
-<a id="partial_bulk_editing-the-superadmin-edits-several-images-at-once"></a>
-
-#### [the-superadmin-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
-
-when the superadmin changes the tags of several images at once, they all come back with the new tag and nothing failed
-
-Given
-
-- one registry and 2 images in it, one superadmin
-  - Domain home-1
-  - Container registry host-1: image source
-  - Image image-0-1: x86_64 image
-  - Image image-1-1: x86_64 image
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission to handle images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: UPDATE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
 
 When
 
@@ -1543,6 +1768,77 @@ Then
   - requirements.supported_accelerators = ['*']
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
   - failed = []
+
+<a id="partial_bulk_editing-a-user-granted-update-is-denied-on-another-users-image"></a>
+
+#### [a-user-granted-update-is-denied-on-another-users-image](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
+
+when a user granted update in their own personal project changes the tags of their own image and another user's image at once, only their own comes back with the new tag and the other comes back in the failed list for lack of permission
+
+Given
+
+- one custom image the caller committed (status ALIVE) and one custom image another user committed (status ALIVE), with image permission only in the caller's personal project
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Committed image mine-1: custom image with an owner, belongs to that user's personal project
+  - Committed image theirs-1: custom image with an owner, belongs to that user's personal project
+  - Prepare a user granted permission to handle the project's images
+    - Role image-keeper-1: applies only within the scope it is granted in
+    - Role image-keeper-1: UPDATE allowed on every image
+    - regular user user-1: holds Role image-keeper-1
+
+When
+
+- ImageAdapter.partial_bulk_update: user-1 changes the tags of 2 images at once
+
+Then
+
+- only one target comes back processed and the other one in the failed list
+  - successes count = 1
+  - id: same as the id of the image created in advance
+  - name = 'mine-1'
+  - image = 'mine-1'
+  - registry = 'host-1'
+  - registry_id: same as the id of the registry created in advance
+  - project = None
+  - tag = 'edited-together'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - is_local = False
+  - customized = True
+  - creator_id: same as the id of the user who committed the image
+  - created_at: the time this run wrote
+  - last_used_at: skipped: a session records it, so this run cannot know it
+  - identity.canonical_name = 'mine-1'
+  - identity.namespace = 'mine-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000000mine-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: the time this run wrote
+  - metadata.last_used_at: same as the node's last_used_at field
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: same as the id of the target image left unprocessed
+  - failed[0].message: a reason containing 'Insufficient permission'
 
 ### restore
 
@@ -3016,7 +3312,7 @@ with no alias attached, a superadmin searching aliases gets an empty answer
 
 Given
 
-- one registry and 2 images in it, one superadmin
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one superadmin
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image
@@ -3047,7 +3343,7 @@ when a user who is not the superadmin tries to search aliases, the call is rejec
 
 Given
 
-- one registry and 2 images in it, one user
+- one registry and 2 images in it (statuses ALIVE, ALIVE), one user
   - Domain home-1
   - Container registry host-1: image source
   - Image image-0-1: x86_64 image

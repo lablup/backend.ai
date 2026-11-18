@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.manager.data.retention.types import RetentionCategory
-from ai.backend.manager.models.base import populate_fixture
+from ai.backend.manager.models.fixture import populate_fixture
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -18,7 +18,7 @@ from ai.backend.testutils.db import with_tables
 
 
 class TestRetentionCategory:
-    def test_has_the_eight_catalog_categories(self) -> None:
+    def test_has_the_nine_categories(self) -> None:
         assert {c.value for c in RetentionCategory} == {
             "logs",
             "login",
@@ -28,6 +28,7 @@ class TestRetentionCategory:
             "sessions",
             "usage_records",
             "usage_buckets",
+            "projects",
         }
 
     def test_unknown_category_string_is_rejected(self) -> None:
