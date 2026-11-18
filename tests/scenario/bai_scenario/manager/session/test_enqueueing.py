@@ -28,6 +28,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -64,6 +65,8 @@ ASKED_FOR: dict[str, Decimal] = {"cpu": Decimal(1), "mem": Decimal(2147483648)}
 """The slots the session asks for, above the image minimum of cpu 1 and mem 1.06g."""
 CAPACITY: dict[str, Decimal] = {"cpu": Decimal(8), "mem": Decimal(34359738368)}
 """What the agent reports in each slot, more than the session asks for."""
+UNKNOWN_AGENT_ID = "i-not-registered"
+"""An agent id no seed registers."""
 
 
 @dataclass(frozen=True)
@@ -161,12 +164,23 @@ class APlaceAndSomeone(Given[Any, LaidPlaceAndCaller]):
 
 @dataclass(frozen=True)
 class CreatingTheSession(When[LaidPlaceAndCaller, SessionAdapter, Enqueued]):
+    designates_unknown_agent: bool = False
+
     @override
     def operation(self) -> str:
         return "enqueue"
 
     @override
     def describe(self, laid: LaidPlaceAndCaller) -> str:
+        if self.designates_unknown_agent:
+            return Says(
+                f"{laid.caller.username}이 등록되지 않은 에이전트를 지정해 그 프로젝트에 "
+                f"{SESSION_NAME} 세션을 만듭니다",
+                english=(
+                    f"{laid.caller.username} creates the session {SESSION_NAME} in that project, "
+                    "designating an agent that is not registered"
+                ),
+            )
         return Says(
             f"{laid.caller.username}이 그 프로젝트에 {SESSION_NAME} 세션을 만듭니다",
             english=f"{laid.caller.username} creates the session {SESSION_NAME} in that project",
@@ -187,6 +201,7 @@ class CreatingTheSession(When[LaidPlaceAndCaller, SessionAdapter, Enqueued]):
                     resource_group_id=ResourceGroupID(laid.resource_group.id),
                     project_id=laid.project.id,
                     is_preemptible=False,
+                    agent_list=[UNKNOWN_AGENT_ID] if self.designates_unknown_agent else None,
                 ),
                 user_id=laid.caller.id,
                 user_role=laid.caller.role.value,
@@ -337,14 +352,26 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
 @dataclass(frozen=True)
 class CreatingASession(Scenario[TestSeedingSession, LaidPlaceAndCaller, SessionAdapter, Enqueued]):
     granted: bool = True
+    designates_unknown_agent: bool = False
 
     @override
     def summary(self) -> str:
+        if self.designates_unknown_agent:
+            return "creating-a-session-designating-an-unknown-agent"
         who = "granted" if self.granted else "granted-nothing"
         return f"creating-a-session-{who}"
 
     @override
     def describe(self) -> str:
+        if self.designates_unknown_agent:
+            return Says(
+                "그 프로젝트에서 세션을 만들 수 있는 사용자가 등록되지 않은 에이전트를 지정해 "
+                "세션을 만들면, 거부됩니다",
+                english=(
+                    "when a user who may create sessions in the project creates one designating "
+                    "an agent that is not registered, the call is rejected"
+                ),
+            )
         if not self.granted:
             return Says(
                 "아무 권한도 받지 않은 사용자가 프로젝트에 세션을 만들려 하면, 권한 부족으로 "
@@ -369,10 +396,12 @@ class CreatingASession(Scenario[TestSeedingSession, LaidPlaceAndCaller, SessionA
 
     @override
     def when(self) -> When[LaidPlaceAndCaller, SessionAdapter, Enqueued]:
-        return CreatingTheSession()
+        return CreatingTheSession(designates_unknown_agent=self.designates_unknown_agent)
 
     @override
     def then(self) -> Then[LaidPlaceAndCaller, Enqueued]:
+        if self.designates_unknown_agent:
+            return TheCallIsRefused(AgentNotFound)
         if not self.granted:
             return TheCallIsRefused(NotEnoughPermission)
         return TheSessionIsCreated()
@@ -381,6 +410,7 @@ class CreatingASession(Scenario[TestSeedingSession, LaidPlaceAndCaller, SessionA
 SCENARIOS: list[Scenario[Any, Any, Any, Any]] = [
     CreatingASession(),
     CreatingASession(granted=False),
+    CreatingASession(designates_unknown_agent=True),
 ]
 
 
