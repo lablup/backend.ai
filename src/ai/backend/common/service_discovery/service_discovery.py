@@ -103,6 +103,10 @@ class HealthStatus(BackendAISchema):
         self.last_heartbeat = time.time()
 
     @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
+
+    @override
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, HealthStatus):
             return False

@@ -74,7 +74,7 @@ def host_port_pair(s: str) -> HostPortPair:
         host = ipaddress.ip_address(host)
     except ValueError:
         # Let it be just a hostname.
-        host = host
+        pass
     try:
         port = int(pieces[1])
         if port <= 0:

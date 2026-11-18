@@ -299,8 +299,6 @@ async def watcher_server(
     _pidx: int,
     args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
-    global shutdown_enabled
-
     app = web.Application()
     app["config"] = args[0]
     logging_config: LoggingConfig = args[0]["logging"]

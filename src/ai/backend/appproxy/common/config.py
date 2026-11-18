@@ -85,10 +85,7 @@ class HostPortPair(BaseSchema):
 
     @property
     def host_set_with_protocol(self) -> bool:
-        for protocol in ("http://", "https://"):
-            if self.host.startswith(protocol):
-                return True
-        return False
+        return any(self.host.startswith(protocol) for protocol in ("http://", "https://"))
 
     @override
     def __repr__(self) -> str:

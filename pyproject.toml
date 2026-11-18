@@ -115,6 +115,16 @@ select = [
     "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
     "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
     "RSE",    # flake8-raise: enforces proper raise statement usage
+    "G",      # flake8-logging-format: logging calls must not format their message eagerly
+    "PLW0127",  # self-assigning-variable
+    "PLW1641",  # eq-without-hash
+    "PLW0602",  # global-variable-not-assigned
+    "PLC0105",  # type-name-incorrect-variance
+    "PLE0604",  # invalid-all-object
+    "PLC0206",  # dict-index-missing-items
+    "PLR1722",  # sys-exit-alias
+    "N805",   # invalid-first-argument-name-for-method
+    "S112",   # try-except-continue
     "PERF",   # perflint: detects performance anti-patterns
     "SIM",    # flake8-simplify: suggests code simplification
     "RUF",    # ruff-specific: Ruff's own linting rules
@@ -160,7 +170,6 @@ ignore = [
     "SIM102", # collapsible-if - nested if statements often improve readability
     "SIM105", # suppressible-exception - explicit try-except is clearer for error handling
     "SIM108", # if-else-block-instead-of-if-exp - ternary can reduce readability for complex conditions
-    "SIM110", # reimplemented-builtin - explicit loops are sometimes clearer than any()/all()
     "SIM115", # open-file-with-context-handler - some file operations need explicit close control
     "SIM117", # multiple-with-statements - nested with statements often improve readability
     "SIM118", # in-dict-keys - explicit .keys() is sometimes clearer
@@ -183,7 +192,6 @@ ignore = [
     "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
-    "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
     # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
@@ -233,6 +241,10 @@ split-on-trailing-comma = true
 "src/ai/backend/common/tristate/unset.py" = ["TID251"]
 # released migration cannot be edited in place
 "src/ai/backend/manager/models/alembic/versions/305e3ddc20a7_update_auditlog_table.py" = ["TRY400", "TRY401"]
+# __all__ is the sum of the submodules' __all__
+"src/ai/backend/appproxy/coordinator/models/__init__.py" = ["PLE0604"]
+"src/ai/backend/account_manager/models/__init__.py" = ["PLE0604"]
+"src/ai/backend/client/__init__.py" = ["PLE0604"]
 # decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
 "src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
 # schema.py defines GQL schema roots (Query, Mutation, Subscription) using @strawberry.type
@@ -276,9 +288,9 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/api/vfolder.py" = ["PLC0415"]
 # - Client func vfolder has progress printing
 "src/ai/backend/client/func/vfolder.py" = ["T20"]
-# - Alembic migrations may print progress and have standard signatures
-"src/ai/backend/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101"]
-"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101"]
+# - Alembic migrations may print progress and have standard signatures; released ones are not edited for G004
+"src/ai/backend/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101", "G004"]
+"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101", "G004"]
 # - Model modules may have circular dependencies between Row classes
 "src/ai/backend/*/models/**/*.py" = ["PLC0415"]
 "src/ai/backend/*/*/models/**/*.py" = ["PLC0415"]
