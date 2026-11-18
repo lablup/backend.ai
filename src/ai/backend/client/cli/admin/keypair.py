@@ -7,7 +7,7 @@ from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

@@ -7,7 +7,7 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
-from . import admin
+from ._group import admin
 
 
 def _parse_label_filters(labels: tuple[str, ...]) -> Sequence[object]:

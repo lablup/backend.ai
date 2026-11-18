@@ -108,6 +108,7 @@ select = [
     "SIM",    # flake8-simplify: suggests code simplification
     "RUF",    # ruff-specific: Ruff's own linting rules
     "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
+    "PGH004", # pygrep-hooks: requires specific rule codes in noqa
     "B",      # flake8-bugbear: detects likely bugs and design issues
     "UP",     # pyupgrade: modernizes Python syntax to latest version
     "A",      # flake8-builtins: prevents shadowing Python builtins

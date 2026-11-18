@@ -10,7 +10,7 @@ from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.pretty import print_info
 from ai.backend.client.cli.types import CLIContext
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

@@ -10,7 +10,7 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.fair_share import fair_share
+from ai.backend.client.cli.fair_share.group import fair_share
 from ai.backend.client.cli.types import CLIContext
 
 # =============================================================================

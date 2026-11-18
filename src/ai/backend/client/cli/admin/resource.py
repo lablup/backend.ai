@@ -4,7 +4,7 @@ import click
 
 from ai.backend.client.cli.pretty import print_error
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()
