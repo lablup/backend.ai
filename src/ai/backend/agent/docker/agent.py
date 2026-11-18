@@ -1100,7 +1100,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 pubkey = self.internal_data["ssh_keypair"]["public_key"].encode("ascii")
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
 
-                def _populate_ssh_config() -> None:
+                def _populate_ssh_config(pubkey: bytes = pubkey, privkey: bytes = privkey) -> None:
                     paths = ContainerSSHFileWriter(self.work_dir, pubkey, privkey).write()
 
                     def chown_idfile(uid: int | None, gid: int | None) -> None:
