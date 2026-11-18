@@ -13,10 +13,10 @@ from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
     ALL_COMPLETED,
-    ERROR,
     FIRST_COMPLETED,
     PASSED,
     REJECTED,
+    HookHandlerFailed,
     HookPlugin,
     HookPluginContext,
     Reject,
@@ -413,21 +413,13 @@ async def test_hook_dispatch(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
         assert hook_result.reason is None
         assert hook_result.src_plugin == ["hook-p", "hook-r"]
 
-        # If a plugin raises an arbitrary exception other than Reject, it's marked as ERROR.
-        hook_result = await ctx.dispatch("HOOK3", ("e", "f"), return_when=FIRST_COMPLETED)
-        assert hook_result.status == ERROR
-        assert hook_result.result is None
-        assert hook_result.reason is not None
-        assert "ZeroDivisionError" in hook_result.reason
-        assert "oops" in hook_result.reason
-        assert hook_result.src_plugin == "hook-e"
-        hook_result = await ctx.dispatch("HOOK3", ("e", "f"), return_when=ALL_COMPLETED)
-        assert hook_result.status == ERROR
-        assert hook_result.result is None
-        assert hook_result.reason is not None
-        assert "ZeroDivisionError" in hook_result.reason
-        assert "oops" in hook_result.reason
-        assert hook_result.src_plugin == "hook-e"
+        # A plugin raising an exception other than Reject fails the dispatch, keeping the cause.
+        for return_when in (FIRST_COMPLETED, ALL_COMPLETED):
+            with pytest.raises(HookHandlerFailed) as exc_info:
+                await ctx.dispatch("HOOK3", ("e", "f"), return_when=return_when)
+            assert isinstance(exc_info.value.__cause__, ZeroDivisionError)
+            assert exc_info.value.extra_msg is None
+            assert exc_info.value.extra_data == {"plugins": "hook-e"}
     finally:
         await ctx.cleanup()
 
