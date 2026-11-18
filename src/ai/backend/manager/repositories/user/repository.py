@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -51,10 +51,14 @@ from ai.backend.manager.models.bootstrap_script.upserters import (
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
 )
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    CurrentBootstrapScriptRevisionSearcher,
+)
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.ssh_keypair.purgers import DefaultSSHKeypairPurger
@@ -168,6 +172,21 @@ class UserRepository:
     async def unset_default_bootstrap_script(self, user_id: UserID) -> None:
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserDefaultBootstrapScriptPurger())
+
+    @user_repository_resilience.apply()
+    async def current_bootstrap_script_revisions(
+        self, script_ids: Sequence[BootstrapScriptID]
+    ) -> Mapping[BootstrapScriptID, BootstrapScriptRevisionData]:
+        """The latest revision of each named script. A script that is gone is absent."""
+        if not script_ids:
+            return {}
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                CurrentBootstrapScriptRevisionSearcher(
+                    script_ids=script_ids, pagination=NoPagination()
+                )
+            )
+        return {revision.script_id: revision for revision in result.items}
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:

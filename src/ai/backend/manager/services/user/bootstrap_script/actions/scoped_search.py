@@ -15,7 +15,7 @@ from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass(frozen=True)
-class SearchBootstrapScriptsAction(
+class ScopedSearchBootstrapScriptsAction(
     OperationScopeOpsAction[BootstrapScriptRow, BootstrapScriptData]
 ):
     """Page through the bootstrap scripts set on one user."""
@@ -45,4 +45,4 @@ class SearchBootstrapScriptsAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "search_bootstrap_scripts"
+        return "scoped_search_bootstrap_scripts"

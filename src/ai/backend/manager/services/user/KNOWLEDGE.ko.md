@@ -12,7 +12,7 @@ keypair row 는 자체 소속을 갖지 않는다. access key 로 keypair 를 �
 - script 내용은 `bootstrap_script_revisions` 에 있고, 이 테이블은 row 만 추가한다. update 는 요청한 사용자를 `creator_id` 로 하여 다음 `revision_number` 를 추가하고, 최신 revision 이 현재 내용이다.
 - legacy API 와 세션 생성은 사용자의 삭제되지 않은 기본 script 의 최신 revision 을 사용한다. 기본 script 가 없으면 조회는 빈 script 를 반환하고 legacy update 는 script 를 생성해 기본으로 지정한다.
 - v2 세션 생성은 script 가 없는 요청을 사용자의 기본 script 로 채우고, 그다음 자원 그룹의 기본 execution spec 으로 채운다.
-- `processors.bootstrap_script` 에서 script 를 id 로 지정하는 operation 인 get, bulk get, add revision, purge 는 dangling lookup field 그룹에 있다. owner lookup 이 row 의 `entity_type` 으로 script 소유자를 찾고, 그 script 소유자가 operation 을 처리한다. 소유자를 이름으로 받는 operation 은 사용자 single-entity action 인 create, switch default, unset default 와 사용자 scope search 다. 삭제된 script 도 삭제되지 않은 script 와 같이 조회하고 영구 삭제한다. switch-default 와 add-revision 은 삭제된 script 에 대해 찾을 수 없음으로 응답한다.
+- `processors.bootstrap_script` 에서 script 를 id 로 지정하는 operation 인 get, bulk get, add revision, purge 는 dangling lookup field 그룹에 있다. owner lookup 이 row 의 `entity_type` 으로 script 소유자를 찾고, 그 script 소유자가 operation 을 처리한다. 소유자를 이름으로 받는 operation 은 사용자 single-entity action 인 create, switch default, unset default 와 사용자 scope search 다. script row 에는 내용이 없다. `bulk_get_current_revisions` 가 같은 owner lookup 으로 지정한 script 마다 가장 마지막 revision 을 읽는다. 이 operation 은 data 가 revision 인 두 번째 그룹에 있다. 삭제된 script 도 삭제되지 않은 script 와 같이 조회하고 영구 삭제한다. switch-default 와 add-revision 은 삭제된 script 에 대해 찾을 수 없음으로 응답한다.
 
 | Operation | 규칙 | 이유 |
 |---|---|---|

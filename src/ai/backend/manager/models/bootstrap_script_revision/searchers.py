@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import aliased
 
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.models.bootstrap_script.row import (
@@ -41,6 +44,32 @@ class DefaultBootstrapScriptRevisionSearcher(
                 UserDefaultBootstrapScriptRow.user_id == self.user_id,
                 BootstrapScriptRow.deleted_at.is_(None),
             )
+        )
+
+    @override
+    def to_data(self, row: BootstrapScriptRevisionRow) -> BootstrapScriptRevisionData:
+        return BootstrapScriptRevisionSearchableFields.own.to_data(row)
+
+
+@dataclass(kw_only=True)
+class CurrentBootstrapScriptRevisionSearcher(
+    Searcher[BootstrapScriptRevisionRow, BootstrapScriptRevisionData]
+):
+    """The latest revision of each named script, which is its current content."""
+
+    script_ids: Sequence[BootstrapScriptID]
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        later = aliased(BootstrapScriptRevisionRow)
+        latest_number = (
+            sa.select(sa.func.max(later.revision_number))
+            .where(later.script_id == BootstrapScriptRevisionRow.script_id)
+            .scalar_subquery()
+        )
+        return sa.select(BootstrapScriptRevisionRow).where(
+            BootstrapScriptRevisionRow.script_id.in_(self.script_ids),
+            BootstrapScriptRevisionRow.revision_number == latest_number,
         )
 
     @override
