@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
-import yarl
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
@@ -182,31 +181,6 @@ class ContainerRegistryRow(Base):
         if not rows:
             raise NoResultFound
         return rows
-
-    @classmethod
-    async def get_known_container_registries(
-        cls,
-        session: AsyncSession,
-    ) -> Mapping[str, Mapping[str, yarl.URL]]:
-        query_stmt = sa.select(ContainerRegistryRow).options(
-            load_only(
-                ContainerRegistryRow.project,
-                ContainerRegistryRow.registry_name,
-                ContainerRegistryRow.url,
-            )
-        )
-        registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt)).all())
-        result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
-        for registry_row in registries:
-            project = registry_row.project
-            if project is None:
-                continue
-            registry_name = registry_row.registry_name
-            url = registry_row.url
-            if project not in result:
-                result[project] = {}
-            result[project][registry_name] = yarl.URL(url)
-        return result
 
     @classmethod
     def scope_id_expr(cls) -> SQLColumnExpression[ContainerRegistryID]:

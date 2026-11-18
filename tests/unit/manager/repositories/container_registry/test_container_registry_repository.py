@@ -434,6 +434,37 @@ class TestContainerRegistryRepository:
         assert len(result) == 2
 
     @pytest.fixture
+    async def registries_with_and_without_project(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        """A Harbor registry with an IDNA host, and a Docker registry with no project."""
+        async with db_with_cleanup.begin_session() as session:
+            session.add_all([
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(uuid.uuid4()),
+                    url="https://xn--3e0b707e.example.com",
+                    registry_name="harbor.example.com",
+                    type=ContainerRegistryType.HARBOR2,
+                    project="library",
+                ),
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(uuid.uuid4()),
+                    url="https://docker.example.com",
+                    registry_name="docker.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project=None,
+                ),
+            ])
+
+    @pytest.mark.usefixtures("registries_with_and_without_project")
+    async def test_get_known_registries_keys_by_project_and_name(
+        self, repository: ContainerRegistryRepository
+    ) -> None:
+        result = await repository.get_known_registries()
+
+        assert result == {"library/harbor.example.com": "https://한국.example.com/"}
+
+    @pytest.fixture
     async def creator(self) -> ContainerRegistryCreator:
         """Fixture that provides a minimal creator spec for creating registries."""
         return ContainerRegistryCreator(
