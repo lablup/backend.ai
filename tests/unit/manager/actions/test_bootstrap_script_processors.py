@@ -41,6 +41,9 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.user.bootstrap_script.actions.add_revision import (
     AddBootstrapScriptRevisionAction,
 )
+from ai.backend.manager.services.user.bootstrap_script.actions.bulk_get_current_revisions import (
+    BulkGetCurrentBootstrapScriptRevisionsAction,
+)
 from ai.backend.manager.services.user.bootstrap_script.actions.get import GetBootstrapScriptAction
 from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner import (
     LookupBootstrapScriptOwnerAction,
@@ -209,3 +212,21 @@ class TestOtherUsersScript:
         with actors.acting_as(Actor.GRANTED):
             with pytest.raises(GenericBadRequest):
                 await processors.get.run(GetBootstrapScriptAction(script_id=other_script))
+
+    async def test_current_revisions_leave_it_out(
+        self,
+        processors: BootstrapScriptProcessors,
+        actors: Actors,
+        own_script: BootstrapScriptID,
+        other_script: BootstrapScriptID,
+    ) -> None:
+        """Each script is answered for by its own owner: one denial does not fail the rest."""
+        with actors.acting_as(Actor.GRANTED):
+            result = await processors.bulk_get_current_revisions.run(
+                BulkGetCurrentBootstrapScriptRevisionsAction(script_ids=[own_script, other_script])
+            )
+
+        assert {script_id: revision.script for script_id, revision in result.successes.items()} == {
+            own_script: "echo 1"
+        }
+        assert set(result.errors) == {other_script}
