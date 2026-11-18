@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql_legacy.domain import CreateDomainNodeInput, ModifyDomainNodeInput
+from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
 
 
 def _packed(path: str) -> bytes:
@@ -54,10 +55,17 @@ class TestDomainNodeInputDotfiles:
         with pytest.raises(InvalidAPIParameters):
             _input(ModifyDomainNodeInput, dotfiles=packed).to_action(DomainID(uuid.uuid4()))
 
-    def test_modify_accepts_path_under_work_dir(self) -> None:
+    def test_modify_accepts_path_under_work_dir_and_leaves_the_column(self) -> None:
         packed = _packed(".bashrc")
         action = _input(ModifyDomainNodeInput, dotfiles=packed).to_action(DomainID(uuid.uuid4()))
-        assert action.updater.dotfiles.optional_value() == packed
+        assert action.updater.dotfiles.optional_value() is None
+
+    def test_modify_rejects_more_files_than_the_limit(self) -> None:
+        packed = msgpack.packb([
+            {"path": f".f{i}", "perm": "644", "data": "x"} for i in range(MAXIMUM_DOTFILE_COUNT + 1)
+        ])
+        with pytest.raises(InvalidAPIParameters):
+            _input(ModifyDomainNodeInput, dotfiles=packed).to_action(DomainID(uuid.uuid4()))
 
     def test_modify_without_dotfiles_skips_the_check(self) -> None:
         action = _input(ModifyDomainNodeInput).to_action(DomainID(uuid.uuid4()))
