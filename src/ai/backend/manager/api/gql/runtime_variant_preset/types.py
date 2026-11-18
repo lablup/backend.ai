@@ -72,6 +72,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -352,12 +353,12 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
         description="Timestamp of the last modification to this preset."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="The runtime variant this preset belongs to. Fetch its name and other attributes in a single query alongside the preset list.",
         )
-    )  # type: ignore[misc]
+    )
     async def runtime_variant(
         self,
         info: Info[StrawberryGQLContext],

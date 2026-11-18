@@ -147,7 +147,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
             return ManagerStatus.TERMINATED
         return ManagerStatus(status)
 
-    async def watch_manager_status(self) -> AsyncGenerator[QueueSentinel | Event, None]:
+    async def watch_manager_status(self) -> AsyncGenerator[QueueSentinel | Event]:
         async with aiotools.aclosing(self._etcd.watch("manager/status")) as agen:
             async for ev in agen:
                 yield ev

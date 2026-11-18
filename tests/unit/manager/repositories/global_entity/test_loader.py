@@ -11,7 +11,7 @@ from ai.backend.manager.data.permission.global_entity import (
     GlobalEntityIDCache,
     global_entity_id,
 )
-from ai.backend.manager.errors.permission import GlobalEntityMissing, GlobalEntityNotLoaded
+from ai.backend.manager.errors.global_entity import GlobalEntityMissing, GlobalEntityNotLoaded
 from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

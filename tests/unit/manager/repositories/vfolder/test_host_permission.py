@@ -21,10 +21,8 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -91,7 +89,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -103,9 +101,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
-                AgentRow,
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -120,7 +116,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def domain_fixture(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         domain_id = DomainID(uuid.uuid4())
         name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
@@ -141,7 +137,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     @pytest.fixture
     async def project_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-proj-policy-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -158,7 +154,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     @pytest.fixture
     async def user_resource_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-user-policy-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -179,7 +175,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         user_resource_policy: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         user_uuid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -206,7 +202,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         project_resource_policy: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -231,7 +227,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         project_resource_policy: str,
-    ) -> AsyncGenerator[UUID, None]:
+    ) -> AsyncGenerator[UUID]:
         gid = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -256,7 +252,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         regular_user: UUID,
         group_a: UUID,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Enroll regular_user in group_a."""
         async with db_with_cleanup.begin_session() as sess:
             await VirtualEntitySeeder().enroll_user_in_project(sess, group_a, regular_user)
@@ -269,7 +265,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         regular_user: UUID,
         group_b: UUID,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Enroll regular_user in group_b."""
         async with db_with_cleanup.begin_session() as sess:
             await VirtualEntitySeeder().enroll_user_in_project(sess, group_b, regular_user)

@@ -23,8 +23,8 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.exception import DuplicateEntityTypeName
 
 
-def _subclasses[T: type](base: T) -> list[T]:
-    found: list[T] = []
+def _subclasses[T](base: type[T]) -> list[type[T]]:
+    found: list[type[T]] = []
     for sub in base.__subclasses__():
         found.append(sub)
         found.extend(_subclasses(sub))

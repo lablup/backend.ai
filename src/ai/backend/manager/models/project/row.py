@@ -61,7 +61,6 @@ from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.rbac import ContainerRegistryScope
-    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
     from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -207,11 +206,6 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
-    # Only ResourceGroupPermissionContextBuilder in resource_group/row.py (legacy RBAC)
-    # reads this. Delete it together with the legacy RBAC cleanup.
-    sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
-        "ResourceGroupForProjectRow"
-    )
     # Read by gql_legacy (network.py, resource_policy.py, vfolder.py), ProjectRow.get and
     # the vfolder repository. Delete it once the vfolder repository joins
     # ProjectResourcePolicyRow directly and gql_legacy is cleaned up.

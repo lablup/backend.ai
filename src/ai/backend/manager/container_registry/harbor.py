@@ -172,7 +172,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if password is not None:
             self.credentials["password"] = password
 
-        async with self.prepare_client_session() as (url, sess):
+        async with self.prepare_client_session() as (_url, sess):
             rqst_args: dict[str, Any] = {}
             if self.credentials:
                 rqst_args["auth"] = aiohttp.BasicAuth(
@@ -476,11 +476,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         architecture = config_data.get("architecture")
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
+        elif tag.endswith(("-arm64", "-aarch64")):
+            architecture = "aarch64"
         else:
-            if tag.endswith(("-arm64", "-aarch64")):
-                architecture = "aarch64"
-            else:
-                architecture = "x86_64"
+            architecture = "x86_64"
 
         manifests = {
             architecture: {

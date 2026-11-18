@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.10.0a8",
+    "version": "26.10.0a9",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -4646,6 +4646,23 @@
             "title": "Resource Group Name",
             "type": "string"
           },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.",
+            "title": "Designated Agent Ids"
+          },
           "name": {
             "anyOf": [
               {
@@ -5134,6 +5151,18 @@
               }
             ],
             "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`."
           }
         },
         "title": "ModelServiceConfigInput",
@@ -5325,6 +5354,46 @@
           }
         },
         "title": "RollingUpdateConfigInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationDelimiterInput": {
+        "properties": {
+          "start": {
+            "description": "Opening delimiter, e.g. `{{`.",
+            "minLength": 1,
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "description": "Closing delimiter, e.g. `}}`.",
+            "minLength": 1,
+            "title": "End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ServiceArgumentInterpolationDelimiterInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationInput": {
+        "properties": {
+          "delimiters": {
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiterInput"
+            },
+            "minItems": 1,
+            "title": "Delimiters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delimiters"
+        ],
+        "title": "ServiceArgumentInterpolationInput",
         "type": "object"
       },
       "CreateDeploymentInput": {
@@ -6743,6 +6812,22 @@
             ],
             "description": "Updated deployment strategy. Omit to leave unchanged.",
             "title": "Default Deployment Strategy"
+          },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.",
+            "title": "Designated Agent Ids"
           }
         },
         "title": "UpdateDeploymentInput",
@@ -8204,7 +8289,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8221,7 +8305,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8441,7 +8524,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8458,7 +8540,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8475,7 +8556,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8492,7 +8572,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8509,7 +8588,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8526,7 +8604,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8697,7 +8774,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -8713,7 +8789,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -9653,6 +9728,18 @@
             ],
             "default": null,
             "description": "Health check configuration for the model service."
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`."
           }
         },
         "title": "PresetModelServiceConfigInput",
@@ -10238,6 +10325,18 @@
               }
             ],
             "title": "Health Check"
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit or null to keep the current value.",
+            "title": "Interpolation"
           }
         },
         "title": "UpdatePresetModelServiceConfigInput",
@@ -11398,7 +11497,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -11431,7 +11529,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -11728,7 +11825,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -11768,7 +11864,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -12091,7 +12186,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -12138,7 +12232,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -12617,7 +12710,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -25108,6 +25200,17 @@
         "title": "AdminSearchResourceGroupsInput",
         "type": "object"
       },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "CreateResourceGroupInput": {
         "description": "Input for creating a new resource group.",
         "properties": {
@@ -25195,6 +25298,23 @@
             "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
             "title": "Is Default",
             "type": "boolean"
+          },
+          "is_active": {
+            "default": true,
+            "description": "Whether the resource group is active.",
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_public": {
+            "default": true,
+            "description": "Whether the resource group is public.",
+            "title": "Is Public",
+            "type": "boolean"
+          },
+          "scheduler_type": {
+            "$ref": "#/components/schemas/SchedulerTypeDTO",
+            "default": "fifo",
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share)."
           }
         },
         "required": [
@@ -25284,17 +25404,6 @@
           "resource-group"
         ],
         "title": "PreemptionVictimScope",
-        "type": "string"
-      },
-      "SchedulerTypeDTO": {
-        "description": "Scheduler type for resource group.",
-        "enum": [
-          "fifo",
-          "lifo",
-          "drf",
-          "fair-share"
-        ],
-        "title": "SchedulerTypeDTO",
         "type": "string"
       },
       "UpdateResourceGroupInput": {
@@ -25516,7 +25625,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -25584,7 +25692,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44516,7 +44623,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44533,7 +44639,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44689,7 +44794,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -44706,7 +44810,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -50057,6 +50160,17 @@
               }
             ],
             "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "ModelServiceConfigDraft",
@@ -50148,6 +50262,54 @@
           "model_mount_config"
         ],
         "title": "RevisionInput",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolation": {
+        "additionalProperties": true,
+        "properties": {
+          "delimiters": {
+            "description": "Delimiters that mark the variables to fill in the service arguments.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceArgumentInterpolationDelimiter"
+            },
+            "minItems": 1,
+            "title": "Delimiters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delimiters"
+        ],
+        "title": "ServiceArgumentInterpolation",
+        "type": "object"
+      },
+      "ServiceArgumentInterpolationDelimiter": {
+        "additionalProperties": true,
+        "properties": {
+          "start": {
+            "description": "Opening delimiter.",
+            "examples": [
+              "{{"
+            ],
+            "minLength": 1,
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "description": "Closing delimiter.",
+            "examples": [
+              "}}"
+            ],
+            "minLength": 1,
+            "title": "End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "ServiceArgumentInterpolationDelimiter",
         "type": "object"
       },
       "CreateDeploymentRequest": {
@@ -51339,7 +51501,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -51368,7 +51529,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -51400,7 +51560,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -51538,7 +51697,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -69371,24 +69529,6 @@
     "/auth/ssh-keypair": {
       "get": {
         "operationId": "auth.get_ssh_keypair",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
-      },
-      "patch": {
-        "operationId": "auth.generate_ssh_keypair",
         "tags": [
           "auth"
         ],

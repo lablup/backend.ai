@@ -20,6 +20,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.errors.artifact import (
+    ArtifactRevisionImportInProgressError,
+    ArtifactRevisionNotFoundError,
+)
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.artifact.row import ArtifactRow
@@ -37,7 +41,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -80,7 +83,7 @@ class TestArtifactRevisionRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -94,7 +97,6 @@ class TestArtifactRevisionRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -128,7 +130,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample artifact directly in DB and return its ID"""
         artifact_id = uuid.uuid4()
 
@@ -155,7 +157,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample artifact revision directly in DB and return its ID"""
         revision_id = uuid.uuid4()
 
@@ -178,7 +180,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[ArtifactIdFilteringFixture, None]:
+    ) -> AsyncGenerator[ArtifactIdFilteringFixture]:
         """Create two artifacts with revisions for artifact_id filtering test."""
         fixture = ArtifactIdFilteringFixture(
             target_artifact_id=uuid.uuid4(),
@@ -243,7 +245,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[dict[ArtifactStatus, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[ArtifactStatus, uuid.UUID]]:
         """Create sample revisions with different statuses for filter testing"""
         revision_map: dict[ArtifactStatus, uuid.UUID] = {}
         statuses = [
@@ -275,7 +277,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample revisions with predictable versions for ordering tests"""
         revision_ids = []
         versions = ["v1.0.0", "v2.0.0", "v3.0.0", "v0.1.0"]
@@ -302,7 +304,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample revisions for pagination testing"""
         revision_ids = []
         now = datetime.now(UTC)
@@ -331,7 +333,7 @@ class TestArtifactRevisionRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample revisions for combined pagination, filter, and ordering tests"""
         revision_ids = []
         # Create 8 AVAILABLE revisions and 4 SCANNED revisions
@@ -358,7 +360,7 @@ class TestArtifactRevisionRepository:
     async def artifact_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ArtifactRepository, None]:
+    ) -> AsyncGenerator[ArtifactRepository]:
         """Create ArtifactRepository instance with database"""
         repo = ArtifactRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
@@ -635,6 +637,70 @@ class TestArtifactRevisionRepository:
             ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
         )
         assert revision.status == ArtifactStatus.VERIFYING
+
+    async def test_mark_artifact_revision_pulling(
+        self,
+        artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
+        sample_revision_id: uuid.UUID,
+    ) -> None:
+        await artifact_repository.mark_artifact_revision_pulling(
+            ArtifactRevisionID(sample_revision_id)
+        )
+
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
+        assert revision.status == ArtifactStatus.PULLING
+
+    @pytest.fixture(
+        params=[ArtifactStatus.PULLING, ArtifactStatus.VERIFYING], ids=["pulling", "verifying"]
+    )
+    async def revision_already_importing(
+        self,
+        request: pytest.FixtureRequest,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_artifact_id: uuid.UUID,
+    ) -> ArtifactRevisionData:
+        revision_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ArtifactRevisionRow(
+                    id=revision_id,
+                    artifact_id=sample_artifact_id,
+                    version="main",
+                    readme="",
+                    size=1024,
+                    status=request.param.value,
+                )
+            )
+            await db_sess.flush()
+        return await OpsRepository(V2DBOpsProvider(db_with_cleanup)).get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(revision_id))
+        )
+
+    async def test_mark_artifact_revision_pulling_rejects_a_revision_already_importing(
+        self,
+        artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
+        revision_already_importing: ArtifactRevisionData,
+    ) -> None:
+        with pytest.raises(ArtifactRevisionImportInProgressError):
+            await artifact_repository.mark_artifact_revision_pulling(revision_already_importing.id)
+
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=revision_already_importing.id)
+        )
+        assert revision.status == revision_already_importing.status
+
+    async def test_mark_artifact_revision_pulling_of_a_missing_revision_raises_not_found(
+        self,
+        artifact_repository: ArtifactRepository,
+    ) -> None:
+        with pytest.raises(ArtifactRevisionNotFoundError):
+            await artifact_repository.mark_artifact_revision_pulling(
+                ArtifactRevisionID(uuid.uuid4())
+            )
 
     async def test_update_artifact_revision_bytesize(
         self,

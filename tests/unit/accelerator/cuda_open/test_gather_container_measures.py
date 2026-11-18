@@ -148,7 +148,7 @@ class TestGatherContainerMeasures:
             stat_context, ["vanished_cid", "good_cid"]
         )
 
-        cuda_mem, cuda_util = results
+        cuda_mem, _cuda_util = results
         assert "vanished_cid" not in cuda_mem.per_container
         assert "good_cid" in cuda_mem.per_container
 

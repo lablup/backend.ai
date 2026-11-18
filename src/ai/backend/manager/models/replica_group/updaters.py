@@ -12,6 +12,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupData,
     ReplicaGroupLifecycle,
@@ -30,7 +31,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class ReplicaGroupDeployUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData]):
-    """Deploy-axis update: revision pointers, rollout lifecycle, traffic weight."""
+    """Deploy-axis update: revision pointers, rollout lifecycle and budget, traffic weight."""
 
     replica_group_id: ReplicaGroupID
     # Revision pointers are nullable; ``TriState`` so a rollback can NULL them explicitly.
@@ -38,6 +39,7 @@ class ReplicaGroupDeployUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData]):
     target_revision_id: TriState[DeploymentRevisionID] = field(default_factory=TriState.nop)
     lifecycle: OptionalState[ReplicaGroupLifecycle] = field(default_factory=OptionalState.nop)
     traffic_weight: OptionalState[int] = field(default_factory=OptionalState.nop)
+    rollout: OptionalState[ReplicaGroupRolloutSpec] = field(default_factory=OptionalState.nop)
 
     @property
     @override
@@ -64,6 +66,7 @@ class ReplicaGroupDeployUpdater(DataUpdater[ReplicaGroupRow, ReplicaGroupData]):
         self.target_revision_id.update_dict(values, "target_revision_id")
         self.lifecycle.update_dict(values, "lifecycle")
         self.traffic_weight.update_dict(values, "traffic_weight")
+        self.rollout.update_dict(values, "rollout")
         return values
 
     @override

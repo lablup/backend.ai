@@ -39,8 +39,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.answers import MissingResponse, RefusedItem
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.refused_item import RefusedItem
 from bai_scenario.components.vfolder import STORAGE_HOST
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.model_card.model_card import TestSeedCardRequirement, TestSeedModelCard

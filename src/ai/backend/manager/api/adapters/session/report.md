@@ -27,7 +27,7 @@ Scenario: incomplete 2 / 30
   - batch_resource_allocation_by_kernel: success present 1 · rejection present 1 (atomic_bulk_field)
   - batch_resource_allocation_by_session: success present 1 · rejection present 1 (partial_bulk)
   - compute_schedule: success present 1 · rejection present 2 (single_entity)
-  - enqueue: success present 1 · rejection present 1 (partial_bulk, scope)
+  - enqueue: success present 1 · rejection present 2 (partial_bulk, scope)
   - exclude_idle_checks: success present 2 · rejection present 1 (legacy_partial_bulk)
   - get: success present 1 · rejection present 1 (partial_bulk, single_entity)
   - get_logs: success present 1 · rejection present 1 (single_entity)
@@ -186,6 +186,7 @@ Scenario: incomplete 2 / 30
 | scenario | verdict |
 |---|---|
 | [when a user who may create sessions in the project creates one, the whole pending session comes back](#enqueueing-creating-a-session-granted) | answered |
+| [when a user who may create sessions in the project creates one designating an agent that is not registered, the call is rejected](#enqueueing-creating-a-session-designating-an-unknown-agent) | rejected |
 | [when a user granted nothing creates a session in a project, the call is rejected for lack of permission](#enqueueing-creating-a-session-granted-nothing) | rejected |
 
 **exclude_idle_checks**
@@ -2293,6 +2294,51 @@ Then
   - network.network_type = 'volatile'
   - network.network_id = None
   - replica_id = None
+
+<a id="enqueueing-creating-a-session-designating-an-unknown-agent"></a>
+
+#### [creating-a-session-designating-an-unknown-agent](/tests/scenario/bai_scenario/manager/session/test_enqueueing.py): pass
+
+when a user who may create sessions in the project creates one designating an agent that is not registered, the call is rejected
+
+Given
+
+- a resource group whose agent holds the slots a session asks for, and one user who may create sessions in that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Project team-1 whose sessions can use Resource group resource-group-1
+  - Resource slot type cpu: a revision may leave it unfilled
+  - Resource slot type mem: a revision may leave it unfilled
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-1: cpu slot capacity 8 reported, 0 in use
+  - Agent agent-1: mem slot capacity 34359738368 reported, 0 in use
+  - Prepare a user who may create and read sessions in the project
+    - Role session-owner-1: applies only within the scope it is granted in
+    - Role session-owner-1: CREATE allowed on every session
+    - Role session-owner-1: READ allowed on every session
+    - regular user user-2: holds Role session-owner-1
+
+When
+
+- SessionAdapter.enqueue: user-2 creates the session created-session in that project, designating an agent that is not registered
+
+Then
+
+- the call is rejected
+  - rejected: AgentNotFound
 
 <a id="enqueueing-creating-a-session-granted-nothing"></a>
 

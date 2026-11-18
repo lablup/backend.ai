@@ -15,6 +15,8 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.coordinator.errors.circuit import HTTP2AccessControlNotSupportedError
 from ai.backend.appproxy.coordinator.models.worker import Worker, add_circuit
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 
 
 @dataclass(frozen=True)
@@ -50,8 +52,8 @@ class TestAddCircuitHTTP2Access:
     def session_config(self) -> SessionConfig:
         return SessionConfig(
             id=None,
-            user_uuid=uuid.uuid4(),
-            project_id=uuid.uuid4(),
+            user_uuid=UserID(uuid.uuid4()),
+            project_id=ProjectID(uuid.uuid4()),
             access_key=None,
             domain_name="default",
         )

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.auth.response import (
     GetSSHKeypairResponse,
     SignoutResponse,
     SignupResponse,
-    SSHKeypairResponse,
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
@@ -103,13 +102,6 @@ class AuthClient(BaseDomainClient):
             "GET",
             "/auth/ssh-keypair",
             response_model=GetSSHKeypairResponse,
-        )
-
-    async def generate_ssh_keypair(self) -> SSHKeypairResponse:
-        return await self._client.typed_request(
-            "PATCH",
-            "/auth/ssh-keypair",
-            response_model=SSHKeypairResponse,
         )
 
     async def upload_ssh_keypair(

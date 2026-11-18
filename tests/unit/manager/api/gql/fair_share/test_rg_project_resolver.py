@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -91,7 +92,7 @@ class TestRGProjectFairShare:
         """Should return project fair share when it exists."""
         scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
 
-        resolver_fn = project_resolver.rg_project_fair_share.base_resolver
+        resolver_fn = cast(Any, project_resolver.rg_project_fair_share).base_resolver
         result = await resolver_fn(
             info_with_project_fair_share_exists,
             scope,
@@ -111,7 +112,7 @@ class TestRGProjectFairShare:
         scope = ResourceGroupProjectScope(resource_group_name="custom-rg", domain_name="my-domain")
         project_id = UUID("11111111-2222-3333-4444-555555555555")
 
-        resolver_fn = project_resolver.rg_project_fair_share.base_resolver
+        resolver_fn = cast(Any, project_resolver.rg_project_fair_share).base_resolver
         await resolver_fn(
             info_with_project_fair_share_exists,
             scope,
@@ -141,7 +142,7 @@ class TestRGProjectFairShare:
         scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
         project_id = UUID("11111111-2222-3333-4444-555555555555")
 
-        resolver_fn = project_resolver.rg_project_fair_share.base_resolver
+        resolver_fn = cast(Any, project_resolver.rg_project_fair_share).base_resolver
         with pytest.raises(ProjectNotFound):
             await resolver_fn(
                 info_with_project_not_found,
@@ -161,7 +162,7 @@ class TestRGProjectFairShares:
         )
         scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
 
-        resolver_fn = project_resolver.rg_project_fair_shares.base_resolver
+        resolver_fn = cast(Any, project_resolver.rg_project_fair_shares).base_resolver
         await resolver_fn(
             info,
             scope,

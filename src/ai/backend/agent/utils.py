@@ -136,23 +136,22 @@ def update_nested_dict(dest: MutableMapping[str, Any], additions: Mapping[str, A
     for k, v in additions.items():
         if k not in dest:
             dest[k] = v
+        elif isinstance(dest[k], MutableMapping):
+            if not isinstance(v, MutableMapping):
+                raise TypeError(
+                    f"Cannot merge non-mapping value into mapping for key '{k}': "
+                    f"expected MutableMapping, got {type(v).__name__}."
+                )
+            update_nested_dict(dest[k], v)
+        elif isinstance(dest[k], list):
+            if not isinstance(v, list):
+                raise TypeError(
+                    f"Cannot extend non-list value into list for key '{k}': "
+                    f"expected List, got {type(v).__name__}."
+                )
+            dest[k].extend(v)
         else:
-            if isinstance(dest[k], MutableMapping):
-                if not isinstance(v, MutableMapping):
-                    raise TypeError(
-                        f"Cannot merge non-mapping value into mapping for key '{k}': "
-                        f"expected MutableMapping, got {type(v).__name__}."
-                    )
-                update_nested_dict(dest[k], v)
-            elif isinstance(dest[k], list):
-                if not isinstance(v, list):
-                    raise TypeError(
-                        f"Cannot extend non-list value into list for key '{k}': "
-                        f"expected List, got {type(v).__name__}."
-                    )
-                dest[k].extend(v)
-            else:
-                dest[k] = v
+            dest[k] = v
 
 
 def numeric_list(s: str) -> list[int]:
@@ -460,19 +459,17 @@ def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUl
 
         if desired_soft == -1:
             safe_soft = current_soft_limit if current_soft_limit != infinity_val else -1
+        elif current_soft_limit == infinity_val:
+            safe_soft = desired_soft
         else:
-            if current_soft_limit == infinity_val:
-                safe_soft = desired_soft
-            else:
-                safe_soft = min(desired_soft, current_soft_limit)
+            safe_soft = min(desired_soft, current_soft_limit)
 
         if desired_hard == -1:
             safe_hard = current_hard_limit if current_hard_limit != infinity_val else -1
+        elif current_hard_limit == infinity_val:
+            safe_hard = desired_hard
         else:
-            if current_hard_limit == infinity_val:
-                safe_hard = desired_hard
-            else:
-                safe_hard = min(desired_hard, current_hard_limit)
+            safe_hard = min(desired_hard, current_hard_limit)
 
         # Log if we had to adjust the limits
         if safe_soft != desired_soft or safe_hard != desired_hard:

@@ -30,7 +30,7 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.errors.permission import InvalidFieldPermission
+from ai.backend.manager.errors.permission_field import InvalidFieldPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -70,7 +70,7 @@ class _TargetID(EntityIdentifier):
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         database_connection,
         [

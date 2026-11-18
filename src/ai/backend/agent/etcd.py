@@ -260,7 +260,7 @@ class AgentEtcdClientView(AbstractKVStore):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         watch_result = self._etcd.watch(
             key,
@@ -285,7 +285,7 @@ class AgentEtcdClientView(AbstractKVStore):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         watch_prefix_result = self._etcd.watch_prefix(
             key_prefix,

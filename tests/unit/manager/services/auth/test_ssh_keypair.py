@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -13,9 +13,6 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
 from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-)
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
 )
@@ -41,6 +38,7 @@ def auth_service(
     mock_auth_repository: AsyncMock,
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
+    mock_auto_generated_file_repository: AsyncMock,
     mock_group_repository: AsyncMock,
     mock_ssh_key_validator: MagicMock,
     mock_client_ip_masking_repository: AsyncMock,
@@ -56,13 +54,14 @@ def auth_service(
         ssh_key_validator=mock_ssh_key_validator,
         client_ip_masking_repository=mock_client_ip_masking_repository,
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        auto_generated_file_repository=mock_auto_generated_file_repository,
     )
 
 
 # Test Get SSH Keypair
 async def test_get_ssh_keypair_existing_key(
     auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
+    mock_user_repository: AsyncMock,
 ) -> None:
     """Test getting existing SSH public key"""
     action = GetSSHKeypairAction(
@@ -70,19 +69,19 @@ async def test_get_ssh_keypair_existing_key(
         access_key="AKIA1234567890ABCDEF",
     )
 
-    mock_auth_repository.get_ssh_public_key.return_value = (
-        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..."
+    mock_user_repository.default_ssh_keypair.return_value = MagicMock(
+        public_key="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..."
     )
 
     result = await auth_service.get_ssh_keypair(action)
 
     assert result.public_key == "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..."
-    mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
+    mock_user_repository.default_ssh_keypair.assert_called_once_with(action.user_id)
 
 
 async def test_get_ssh_keypair_nonexistent_key(
     auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
+    mock_user_repository: AsyncMock,
 ) -> None:
     """Test getting non-existing SSH public key returns empty string"""
     action = GetSSHKeypairAction(
@@ -90,53 +89,21 @@ async def test_get_ssh_keypair_nonexistent_key(
         access_key="AKIANONEXISTENT",
     )
 
-    mock_auth_repository.get_ssh_public_key.return_value = None
+    mock_user_repository.default_ssh_keypair.return_value = None
 
     result = await auth_service.get_ssh_keypair(action)
 
     assert result.public_key == ""
-    mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
-
-
-# Test Generate SSH Keypair
-async def test_generate_ssh_keypair(
-    auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
-) -> None:
-    """Test SSH keypair generation"""
-    action = GenerateSSHKeypairAction(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        access_key="AKIA1234567890ABCDEF",
-    )
-
-    # Mock the keypair generation
-    mock_pubkey = "ssh-rsa AAAAB3NzaC1yc2EGENERATED..."
-    mock_privkey = "-----BEGIN RSA PRIVATE KEY-----\nGENERATED...\n-----END RSA PRIVATE KEY-----"
-
-    with patch(
-        "ai.backend.manager.services.auth.service.generate_ssh_keypair",
-        return_value=(mock_pubkey, mock_privkey),
-    ):
-        result = await auth_service.generate_ssh_keypair(action)
-
-    # Verify repository was called with generated keys
-    mock_auth_repository.update_ssh_keypair.assert_called_once_with(
-        "AKIA1234567890ABCDEF",
-        mock_pubkey,
-        mock_privkey,
-    )
-
-    assert result.ssh_keypair.ssh_public_key == mock_pubkey
-    assert result.ssh_keypair.ssh_private_key == mock_privkey
+    mock_user_repository.default_ssh_keypair.assert_called_once_with(action.user_id)
 
 
 # Test Upload SSH Keypair
-async def test_upload_ssh_keypair_replaces_only_the_public_key(
+async def test_upload_ssh_keypair_replaces_the_default_with_only_a_public_key(
     auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
+    mock_user_repository: AsyncMock,
     mock_ssh_key_validator: MagicMock,
 ) -> None:
-    """Test uploading a valid SSH public key leaves the stored private key alone"""
+    """Uploading a valid SSH public key replaces the default with no private key"""
     action = UploadSSHKeypairAction(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key=AccessKey("AKIA1234567890ABCDEF"),
@@ -149,17 +116,17 @@ async def test_upload_ssh_keypair_replaces_only_the_public_key(
     result = await auth_service.upload_ssh_keypair(action)
 
     mock_ssh_key_validator.validate.assert_called_once_with(action.public_key)
-    mock_auth_repository.update_ssh_public_key.assert_called_once_with(
-        action.access_key,
+    mock_user_repository.replace_default_ssh_keypair.assert_called_once_with(
+        action.user_id,
         action.public_key,
+        None,
     )
-    mock_auth_repository.update_ssh_keypair.assert_not_called()
     assert result.public_key == action.public_key
 
 
 async def test_upload_ssh_keypair_invalid_public_key(
     auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
+    mock_user_repository: AsyncMock,
     mock_ssh_key_validator: MagicMock,
 ) -> None:
     """Test uploading an invalid SSH public key propagates the validator error"""
@@ -174,5 +141,4 @@ async def test_upload_ssh_keypair_invalid_public_key(
     with pytest.raises(InvalidSSHPublicKey):
         await auth_service.upload_ssh_keypair(action)
 
-    # Verify repository was NOT called for an invalid key
-    mock_auth_repository.update_ssh_public_key.assert_not_called()
+    mock_user_repository.replace_default_ssh_keypair.assert_not_called()

@@ -1,5 +1,7 @@
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,7 +11,7 @@ from ai.backend.common.exception import (
 )
 
 
-class InvalidTaskMetadataError(BackendAIError):
+class InvalidTaskMetadataError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-bgtask-metadata"
     error_title = "Invalid Task Metadata"
 
@@ -23,7 +25,7 @@ class InvalidTaskMetadataError(BackendAIError):
         )
 
 
-class BgtaskInvalidMetadata(BackendAIError):
+class BgtaskInvalidMetadata(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-invalid-metadata"
     error_title = "Background Task has invalid metadata"
 

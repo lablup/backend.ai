@@ -162,7 +162,7 @@ class RedisQueue(AbstractMessageQueue):
     # Consumer methods
 
     @override
-    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
+    async def consume_queue(self) -> AsyncGenerator[MQMessage]:  # type: ignore
         """
         Consume messages from the queue.
         This method will block until a message is available.
@@ -187,7 +187,7 @@ class RedisQueue(AbstractMessageQueue):
     # Subscriber methods
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload]:  # type: ignore
         """
         Subscribe to broadcast messages.
         """

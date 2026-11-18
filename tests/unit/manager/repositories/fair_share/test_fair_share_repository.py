@@ -36,8 +36,6 @@ from ai.backend.manager.models.fair_share.upserters import (
     UserFairShareUpserter,
 )
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -81,7 +79,7 @@ class TestFairShareRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -96,7 +94,6 @@ class TestFairShareRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ResourceGroupForProjectRow,
                 AssocGroupUserRow,
@@ -104,7 +101,6 @@ class TestFairShareRepository:
                 ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
-                KernelRow,
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
                 AgentResourceRow,

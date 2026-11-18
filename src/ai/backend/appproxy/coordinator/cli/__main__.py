@@ -202,7 +202,7 @@ def dbshell(
             ),
             *psql_args,
         ]
-        subprocess.run(cmd)
+        subprocess.run(cmd, check=False)
         return
     # Use the container to start the psql client command
     _get_logger().info("using the db container", container_name=container_name)
@@ -219,7 +219,7 @@ def dbshell(
         db_config.name,
         *psql_args,
     ]
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=False)
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dependencies:cli")

@@ -5,11 +5,11 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.clients.agent.client import AgentClient
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import (
     AgentId,
     ClusterInfo,
     ImageConfig,
-    KernelCreationConfig,
     KernelId,
     SessionId,
 )
@@ -60,7 +60,7 @@ class TestAgentClientPassesAgentId:
             SessionId(uuid4()), [KernelId(uuid4())], kernel_configs, cluster_info, {}
         )
 
-        args, kwargs = mock_peer.call.create_kernels.call_args
+        _args, kwargs = mock_peer.call.create_kernels.call_args
         assert kwargs["agent_id"] == AgentId("agent-2")
 
     async def test_destroy_kernel_passes_agent_id(self, mock_peer: MagicMock) -> None:
@@ -70,7 +70,7 @@ class TestAgentClientPassesAgentId:
 
         await client.destroy_kernel(KernelId(uuid4()), SessionId(uuid4()), "test-reason")
 
-        args, kwargs = mock_peer.call.destroy_kernel.call_args
+        _args, kwargs = mock_peer.call.destroy_kernel.call_args
         assert kwargs["agent_id"] == AgentId("agent-1")
 
     async def test_execute_passes_agent_id(self, mock_peer: MagicMock) -> None:
@@ -82,7 +82,7 @@ class TestAgentClientPassesAgentId:
             SessionId(uuid4()), KernelId(uuid4()), 1, "run-1", "query", "print('hello')", {}, None
         )
 
-        args, kwargs = mock_peer.call.execute.call_args
+        _args, kwargs = mock_peer.call.execute.call_args
         assert kwargs["agent_id"] == AgentId("exec-agent")
 
     async def test_check_and_pull_passes_agent_id(self, mock_peer: MagicMock) -> None:

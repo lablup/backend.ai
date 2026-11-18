@@ -585,7 +585,7 @@ class TestSeededKeyLook:
             Same("is_default", node.is_default, False),
             Same("rate_limit", node.rate_limit, rate_limit),
             Same("resource_policy", node.resource_policy, laid.policy.name),
-            Same("ssh_public_key", node.ssh_public_key, ""),
+            Same("ssh_public_key", node.ssh_public_key, None),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
             Held("user_id", node.user_id, SameAs(laid.target.id, owner)),
@@ -615,7 +615,7 @@ class TestSeededKeyLook:
             Same(f"{at}is_default", node.is_default, True),
             Same(f"{at}rate_limit", node.rate_limit, SERVER_RATE_LIMIT),
             Same(f"{at}resource_policy", node.resource_policy, policy.name),
-            Same(f"{at}ssh_public_key", node.ssh_public_key, ""),
+            Same(f"{at}ssh_public_key", node.ssh_public_key, None),
             Same(f"{at}num_queries", node.num_queries, 0),
             Same(f"{at}last_used", node.last_used, None),
             Held(f"{at}user_id", node.user_id, SameAs(owner.id, owner_says)),
@@ -788,7 +788,7 @@ class TheSSHPublicKey(Then[AKeyOwnerAndACaller, Answer]):
                     Says("대상의 기본 키", english="the default key of the target"),
                 ),
             ),
-            Same("keypair.ssh_public_key", read.payload.keypair.ssh_public_key, ""),
+            Same("keypair.ssh_public_key", read.payload.keypair.ssh_public_key, None),
         ]
 
 

@@ -81,7 +81,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def consume_queue(
         self,
-    ) -> AsyncGenerator[MQMessage, None]:
+    ) -> AsyncGenerator[MQMessage]:
         """
         Consume messages from the queue.
         This method will block until a message is available.
@@ -94,7 +94,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def subscribe_queue(
         self,
-    ) -> AsyncGenerator[BroadcastMessagePayload, None]:
+    ) -> AsyncGenerator[BroadcastMessagePayload]:
         """
         Subscribe to messages from the queue.
         This method will block until a message is available.

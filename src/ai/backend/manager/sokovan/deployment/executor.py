@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal, DecimalException
 from uuid import UUID
 
+from pydantic import AnyUrl
+
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
@@ -13,6 +15,9 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -24,10 +29,12 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     SessionTagsModel,
     TagsModel,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
-    PrometheusConnectionError,
 )
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -212,7 +219,7 @@ class DeploymentExecutor:
                 await self._build_endpoint_item(dep.deployment_info, rev)
                 for dep, rev, _ in group_entries
             ]
-        except BaseException as exc:
+        except Exception as exc:
             log.error("endpoint item build failed", proxy_address=addr, exc_info=exc)
             for deployment, _, _ in group_entries:
                 failures.append(
@@ -230,7 +237,7 @@ class DeploymentExecutor:
             response = await client.create_endpoints_bulk(
                 BulkCreateEndpointRequest(endpoints=items)
             )
-        except BaseException as exc:
+        except Exception as exc:
             log.warning("bulk endpoint creation failed", proxy_address=addr, exc_info=exc)
             for deployment, _, _ in group_entries:
                 failures.append(
@@ -248,7 +255,7 @@ class DeploymentExecutor:
             dep_id = deployment.deployment_info.id
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
-            except BaseException as exc:
+            except Exception as exc:
                 log.error("endpoint URL not persisted", deployment_id=dep_id, exc_info=exc)
                 failures.append(
                     DeploymentExecutionError(
@@ -420,7 +427,7 @@ class DeploymentExecutor:
         )
         try:
             response = await client.delete_endpoints_bulk(request)
-        except BaseException as exc:
+        except Exception as exc:
             log.warning("bulk endpoint deletion failed", proxy_address=addr, exc_info=exc)
             for deployment in group:
                 errors.append(
@@ -499,14 +506,16 @@ class DeploymentExecutor:
             service_name=deployment.metadata.name,
             tags=TagsModel(
                 session=SessionTagsModel(
-                    user_uuid=str(deployment.metadata.session_owner),
-                    project_id=str(deployment.metadata.project),
-                    domain_name=deployment.metadata.domain,
+                    user_uuid=UserID(deployment.metadata.session_owner),
+                    project_id=ProjectID(deployment.metadata.project),
+                    domain_name=DomainName(deployment.metadata.domain),
                 ),
                 endpoint=EndpointTagsModel(
-                    id=str(deployment.id),
+                    id=deployment.id,
                     runtime_variant=variant.name,
-                    existing_url=str(deployment.network.url) if deployment.network.url else None,
+                    existing_url=(
+                        AnyUrl(deployment.network.url) if deployment.network.url else None
+                    ),
                 ),
             ),
             open_to_public=deployment.network.open_to_public,

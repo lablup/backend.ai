@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -10,8 +10,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
@@ -223,3 +226,20 @@ async def image_fixture(
 @pytest.fixture(autouse=True)
 def _act_as_superadmin(acting_superadmin: None) -> None:
     """These tests drive processors directly, so they supply the caller the gates read."""
+
+
+@pytest.fixture()
+def acting_superadmin() -> Iterator[None]:
+    """Run the test body as a superadmin, the caller the action gates read."""
+    with with_user_context(
+        UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+        )
+    ):
+        yield

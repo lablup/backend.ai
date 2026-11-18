@@ -32,6 +32,7 @@ _SYSTEM_SESSION_ENVIRON_MEMBER_REVOKES_REVISION = (
 )
 _VFOLDER_AUTO_MOUNT_REVISION = "456a338e7c3a_add_vfolder_auto_mounts"
 _USER_OWNER_VFOLDER_AUTO_MOUNT_REVISION = "8bb02f0415eb_grant_user_owners_on_vfolder_auto_mounts"
+_AUTO_GENERATED_FILE_REVISION = "592dedb4a39c_put_auto_generated_files_in_the_graph"
 _REPOSITORY = Path(__file__).resolve().parents[5]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -108,6 +109,11 @@ def user_owner_vfolder_auto_mount_migration() -> Any:
 
 
 @pytest.fixture(scope="module")
+def auto_generated_file_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_AUTO_GENERATED_FILE_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
     path = _REPOSITORY / "fixtures/manager/example-role-presets.json"
     loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
@@ -176,6 +182,7 @@ class TestMigrationMatchesFixture:
         system_session_environ_member_revokes_migration: Any,
         vfolder_auto_mount_migration: Any,
         user_owner_vfolder_auto_mount_migration: Any,
+        auto_generated_file_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         """Compared by what a grant is: the seed upserts on that key."""
@@ -228,6 +235,7 @@ class TestMigrationMatchesFixture:
             )
             for bit in user_owner_vfolder_auto_mount_migration._BITS
         }
+        written |= set(auto_generated_file_migration._GRANTS)
         seeded = {
             (row["role_preset_id"], row["entity_type"], row["permission"])
             for row in fixture["role_permission_presets"]

@@ -73,6 +73,7 @@ Entity (`Entity*`):
 | artifact_revision | artifact | the import/approve state machine is per revision |
 | model_card | project | |
 | session_template | creating scope (domain/project/user) | |
+| auto_generated_file | creating scope (domain/project/user) | only user files are created here; project and domain files still live in their rows' `dotfiles` column |
 | role | the scope the role belongs to | |
 
 ## entity_types demoted to fields
@@ -87,7 +88,6 @@ never entered into the membership graph.
 | deployment:policy | deployment | the deployment's single (1:1, FK CASCADE) rollout-strategy config (settled) |
 | role:permission, role:assignment | role | |
 | keypair | user | credential: no independent permission, revoked/reissued rather than renamed |
-| dotfile | keypair | packed column inside the keypairs row |
 | image:alias, tag, resource_limit | image | |
 | storage_namespace | object_storage | storage_id+namespace, lifetime-bound |
 | fair_share x3, usage_bucket x3 | resource_group | every row carries `resource_group_id` (fair-share uniqueness is keyed on it): the rows are the resource group's accounting decomposed by scope; domain/project/user access is a scope filter on reads, management writes are rg-level |

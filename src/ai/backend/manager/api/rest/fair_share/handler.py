@@ -424,11 +424,10 @@ class FairShareAPIHandler:
             filter = DomainUsageBucketFilter(
                 resource_group=StringFilter(equals=path.parsed.resource_group)
             )
-        else:
-            if filter.resource_group is None:
-                filter.resource_group = StringFilter(equals=path.parsed.resource_group)
-            elif filter.resource_group.equals != path.parsed.resource_group:
-                raise web.HTTPBadRequest(reason="Filter resource_group must match path parameter")
+        elif filter.resource_group is None:
+            filter.resource_group = StringFilter(equals=path.parsed.resource_group)
+        elif filter.resource_group.equals != path.parsed.resource_group:
+            raise web.HTTPBadRequest(reason="Filter resource_group must match path parameter")
 
         modified_request = SearchDomainUsageBucketsRequest(
             filter=filter,

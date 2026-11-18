@@ -31,7 +31,6 @@ from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -93,7 +92,7 @@ class TestReplicaGroupHistoryRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -108,7 +107,6 @@ class TestReplicaGroupHistoryRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -123,7 +121,7 @@ class TestReplicaGroupHistoryRepository:
     async def scheduling_history_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[SchedulingHistoryRepository, None]:
+    ) -> AsyncGenerator[SchedulingHistoryRepository]:
         """Create SchedulingHistoryRepository instance with database"""
         repo = SchedulingHistoryRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo

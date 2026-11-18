@@ -48,18 +48,16 @@ def format_nested_dicts(value: Mapping[str, Mapping[str, Any] | None]) -> str:
                     rows.append(textwrap.indent(inner_rows, prefix="  "))
                 else:
                     rows.append(f"+ {outer_key}: (empty)")
+            elif outer_value is None:
+                rows.append(f"- {outer_key}: (null)")
+            # TODO: refactor as a formatter
+            elif outer_key == "shmem":
+                rows.append(
+                    f"- {outer_key}:"
+                    f" {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
+                )
             else:
-                if outer_value is None:
-                    rows.append(f"- {outer_key}: (null)")
-                else:
-                    # TODO: refactor as a formatter
-                    if outer_key == "shmem":
-                        rows.append(
-                            f"- {outer_key}:"
-                            f" {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
-                        )
-                    else:
-                        rows.append(f"- {outer_key}: {outer_value}")
+                rows.append(f"- {outer_key}: {outer_value}")
     return "\n".join(rows)
 
 

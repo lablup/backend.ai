@@ -27,7 +27,7 @@ class TestDatabaseProvider:
         postgres_container: tuple[str, HostPortPairModel],
     ) -> ServerConfig:
         """Create a coordinator config pointing to the test database."""
-        container_id, db_addr = postgres_container
+        _container_id, db_addr = postgres_container
 
         # Create DB config for testing
         db_config = DBConfig(

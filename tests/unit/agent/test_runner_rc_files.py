@@ -44,6 +44,7 @@ class TestRunnerRcStdout:
     ) -> None:
         result = subprocess.run(
             ["bash", "--noprofile", "--norc", "-c", f"source {bashrc}"],
+            check=False,
             env=shell_env,
             capture_output=True,
             timeout=5,
@@ -57,6 +58,7 @@ class TestRunnerRcStdout:
     ) -> None:
         result = subprocess.run(
             ["zsh", "--no-rcs", "--no-globalrcs", "-c", f"source {zshrc}"],
+            check=False,
             env=shell_env,
             capture_output=True,
             timeout=5,

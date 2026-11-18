@@ -123,7 +123,7 @@ async def init_sshd_service(
                 except FileNotFoundError:
                     pass
 
-                def _write_replica_config() -> None:
+                def _write_replica_config(role_name: str = role_name) -> None:
                     with user_ssh_config_path.open("a") as f:
                         f.write(f"\nHost {role_name}*\n")
                         f.write("\tPort 2200\n")

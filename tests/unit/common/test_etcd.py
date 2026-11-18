@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -171,6 +171,24 @@ async def test_unquote_for_get_prefix(etcd: AsyncEtcd) -> None:
 
     v = await etcd.get_prefix("obj/aa%3Acc")
     assert dict(v) == {"": "wow"}
+
+
+@pytest.fixture
+async def gateway_etcd(
+    etcd_container: tuple[str, HostPortPairModel],
+    test_ns: str,
+) -> AsyncIterator[AsyncEtcd]:
+    async with AsyncEtcd(
+        addrs=[etcd_container[1].to_legacy()],
+        namespace=test_ns,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "",
+        },
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+    ) as etcd:
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+        yield etcd
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
 
 
 async def test_scope_empty_prefix(gateway_etcd: AsyncEtcd) -> None:
@@ -529,7 +547,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -557,7 +575,7 @@ class TestWatchExponentialBackoff:
             "message": "h2 protocol error: error reading a body from connection",
         })
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -579,7 +597,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -608,7 +626,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_initial_failures:
@@ -642,7 +660,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -670,7 +688,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:

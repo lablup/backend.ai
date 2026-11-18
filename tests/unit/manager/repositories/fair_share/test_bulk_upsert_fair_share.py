@@ -28,7 +28,6 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -88,7 +87,7 @@ class TestBulkUpsertDomainFairShare:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -101,7 +100,6 @@ class TestBulkUpsertDomainFairShare:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ResourceSlotTypeRow,
@@ -397,7 +395,7 @@ class TestBulkUpsertProjectFairShare:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -410,7 +408,6 @@ class TestBulkUpsertProjectFairShare:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ResourceSlotTypeRow,
@@ -652,7 +649,7 @@ class TestBulkUpsertUserFairShare:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -665,7 +662,6 @@ class TestBulkUpsertUserFairShare:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ResourceSlotTypeRow,

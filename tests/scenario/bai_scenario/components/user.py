@@ -223,7 +223,6 @@ class KeypairNodeLook:
             Same("is_default", node.is_default, expected.is_default),
             Same("rate_limit", node.rate_limit, expected.rate_limit),
             Same("resource_policy", node.resource_policy, expected.resource_policy_name),
-            Same("ssh_public_key", node.ssh_public_key, expected.ssh_public_key),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
             Held(

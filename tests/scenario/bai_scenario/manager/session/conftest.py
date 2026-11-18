@@ -8,7 +8,7 @@ which.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any, cast
 from unittest.mock import MagicMock
 
@@ -27,8 +27,9 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -47,6 +48,7 @@ from ai.backend.manager.data.kernel_group.types import (
     KernelGroupEnvironData,
     KernelGroupResourceSlotData,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -66,6 +68,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker.service import IdleCheckerService
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_environ_owner import (
@@ -104,6 +107,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.fakes.agent import FakeAgentRegistry
 from bai_scenario.fakes.events import SilentEventProducer
 from bai_scenario.fakes.storage_proxy import (
@@ -112,6 +116,22 @@ from bai_scenario.fakes.storage_proxy import (
 )
 from bai_scenario.runner.unwired import unwired
 from bai_scenario.valkey import ScenarioValkey
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
 
 
 @pytest.fixture
@@ -158,6 +178,7 @@ async def adapter(
         config,
         FakeStorageSessionManager({"local": storage}),
         RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = SessionService(
         SessionServiceArgs(

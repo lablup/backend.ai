@@ -35,6 +35,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -65,6 +66,7 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -82,7 +84,7 @@ class TestForceTerminateResourceDeallocation:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -125,7 +127,7 @@ class TestForceTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -146,7 +148,7 @@ class TestForceTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -171,7 +173,7 @@ class TestForceTerminateResourceDeallocation:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -189,7 +191,7 @@ class TestForceTerminateResourceDeallocation:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -208,7 +210,7 @@ class TestForceTerminateResourceDeallocation:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -235,7 +237,7 @@ class TestForceTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -259,7 +261,7 @@ class TestForceTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -283,7 +285,7 @@ class TestForceTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -307,7 +309,7 @@ class TestForceTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -329,7 +331,7 @@ class TestForceTerminateResourceDeallocation:
     async def resource_slot_types(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Seed resource slot types required by resource_allocations FK."""
         async with db_with_cleanup.begin_session() as db_sess:
             for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
@@ -486,7 +488,11 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Force-terminate sets free_at on allocations and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -557,7 +563,11 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """When agent_id is NULL (offline agent), free_at is still set on allocations."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -608,7 +618,11 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Forced termination must also apply to sessions already in TERMINATING."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -659,7 +673,7 @@ class TestBulkTerminateResourceDeallocation:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -701,7 +715,7 @@ class TestBulkTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -722,7 +736,7 @@ class TestBulkTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -747,7 +761,7 @@ class TestBulkTerminateResourceDeallocation:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -765,7 +779,7 @@ class TestBulkTerminateResourceDeallocation:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -784,7 +798,7 @@ class TestBulkTerminateResourceDeallocation:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -811,7 +825,7 @@ class TestBulkTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -835,7 +849,7 @@ class TestBulkTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -859,7 +873,7 @@ class TestBulkTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -883,7 +897,7 @@ class TestBulkTerminateResourceDeallocation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -905,7 +919,7 @@ class TestBulkTerminateResourceDeallocation:
     async def resource_slot_types(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         async with db_with_cleanup.begin_session() as db_sess:
             for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
                 db_sess.add(ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type))
@@ -1056,7 +1070,11 @@ class TestBulkTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """update_kernels_to_terminated sets free_at and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         _, kernel_id = await self._create_kernel_with_resources(
             db_with_cleanup,
@@ -1112,7 +1130,7 @@ class TestNegativeValueGuard:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -1154,7 +1172,7 @@ class TestNegativeValueGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1175,7 +1193,7 @@ class TestNegativeValueGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1200,7 +1218,7 @@ class TestNegativeValueGuard:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1218,7 +1236,7 @@ class TestNegativeValueGuard:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1237,7 +1255,7 @@ class TestNegativeValueGuard:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1264,7 +1282,7 @@ class TestNegativeValueGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1288,7 +1306,7 @@ class TestNegativeValueGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1312,7 +1330,7 @@ class TestNegativeValueGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1336,7 +1354,7 @@ class TestNegativeValueGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1358,7 +1376,7 @@ class TestNegativeValueGuard:
     async def resource_slot_types(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         async with db_with_cleanup.begin_session() as db_sess:
             for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
                 db_sess.add(ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type))
@@ -1379,7 +1397,11 @@ class TestNegativeValueGuard:
         resource_slot_types: None,
     ) -> None:
         """Calling update_kernel_status_terminated twice doesn't produce negative used values."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         cpu_used = Decimal("2")

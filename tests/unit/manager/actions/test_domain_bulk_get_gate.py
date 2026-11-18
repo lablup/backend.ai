@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
@@ -23,7 +24,12 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityPartialBulkActionRBACValidator,
 )
@@ -139,7 +145,7 @@ class _Domains:
 @pytest.fixture
 async def db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, _WITH_TABLES):
         yield database_connection
 
@@ -228,7 +234,12 @@ def processors(db: ExtendedAsyncSAEngine) -> DomainProcessors:
             repository=OpsRepository(V2DBOpsProvider(db)),
         )
     )
-    return DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    return DomainProcessors(
+        registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
+        MagicMock(),
+    )
 
 
 def _member(domains: _Domains) -> UserData:

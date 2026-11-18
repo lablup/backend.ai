@@ -10,11 +10,7 @@ from ai.backend.manager.actions.registry.types import (
     SidecarGroupMeta,
     WiredProcessor,
 )
-from ai.backend.manager.actions.types import (
-    ActionBacking,
-    ActionGate,
-    ActionKind,
-)
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,

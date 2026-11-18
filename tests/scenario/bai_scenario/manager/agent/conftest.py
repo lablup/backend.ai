@@ -6,6 +6,7 @@ the scheduling controller are reached only by calls no row makes, so each refuse
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
@@ -14,6 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -22,6 +24,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -33,13 +36,31 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.runner.unwired import unwired
 from bai_scenario.valkey import ScenarioValkey
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
 
 
 @pytest.fixture
@@ -82,6 +103,9 @@ async def adapter(
                     config,
                     unwired(StorageSessionManager, "no row reaches a storage host"),
                     permission_check,
+                    key_provider_pool=KeyProviderPool(
+                        providers=[], write_provider_type=KeyProviderType.PLAIN
+                    ),
                 ),
                 scheduling_controller=unwired(
                     SchedulingController, "no row leaves a kernel running on the agent"

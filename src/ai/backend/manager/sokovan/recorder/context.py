@@ -50,7 +50,7 @@ class RecorderContext[EntityIdT: UUID]:
         cls,
         operation: str,
         entity_ids: Sequence[EntityIdT],
-    ) -> Generator[RecordPool[EntityIdT], None, None]:
+    ) -> Generator[RecordPool[EntityIdT]]:
         """
         Create a new recorder scope.
 
@@ -114,7 +114,7 @@ class RecorderContext[EntityIdT: UUID]:
         name: str,
         success_detail: str | None = None,
         entity_ids: set[EntityIdT] | None = None,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         """
         Record a shared phase that applies to all or specific entities.
 
@@ -172,7 +172,7 @@ class RecorderContext[EntityIdT: UUID]:
         cls,
         name: str,
         success_detail: str | None = None,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         """
         Record a step within a shared phase.
 

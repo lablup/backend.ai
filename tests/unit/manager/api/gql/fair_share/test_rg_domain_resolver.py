@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -84,7 +85,7 @@ class TestRGDomainFairShare:
         """Should return domain fair share when it exists."""
         scope = ResourceGroupDomainScope(resource_group_name="default")
 
-        resolver_fn = domain_resolver.rg_domain_fair_share.base_resolver
+        resolver_fn = cast(Any, domain_resolver.rg_domain_fair_share).base_resolver
         result = await resolver_fn(
             info_with_domain_fair_share_exists,
             scope,
@@ -103,7 +104,7 @@ class TestRGDomainFairShare:
         """Should call adapter with correct resource_group and domain_name."""
         scope = ResourceGroupDomainScope(resource_group_name="custom-rg")
 
-        resolver_fn = domain_resolver.rg_domain_fair_share.base_resolver
+        resolver_fn = cast(Any, domain_resolver.rg_domain_fair_share).base_resolver
         await resolver_fn(
             info_with_domain_fair_share_exists,
             scope,
@@ -132,7 +133,7 @@ class TestRGDomainFairShare:
         """Should raise DomainNotFound when domain does not exist."""
         scope = ResourceGroupDomainScope(resource_group_name="default")
 
-        resolver_fn = domain_resolver.rg_domain_fair_share.base_resolver
+        resolver_fn = cast(Any, domain_resolver.rg_domain_fair_share).base_resolver
         with pytest.raises(DomainNotFound):
             await resolver_fn(
                 info_with_domain_not_found,
@@ -152,7 +153,7 @@ class TestRGDomainFairShares:
         )
         scope = ResourceGroupDomainScope(resource_group_name="default")
 
-        resolver_fn = domain_resolver.rg_domain_fair_shares.base_resolver
+        resolver_fn = cast(Any, domain_resolver.rg_domain_fair_shares).base_resolver
         await resolver_fn(
             info,
             scope,

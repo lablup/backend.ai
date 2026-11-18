@@ -4,8 +4,7 @@
 
 시나리오: 미완성 12 / 47
 
-- ops 구성 (22)
-  - admin_search: 대표 성공 ✓ · 대표 거부 ✓
+- ops 구성 (19)
   - admin_search_replicas: 대표 성공 ✓ · 대표 거부 ✓
   - admin_search_revisions: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_access_tokens_by_ids: 대표 성공 ✓ · 대표 거부 ✓
@@ -19,8 +18,6 @@
   - get_access_token: 대표 성공 ✓ · 대표 거부 ✓
   - get_replica: 대표 성공 ✓ · 대표 거부 ✓
   - get_revision: 대표 성공 ✓ · 대표 거부 ✓
-  - project_search: 대표 성공 ✓ · 대표 거부 ✓
-  - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - search_access_tokens: 대표 성공 ✓ · 대표 거부 ✓
   - search_policies: 대표 성공 ✓ · 대표 거부 ✓
   - search_replicas: 대표 성공 ✓ · 대표 거부 ✓
@@ -29,10 +26,11 @@
   - search_rules: 대표 성공 ✓ · 대표 거부 ✓
 - ops + 직접 구현 (1)
   - get_current_revision: 성공 없음 · 거부 있음 1 (get_ops, single_entity): SCENARIO-GAP
-- 직접 구현 (24)
+- 직접 구현 (27)
   - activate_revision: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
   - add_revision: 성공 있음 4 · 거부 있음 7 (single_entity)
   - admin_refresh_deployment_revisions: 성공 없음 · 거부 없음 (global_scope): SCENARIO-GAP
+  - admin_search: 성공 있음 1 · 거부 있음 1 (global_scope)
   - bulk_delete_access_tokens: 성공 있음 2 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
   - bulk_delete_rules: 성공 없음 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - create: 성공 있음 3 · 거부 있음 2 (scope)
@@ -45,22 +43,17 @@
   - partial_bulk_purge_access_tokens: 성공 있음 2 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_purge_rules: 성공 있음 3 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_update_rules: 성공 있음 2 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
+  - project_search: 성공 있음 1 · 거부 있음 1 (scope)
   - purge_access_token: 성공 있음 1 · 거부 있음 1 (single_field)
   - purge_rule: 성공 있음 1 · 거부 있음 1 (single_entity)
   - replace_options: 성공 있음 4 · 거부 있음 3 (single_entity)
+  - scoped_search: 성공 있음 1 · 거부 있음 1 (scope)
   - search_revision_resource_slots: 성공 있음 1 · 거부 있음 1 (single_field)
   - sync_replicas: 성공 있음 1 · 거부 있음 1 (single_entity)
   - update: 성공 있음 5 · 거부 있음 2 (single_entity)
   - update_route_traffic: 성공 있음 1 · 거부 있음 1 (single_field)
   - update_rule: 성공 있음 1 · 거부 있음 1 (single_entity)
   - upsert_policy: 성공 있음 1 · 거부 있음 1 (single_entity)
-
-**admin_search**
-
-| 시나리오 | 판정 |
-|---|---|
-| [배포 셋이 있고 superadmin 이 필터 없이 전체를 조회하면, 셋을 모두 셉니다](#searching-the-superadmin-counts-every-deployment) | 성공 |
-| [배포 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체를 조회하면, 역할로 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사합니다](#searching-a-user-granted-read-may-not-search-every-deployment) | 거부 |
 
 **admin_search_replicas**
 
@@ -140,20 +133,6 @@
 | [배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id 로 리비전을 조회하면, 볼 수 없는 id 와 같은 이유로 거부됩니다](#reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable) | 거부 |
 | [아무 배포 권한도 받지 않은 사용자가 리비전을 id 로 조회하면, 키를 풀 수 없다는 이유로 거부됩니다](#reading_revisions-a-user-granted-nothing-may-not-read-a-revision) | 거부 |
 
-**project_search**
-
-| 시나리오 | 판정 |
-|---|---|
-| [두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 조회하면, 그 프로젝트의 것만 나옵니다](#searching-searching-a-project-finds-only-its-own-deployments) | 성공 |
-| [그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 조회하면, 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-a-project) | 거부 |
-
-**scoped_search**
-
-| 시나리오 | 판정 |
-|---|---|
-| [같은 프로젝트에 두 사람이 각자 배포를 생성했고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 조회하면, 자기가 생성한 것만 나옵니다](#searching-searching-my-own-finds-only-what-i-made) | 성공 |
-| [자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 조회하면, 권한 부족으로 거부됩니다. 이 동작도 범위를 좁히기만 하지 않고 권한이 검사합니다](#searching-a-user-granted-nothing-may-not-search-even-their-own) | 거부 |
-
 **search_access_tokens**
 
 | 시나리오 | 판정 |
@@ -220,6 +199,13 @@
 | [vfolder 파일을 읽지 않는 인퍼런스 런타임 종류로 프리셋 없이 모델 정의를 빼고 리비전을 추가하면, 이름 없는 모델이 모델 정의 검증에서 거부됩니다](#adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused) | 거부 |
 | [프리셋 없이 인퍼런스 런타임 종류를 빼고 리비전을 추가하면, 입력이 틀렸다는 이유로 거부됩니다](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | 거부 |
 | [배포 읽기 권한만 받은 사용자가 리비전을 추가하면, 권한 부족으로 거부됩니다](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | 거부 |
+
+**admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 셋이 있고 superadmin 이 필터 없이 전체를 조회하면, 셋을 모두 셉니다](#searching-the-superadmin-counts-every-deployment) | 성공 |
+| [배포 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체를 조회하면, 역할로 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사합니다](#searching-a-user-granted-read-may-not-search-every-deployment) | 거부 |
 
 **bulk_delete_access_tokens**
 
@@ -306,6 +292,13 @@
 | [배포 수정 권한을 받은 사용자가 오토스케일링 규칙 여럿의 지표 이름을 한 번에 변경하면, 모두 새 이름으로 오고 실패한 것은 없습니다](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | 성공 |
 | [아무 권한도 받지 않은 사용자가 오토스케일링 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | 성공 |
 
+**project_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 조회하면, 그 프로젝트의 것만 나옵니다](#searching-searching-a-project-finds-only-its-own-deployments) | 성공 |
+| [그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 조회하면, 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-a-project) | 거부 |
+
 **purge_access_token**
 
 | 시나리오 | 판정 |
@@ -331,6 +324,13 @@
 | [읽기 권한만 받은 사용자가 옵션을 교체하면, 권한 부족으로 거부됩니다](#options-a-user-granted-only-read-may-not-replace-the-options) | 거부 |
 | [같은 처리기 이름을 두 번 담아 옵션을 교체하면, 입력이 틀렸다는 이유로 거부됩니다](#options-naming-a-handler-twice-is-refused) | 거부 |
 | [등록되지 않은 처리기 이름을 담아 옵션을 교체하면, 입력이 틀렸다는 이유로 거부됩니다](#options-naming-an-unregistered-handler-is-refused) | 거부 |
+
+**scoped_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [같은 프로젝트에 두 사람이 각자 배포를 생성했고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 조회하면, 자기가 생성한 것만 나옵니다](#searching-searching-my-own-finds-only-what-i-made) | 성공 |
+| [자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 조회하면, 권한 부족으로 거부됩니다. 이 동작도 범위를 좁히기만 하지 않고 권한이 검사합니다](#searching-a-user-granted-nothing-may-not-search-even-their-own) | 거부 |
 
 **search_revision_resource_slots**
 
@@ -378,76 +378,6 @@
 |---|---|
 | [배포 수정 권한을 받은 사용자가 배포에 정책을 올리면, 올린 정책이 옵니다. 정책 upsert 는 갈아끼우기라 수정 권한으로 거는 호출입니다](#upserting_policy-a-user-granted-deployment-update-puts-the-policy) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포에 정책을 올리려 하면, 권한이 없다는 이유로 거부됩니다](#upserting_policy-a-user-granted-nothing-puts-no-policy) | 거부 |
-
-### admin_search
-
-<a id="searching-the-superadmin-counts-every-deployment"></a>
-
-#### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-배포 셋이 있고 superadmin 이 필터 없이 전체를 조회하면, 셋을 모두 셉니다
-
-Given
-
-- 같은 프로젝트의 배포 3개와, 그 프로젝트의 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 other-2: 복제본 1개를 두려 한다, 아직 리비전이 없다
-
-When
-
-- DeploymentAdapter.admin_search: user-1 이 필터 없이 전체를 조회합니다
-
-Then
-
-- 미리 저장한 배포가 모두, 그리고 그것만 셉니다
-  - items = ['other-1', 'other-2', 'wanted-1']
-  - total_count = 3
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-user-granted-read-may-not-search-every-deployment"></a>
-
-#### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-배포 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체를 조회하면, 역할로 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사합니다
-
-Given
-
-- 같은 프로젝트의 배포 3개와, 그 프로젝트의 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 other-2: 복제본 1개를 두려 한다, 아직 리비전이 없다
-
-When
-
-- DeploymentAdapter.admin_search: user-1 이 필터 없이 전체를 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: InsufficientPrivilege
 
 ### admin_search_replicas
 
@@ -1541,151 +1471,6 @@ Then
 
 - 거부됩니다
   - 거부: GenericBadRequest
-
-### project_search
-
-<a id="searching-searching-a-project-finds-only-its-own-deployments"></a>
-
-#### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 조회하면, 그 프로젝트의 것만 나옵니다
-
-Given
-
-- 두 프로젝트에 나뉜 배포들과, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 프로젝트 other-1
-  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 beside-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 elsewhere-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-
-When
-
-- DeploymentAdapter.project_search: user-1 이 team-1 안을 조회합니다
-
-Then
-
-- 미리 저장한 배포가 모두, 그리고 그것만 셉니다
-  - items = ['beside-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
-
-#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 조회하면, 권한 부족으로 거부됩니다
-
-Given
-
-- 같은 프로젝트의 배포 3개와, 그 프로젝트의 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 other-2: 복제본 1개를 두려 한다, 아직 리비전이 없다
-
-When
-
-- DeploymentAdapter.project_search: user-1 이 team-1 안을 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
-### scoped_search
-
-<a id="searching-searching-my-own-finds-only-what-i-made"></a>
-
-#### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-같은 프로젝트에 두 사람이 각자 배포를 생성했고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 조회하면, 자기가 생성한 것만 나옵니다
-
-Given
-
-- 두 사람이 각자 만든 배포와, 자기 스코프에서 배포 읽기 권한을 받은 그중 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 자기 스코프에서 배포를 읽을 수 있는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 역할 deployment-owner-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 deployment-owner-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 배포 mine-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 theirs-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-
-When
-
-- DeploymentAdapter.scoped_search: user-1 이 자기 것을 조회합니다
-
-Then
-
-- 미리 저장한 배포가 모두, 그리고 그것만 셉니다
-  - items = ['mine-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-user-granted-nothing-may-not-search-even-their-own"></a>
-
-#### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 조회하면, 권한 부족으로 거부됩니다. 이 동작도 범위를 좁히기만 하지 않고 권한이 검사합니다
-
-Given
-
-- 두 사람이 각자 만든 배포와, 아무 배포 권한도 받지 않은 그중 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 배포 mine-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-  - 배포 theirs-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
-
-When
-
-- DeploymentAdapter.scoped_search: user-1 이 자기 것을 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
 
 ### search_access_tokens
 
@@ -3015,6 +2800,79 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
+### admin_search
+
+<a id="searching-the-superadmin-counts-every-deployment"></a>
+
+#### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+배포 셋이 있고 superadmin 이 필터 없이 전체를 조회하면, 셋을 모두 셉니다
+
+Given
+
+- 같은 프로젝트의 배포 3개 중 하나만 배포 정책을 갖고, 그 프로젝트의 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 wanted-1: 배포 정책 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-2: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.admin_search: user-1 이 필터 없이 전체를 조회합니다
+
+Then
+
+- 미리 저장한 배포가 모두, 그리고 그것만 셉니다. 배포 정책은 정책을 가진 배포에만 옵니다
+  - items = ['other-1', 'other-2', 'wanted-1']
+  - items[].policy = {'wanted-1': DeploymentPolicyInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, rolling_update=RollingUpdateConfigInfo(max_surge=IntOrPercent(count=1, percent=None), max_unavailable=IntOrPercent(count=0, percent=None)), blue_green=None), 'other-1': None, 'other-2': None}
+  - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-read-may-not-search-every-deployment"></a>
+
+#### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+배포 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체를 조회하면, 역할로 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사합니다
+
+Given
+
+- 같은 프로젝트의 배포 3개 중 하나만 배포 정책을 갖고, 그 프로젝트의 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 wanted-1: 배포 정책 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-2: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.admin_search: user-1 이 필터 없이 전체를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
+
 ### bulk_delete_access_tokens
 
 <a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once"></a>
@@ -4161,6 +4019,80 @@ Then
   - failed[1].id: 미리 저장한 규칙의 id 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
+### project_search
+
+<a id="searching-searching-a-project-finds-only-its-own-deployments"></a>
+
+#### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 조회하면, 그 프로젝트의 것만 나옵니다
+
+Given
+
+- 두 프로젝트에 나뉜 배포들(찾을 배포 하나만 배포 정책을 가짐)과, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 프로젝트 other-1
+  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 wanted-1: 배포 정책 하나를 갖는다
+  - 배포 beside-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 elsewhere-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.project_search: user-1 이 team-1 안을 조회합니다
+
+Then
+
+- 미리 저장한 배포가 모두, 그리고 그것만 셉니다. 배포 정책은 정책을 가진 배포에만 옵니다
+  - items = ['beside-1', 'wanted-1']
+  - items[].policy = {'wanted-1': DeploymentPolicyInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, rolling_update=RollingUpdateConfigInfo(max_surge=IntOrPercent(count=1, percent=None), max_unavailable=IntOrPercent(count=0, percent=None)), blue_green=None), 'beside-1': None}
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
+
+#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 조회하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 같은 프로젝트의 배포 3개 중 하나만 배포 정책을 갖고, 그 프로젝트의 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 wanted-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 wanted-1: 배포 정책 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-2: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.project_search: user-1 이 team-1 안을 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
 ### purge_access_token
 
 <a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token"></a>
@@ -4540,6 +4472,83 @@ Then
 
 - 거부됩니다
   - 거부: InvalidAPIParameters
+
+### scoped_search
+
+<a id="searching-searching-my-own-finds-only-what-i-made"></a>
+
+#### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+같은 프로젝트에 두 사람이 각자 배포를 생성했고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 조회하면, 자기가 생성한 것만 나옵니다
+
+Given
+
+- 두 사람이 각자 만든 배포(호출자의 배포는 배포 정책을 가짐)와, 자기 스코프에서 배포 읽기 권한을 받은 그중 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 자기 스코프에서 배포를 읽을 수 있는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-owner-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-owner-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-owner-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 mine-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 mine-1: 배포 정책 하나를 갖는다
+  - 배포 theirs-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.scoped_search: user-1 이 자기 것을 조회합니다
+
+Then
+
+- 미리 저장한 배포가 모두, 그리고 그것만 셉니다. 배포 정책은 정책을 가진 배포에만 옵니다
+  - items = ['mine-1']
+  - items[].policy = {'mine-1': DeploymentPolicyInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, rolling_update=RollingUpdateConfigInfo(max_surge=IntOrPercent(count=1, percent=None), max_unavailable=IntOrPercent(count=0, percent=None)), blue_green=None)}
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-nothing-may-not-search-even-their-own"></a>
+
+#### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 조회하면, 권한 부족으로 거부됩니다. 이 동작도 범위를 좁히기만 하지 않고 권한이 검사합니다
+
+Given
+
+- 두 사람이 각자 만든 배포(호출자의 배포는 배포 정책을 가짐)와, 아무 배포 권한도 받지 않은 그중 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 mine-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 mine-1: 배포 정책 하나를 갖는다
+  - 배포 theirs-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.scoped_search: user-1 이 자기 것을 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### search_revision_resource_slots
 

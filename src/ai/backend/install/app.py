@@ -41,10 +41,12 @@ from .types import (
     Accelerator,
     CliArgs,
     DistInfo,
+    FrontendMode,
     InstallInfo,
     InstallModes,
     InstallVariable,
     PrerequisiteError,
+    ProxyBackend,
 )
 
 top_tasks: WeakSet[asyncio.Task[Any]] = WeakSet()
@@ -150,20 +152,19 @@ class PackageSetup(Static):
             if self._non_interactive:
                 if dist_info.target_path is None:
                     raise ValueError("Target path must be specified in non-interactive mode")
-            else:
-                if dist_info.target_path.exists():
-                    input_box = InputDialog(
-                        f"The target path {dist_info.target_path} already exists. "
-                        "Please set a different target path below, or "
-                        "leave the box as blank to overwrite the folder.",
-                        str(dist_info.target_path),
-                        allow_cancel=False,
-                    )
-                    _log.mount(input_box)
-                    value = await input_box.wait()
-                    if value is None:
-                        raise ValueError("Target path input was cancelled")
-                    dist_info.target_path = Path(value)
+            elif dist_info.target_path.exists():
+                input_box = InputDialog(
+                    f"The target path {dist_info.target_path} already exists. "
+                    "Please set a different target path below, or "
+                    "leave the box as blank to overwrite the folder.",
+                    str(dist_info.target_path),
+                    allow_cancel=False,
+                )
+                _log.mount(input_box)
+                value = await input_box.wait()
+                if value is None:
+                    raise ValueError("Target path input was cancelled")
+                dist_info.target_path = Path(value)
             ctx = PackageContext(
                 dist_info,
                 install_variable,
@@ -279,20 +280,19 @@ class DockerSetup(Static):
         if self._non_interactive:
             if dist_info.target_path is None:
                 raise ValueError("Target path must be specified in non-interactive mode")
-        else:
-            if dist_info.target_path.exists():
-                input_box = InputDialog(
-                    f"The target path {dist_info.target_path} already exists. "
-                    "Please set a different target path below, or "
-                    "leave the box as blank to overwrite the folder.",
-                    str(dist_info.target_path),
-                    allow_cancel=False,
-                )
-                _log.mount(input_box)
-                value = await input_box.wait()
-                if value is None:
-                    raise ValueError("Target path input was cancelled")
-                dist_info.target_path = Path(value)
+        elif dist_info.target_path.exists():
+            input_box = InputDialog(
+                f"The target path {dist_info.target_path} already exists. "
+                "Please set a different target path below, or "
+                "leave the box as blank to overwrite the folder.",
+                str(dist_info.target_path),
+                allow_cancel=False,
+            )
+            _log.mount(input_box)
+            value = await input_box.wait()
+            if value is None:
+                raise ValueError("Target path input was cancelled")
+            dist_info.target_path = Path(value)
         ctx = DockerContext(
             dist_info,
             install_variable,
@@ -562,6 +562,23 @@ class InstallReport(Static):
                     )
                 )
             with TabPane("App-Proxy Workers", id="appproxy-worker"):
+                if service.proxy_backend == ProxyBackend.TRAEFIK:
+                    if service.frontend_mode == FrontendMode.WILDCARD:
+                        traefik_traffic = (
+                            "proxied apps are served as subdomains on the"
+                            " `domainproxy` entrypoint (port 10250)"
+                        )
+                    else:
+                        traefik_traffic = "proxied apps are served on ports 10205-10300"
+                    traefik_note = f"""
+                **Traefik backend**: the HTTP worker delegates its dataplane to the
+                Traefik container which already runs as part of the halfstack
+                (compose profile `traefik`). Its dashboard is at
+                <http://127.0.0.1:8080>; {traefik_traffic}. The TCP worker keeps
+                the builtin port-based frontend.
+                """
+                else:
+                    traefik_note = ""
                 yield Markdown(
                     textwrap.dedent(
                         f"""
@@ -576,6 +593,7 @@ class InstallReport(Static):
                 $ cd {self.install_info.base_path.resolve()}
                 $ ./backend.ai app-proxy worker start-server -f app-proxy-worker-tcp.toml --debug
                 ```
+                {traefik_note}
                 """
                     )
                 )
@@ -707,6 +725,7 @@ class ModeMenu(Static):
             advertised_port=args.advertised_port,
             endpoint_protocol=args.endpoint_protocol,
             frontend_mode=args.frontend_mode,
+            proxy_backend=args.proxy_backend,
             use_wildcard_binding=args.use_wildcard_binding,
             otel_endpoint=args.otel_endpoint,
             metric_access_cidr=args.metric_access_cidr,

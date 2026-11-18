@@ -7,7 +7,7 @@ own service, and ``deploy`` through the deployment controller the deployment tab
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -21,6 +21,7 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
@@ -30,6 +31,7 @@ from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
@@ -67,6 +69,7 @@ from ai.backend.manager.sokovan.deployment.revision_draft.reader import Revision
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.fakes.deployment import FakeValkeyScheduleClient
 from bai_scenario.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
@@ -74,6 +77,22 @@ from bai_scenario.fakes.storage_proxy import (
 )
 from bai_scenario.runner.unwired import unwired
 from bai_scenario.valkey import ScenarioValkey
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
 
 
 @pytest.fixture
@@ -171,6 +190,7 @@ async def adapter(
     deployment_service = DeploymentService(
         deployment_controller,
         deployment_repository,
+        unwired(AgentRepository, "no deployment here designates an agent"),
         unwired(AppProxyClientPool, "only a served deployment reaches the proxy"),
         preset_repository,
     )

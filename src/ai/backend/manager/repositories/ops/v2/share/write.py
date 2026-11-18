@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import EntityShareData, EntityShareStatus
-from ai.backend.manager.errors.permission import InvalidFieldPermission
+from ai.backend.manager.errors.permission_field import InvalidFieldPermission
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator

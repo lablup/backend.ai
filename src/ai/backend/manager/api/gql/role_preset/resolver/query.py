@@ -38,7 +38,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.4",
         description="Get a single role preset by ID (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_role_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
@@ -53,7 +53,7 @@ async def admin_role_preset(
         added_version="26.4.4",
         description="List role presets with filtering and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_role_presets(
     info: Info[StrawberryGQLContext],
     usage: Annotated[

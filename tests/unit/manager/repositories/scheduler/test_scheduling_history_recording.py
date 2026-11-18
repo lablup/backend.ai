@@ -52,6 +52,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
     KernelGroup,
@@ -72,6 +73,7 @@ from ai.backend.manager.data.session.spec import (
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import InvalidKernelConfig
@@ -118,6 +120,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -130,7 +133,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -175,7 +178,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -198,7 +201,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -224,7 +227,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -244,7 +247,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test user resource policy and return policy name."""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -265,7 +268,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test keypair resource policy and return policy name."""
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
 
@@ -294,7 +297,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -320,7 +323,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
 
@@ -346,7 +349,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -370,7 +373,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_image_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ImageID, None]:
+    ) -> AsyncGenerator[ImageID]:
         """Register a container registry and one image, and return the image id."""
         registry_id = uuid.uuid4()
         image_id = ImageID(uuid.uuid4())
@@ -411,7 +414,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def resource_slot_types(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Register the slot types the requested amounts refer to."""
         async with db_with_cleanup.begin_session() as db_sess:
             for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
@@ -426,7 +429,7 @@ class TestEnqueueSessionSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None]:
         """Provision the user's and the project's virtual entities.
 
         Existing deployments carry them from the backfill migration; a session joins
@@ -565,7 +568,7 @@ class TestEnqueueSessionSchedulingHistory:
                 )
             )
 
-    async def test_enqueue_writes_a_row_per_designated_agent_still_in_agents(
+    async def test_enqueue_writes_a_row_per_designated_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
@@ -578,7 +581,11 @@ class TestEnqueueSessionSchedulingHistory:
         enrolled_scopes: None,
         resource_slot_types: None,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -591,7 +598,7 @@ class TestEnqueueSessionSchedulingHistory:
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             image_id=test_image_id,
-            designated_agents=(registered_agent_id, AgentId("i-not-registered")),
+            designated_agents=(registered_agent_id,),
         )
 
         await db_source.enqueue_session_from_spec(spec)
@@ -613,6 +620,57 @@ class TestEnqueueSessionSchedulingHistory:
             )
         assert list(designated) == [registered_agent_id]
 
+    @pytest.mark.parametrize(
+        "with_registered",
+        [False, True],
+        ids=["only-unknown", "unknown-with-registered"],
+    )
+    async def test_enqueue_refuses_an_unknown_designated_agent_and_writes_no_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        registered_agent_id: AgentId,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+        with_registered: bool,
+    ) -> None:
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        session_id = SessionID(uuid.uuid4())
+        unknown = AgentId("i-not-registered")
+        spec = self._spec(
+            session_id=session_id,
+            domain=test_domain,
+            resource_group_id=await self._resource_group_id(
+                db_with_cleanup, test_scaling_group_name
+            ),
+            resource_group_name=test_scaling_group_name,
+            project_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            image_id=test_image_id,
+            designated_agents=(registered_agent_id, unknown) if with_registered else (unknown,),
+        )
+
+        with pytest.raises(AgentNotFound):
+            await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(SessionRow)
+                .where(SessionRow.id == session_id)
+            )
+        assert stored == 0
+
     async def test_enqueue_writes_the_session_its_kernels_and_the_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -627,7 +685,11 @@ class TestEnqueueSessionSchedulingHistory:
     ) -> None:
         """One enqueue writes the session, its kernels, their requested slots, and the
         PENDING history row, and enrolls the session under its user and project."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -731,7 +793,11 @@ class TestEnqueueSessionSchedulingHistory:
         resource_slot_types: None,
     ) -> None:
         """A dependency the caller declares becomes one row of the dependency graph."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
         first_id = SessionID(uuid.uuid4())
         await db_source.enqueue_session_from_spec(
@@ -788,7 +854,11 @@ class TestEnqueueSessionSchedulingHistory:
         enrolled_scopes: None,
     ) -> None:
         """A dependency naming no session leaves nothing behind."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -812,6 +882,116 @@ class TestEnqueueSessionSchedulingHistory:
                 await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
             ) is None
 
+    async def test_enqueue_records_every_declared_dependency(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+    ) -> None:
+        """Several dependencies the caller declares become one row each."""
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
+        dependency_ids = [SessionID(uuid.uuid4()), SessionID(uuid.uuid4())]
+        for dependency_id in dependency_ids:
+            await db_source.enqueue_session_from_spec(
+                self._spec(
+                    session_id=dependency_id,
+                    domain=test_domain,
+                    resource_group_id=resource_group_id,
+                    resource_group_name=test_scaling_group_name,
+                    project_id=test_group_id,
+                    user_uuid=test_user_uuid,
+                    access_key=test_access_key,
+                    image_id=test_image_id,
+                )
+            )
+
+        session_id = SessionID(uuid.uuid4())
+        await db_source.enqueue_session_from_spec(
+            self._spec(
+                session_id=session_id,
+                domain=test_domain,
+                resource_group_id=resource_group_id,
+                resource_group_name=test_scaling_group_name,
+                project_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                image_id=test_image_id,
+                dependencies=tuple(dependency_ids),
+            )
+        )
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            depends_on = await db_sess.scalars(
+                sa.select(SessionDependencyRow.depends_on).where(
+                    SessionDependencyRow.session_id == session_id
+                )
+            )
+            assert set(depends_on) == set(dependency_ids)
+
+    async def test_enqueue_refuses_an_unknown_dependency_among_known_ones(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+    ) -> None:
+        """One unknown dependency next to a known one leaves nothing behind."""
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
+        known_id = SessionID(uuid.uuid4())
+        await db_source.enqueue_session_from_spec(
+            self._spec(
+                session_id=known_id,
+                domain=test_domain,
+                resource_group_id=resource_group_id,
+                resource_group_name=test_scaling_group_name,
+                project_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                image_id=test_image_id,
+            )
+        )
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            domain=test_domain,
+            resource_group_id=resource_group_id,
+            resource_group_name=test_scaling_group_name,
+            project_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            image_id=test_image_id,
+            dependencies=(known_id, SessionID(uuid.uuid4())),
+        )
+
+        with pytest.raises(InvalidAPIParameters):
+            await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            assert (
+                await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
+            ) is None
+
     async def test_enqueue_refuses_an_unregistered_image(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -823,7 +1003,11 @@ class TestEnqueueSessionSchedulingHistory:
         enrolled_scopes: None,
     ) -> None:
         """A kernel whose image is not registered fails before anything is written."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -889,7 +1073,11 @@ class TestEnqueueSessionSchedulingHistory:
     ) -> None:
         """One main and three workers write two group rows; the worker row keeps the
         requested image and slots."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -928,7 +1116,11 @@ class TestEnqueueSessionSchedulingHistory:
         enqueue_spec_args: dict[str, Any],
     ) -> None:
         """Every worker kernel references the worker group row."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -963,7 +1155,11 @@ class TestEnqueueSessionSchedulingHistory:
         enqueue_spec_args: dict[str, Any],
     ) -> None:
         """Environ given to the worker group is stored only under that group."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -1005,7 +1201,11 @@ class TestEnqueueSessionSchedulingHistory:
         enqueue_spec_args: dict[str, Any],
     ) -> None:
         """A key that is not an environment variable name leaves nothing behind."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -1096,7 +1296,11 @@ class TestEnqueueSessionSchedulingHistory:
         worker_mount: VFolderMount,
     ) -> SessionID:
         """A session whose main and two workers mount different vfolders."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         await db_source.enqueue_session_from_spec(
             self._spec(
@@ -1151,7 +1355,11 @@ class TestEnqueueSessionSchedulingHistory:
         worker_mount: VFolderMount,
     ) -> None:
         """The main kernel starts with the main mount and every worker with the worker mount."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         result = await db_source.search_sessions_with_kernels(
             SessionSearcher(
@@ -1182,7 +1390,11 @@ class TestEnqueueSessionSchedulingHistory:
         main_mount: VFolderMount,
     ) -> None:
         """Two mounts of one group at the same destination leave nothing behind."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -1207,7 +1419,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -1248,7 +1460,7 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -1271,7 +1483,7 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -1298,7 +1510,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1318,7 +1530,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test user resource policy and return policy name."""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1339,7 +1551,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test keypair resource policy and return policy name."""
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1368,7 +1580,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -1394,7 +1606,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
 
@@ -1420,7 +1632,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -1446,7 +1658,7 @@ class TestMarkTerminatingSchedulingHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test agent and return agent ID."""
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
 
@@ -1555,6 +1767,9 @@ class TestMarkTerminatingSchedulingHistory:
             MagicMock(),
             MagicMock(),
             MagicMock(),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
         )
 
     @pytest.fixture
@@ -1590,7 +1805,11 @@ class TestMarkTerminatingSchedulingHistory:
         running_session_id: SessionId,
     ) -> None:
         """Test that mark_sessions_terminating() creates history records for RUNNING sessions."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         result = await db_source.mark_sessions_terminating([running_session_id])
         assert running_session_id in result.terminating_sessions
@@ -1643,7 +1862,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Test that mark_sessions_terminating() records history for cancelled PENDING sessions."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id = await self._create_session_with_kernel(
             db_with_cleanup,
@@ -1688,7 +1911,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Test that mark_sessions_terminating(forced=True) creates TERMINATED history records."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id = await self._create_session_with_kernel(
             db_with_cleanup,
@@ -1732,7 +1959,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Forced termination should record history for TERMINATING sessions too."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id = await self._create_session_with_kernel(
             db_with_cleanup,
@@ -1776,7 +2007,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Test that different from_statuses are correctly captured for each session."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # Create sessions in different terminatable statuses
         running_session_id = await self._create_session_with_kernel(

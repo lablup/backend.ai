@@ -16,10 +16,10 @@ from ai.backend.manager.api.adapters.reservoir_registry.adapter import (
     ReservoirRegistryAdapter,
 )
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,

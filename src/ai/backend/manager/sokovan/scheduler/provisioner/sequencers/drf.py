@@ -78,7 +78,6 @@ class DRFSequencer(WorkloadSequencer):
             if slot_resource is None or slot_resource.capacity == 0:
                 continue
             share = slot_allocation.allocated / slot_resource.capacity
-            if share > dominant_share:
-                dominant_share = share
+            dominant_share = max(dominant_share, share)
 
         return dominant_share

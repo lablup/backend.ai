@@ -12,6 +12,7 @@ from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,
@@ -93,7 +94,7 @@ class ResourceGroupSchedulerOptions:
     agent_selection_strategy: AgentSelectionStrategy
     agent_selector_config: Mapping[str, Any]
     allow_fractional_resource_fragmentation: bool
-    route_cleanup_target_statuses: list[str]
+    route_cleanup_target_statuses: list[RouteHealthStatus]
     preemption: PreemptionConfig = dataclasses.field(default_factory=PreemptionConfig)
 
     def to_json(self) -> dict[str, Any]:
@@ -105,7 +106,9 @@ class ResourceGroupSchedulerOptions:
             "agent_selection_strategy": self.agent_selection_strategy.value,
             "agent_selector_config": dict(self.agent_selector_config),
             "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
-            "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
+            "route_cleanup_target_statuses": [
+                status.value for status in self.route_cleanup_target_statuses
+            ],
             "preemption": {
                 "enabled": self.preemption.enabled,
                 "preemptible_priority": self.preemption.preemptible_priority,

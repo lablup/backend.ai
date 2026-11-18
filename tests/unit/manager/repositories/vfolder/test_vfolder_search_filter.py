@@ -99,7 +99,7 @@ class TestVfolderSearchFilter:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -140,7 +140,7 @@ class TestVfolderSearchFilter:
     async def cloneable_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create vfolders with mixed cloneable values.
 
         user_a owns:

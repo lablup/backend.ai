@@ -6,6 +6,8 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelDefinitionInputGQL,
     ModelHealthCheckInputGQL,
     ModelServiceConfigInputGQL,
+    ServiceArgumentInterpolationDelimiterInputGQL,
+    ServiceArgumentInterpolationInputGQL,
 )
 
 
@@ -71,3 +73,30 @@ class TestModelDefinitionInputGQL:
         assert service.health_check is not None
         assert service.health_check.path == "/1"
         assert service.health_check.expected_status_code == 101
+
+    def test_interpolation_reaches_resolved_service(self) -> None:
+        baseline = ModelDefinitionDraft.model_validate({
+            "models": [
+                {"name": "demo", "model_path": "/models", "service": {"port": 8000}},
+            ]
+        })
+        gql_patch = ModelDefinitionInputGQL(
+            models=[
+                ModelConfigInputGQL(
+                    service=ModelServiceConfigInputGQL(
+                        interpolation=ServiceArgumentInterpolationInputGQL(
+                            delimiters=[
+                                ServiceArgumentInterpolationDelimiterInputGQL(start="{{", end="}}")
+                            ]
+                        )
+                    )
+                )
+            ]
+        )
+
+        resolved = baseline.merge(gql_patch.to_pydantic().to_draft()).to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.interpolation is not None
+        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("{{", "}}")]

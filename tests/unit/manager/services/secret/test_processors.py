@@ -33,7 +33,6 @@ from ai.backend.manager.data.secret.types import (
     SecretStatus,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -79,7 +78,7 @@ def registry(global_gate: VirtualEntityGlobalActionRBACValidator) -> ProcessorRe
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(global_scope=[global_gate]),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 

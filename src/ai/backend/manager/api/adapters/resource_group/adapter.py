@@ -57,6 +57,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
+    ResourceGroupSchedulerOptionsInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
@@ -120,6 +122,7 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.resource_group.types import NUM_RETRIES_TO_SKIP_CONFIG_KEY
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
@@ -199,7 +202,7 @@ def _normalize_quantity(value: Decimal) -> Decimal:
         Decimal('4294967296.000000') -> Decimal('4294967296')
     """
     normalized = value.normalize()
-    sign, digits, exponent = normalized.as_tuple()
+    _sign, _digits, exponent = normalized.as_tuple()
     if isinstance(exponent, int) and exponent > 0:
         # normalize() may produce scientific notation for large integers
         # (e.g., Decimal('1000000000') -> Decimal('1E+9')).
@@ -498,13 +501,13 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         creator = ResourceGroupCreator(
             name=input.name,
-            # ResourceGroupCreator requires driver and scheduler fields
-            # which are not exposed in CreateResourceGroupInput.
-            # Default to "static" driver and "fifo" scheduler as reasonable defaults.
+            # ResourceGroupCreator requires a driver field which is not exposed in
+            # CreateResourceGroupInput. Default to the "static" driver.
             driver="static",
-            scheduler="fifo",
+            scheduler=SchedulerType(input.scheduler_type).value,
             description=input.description,
-            is_active=True,
+            is_active=input.is_active,
+            is_public=input.is_public,
             is_default=input.is_default,
         )
         action_result = await self._resource_group.create_resource_group.run(
@@ -1097,6 +1100,22 @@ class ResourceGroupAdapter(BaseAdapter):
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
                     victim_scope=data.scheduler.options.preemption.victim_scope,
+                ),
+                options=ResourceGroupSchedulerOptionsInfo(
+                    allowed_session_types=data.scheduler.options.allowed_session_types,
+                    pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
+                    config=ResourceGroupSchedulerOptionsConfigInfo(
+                        num_retries_to_skip=data.scheduler.options.config.get(
+                            NUM_RETRIES_TO_SKIP_CONFIG_KEY
+                        ),
+                    ),
+                    agent_selection_strategy=data.scheduler.options.agent_selection_strategy,
+                    allow_fractional_resource_fragmentation=(
+                        data.scheduler.options.allow_fractional_resource_fragmentation
+                    ),
+                    route_cleanup_target_statuses=(
+                        data.scheduler.options.route_cleanup_target_statuses
+                    ),
                 ),
             ),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),

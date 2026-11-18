@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.manager.data.retention.types import RetentionCategory
-from ai.backend.manager.models.base import populate_fixture
+from ai.backend.manager.models.fixture import populate_fixture
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow

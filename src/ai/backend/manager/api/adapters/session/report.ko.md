@@ -27,7 +27,7 @@
   - batch_resource_allocation_by_kernel: 성공 있음 1 · 거부 있음 1 (atomic_bulk_field)
   - batch_resource_allocation_by_session: 성공 있음 1 · 거부 있음 1 (partial_bulk)
   - compute_schedule: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - enqueue: 성공 있음 1 · 거부 있음 1 (partial_bulk, scope)
+  - enqueue: 성공 있음 1 · 거부 있음 2 (partial_bulk, scope)
   - exclude_idle_checks: 성공 있음 2 · 거부 있음 1 (legacy_partial_bulk)
   - get: 성공 있음 1 · 거부 있음 1 (partial_bulk, single_entity)
   - get_logs: 성공 있음 1 · 거부 있음 1 (single_entity)
@@ -186,6 +186,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [그 프로젝트에서 세션을 만들 수 있는 사용자가 세션을 만들면, 대기 상태의 세션 전체가 반환됩니다](#enqueueing-creating-a-session-granted) | 성공 |
+| [그 프로젝트에서 세션을 만들 수 있는 사용자가 등록되지 않은 에이전트를 지정해 세션을 만들면, 거부됩니다](#enqueueing-creating-a-session-designating-an-unknown-agent) | 거부 |
 | [아무 권한도 받지 않은 사용자가 프로젝트에 세션을 만들려 하면, 권한 부족으로 거부됩니다](#enqueueing-creating-a-session-granted-nothing) | 거부 |
 
 **exclude_idle_checks**
@@ -2293,6 +2294,51 @@ Then
   - network.network_type = 'volatile'
   - network.network_id = None
   - replica_id = None
+
+<a id="enqueueing-creating-a-session-designating-an-unknown-agent"></a>
+
+#### [creating-a-session-designating-an-unknown-agent](/tests/scenario/bai_scenario/manager/session/test_enqueueing.py): pass
+
+그 프로젝트에서 세션을 만들 수 있는 사용자가 등록되지 않은 에이전트를 지정해 세션을 만들면, 거부됩니다
+
+Given
+
+- 요구할 슬롯을 감당하는 에이전트가 있는 자원 그룹과 이미지, 그리고 그 프로젝트에서 세션을 만들 수 있는 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 프로젝트 team-1 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 에이전트 agent-1: cpu 슬롯 용량 8 보고, 0 사용 중
+  - 에이전트 agent-1: mem 슬롯 용량 34359738368 보고, 0 사용 중
+  - 그 프로젝트에서 세션을 만들고 읽을 수 있는 사용자 준비
+    - 역할 session-owner-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 session-owner-1: session 전체에 CREATE 허용
+    - 역할 session-owner-1: session 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 session-owner-1 보유
+
+When
+
+- SessionAdapter.enqueue: user-2이 등록되지 않은 에이전트를 지정해 그 프로젝트에 created-session 세션을 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: AgentNotFound
 
 <a id="enqueueing-creating-a-session-granted-nothing"></a>
 

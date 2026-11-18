@@ -27,7 +27,6 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -76,7 +75,6 @@ _TABLES: list[Table | type[HasTable]] = [
     ImageRow,
     VFolderRow,
     SessionRow,
-    KernelRow,
     ModelCardRow,
 ]
 
@@ -101,7 +99,7 @@ class _Edges:
 @pytest.fixture
 async def db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, _TABLES):
         yield database_connection
 

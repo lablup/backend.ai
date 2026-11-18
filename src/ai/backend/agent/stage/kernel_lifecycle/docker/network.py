@@ -5,6 +5,7 @@ from typing import Any, override
 
 from ai.backend.agent.errors import NetworkPluginNotFound
 from ai.backend.agent.plugin.network import NetworkPluginContext
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
@@ -14,7 +15,6 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
-    KernelCreationConfig,
 )
 
 

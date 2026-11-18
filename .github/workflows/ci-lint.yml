@@ -74,10 +74,16 @@ jobs:
       run: python ./scripts/validate-changelog-fragments.py
     - name: Check the manager package __init__ files hold no imports
       run: python ./scripts/check-init-imports.py src/ai/backend/manager
+    - name: Check the import contracts
+      run: |
+        pip install import-linter==2.16
+        PYTHONPATH=src lint-imports --config .importlinter
     - name: Restore the Pants caches
       uses: ./.github/actions/pants-caches
       with:
         mode: restore
+    - name: Install the Pants launcher
+      uses: ./.github/actions/pants-launcher
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:

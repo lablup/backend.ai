@@ -166,8 +166,7 @@ class AgentClientPool:
         keepalive_retry_count = 3
         keepalive_timeout = self._agent_cache.rpc_keepalive_timeout
         keepalive_interval = keepalive_timeout // keepalive_retry_count
-        if keepalive_interval < 2:
-            keepalive_interval = 2
+        keepalive_interval = max(keepalive_interval, 2)
 
         peer: PeerInvoker = self._create_peer(
             agent_addr,

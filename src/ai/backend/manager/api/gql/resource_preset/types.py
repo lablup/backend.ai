@@ -59,6 +59,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -131,12 +132,12 @@ class ResourcePresetGQL(PydanticNodeMixin[ResourcePresetNode]):
         description="Resource group name. Null means global preset."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The resource group this preset belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(
         self,
         info: Info[StrawberryGQLContext],

@@ -1,5 +1,7 @@
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,7 +11,7 @@ from ai.backend.common.exception import (
 )
 
 
-class InvalidMessagePayloadError(BackendAIError):
+class InvalidMessagePayloadError(BackendAIError, web.HTTPInternalServerError):
     """
     Raised when a received message does not conform to the message envelope contract.
     """

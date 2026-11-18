@@ -23,7 +23,6 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -102,7 +101,7 @@ class TestTemplateRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -119,7 +118,6 @@ class TestTemplateRepository:
                 ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
-                KernelRow,
                 SessionTemplateRow,
                 VirtualEntityRow,
                 EntityMembershipRow,

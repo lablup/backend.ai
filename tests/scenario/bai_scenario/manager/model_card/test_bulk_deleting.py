@@ -30,12 +30,13 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse, RefusedItem
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.model_card import (
     PERMISSION_REASON,
     CardsInAProjectAndSomeone,
     ModelCardsAndACaller,
 )
+from bai_scenario.components.refused_item import RefusedItem
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario

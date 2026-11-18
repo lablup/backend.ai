@@ -32,11 +32,12 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse, OneOfTheSeeded, TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.huggingface_registry import (
     ManyRegistriesAndACaller,
     ManyRegistriesAndSomeone,
 )
+from bai_scenario.components.one_of_the_seeded import OneOfTheSeeded
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario

@@ -40,7 +40,7 @@ from ai.backend.manager.data.deployment.types import (
     BackendAIGQLMeta(
         added_version="25.19.0", description="List routes for a deployment with optional filters."
     )
-)  # type: ignore[misc]
+)
 async def routes(
     info: Info[StrawberryGQLContext],
     deployment_id: ID,
@@ -86,7 +86,7 @@ async def routes(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="25.19.0", description="Get a specific route by ID.")
-)  # type: ignore[misc]
+)
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     route_id = resolve_field_id(id, ReplicaID)

@@ -96,11 +96,10 @@ class SSHProvisioner(Provisioner[SSHSpec, SSHResult]):
         chowner = Chowner(spec)
         if do_override:
             chowner.chown_paths_if_root([priv_key_path, pub_key_path], ouid, ogid)
-        else:
-            if KernelFeatures.UID_MATCH in spec.agent_kernel_features:
-                chowner.chown_paths_if_root(
-                    [priv_key_path, pub_key_path], spec.agent_kernel_uid, spec.agent_kernel_gid
-                )
+        elif KernelFeatures.UID_MATCH in spec.agent_kernel_features:
+            chowner.chown_paths_if_root(
+                [priv_key_path, pub_key_path], spec.agent_kernel_uid, spec.agent_kernel_gid
+            )
 
         priv_key_path.chmod(0o600)
         if cluster_ssh_port_mapping := spec.cluster_ssh_port_mapping:

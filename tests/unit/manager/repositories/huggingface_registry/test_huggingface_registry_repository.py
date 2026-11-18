@@ -48,7 +48,7 @@ class TestHuggingFaceRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -63,7 +63,7 @@ class TestHuggingFaceRepository:
     async def sample_registry_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample HuggingFace registry directly in DB and return its ID"""
         registry_id = uuid.uuid4()
 
@@ -92,7 +92,7 @@ class TestHuggingFaceRepository:
     async def sample_registries_for_ordering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample HuggingFace registries with predictable names for ordering tests"""
         registry_ids = []
         names = ["alpha-registry", "beta-registry", "gamma-registry", "delta-registry"]
@@ -124,7 +124,7 @@ class TestHuggingFaceRepository:
     async def sample_registries_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample HuggingFace registries for pagination testing"""
         registry_ids = []
 
@@ -155,7 +155,7 @@ class TestHuggingFaceRepository:
     async def huggingface_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[HuggingFaceRepository, None]:
+    ) -> AsyncGenerator[HuggingFaceRepository]:
         """Create HuggingFaceRepository instance with database"""
         repo = HuggingFaceRepository(
             db=db_with_cleanup,
@@ -414,7 +414,7 @@ class TestHuggingFaceRepositoryCreate:
     async def db_with_tables(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [

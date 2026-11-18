@@ -192,7 +192,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -810,7 +810,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_group_id: uuid.UUID,
     ) -> None:
         """Test fetching service discovery info for a single route with inference port."""
-        kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
+        _kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
 
         result = await deployment_repository.fetch_route_service_discovery_info({
             ReplicaID(test_route_id)
@@ -1090,7 +1090,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -1432,7 +1432,7 @@ class TestDeploymentRevisionOperations:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -2212,7 +2212,7 @@ class TestDeploymentPolicyOperations:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -2552,7 +2552,7 @@ class TestSearchDeploymentPolicies:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -2810,7 +2810,7 @@ class TestRouteOperations:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -3185,7 +3185,7 @@ class TestDeploymentRepositoryDuplicateName:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with required tables for EndpointRow and RBAC."""
         async with with_tables(
             database_connection,

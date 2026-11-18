@@ -14,7 +14,7 @@ from ai.backend.testutils.ops_contract import BASE_TABLES, Actors, OpsHarness, s
 @pytest.fixture
 async def ops_db(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(global_entity_ids, BASE_TABLES):
         yield global_entity_ids
 

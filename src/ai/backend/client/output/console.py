@@ -133,19 +133,18 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 )
             except NoItems:
                 print("No matching items.")
+        elif is_scalar:
+            for line in tabulate_items(
+                map(lambda v: {fields[0].field_name: v}, items),
+                fields,
+            ):
+                print(line, end="")
         else:
-            if is_scalar:
-                for line in tabulate_items(
-                    map(lambda v: {fields[0].field_name: v}, items),
-                    fields,
-                ):
-                    print(line, end="")
-            else:
-                for line in tabulate_items(
-                    items,  # type: ignore
-                    fields,
-                ):
-                    print(line, end="")
+            for line in tabulate_items(
+                items,  # type: ignore
+                fields,
+            ):
+                print(line, end="")
 
     @override
     def print_paginated_list(

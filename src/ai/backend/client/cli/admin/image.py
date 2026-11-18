@@ -15,7 +15,7 @@ from ai.backend.client.cli.pretty import (
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.compat import asyncio_run
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()
@@ -94,7 +94,7 @@ def rescan(registry: str, project: str | None = None) -> None:
                                 pbar.update(data["current_progress"] - pbar.n)
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
+                                completion_msg_func = lambda error_msg=error_msg: print_fail(
                                     f"Error occurred: {error_msg}"
                                 )
                             case BgtaskStatus.CANCELLED:
@@ -107,7 +107,7 @@ def rescan(registry: str, project: str | None = None) -> None:
                                 if errors:
                                     for error in errors:
                                         print_fail(f"Error reported: {error}")
-                                    completion_msg_func = lambda: print_warn(
+                                    completion_msg_func = lambda errors=errors: print_warn(
                                         f"Finished registry scanning with {len(errors)} issues."
                                     )
             finally:

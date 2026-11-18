@@ -212,7 +212,7 @@ class TestTarget:
 @pytest.fixture
 async def login_client_type_db(
     ops_db: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(ops_db, [LoginClientTypeRow]):
         yield ops_db
 

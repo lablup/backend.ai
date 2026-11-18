@@ -1,4 +1,8 @@
 python_tests(
+    overrides={
+        # Reads every kind directory's idempotence test as text.
+        "test_seed_idempotence.py": {"dependencies": [":idempotence_tests"]},
+    },
     dependencies=[
         # The role_preset kind scans the entity package at run time, and
         # `ensure_all_tables_registered` imports every model by name; dependency inference
@@ -9,3 +13,5 @@ python_tests(
 )
 
 python_test_utils(name="test_utils")
+
+files(name="idempotence_tests", sources=["*/test_idempotence.py"])

@@ -24,13 +24,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityI
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.actions.types import (
-    ActionBacking,
-    ActionGate,
-    ActionKind,
-    ActionOperationType,
-    OperationStatus,
-)
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.ops.base import PartialBulkUpsertFieldOpsAction
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.errors.permission import NotEnoughPermission

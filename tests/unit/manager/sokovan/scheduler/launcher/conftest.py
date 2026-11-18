@@ -105,7 +105,7 @@ def mock_agent_client_pool() -> MagicMock:
     mock_client.assign_port = AsyncMock(return_value=22000)
 
     @asynccontextmanager
-    async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock, None]:
+    async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock]:
         yield mock_client
 
     pool.acquire = MagicMock(side_effect=acquire)
@@ -220,12 +220,6 @@ def _create_session_for_pull(
 
 
 @pytest.fixture
-def session_for_pull_single_kernel() -> SessionDataForPull:
-    """Single session with one kernel for image pulling."""
-    return _create_session_for_pull()
-
-
-@pytest.fixture
 def sessions_for_pull_multiple() -> list[SessionDataForPull]:
     """Multiple sessions with kernels on different agents."""
     return [
@@ -240,18 +234,6 @@ def sessions_for_pull_multiple() -> list[SessionDataForPull]:
             ]
         ),
     ]
-
-
-@pytest.fixture
-def session_for_pull_multiple_kernels_same_agent() -> SessionDataForPull:
-    """Session with multiple kernels on the same agent."""
-    agent_id = AgentId("agent-1")
-    return _create_session_for_pull(
-        kernels=[
-            _create_kernel_binding_data(agent_id=agent_id, image="image-1", image_id=_IMAGE_ID_1),
-            _create_kernel_binding_data(agent_id=agent_id, image="image-2", image_id=_IMAGE_ID_2),
-        ]
-    )
 
 
 @pytest.fixture
@@ -363,14 +345,6 @@ def session_for_start_persistent_network() -> SessionDataForStart:
     )
 
 
-@pytest.fixture
-def session_for_start_kernel_no_agent() -> SessionDataForStart:
-    """Session with kernel that has no agent assigned."""
-    kernel = _create_kernel_binding_data()
-    kernel.agent_id = None
-    return _create_session_for_start(kernels=[kernel])
-
-
 # =============================================================================
 # Image Config Fixtures
 # =============================================================================
@@ -402,15 +376,4 @@ def image_config_default() -> dict[UUID, ImageConfigData]:
     config = _create_image_config_data()
     return {
         config.id: config,
-    }
-
-
-@pytest.fixture
-def image_configs_multiple() -> dict[UUID, ImageConfigData]:
-    """Multiple image configurations."""
-    config1 = _create_image_config_data(canonical="image-1", image_id=_IMAGE_ID_1)
-    config2 = _create_image_config_data(canonical="image-2", image_id=_IMAGE_ID_2)
-    return {
-        config1.id: config1,
-        config2.id: config2,
     }

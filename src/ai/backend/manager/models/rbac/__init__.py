@@ -395,8 +395,7 @@ def deserialize_scope(val: str) -> ScopeType:
             return scope.deserialize(val)
         except ScopeTypeMismatch:
             continue
-    else:
-        raise InvalidScope(f"Invalid scope (s: {scope})")
+    raise InvalidScope(f"Invalid scope (s: {scope})")
 
 
 # Extra scope is to address some scopes that contain specific object types

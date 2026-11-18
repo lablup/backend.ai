@@ -184,3 +184,6 @@ premise had not been seeded.
 - `seeds/` does not import `components`, `runner` or the execution environment modules. It knows only write specs
   and their data types.
 - Do not add per-component registries. A test module imports only what it uses.
+- `components/answers.py` holds only the verdicts most components use. A verdict that one to a few components use
+  goes in its own module in `components/`, one module per verdict. Do not re-export it from `answers.py`: CI
+  selects every scenario component that imports a changed module.

@@ -24,16 +24,19 @@
 
 ```
 domain
+├── auto-generated file  (owned by domain)
 ├── project
 │   ├── session
 │   ├── session group
 │   ├── deployment
 │   ├── network
 │   ├── vfolder          (owned by project)
+│   ├── auto-generated file  (owned by project)
 │   ├── model card
 │   └── role
 └── user
     ├── vfolder          (owned by user)
+    ├── auto-generated file  (owned by user)
     └── role
 
 resource group

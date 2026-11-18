@@ -56,7 +56,7 @@ class TestTusUploadPartOffsetValidation:
         }
 
     @pytest.fixture(autouse=True)
-    def _patch_disk_helpers(self) -> Generator[None, None, None]:
+    def _patch_disk_helpers(self) -> Generator[None]:
         """Mock the aiofiles-based file write path with no-ops.
 
         ``tus_upload_part`` opens the upload file via ``aiofiles.open`` and
@@ -128,7 +128,7 @@ class TestTusUploadPartOffsetValidation:
     @pytest.fixture
     def request_without_offset_header(
         self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    ) -> Generator[MagicMock]:
         """Scenario: Missing Upload-Offset header."""
         request = self._create_mock_request(tmp_path, client_offset=None)
 
@@ -147,7 +147,7 @@ class TestTusUploadPartOffsetValidation:
     @pytest.fixture
     def request_with_invalid_offset(
         self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    ) -> Generator[MagicMock]:
         """Scenario: Invalid (non-integer) Upload-Offset header."""
         request = self._create_mock_request(tmp_path, client_offset="not-a-number")
 
@@ -166,7 +166,7 @@ class TestTusUploadPartOffsetValidation:
     @pytest.fixture
     def request_offset_mismatch_client_behind(
         self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    ) -> Generator[MagicMock]:
         """Scenario: Client offset (512) behind server offset (1024)."""
         request = self._create_mock_request(tmp_path, client_offset="512", server_offset=1024)
 
@@ -185,7 +185,7 @@ class TestTusUploadPartOffsetValidation:
     @pytest.fixture
     def request_offset_mismatch_client_ahead(
         self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    ) -> Generator[MagicMock]:
         """Scenario: Client offset (2048) ahead of server offset (1024)."""
         request = self._create_mock_request(tmp_path, client_offset="2048", server_offset=1024)
 
@@ -204,7 +204,7 @@ class TestTusUploadPartOffsetValidation:
     @pytest.fixture
     def request_with_matching_offset(
         self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    ) -> Generator[MagicMock]:
         """Scenario: Client offset matches server offset (both 1024)."""
         request = self._create_mock_request(tmp_path, client_offset="1024", server_offset=1024)
 
@@ -229,7 +229,7 @@ class TestTusUploadPartOffsetValidation:
     @pytest.fixture
     def request_with_zero_offset(
         self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    ) -> Generator[MagicMock]:
         """Scenario: New file upload with zero offset."""
         request = self._create_mock_request(tmp_path, client_offset="0", server_offset=0)
 
@@ -368,7 +368,7 @@ class TestTusUploadExpiration:
     """``Upload-Expires`` is the earlier of the upload token's ``exp`` and the offset TTL."""
 
     @pytest.fixture
-    def frozen_now(self) -> Generator[None, None, None]:
+    def frozen_now(self) -> Generator[None]:
         with patch("ai.backend.storage.api.client.datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = _NOW
             yield
@@ -414,9 +414,7 @@ class TestTusUploadExpiration:
         return ctx
 
     @pytest.fixture
-    def head_request(
-        self, ctx: MagicMock, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    def head_request(self, ctx: MagicMock, token_data: dict[str, Any]) -> Generator[MagicMock]:
         request = MagicMock(spec=web.Request)
         request.app = {"ctx": ctx}
         with patch("ai.backend.storage.api.client.check_params") as mock_check_params:
@@ -427,9 +425,7 @@ class TestTusUploadExpiration:
             yield request
 
     @pytest.fixture
-    def patch_request(
-        self, ctx: MagicMock, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
+    def patch_request(self, ctx: MagicMock, token_data: dict[str, Any]) -> Generator[MagicMock]:
         """The offset entry read before the drain still has 60 seconds left;
         ``advance_offset`` refreshes it to ``case.offset_ttl``."""
         ctx.valkey_tus_client.get_upload_state = AsyncMock(
@@ -793,7 +789,7 @@ class TestStagingSymlink:
 
 class TestCreateUploadSessionPath:
     @pytest.fixture
-    def manager_request(self, vfolder: Path) -> Generator[tuple[MagicMock, MagicMock], None, None]:
+    def manager_request(self, vfolder: Path) -> Generator[tuple[MagicMock, MagicMock]]:
         volume = MagicMock()
         volume.mangle_vfpath.return_value = vfolder
         volume.prepare_upload = AsyncMock(return_value=_SESSION)

@@ -87,8 +87,7 @@ class AgentRPCCache:
         agent_addr, agent_public_key = await self.get_rpc_args(agent_id)
         keepalive_retry_count = 3
         keepalive_interval = self.rpc_keepalive_timeout // keepalive_retry_count
-        if keepalive_interval < 2:
-            keepalive_interval = 2
+        keepalive_interval = max(keepalive_interval, 2)
         if agent_public_key:
             auth_handler = ManagerAuthHandler(
                 "local",

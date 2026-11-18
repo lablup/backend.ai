@@ -47,7 +47,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Search deployment revision presets.",
     )
-)  # type: ignore[misc]
+)
 async def deployment_revision_presets(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -114,7 +114,7 @@ async def deployment_revision_presets(
         added_version="26.4.2",
         description="Get a single deployment revision preset by ID.",
     )
-)  # type: ignore[misc]
+)
 async def deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,

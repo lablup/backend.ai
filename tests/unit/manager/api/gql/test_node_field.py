@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -41,7 +41,7 @@ query ($id: ID!) {
 @pytest.fixture
 def schema() -> Schema:
     return Schema(
-        query=create_type("Query", [node, nodes]),
+        query=create_type("Query", [cast(Any, node), cast(Any, nodes)]),
         types=[EntityTypeGQL, DomainFairShareGQL, RolePresetGQL],
         federation_version="2.7",
     )

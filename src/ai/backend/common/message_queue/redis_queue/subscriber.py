@@ -81,7 +81,7 @@ class RedisSubscriber(AbstractSubscriber):
         return cls(client, channels)
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore[override]
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload]:  # type: ignore[override]
         """
         Subscribe to broadcast messages.
 

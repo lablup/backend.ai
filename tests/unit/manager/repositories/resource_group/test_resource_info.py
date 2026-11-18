@@ -25,7 +25,6 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -122,7 +121,7 @@ class TestResourceInfo:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with required tables."""
         async with with_tables(
             database_connection,
@@ -136,7 +135,6 @@ class TestResourceInfo:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 SessionRow,
                 AgentRow,
@@ -178,7 +176,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create a basic scaling group for testing."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -206,7 +204,7 @@ class TestResourceInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
         base_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[tuple[str, list[ResourceSlot]], None]:
+    ) -> AsyncGenerator[tuple[str, list[ResourceSlot]]]:
         """Create scaling group with ALIVE, schedulable agents.
 
         Returns:
@@ -247,7 +245,7 @@ class TestResourceInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
         base_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[tuple[str, ResourceSlot], None]:
+    ) -> AsyncGenerator[tuple[str, ResourceSlot]]:
         """Create scaling group with mixed agent statuses.
 
         Only ALIVE agents should be counted for capacity.
@@ -335,7 +333,7 @@ class TestResourceInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
         base_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[tuple[str, ResourceSlot], None]:
+    ) -> AsyncGenerator[tuple[str, ResourceSlot]]:
         """Create scaling group with schedulable and non-schedulable agents.
 
         Only schedulable agents should be counted for capacity.
@@ -401,7 +399,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID], None]:
+    ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID]]:
         """Create test domain, user, and group for kernel tests.
 
         Returns:
@@ -487,7 +485,7 @@ class TestResourceInfo:
         base_scaling_group_id: ResourceGroupID,
         test_domain_id: DomainID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[tuple[str, ResourceSlot, list[ResourceSlot]], None]:
+    ) -> AsyncGenerator[tuple[str, ResourceSlot, list[ResourceSlot]]]:
         """Create scaling group with agent and RUNNING/TERMINATING kernels.
 
         Returns:
@@ -590,7 +588,7 @@ class TestResourceInfo:
         base_scaling_group_id: ResourceGroupID,
         test_domain_id: DomainID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[tuple[str, ResourceSlot, ResourceSlot], None]:
+    ) -> AsyncGenerator[tuple[str, ResourceSlot, ResourceSlot]]:
         """Create scaling group with kernels in various statuses.
 
         Used is now sourced from agent_resources.used (not from kernel occupied_slots).

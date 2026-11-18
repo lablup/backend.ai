@@ -13,13 +13,13 @@ _BASH_TMUX = ["/bin/bash", "-c", "export SHELL=/bin/bash; /opt/kernel/tmux -2 at
 
 
 @pytest.fixture
-def bash_only() -> Generator[None, None, None]:
+def bash_only() -> Generator[None]:
     with patch.object(Path, "exists", lambda self: str(self) == "/bin/bash"):
         yield
 
 
 @pytest.fixture
-def ash_only() -> Generator[None, None, None]:
+def ash_only() -> Generator[None]:
     with patch.object(Path, "exists", lambda self: str(self) == "/bin/ash"):
         yield
 

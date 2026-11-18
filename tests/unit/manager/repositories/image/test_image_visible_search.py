@@ -57,7 +57,8 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.permission.read import PermissionReadOps
-from ai.backend.testutils.db import with_global_entities, with_tables
+from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db_global import with_global_entities
 
 _DOMAIN_NAME = "test-visible-image"
 _POLICY_NAME = "test-visible-image"
@@ -156,7 +157,7 @@ class TestVisibleImageSearch:
     @pytest.fixture
     async def image_db(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [

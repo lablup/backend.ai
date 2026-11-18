@@ -26,7 +26,6 @@ from ai.backend.manager.repositories.ops.v2.permission.provider import Permissio
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
-from ai.backend.testutils.bootstrap import flush_redis
 from ai.backend.testutils.scenario_steps import Configured
 from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
 from bai_scenario.db import (
@@ -40,7 +39,6 @@ from bai_scenario.monitors import ActionRecorder
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.seeds.ops import TestSeedOpsProvider
 from bai_scenario.seeds.seeder import TestSeeder
-from bai_scenario.valkey import ScenarioValkey
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
@@ -89,22 +87,6 @@ async def engine(template: TemplateDatabase, test_db: str) -> AsyncIterator[Any]
 def valkey_addr(redis_container: tuple[str, HostPortPairModel]) -> HostPortPairModel:
     _, addr = redis_container
     return addr
-
-
-@pytest.fixture
-async def valkey(
-    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
-) -> AsyncIterator[ScenarioValkey]:
-    """The real server, cleared of what the previous test left.
-
-    The database is copied per test; a server has no such thing, so every key goes.
-    """
-    flush_redis(valkey_addr.host, valkey_addr.port)
-    clients = await ScenarioValkey.create(config)
-    try:
-        yield clients
-    finally:
-        await clients.close()
 
 
 @pytest.fixture

@@ -22,7 +22,7 @@ log = logging.getLogger("ai.backend.agent.monitor")
 
 
 def check_lspci():
-    proc = subprocess.run("lspci", capture_output=True)
+    proc = subprocess.run("lspci", check=False, capture_output=True)
     faulty_gpus = []
     gpu_count = 0
     for raw_line in proc.stdout.splitlines():

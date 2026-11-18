@@ -44,7 +44,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
             "Page through the shares the caller stands on a side of. Naming no side reads both."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_entity_shares(
     info: Info[StrawberryGQLContext],
     sides: list[EntityShareSideGQL] | None = None,
@@ -80,7 +80,7 @@ async def my_entity_shares(
             "Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def entity_shares(
     info: Info[StrawberryGQLContext],
     scope: EntityShareScopeGQL,
@@ -147,7 +147,7 @@ def _to_connection(result: SearchEntitySharesPayload) -> EntityShareConnection:
             "The receiving side reaches theirs through the search addressed to it."
         ),
     )
-)  # type: ignore[misc]
+)
 async def entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,

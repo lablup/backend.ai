@@ -99,7 +99,7 @@ manager_local_config_iv = (
             t.Key(
                 "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
             ): tx.Path(type="file"),
-            t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
+            t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],
             t.Key("secret", default=None): t.Null | t.String,
             t.Key("ssl-enabled", default=False): t.ToBool,
             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),

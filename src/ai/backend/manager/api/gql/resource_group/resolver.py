@@ -73,7 +73,7 @@ from .types import (
             "Every scope is authorized before the read runs."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_resource_groups(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupScopeGQL,
@@ -126,7 +126,7 @@ async def scoped_resource_groups(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List resource groups (admin only)")
-)  # type: ignore[misc]
+)
 async def admin_resource_groups(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -185,7 +185,7 @@ async def admin_resource_groups(
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List resource groups"),
     deprecation_reason="Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def resource_groups(
     info: Info[StrawberryGQLContext],
     filter: ResourceGroupFilterGQL | None = None,
@@ -411,7 +411,7 @@ async def replace_resource_group_default_session_options(
         added_version="26.4.2",
         description="Get a single resource group by name (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_resource_group_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -476,7 +476,7 @@ async def admin_delete_resource_group_v2(
         added_version="26.4.2",
         description="Get allowed resource groups for a domain (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_resource_groups_for_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
@@ -493,7 +493,7 @@ async def admin_allowed_resource_groups_for_domain_v2(
         added_version="26.4.2",
         description="Get allowed resource groups for a project (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_resource_groups_for_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -510,7 +510,7 @@ async def admin_allowed_resource_groups_for_project_v2(
         added_version="26.4.2",
         description="Get allowed domains for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_domains_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -527,7 +527,7 @@ async def admin_allowed_domains_for_resource_group_v2(
         added_version="26.4.2",
         description="Get allowed projects for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_projects_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,

@@ -7,7 +7,8 @@ from typing import override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
-from ai.backend.manager.actions.types import ActionKind, OperationStatus
+from ai.backend.manager.actions.spec import ActionKind
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow

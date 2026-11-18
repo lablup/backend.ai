@@ -134,7 +134,7 @@ class QuotaExceeded(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class BackendAgentError(BackendAIError):
+class BackendAgentError(BackendAIError, web.HTTPInternalServerError):
     """
     An RFC-7807 error class that wraps agent-side errors.
     """

@@ -146,6 +146,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -160,7 +161,6 @@ from ai.backend.common.types import (
     ImageCanonical,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
@@ -661,12 +661,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 if do_override:
                     chown_scratch(ouid, ogid)
-                else:
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        chown_scratch(
-                            self.local_config.container.kernel_uid,
-                            self.local_config.container.kernel_gid,
-                        )
+                elif KernelFeatures.UID_MATCH in self.kernel_features:
+                    chown_scratch(
+                        self.local_config.container.kernel_uid,
+                        self.local_config.container.kernel_gid,
+                    )
 
             await run_in_executor_with_context(None, _clone_dotfiles)
 
@@ -1038,13 +1037,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
-                    else:
-                        if KernelFeatures.UID_MATCH in self.kernel_features:
-                            self._chown_paths_if_root(
-                                [self.work_dir / "bootstrap.sh"],
-                                self.local_config.container.kernel_uid,
-                                self.local_config.container.kernel_gid,
-                            )
+                    elif KernelFeatures.UID_MATCH in self.kernel_features:
+                        self._chown_paths_if_root(
+                            [self.work_dir / "bootstrap.sh"],
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
+                        )
 
                 await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
@@ -1092,7 +1090,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 pubkey = self.internal_data["ssh_keypair"]["public_key"].encode("ascii")
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
 
-                def _populate_ssh_config() -> None:
+                def _populate_ssh_config(pubkey: bytes = pubkey, privkey: bytes = privkey) -> None:
                     paths = ContainerSSHFileWriter(self.work_dir, pubkey, privkey).write()
 
                     def chown_idfile(uid: int | None, gid: int | None) -> None:
@@ -1100,12 +1098,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                     if ouid is not None or ogid is not None:
                         chown_idfile(ouid, ogid)
-                    else:
-                        if KernelFeatures.UID_MATCH in self.kernel_features:
-                            chown_idfile(
-                                self.local_config.container.kernel_uid,
-                                self.local_config.container.kernel_gid,
-                            )
+                    elif KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_idfile(
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
+                        )
 
                 await run_in_executor_with_context(None, _populate_ssh_config)
 
@@ -1129,13 +1126,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 tmp.chmod(int(dotfile["perm"], 8))
             if ouid is not None or ogid is not None:
                 self._chown_paths_if_root(tmp_paths, ouid, ogid)
-            else:
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    self._chown_paths_if_root(
-                        tmp_paths,
-                        self.local_config.container.kernel_uid,
-                        self.local_config.container.kernel_gid,
-                    )
+            elif KernelFeatures.UID_MATCH in self.kernel_features:
+                self._chown_paths_if_root(
+                    tmp_paths,
+                    self.local_config.container.kernel_uid,
+                    self.local_config.container.kernel_gid,
+                )
 
         return DockerKernel(
             self.ownership_data,
@@ -2388,7 +2384,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if container_id is not None:
                 container = docker.containers.container(container_id)
 
-                async def log_iter() -> AsyncGenerator[bytes, None]:
+                async def log_iter() -> AsyncGenerator[bytes]:
                     it = container.log(
                         stdout=True,
                         stderr=True,
@@ -2488,7 +2484,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]

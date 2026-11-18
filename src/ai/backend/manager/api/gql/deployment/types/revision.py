@@ -87,6 +87,12 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder as RevisionOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ServiceArgumentInterpolationDelimiterInput as ServiceArgumentInterpolationDelimiterInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ServiceArgumentInterpolationInput as ServiceArgumentInterpolationInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload as ActivateRevisionPayloadDTO,
 )
@@ -111,7 +117,10 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
     RuntimeVariantPresetValueInfoDTO,
+    ServiceArgumentInterpolationDelimiterInfoDTO,
+    ServiceArgumentInterpolationInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -130,12 +139,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.image_federation import Image
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -227,7 +238,7 @@ class ResourceConfig:
         default=None,
     )
 
-    @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The resource group of this entity.")
     def resource_group(self) -> ResourceGroup | None:
         """Resolves the federated ResourceGroup."""
         # Federated ResourceGroupNode stub is a relay.Node; pass the inner id so Strawberry
@@ -247,7 +258,7 @@ class RuntimeVariantPresetValueGQL:
     preset_id: UUID = gql_field(description="The preset this value is bound to.")
     value: str = gql_field(description="Value bound to the preset.")
 
-    @gql_field(description="The runtime variant preset this value is bound to.")  # type: ignore[misc]
+    @gql_resolver(description="The runtime variant preset this value is bound to.")
     async def preset(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -287,12 +298,12 @@ class ModelRuntimeConfig:
         ),
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="The runtime variant referenced by this runtime config.",
         )
-    )  # type: ignore[misc]
+    )
     async def runtime_variant(
         self,
         info: Info[StrawberryGQLContext],
@@ -331,7 +342,7 @@ class ModelMountConfig:
         default=None,
     )
 
-    @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The vfolder of this entity.")
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         # Federated VirtualFolderNode stub is a relay.Node; pass the inner id so Strawberry
         # re-encodes the same global ID the graphene subgraph expects.
@@ -368,7 +379,7 @@ class ExtraVFolderMountInfoGQL:
         default=None,
     )
 
-    @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The vfolder of this entity.")
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         # Federated VirtualFolderNode stub is a relay.Node; pass the inner id so Strawberry
         # re-encodes the same global ID the graphene subgraph expects.
@@ -423,6 +434,33 @@ class ModelHealthCheckGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A pair of delimiters that marks a variable in the service arguments.",
+    ),
+    model=ServiceArgumentInterpolationDelimiterInfoDTO,
+    name="ServiceArgumentInterpolationDelimiter",
+)
+class ServiceArgumentInterpolationDelimiterGQL:
+    start: str = gql_field(description="Opening delimiter.")
+    end: str = gql_field(description="Closing delimiter.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Variable syntax of the service arguments of a model service.",
+    ),
+    model=ServiceArgumentInterpolationInfoDTO,
+    name="ServiceArgumentInterpolation",
+)
+class ServiceArgumentInterpolationGQL:
+    delimiters: list[ServiceArgumentInterpolationDelimiterGQL] = gql_field(
+        description="Delimiters that mark the variables to fill in the service arguments."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Service configuration for a model entry.",
     ),
@@ -456,6 +494,12 @@ class ModelServiceConfigGQL:
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
         default=None,
+    )
+    interpolation: ServiceArgumentInterpolationGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Variable syntax of the service arguments.",
+        ),
     )
 
 
@@ -592,21 +636,21 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
-    @gql_field(
+    @gql_resolver(
         description="The image of this entity.",
         deprecation_reason="Use image_v2 instead.",
-    )  # type: ignore[misc]
+    )
     async def image(self, info: Info[StrawberryGQLContext]) -> Image | None:
         # Federated ImageNode stub is a relay.Node; pass the inner id so Strawberry
         # re-encodes the same global ID the graphene subgraph expects.
         return Image(id=ID(str(UUID(str(self.image_id)))))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The container image used by this revision.",
         )
-    )  # type: ignore[misc]
+    )
     async def image_v2(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -620,7 +664,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
         return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
@@ -631,7 +675,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
                 "that predate this field."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def revision_preset(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -647,12 +691,12 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
             DeploymentPresetID(self.revision_preset_id)
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="The parent deployment owning this revision.",
         )
-    )  # type: ignore[misc]
+    )
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
@@ -660,12 +704,12 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
             DeploymentID(UUID(str(self.deployment_id)))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.2",
             description="Resource slot allocations for this revision.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],
@@ -1035,6 +1079,35 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="A pair of delimiters that marks a variable in the service arguments.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ServiceArgumentInterpolationDelimiterInput",
+)
+class ServiceArgumentInterpolationDelimiterInputGQL(
+    PydanticInputMixin[ServiceArgumentInterpolationDelimiterInputDTO]
+):
+    start: str = gql_field(description="Opening delimiter, e.g. `{{`.")
+    end: str = gql_field(description="Closing delimiter, e.g. `}}`.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Variable syntax of the service arguments of a model service.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ServiceArgumentInterpolationInput",
+)
+class ServiceArgumentInterpolationInputGQL(
+    PydanticInputMixin[ServiceArgumentInterpolationInputDTO]
+):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInputGQL] = gql_field(
+        description="Delimiters that mark the variables to fill in the service arguments."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Service configuration for a model, including startup command and health check.",
         added_version="26.4.0",
     ),
@@ -1071,6 +1144,16 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
     port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
+    )
+    interpolation: ServiceArgumentInterpolationInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Variable syntax of the service arguments. "
+                "Omit to inherit it; the default is `${{ }}` and `{ }`."
+            ),
+        ),
+        default=None,
     )
 
 

@@ -13,7 +13,7 @@ Declares what an entity search can filter and order by. A declaration holds SQL 
 |---|---|---|
 | `own` | The entity's own columns as `SearchableField(column, filter, order)`. Implements `RowDataConverter` to build data from a row | The entity's field cap |
 | `nested` | Rows of other tables the entity owns (labels, mount policies, dangling fields), readable under the entity's own permission. `NestedSearchableField(<other entry>.own, correlation)` | The entity's field cap (`labels.key`) |
-| `linked` | Connections to other entities (`MembershipConditions`, `UsageConditions`) | Scopes, the other entity's permission |
+| `linked` | Connections whose foreign key sits on the other entity (`MembershipConditions`, `UsageConditions`) | Scopes, the other entity's permission |
 
 - Every data field has a `SearchableField` of the same name, and `to_data` reads every value through `self.<name>.read(row)`. The data constructor requires every field, so a missing declaration fails mypy.
 - Row classes carry no `to_data` or similar method. Callers use `{Entity}SearchableFields.own.to_data(row)`.
@@ -154,7 +154,8 @@ Depth follows the permission axis, not the foreign keys.
 ## Usage between entities
 
 - A usage that is not ownership, such as a session using a vfolder, stays out of the ownership graph. It is decided from a table column.
-- Only a foreign key column counts as a usage. An id inside a JSON value does not. A key sitting on the searched row (`roles.role_preset_id`) is a usage too.
+- Only a foreign key column on the other entity's side counts as a usage. An id inside a JSON value does not.
+- A foreign key on the searched row (`roles.role_preset_id`) is an own filter, and one on an owned row a nested filter. A relation with a lifecycle condition stays a usage.
 - There is one bundle, usage, and two directions inside it.
 
 | Direction | Side searched | Narrowed by | Example |

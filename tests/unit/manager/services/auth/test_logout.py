@@ -34,6 +34,7 @@ class TestLogout:
         mock_hook_plugin_ctx: MagicMock,
         mock_config_provider: MagicMock,
         mock_user_repository: AsyncMock,
+        mock_auto_generated_file_repository: AsyncMock,
         mock_group_repository: AsyncMock,
         mock_client_ip_masking_repository: AsyncMock,
         mock_valkey_session_client: AsyncMock,
@@ -51,6 +52,7 @@ class TestLogout:
             key_provider_pool=KeyProviderPool(
                 providers=[], write_provider_type=KeyProviderType.PLAIN
             ),
+            auto_generated_file_repository=mock_auto_generated_file_repository,
         )
 
     @pytest.fixture

@@ -6,13 +6,19 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -57,7 +63,10 @@ def server_module_registries(
             ExportHandler(
                 export=export_processors,
                 domain=DomainProcessors(
-                    processor_registry.group(GroupMeta(DomainEntityType())), AsyncMock()
+                    processor_registry.group(GroupMeta(DomainEntityType())),
+                    processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+                    processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
+                    AsyncMock(),
                 ),
                 export_config=MagicMock(),
             ),

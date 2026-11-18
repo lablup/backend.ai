@@ -317,7 +317,7 @@ class AbstractKVStore(ABC):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         pass
 
     @abstractmethod
@@ -331,7 +331,7 @@ class AbstractKVStore(ABC):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         pass
 
 
@@ -885,7 +885,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
-    ) -> AsyncGenerator[tuple[str, str], None]:
+    ) -> AsyncGenerator[tuple[str, str]]:
         """Every key under one scope's prefix with its raw value, in key order, from one read."""
         scope_prefix = _slash(self._merge_scope_prefix_map(scope_prefix_map)[scope])
         mangled_prefix = self._mangle_key(f"{scope_prefix}{key_prefix}")
@@ -1121,7 +1121,7 @@ class AsyncEtcd(AbstractKVStore):
         once: bool,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         try:
             async with self._connect() as communicator:
                 iterator = iterator_factory(communicator)
@@ -1154,7 +1154,7 @@ class AsyncEtcd(AbstractKVStore):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -1211,7 +1211,7 @@ class AsyncEtcd(AbstractKVStore):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")

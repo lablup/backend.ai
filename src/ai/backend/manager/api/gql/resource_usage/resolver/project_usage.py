@@ -27,7 +27,7 @@ from ai.backend.manager.errors.auth import SuperadminRequired
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List project usage buckets (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_project_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: ProjectUsageBucketFilter | None = None,
@@ -76,7 +76,7 @@ async def admin_project_usage_buckets(
         added_version="26.1.0", description="List project usage buckets (superadmin only)."
     ),
     deprecation_reason="Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def project_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: ProjectUsageBucketFilter | None = None,
