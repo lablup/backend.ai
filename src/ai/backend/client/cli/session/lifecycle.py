@@ -1033,7 +1033,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 pbar.display(data["message"])
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
+                                completion_msg_func = lambda error_msg=error_msg: print_fail(
                                     f"Error during the operation: {error_msg}",
                                 )
                             case BgtaskStatus.CANCELLED:
@@ -1046,7 +1046,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 if errors:
                                     for error in errors:
                                         print_fail(f"Error reported: {error}")
-                                    completion_msg_func = lambda: print_warn(
+                                    completion_msg_func = lambda errors=errors: print_warn(
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:

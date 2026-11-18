@@ -170,7 +170,6 @@ ignore = [
     "B010",  # set-attr-with-constant - setattr with constant needed for mypy compatibility on dynamic attributes
     "B012",  # return-in-finally - intentional pattern in some response handlers
     "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
-    "B023",  # function-uses-loop-variable - many false positives with for-else, nested functions
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
