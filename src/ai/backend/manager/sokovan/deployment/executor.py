@@ -210,12 +210,17 @@ class DeploymentExecutor:
                 await self._build_endpoint_item(dep.deployment_info, rev)
                 for dep, rev, _ in group_entries
             ]
+<<<<<<< HEAD
         except BaseException as exc:
             log.error(
                 "Failed to build endpoint items for proxy {}: {}",
                 addr,
                 exc,
             )
+=======
+        except Exception as exc:
+            log.error("endpoint item build failed", proxy_address=addr, exc_info=exc)
+>>>>>>> 69820641 (fix(BAI-777): propagate cancellation in deployment executor bulk endpoint handling (#17181))
             for deployment, _, _ in group_entries:
                 failures.append(
                     DeploymentExecutionError(
@@ -232,12 +237,17 @@ class DeploymentExecutor:
             response = await client.create_endpoints_bulk(
                 BulkCreateEndpointRequest(endpoints=items)
             )
+<<<<<<< HEAD
         except BaseException as exc:
             log.error(
                 "Bulk endpoint create failed against proxy {}: {}",
                 addr,
                 exc,
             )
+=======
+        except Exception as exc:
+            log.warning("bulk endpoint creation failed", proxy_address=addr, exc_info=exc)
+>>>>>>> 69820641 (fix(BAI-777): propagate cancellation in deployment executor bulk endpoint handling (#17181))
             for deployment, _, _ in group_entries:
                 failures.append(
                     DeploymentExecutionError(
@@ -254,12 +264,17 @@ class DeploymentExecutor:
             dep_id = deployment.deployment_info.id
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
+<<<<<<< HEAD
             except BaseException as exc:
                 log.error(
                     "Failed to persist endpoint URL for deployment {}: {}",
                     dep_id,
                     exc,
                 )
+=======
+            except Exception as exc:
+                log.error("endpoint URL not persisted", deployment_id=dep_id, exc_info=exc)
+>>>>>>> 69820641 (fix(BAI-777): propagate cancellation in deployment executor bulk endpoint handling (#17181))
                 failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
@@ -434,8 +449,13 @@ class DeploymentExecutor:
         )
         try:
             response = await client.delete_endpoints_bulk(request)
+<<<<<<< HEAD
         except BaseException as exc:
             log.warning("Bulk endpoint delete failed against proxy {}: {}", addr, exc)
+=======
+        except Exception as exc:
+            log.warning("bulk endpoint deletion failed", proxy_address=addr, exc_info=exc)
+>>>>>>> 69820641 (fix(BAI-777): propagate cancellation in deployment executor bulk endpoint handling (#17181))
             for deployment in group:
                 errors.append(
                     DeploymentExecutionError(
