@@ -2149,7 +2149,7 @@
         "type": "object"
       },
       "ArtifactAvailability": {
-        "description": "Artifact's availability.",
+        "description": "Availability of an artifact.",
         "enum": [
           "ALIVE",
           "DELETED"
@@ -2295,6 +2295,7 @@
         "type": "object"
       },
       "ArtifactOrderField": {
+        "description": "Fields available for ordering artifacts.\n\n``SIZE`` is deprecated since 26.9.0: a size belongs to a revision rather than the\nartifact, so the value is not used for ordering. It is removed in the next release.",
         "enum": [
           "NAME",
           "TYPE",
@@ -2306,6 +2307,7 @@
         "type": "string"
       },
       "ArtifactType": {
+        "description": "Type of artifact.",
         "enum": [
           "MODEL",
           "PACKAGE",
@@ -45505,7 +45507,8 @@
         "title": "HarborWebhookRequestModel",
         "type": "object"
       },
-      "CleanupArtifactsReq": {
+      "CleanupRevisionsRequest": {
+        "description": "Request to clean up artifact revision data.",
         "properties": {
           "artifact_revision_ids": {
             "description": "List of artifact revision IDs to cleanup.",
@@ -45520,10 +45523,11 @@
         "required": [
           "artifact_revision_ids"
         ],
-        "title": "CleanupArtifactsReq",
+        "title": "CleanupRevisionsRequest",
         "type": "object"
       },
-      "CancelImportArtifactReq": {
+      "CancelImportTaskRequest": {
+        "description": "Request to cancel an in-progress artifact import task.",
         "properties": {
           "artifact_revision_id": {
             "description": "The artifact revision ID to cancel import.",
@@ -45535,7 +45539,7 @@
         "required": [
           "artifact_revision_id"
         ],
-        "title": "CancelImportArtifactReq",
+        "title": "CancelImportTaskRequest",
         "type": "object"
       },
       "ImportArtifactsOptions": {
@@ -45551,7 +45555,8 @@
         "title": "ImportArtifactsOptions",
         "type": "object"
       },
-      "ImportArtifactsReq": {
+      "ImportArtifactsRequest": {
+        "description": "Request to import scanned artifact revisions from external registries.",
         "properties": {
           "artifact_revision_ids": {
             "description": "List of artifact revision IDs to import.",
@@ -45577,17 +45582,26 @@
             "title": "Vfolder Id"
           },
           "options": {
-            "$ref": "#/components/schemas/ImportArtifactsOptions",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportArtifactsOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Options controlling import behavior such as forcing re-download."
           }
         },
         "required": [
           "artifact_revision_ids"
         ],
-        "title": "ImportArtifactsReq",
+        "title": "ImportArtifactsRequest",
         "type": "object"
       },
-      "UpdateArtifactReqBodyParam": {
+      "UpdateArtifactRequest": {
+        "description": "Request to update artifact metadata.",
         "properties": {
           "readonly": {
             "anyOf": [
@@ -45612,11 +45626,11 @@
               }
             ],
             "default": null,
-            "description": "Updated description",
+            "description": "Updated description.",
             "title": "Description"
           }
         },
-        "title": "UpdateArtifactReqBodyParam",
+        "title": "UpdateArtifactRequest",
         "type": "object"
       },
       "ModelSortKey": {
@@ -45630,7 +45644,8 @@
         "title": "ModelSortKey",
         "type": "string"
       },
-      "ScanArtifactsReq": {
+      "ScanArtifactsRequest": {
+        "description": "Request body for scanning external registries.",
         "properties": {
           "registry_id": {
             "anyOf": [
@@ -45655,7 +45670,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Artifact type filter"
           },
           "limit": {
             "description": "Maximum number of artifacts to scan (max: 500)",
@@ -45672,7 +45688,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Sort order key"
           },
           "search": {
             "anyOf": [
@@ -45684,23 +45701,27 @@
               }
             ],
             "default": null,
+            "description": "Search query string",
             "title": "Search"
           }
         },
         "required": [
           "limit"
         ],
-        "title": "ScanArtifactsReq",
+        "title": "ScanArtifactsRequest",
         "type": "object"
       },
-      "DelegateeTarget": {
+      "DelegateeTargetInput": {
+        "description": "Target reservoir for delegation operations.",
         "properties": {
           "delegatee_reservoir_id": {
+            "description": "ID of the delegatee reservoir",
             "format": "uuid",
             "title": "Delegatee Reservoir Id",
             "type": "string"
           },
           "target_registry_id": {
+            "description": "ID of the target registry",
             "format": "uuid",
             "title": "Target Registry Id",
             "type": "string"
@@ -45710,10 +45731,11 @@
           "delegatee_reservoir_id",
           "target_registry_id"
         ],
-        "title": "DelegateeTarget",
+        "title": "DelegateeTargetInput",
         "type": "object"
       },
-      "DelegateScanArtifactsReq": {
+      "DelegateScanArtifactsRequest": {
+        "description": "Request body for scanning with delegation.",
         "properties": {
           "delegator_reservoir_id": {
             "anyOf": [
@@ -45732,14 +45754,14 @@
           "delegatee_target": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DelegateeTarget"
+                "$ref": "#/components/schemas/DelegateeTargetInput"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "The unique identifier of the target reservoir to delegate the scan."
+            "description": "The target reservoir to delegate the scan."
           },
           "artifact_type": {
             "anyOf": [
@@ -45750,7 +45772,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Artifact type filter"
           },
           "limit": {
             "description": "Maximum number of artifacts to scan (max: 500)",
@@ -45767,7 +45790,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Sort order key"
           },
           "search": {
             "anyOf": [
@@ -45779,16 +45803,31 @@
               }
             ],
             "default": null,
+            "description": "Search query string",
             "title": "Search"
           }
         },
         "required": [
           "limit"
         ],
-        "title": "DelegateScanArtifactsReq",
+        "title": "DelegateScanArtifactsRequest",
         "type": "object"
       },
-      "DelegateImportArtifactsReq": {
+      "ImportArtifactsOptionsInput": {
+        "description": "Options for importing artifact revisions.",
+        "properties": {
+          "force": {
+            "default": false,
+            "description": "Force re-download regardless of digest freshness check.",
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "title": "ImportArtifactsOptionsInput",
+        "type": "object"
+      },
+      "DelegateImportArtifactsRequest": {
+        "description": "Request body for importing artifacts with delegation.",
         "properties": {
           "artifact_revision_ids": {
             "description": "List of artifact revision IDs to delegate the import request.",
@@ -45816,13 +45855,14 @@
           "delegatee_target": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DelegateeTarget"
+                "$ref": "#/components/schemas/DelegateeTargetInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "The target reservoir to delegate the import."
           },
           "artifact_type": {
             "anyOf": [
@@ -45832,21 +45872,22 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "default": null,
+            "description": "Artifact type filter"
           },
           "options": {
-            "$ref": "#/components/schemas/ImportArtifactsOptions",
+            "$ref": "#/components/schemas/ImportArtifactsOptionsInput",
             "description": "Options controlling import behavior such as forcing re-download."
           }
         },
         "required": [
-          "artifact_revision_ids",
-          "artifact_type"
+          "artifact_revision_ids"
         ],
-        "title": "DelegateImportArtifactsReq",
+        "title": "DelegateImportArtifactsRequest",
         "type": "object"
       },
-      "ArtifactFilterOptions": {
+      "ArtifactFilterInput": {
         "description": "Filtering options for artifacts.",
         "properties": {
           "artifact_type": {
@@ -45862,40 +45903,44 @@
               }
             ],
             "default": null,
+            "description": "Filter by artifact type(s)",
             "title": "Artifact Type"
           },
           "name_filter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilterData"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by name"
           },
           "registry_filter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilterData"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by registry name"
           },
           "source_filter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilterData"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by source name"
           },
           "registry_id": {
             "anyOf": [
@@ -45908,6 +45953,7 @@
               }
             ],
             "default": null,
+            "description": "Filter by registry ID",
             "title": "Registry Id"
           },
           "registry_type": {
@@ -45919,7 +45965,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by registry type"
           },
           "source_registry_id": {
             "anyOf": [
@@ -45932,6 +45979,7 @@
               }
             ],
             "default": null,
+            "description": "Filter by source registry ID",
             "title": "Source Registry Id"
           },
           "source_registry_type": {
@@ -45943,7 +45991,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by source registry type"
           },
           "availability": {
             "anyOf": [
@@ -45958,13 +46007,14 @@
               }
             ],
             "default": null,
+            "description": "Filter by availability status",
             "title": "Availability"
           },
           "AND": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/ArtifactFilterOptions"
+                  "$ref": "#/components/schemas/ArtifactFilterInput"
                 },
                 "type": "array"
               },
@@ -45973,13 +46023,14 @@
               }
             ],
             "default": null,
+            "description": "AND filter group",
             "title": "And"
           },
           "OR": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/ArtifactFilterOptions"
+                  "$ref": "#/components/schemas/ArtifactFilterInput"
                 },
                 "type": "array"
               },
@@ -45988,13 +46039,14 @@
               }
             ],
             "default": null,
+            "description": "OR filter group",
             "title": "Or"
           },
           "NOT": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/ArtifactFilterOptions"
+                  "$ref": "#/components/schemas/ArtifactFilterInput"
                 },
                 "type": "array"
               },
@@ -46003,16 +46055,18 @@
               }
             ],
             "default": null,
+            "description": "NOT filter group",
             "title": "Not"
           }
         },
-        "title": "ArtifactFilterOptions",
+        "title": "ArtifactFilterInput",
         "type": "object"
       },
-      "ArtifactOrderingOptions": {
+      "ArtifactOrderingInput": {
         "description": "Ordering options for artifact queries.",
         "properties": {
           "order_by": {
+            "description": "List of (field, descending) tuples",
             "items": {
               "maxItems": 2,
               "minItems": 2,
@@ -46030,7 +46084,7 @@
             "type": "array"
           }
         },
-        "title": "ArtifactOrderingOptions",
+        "title": "ArtifactOrderingInput",
         "type": "object"
       },
       "ArtifactRegistryType": {
@@ -46041,7 +46095,7 @@
         "title": "ArtifactRegistryType",
         "type": "string"
       },
-      "BackwardPaginationOptions": {
+      "BackwardPaginationInput": {
         "description": "Backward pagination: fetch items before a given cursor.",
         "properties": {
           "before": {
@@ -46054,6 +46108,7 @@
               }
             ],
             "default": null,
+            "description": "Cursor to start before",
             "title": "Before"
           },
           "last": {
@@ -46066,13 +46121,14 @@
               }
             ],
             "default": null,
+            "description": "Number of items to fetch",
             "title": "Last"
           }
         },
-        "title": "BackwardPaginationOptions",
+        "title": "BackwardPaginationInput",
         "type": "object"
       },
-      "ForwardPaginationOptions": {
+      "ForwardPaginationInput": {
         "description": "Forward pagination: fetch items after a given cursor.",
         "properties": {
           "after": {
@@ -46085,6 +46141,7 @@
               }
             ],
             "default": null,
+            "description": "Cursor to start after",
             "title": "After"
           },
           "first": {
@@ -46097,13 +46154,14 @@
               }
             ],
             "default": null,
+            "description": "Number of items to fetch",
             "title": "First"
           }
         },
-        "title": "ForwardPaginationOptions",
+        "title": "ForwardPaginationInput",
         "type": "object"
       },
-      "OffsetBasedPaginationOptions": {
+      "OffsetPaginationInput": {
         "description": "Standard offset/limit pagination options.",
         "properties": {
           "offset": {
@@ -46116,6 +46174,7 @@
               }
             ],
             "default": null,
+            "description": "Number of items to skip",
             "title": "Offset"
           },
           "limit": {
@@ -46128,210 +46187,92 @@
               }
             ],
             "default": null,
+            "description": "Maximum items to return",
             "title": "Limit"
           }
         },
-        "title": "OffsetBasedPaginationOptions",
+        "title": "OffsetPaginationInput",
         "type": "object"
       },
-      "PaginationOptions": {
+      "PaginationInput": {
+        "description": "Pagination options supporting cursor-based and offset-based pagination.",
         "properties": {
           "forward": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ForwardPaginationOptions"
+                "$ref": "#/components/schemas/ForwardPaginationInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Forward cursor-based pagination"
           },
           "backward": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BackwardPaginationOptions"
+                "$ref": "#/components/schemas/BackwardPaginationInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Backward cursor-based pagination"
           },
           "offset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OffsetBasedPaginationOptions"
+                "$ref": "#/components/schemas/OffsetPaginationInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Offset-based pagination"
           }
         },
-        "title": "PaginationOptions",
+        "title": "PaginationInput",
         "type": "object"
       },
-      "StringFilterData": {
-        "description": "Data class that corresponds 1:1 with StringFilter for API requests.",
-        "properties": {
-          "contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Contains"
-          },
-          "starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Starts With"
-          },
-          "ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Ends With"
-          },
-          "equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Equals"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not Equals"
-          },
-          "i_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "I Contains"
-          },
-          "i_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "I Starts With"
-          },
-          "i_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "I Ends With"
-          },
-          "i_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "I Equals"
-          },
-          "i_not_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "I Not Equals"
-          }
-        },
-        "title": "StringFilterData",
-        "type": "object"
-      },
-      "SearchArtifactsReq": {
+      "SearchArtifactsRequest": {
+        "description": "Request body for searching registered artifacts.",
         "properties": {
           "pagination": {
-            "$ref": "#/components/schemas/PaginationOptions"
+            "$ref": "#/components/schemas/PaginationInput",
+            "description": "Pagination options"
           },
           "ordering": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ArtifactOrderingOptions"
+                "$ref": "#/components/schemas/ArtifactOrderingInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Ordering options"
           },
           "filters": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ArtifactFilterOptions"
+                "$ref": "#/components/schemas/ArtifactFilterInput"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter options"
           }
         },
         "required": [
           "pagination"
         ],
-        "title": "SearchArtifactsReq",
+        "title": "SearchArtifactsRequest",
         "type": "object"
       },
       "ModelTarget": {
@@ -46371,7 +46312,8 @@
         "title": "ModelTarget",
         "type": "object"
       },
-      "ScanArtifactModelsReq": {
+      "ScanArtifactModelsRequest": {
+        "description": "Request body for batch scanning models.",
         "properties": {
           "models": {
             "description": "List of models to scan from the registry.",
@@ -46399,7 +46341,7 @@
         "required": [
           "models"
         ],
-        "title": "ScanArtifactModelsReq",
+        "title": "ScanArtifactModelsRequest",
         "type": "object"
       },
       "GetConfigRequest": {
@@ -71817,7 +71759,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CleanupArtifactsReq"
+                "$ref": "#/components/schemas/CleanupRevisionsRequest"
               }
             }
           }
@@ -71904,7 +71846,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CancelImportArtifactReq"
+                "$ref": "#/components/schemas/CancelImportTaskRequest"
               }
             }
           }
@@ -71933,7 +71875,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportArtifactsReq"
+                "$ref": "#/components/schemas/ImportArtifactsRequest"
               }
             }
           }
@@ -71962,7 +71904,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateArtifactReqBodyParam"
+                "$ref": "#/components/schemas/UpdateArtifactRequest"
               }
             }
           }
@@ -72087,7 +72029,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScanArtifactsReq"
+                "$ref": "#/components/schemas/ScanArtifactsRequest"
               }
             }
           }
@@ -72116,7 +72058,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DelegateScanArtifactsReq"
+                "$ref": "#/components/schemas/DelegateScanArtifactsRequest"
               }
             }
           }
@@ -72145,7 +72087,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DelegateImportArtifactsReq"
+                "$ref": "#/components/schemas/DelegateImportArtifactsRequest"
               }
             }
           }
@@ -72174,7 +72116,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SearchArtifactsReq"
+                "$ref": "#/components/schemas/SearchArtifactsRequest"
               }
             }
           }
@@ -72268,7 +72210,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScanArtifactModelsReq"
+                "$ref": "#/components/schemas/ScanArtifactModelsRequest"
               }
             }
           }
