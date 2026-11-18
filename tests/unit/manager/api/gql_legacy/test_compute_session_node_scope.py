@@ -61,8 +61,12 @@ class TestComputeSessionNodeScopeCondition:
         return AsyncMock()
 
     @pytest.fixture
+    def enforcement_enabled(self) -> bool:
+        return True
+
+    @pytest.fixture
     def make_info(
-        self, db_session: MagicMock, held_permissions: AsyncMock
+        self, db_session: MagicMock, held_permissions: AsyncMock, enforcement_enabled: bool
     ) -> Callable[[UserRole], graphene.ResolveInfo]:
         def _make(role: UserRole) -> graphene.ResolveInfo:
             ctx = MagicMock()
@@ -75,6 +79,7 @@ class TestComputeSessionNodeScopeCondition:
             )
             ctx.scheduler_repository.get_domain_id_by_name = AsyncMock(return_value=_DOMAIN_ID)
             ctx.processors.permission_controller.scoped_get_held_permissions.run = held_permissions
+            ctx.config_provider.config.manager.rbac.enforcement_enabled = enforcement_enabled
             info = MagicMock(spec=graphene.ResolveInfo)
             info.context = ctx
             return info
@@ -197,6 +202,24 @@ class TestComputeSessionNodeScopeCondition:
         await self._where(make_info, db_session, UserRole.ADMIN, DomainScope("default"))
 
         held_permissions.assert_awaited_once()
+
+    @pytest.mark.parametrize("enforcement_enabled", [False])
+    @pytest.mark.parametrize(
+        ("role", "role_bound"),
+        [(UserRole.ADMIN, "default"), (UserRole.USER, _CALLER_ID)],
+        ids=["admin-within-domain", "user-own-sessions"],
+    )
+    async def test_with_enforcement_off_the_role_bounds_the_scope(
+        self,
+        make_info: Callable[[UserRole], graphene.ResolveInfo],
+        db_session: MagicMock,
+        role: UserRole,
+        role_bound: object,
+    ) -> None:
+        where = await self._where(make_info, db_session, role, ProjectScope(_PROJECT_ID))
+
+        assert _PROJECT_ID in _bound_values(where)
+        assert role_bound in _bound_values(where)
 
     async def test_a_permission_other_than_read_attribute_reads_no_session(
         self,

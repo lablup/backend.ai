@@ -770,7 +770,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> sa.ColumnElement[bool]:
         """The sessions the caller may read within `scope_id`, by the new RBAC.
 
-        Without READ on the scope, the caller still reads their own sessions in it.
+        Without READ on the scope, only their own sessions in it; with enforcement off, their role.
         """
         user = graph_ctx.user
         is_superadmin = user["role"] == UserRole.SUPERADMIN
@@ -797,6 +797,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         scope_cond = target.to_condition()()
         if is_superadmin:
             return scope_cond
+        if not graph_ctx.config_provider.config.manager.rbac.enforcement_enabled:
+            return scope_cond & ComputeSessionNode._visible_to(user)
         caller_id = UserID(user["uuid"])
         own = UserSessionTarget(user_id=caller_id)
         keys = [
