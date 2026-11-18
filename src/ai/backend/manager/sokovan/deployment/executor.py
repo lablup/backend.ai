@@ -220,7 +220,7 @@ class DeploymentExecutor:
                 for dep, rev, _ in group_entries
             ]
         except Exception as exc:
-            log.error("endpoint item build failed", proxy_address=addr, exc_info=exc)
+            log.exception("endpoint item build failed", proxy_address=addr)
             for deployment, _, _ in group_entries:
                 failures.append(
                     DeploymentExecutionError(
@@ -256,7 +256,7 @@ class DeploymentExecutor:
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
             except Exception as exc:
-                log.error("endpoint URL not persisted", deployment_id=dep_id, exc_info=exc)
+                log.exception("endpoint URL not persisted", deployment_id=dep_id)
                 failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,

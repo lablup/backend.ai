@@ -1006,7 +1006,7 @@ async def scan_gpu_alloc_map(
             alloc_map = await task
         except Exception as e:
             kernel_id = getattr(e, "kernel_id", "(unknown)")
-            log.error("gpu alloc map scan failed", exc_info=e, kernel_id=str(kernel_id))
+            log.exception("gpu alloc map scan failed", kernel_id=str(kernel_id))
             break
 
         for device_id, alloc in alloc_map.items():
