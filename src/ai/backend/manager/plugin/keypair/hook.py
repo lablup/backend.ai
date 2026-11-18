@@ -22,7 +22,7 @@ from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
 from ai.backend.manager.models.user.queriers import AuthorizingUserQuerier
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 
-from .utils import deserialize_stoken, has_access_key_claim
+from .utils import deserialize_stoken
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -143,9 +143,6 @@ class KeypairAuthHookPlugin(HookPlugin):
 
         stoken = params[auth_token_name]
         if stoken:
-            if self.parse_token(stoken) is None and not has_access_key_claim(stoken):
-                # Not a keypair sToken; the next AUTHORIZE hook (e.g. openid) handles it.
-                return None
             try:
                 payload = deserialize_stoken(stoken, self._config.secret)
                 owner = await auth_repository.lookup(
