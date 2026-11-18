@@ -85,7 +85,7 @@
 | `GenericBadRequest` | 요청 자체(지원하지 않는 API version, 알 수 없는 scheduler operation, 빠뜨린 parameter)이거나 이미 있는 Harbor quota 다 |
 | `GenericForbidden` | 모든 지점이 호출자를 거부하고("only authorized requests", "not the account owner") row 가 아니다 |
 | `Forbidden` | 모든 지점이 vfolder 에 대한 것이지만 `ErrorOperation.ACCESS` 를 보고하고 여기에는 대응하는 `ActionOperationType` 이 없으며, WebUI 가 `vfolder_access_forbidden` 으로 분기한다 |
-| `RejectedByHook` | plugin hook 의 응답이고, `AGENTS.md` 표에서 `plugin` 은 system 도메인이다 |
+| `RejectedByHook`, `HookHandlerFailed` | plugin hook 의 응답이나 실패이고, `AGENTS.md` 표에서 `plugin` 은 system 도메인이다 |
 | `InternalServerError`, `ServerMisconfiguredError`, `ServiceUnavailable` | manager 자신이다 |
 | `RepositoryError`, `UpsertEmptyResultError`, `UnsupportedCompositePrimaryKeyError`, `EmptyOperationScopeError`, `AmbiguousEntityKeyError` | 제네릭 ops 가 만나는 schema 나 invariant 결함이다. 유일하지 않은 key, composite primary key, 빈 scope, row 를 반환하지 않은 upsert. row 종류는 조회 시점에 알 수 있지만 실패한 것은 key 다 |
 | `RepositoryIntegrityError` 와 그 다섯 SQLSTATE 종류 | `IntegrityErrorCheck` 가 `violation_type` 으로 대응하는 값이고, row 를 향하는 에러는 그 검사의 `error` 다 |

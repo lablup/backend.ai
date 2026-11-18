@@ -110,7 +110,7 @@ one place per domain.
 | `GenericBadRequest` | the request itself (an unsupported API version, an unknown scheduler operation, a parameter left out) or a Harbor quota that already exists |
 | `GenericForbidden` | every site rejects the caller ("only authorized requests", "not the account owner"), not a row |
 | `Forbidden` | every site is about a vfolder, but it reports `ErrorOperation.ACCESS`, which no `ActionOperationType` maps to, and the WebUI branches on `vfolder_access_forbidden` |
-| `RejectedByHook` | a plugin hook's answer; `plugin` is a system domain by the `AGENTS.md` table |
+| `RejectedByHook`, `HookHandlerFailed` | a plugin hook's answer or failure; `plugin` is a system domain by the `AGENTS.md` table |
 | `InternalServerError`, `ServerMisconfiguredError`, `ServiceUnavailable` | the manager itself |
 | `RepositoryError`, `UpsertEmptyResultError`, `UnsupportedCompositePrimaryKeyError`, `EmptyOperationScopeError`, `AmbiguousEntityKeyError` | a schema or invariant fault the generic ops hit: a key that is not unique, a composite primary key, an empty scope, an upsert that returned no row. The row's kind is at hand in the lookup, but what failed is the key |
 | `RepositoryIntegrityError` and its five SQLSTATE kinds | what an `IntegrityErrorCheck` matches on by `violation_type`; the row-facing error is the check's `error` |

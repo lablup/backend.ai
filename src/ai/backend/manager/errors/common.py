@@ -105,6 +105,30 @@ class RejectedByHook(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class HookHandlerFailed(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a hook plugin handler raises an unexpected exception during dispatch."""
+
+    error_type = "https://api.backend.ai/probs/hook-handler-failed"
+    error_title = "A hook plugin handler failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.HOOK,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+    @classmethod
+    def from_hook_result(cls, result: HookResult) -> HookHandlerFailed:
+        return cls(
+            extra_msg=result.reason,
+            extra_data={
+                "plugins": result.src_plugin,
+            },
+        )
+
+
 class MethodNotAllowed(BackendAIError, web.HTTPMethodNotAllowed):
     error_type = "https://api.backend.ai/probs/method-not-allowed"
     error_title = "HTTP Method Not Allowed."

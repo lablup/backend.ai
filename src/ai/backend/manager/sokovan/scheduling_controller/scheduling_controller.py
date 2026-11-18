@@ -17,7 +17,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED
+from ai.backend.common.plugin.hook import ALL_COMPLETED, ERROR, PASSED
 from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.types import (
     ArchName,
@@ -44,7 +44,7 @@ from ai.backend.manager.data.session.spec import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import verify_mount_destination
-from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
+from ai.backend.manager.errors.common import HookHandlerFailed, InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
@@ -339,6 +339,8 @@ class SchedulingController:
             (),
             return_when=ALL_COMPLETED,
         )
+        if hook_result.status == ERROR:
+            raise HookHandlerFailed.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
