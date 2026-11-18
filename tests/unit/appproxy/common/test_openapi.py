@@ -10,13 +10,15 @@ import pytest
 from aiohttp import web
 from click.testing import CliRunner
 
-from ai.backend.appproxy.common.openapi import generate_openapi
+from ai.backend.appproxy.common.openapi import AppProxyOpenAPISpecGenerator
 from ai.backend.appproxy.common.types import PydanticResponse
+from ai.backend.appproxy.common.utils import set_handler_attr
 from ai.backend.appproxy.coordinator.cli.__main__ import main as coordinator_cli
 from ai.backend.appproxy.worker.cli.__main__ import main as worker_cli
 from ai.backend.common.types import BackendAISchema
 
 _ITEM_SCHEMA_REF = "#/components/schemas/_ItemResponseModel"
+_ITEM_LIST_SCHEMA_REF = "#/components/schemas/_ItemResponseModel_List"
 
 
 class _ItemResponseModel(BackendAISchema):
@@ -37,13 +39,20 @@ async def _get_item_or_plain_response(
     return web.Response()
 
 
+async def _deprecated_handler(_request: web.Request) -> web.Response:
+    return web.Response()
+
+
+set_handler_attr(_deprecated_handler, "deprecated", True)
+
+
 @dataclass(frozen=True)
 class _ResponseSchemaCase:
     handler: Callable[[web.Request], Awaitable[Any]]
     expected_schema: dict[str, Any]
 
 
-class TestGenerateOpenAPIResponseSchema:
+class TestAppProxyOpenAPISpecGeneratorResponseSchema:
     @pytest.fixture
     def app_serving_handler_of_case(self, case: _ResponseSchemaCase) -> web.Application:
         app = web.Application()
@@ -56,7 +65,7 @@ class TestGenerateOpenAPIResponseSchema:
         [
             _ResponseSchemaCase(
                 handler=_list_items,
-                expected_schema={"type": "array", "items": {"$ref": _ITEM_SCHEMA_REF}},
+                expected_schema={"$ref": _ITEM_LIST_SCHEMA_REF},
             ),
             _ResponseSchemaCase(
                 handler=_get_item,
@@ -69,14 +78,29 @@ class TestGenerateOpenAPIResponseSchema:
         ],
         ids=lambda case: case.handler.__name__,
     )
-    def test_response_schema_refers_to_the_registered_model(
+    def test_response_schema_refers_to_the_pydantic_response_model(
         self, app_serving_handler_of_case: web.Application, case: _ResponseSchemaCase
     ) -> None:
-        spec = generate_openapi("Test", [app_serving_handler_of_case])
+        spec = AppProxyOpenAPISpecGenerator("Test").generate([app_serving_handler_of_case])
 
         response = spec["paths"]["/items"]["get"]["responses"]["200"]
         assert response["content"]["application/json"]["schema"] == case.expected_schema
-        assert "_ItemResponseModel" in spec["components"]["schemas"]
+
+
+class TestAppProxyOpenAPISpecGeneratorDeprecation:
+    @pytest.fixture
+    def app_serving_deprecated_handler(self) -> web.Application:
+        app = web.Application()
+        app["prefix"] = "items"
+        app.router.add_get("", _deprecated_handler)
+        return app
+
+    def test_deprecated_handler_marks_the_operation_deprecated(
+        self, app_serving_deprecated_handler: web.Application
+    ) -> None:
+        spec = AppProxyOpenAPISpecGenerator("Test").generate([app_serving_deprecated_handler])
+
+        assert spec["paths"]["/items"]["get"]["deprecated"] is True
 
 
 @dataclass(frozen=True)
@@ -109,4 +133,4 @@ class TestGenerateOpenAPISpecCommand:
         assert result.exit_code == 0, result.output
         spec = json.loads(result.stdout)
         response = spec["paths"][list_handler_path]["get"]["responses"]["200"]
-        assert response["content"]["application/json"]["schema"]["type"] == "array"
+        assert response["content"]["application/json"]["schema"]["$ref"].endswith("_List")

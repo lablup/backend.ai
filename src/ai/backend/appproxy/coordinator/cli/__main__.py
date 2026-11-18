@@ -101,7 +101,7 @@ async def _generate() -> dict[str, Any]:
     import aiohttp_cors
     from aiohttp import web
 
-    from ai.backend.appproxy.common.openapi import generate_openapi
+    from ai.backend.appproxy.common.openapi import AppProxyOpenAPISpecGenerator
     from ai.backend.appproxy.coordinator.server import global_subapp_pkgs
 
     cors_options = {
@@ -115,7 +115,7 @@ async def _generate() -> dict[str, Any]:
         pkg = importlib.import_module("ai.backend.appproxy.coordinator.api" + subapp)
         app, _ = pkg.create_app(cors_options)
         subapps.append(app)
-    return generate_openapi("Proxy Coordinator", subapps, verbose=True)
+    return AppProxyOpenAPISpecGenerator("Proxy Coordinator").generate(subapps, verbose=True)
 
 
 @main.command()

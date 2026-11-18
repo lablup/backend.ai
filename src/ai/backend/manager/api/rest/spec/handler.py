@@ -16,7 +16,7 @@ from aiohttp import web
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.openapi import generate_openapi
+from ai.backend.manager.openapi import ManagerOpenAPISpecGenerator
 
 if TYPE_CHECKING:
     from aiohttp.web import Application
@@ -179,4 +179,4 @@ class SpecHandler:
     ) -> web.StreamResponse:
         if not self._config_provider.config.api.allow_openapi_schema_introspection:
             raise GenericForbidden
-        return web.json_response(generate_openapi(self._root_app._subapps))
+        return web.json_response(ManagerOpenAPISpecGenerator().generate(self._root_app._subapps))
