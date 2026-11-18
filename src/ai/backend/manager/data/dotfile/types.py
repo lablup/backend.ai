@@ -66,11 +66,16 @@ class DotfileEntries:
     @classmethod
     def verify_packed(cls, packed: bytes) -> None:
         try:
-            cls.unpack(packed).verify_paths()
+            entries = cls.unpack(packed)
+            entries.verify_paths()
         except (ValueError, TypeError, KeyError) as e:
             raise InvalidAPIParameters(
                 "dotfiles must be a msgpack list of path, perm and data entries."
             ) from e
+        if len(entries.entries) > MAXIMUM_DOTFILE_COUNT:
+            raise InvalidAPIParameters(
+                f"dotfiles may hold at most {MAXIMUM_DOTFILE_COUNT} entries."
+            )
 
     def verify_paths(self) -> None:
         for entry in self.entries:
