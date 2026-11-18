@@ -1425,9 +1425,7 @@ class ManagerConfig(BaseConfigSchema):
     @classmethod
     def _parse_rpc_auth_manager_keypair(cls, v: str) -> str:
         if not Path(v).exists():
-            log.warning(
-                f'RPC authentication keypair file does not exist: "{v}".',
-            )
+            log.warning('RPC authentication keypair file does not exist: "{}".', v)
         return v
 
 

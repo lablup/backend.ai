@@ -1448,6 +1448,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
 
+    @staticmethod
     async def resolve_agent_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3264,6 +3265,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             last,
         )
 
+    @staticmethod
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3397,7 +3399,9 @@ class GQLMutationPrivilegeCheckMiddleware:
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
                 if _is_legacy_mutation(mutation_cls):
-                    return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                    return cast(Any, mutation_cls)(
+                        False, f"no permission to execute {info.path.key}"
+                    )
                 raise PermissionDeniedError()
         return next(root, info, **args)
 

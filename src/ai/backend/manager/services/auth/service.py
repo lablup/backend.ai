@@ -689,10 +689,9 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        log_fmt = "AUTH.UPDATE_PASSWORD(d:{}, email:{})"
         log_args = (domain_name, email)
         if action.new_password != action.new_password_confirm:
-            log.info(log_fmt + ": new password mismtach", *log_args)
+            log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{}): new password mismtach", *log_args)
             return UpdatePasswordActionResult(
                 success=False,
                 message="new password mismatch",
@@ -704,7 +703,7 @@ class AuthService:
                 action.old_password,
             )
         except AuthorizationFailed as e:
-            log.info(log_fmt + ": old password mismatch", *log_args)
+            log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{}): old password mismatch", *log_args)
             raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]

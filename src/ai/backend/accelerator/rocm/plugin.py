@@ -10,27 +10,13 @@ from typing import (
 import aiodocker
 import trafaret as t
 
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-
-from . import __version__
-from .exception import (
-    GenericRocmError,
-    NoRocmDeviceError,
-    RocmMemFetchError,
-    RocmUtilFetchError,
-)
-from .hip import libhip, librocm_smi
-from .types import ROCmDevice, ROCmXCD
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -51,6 +37,16 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+from . import __version__
+from .exception import (
+    GenericRocmError,
+    NoRocmDeviceError,
+    RocmMemFetchError,
+    RocmUtilFetchError,
+)
+from .hip import libhip, librocm_smi
+from .types import ROCmDevice, ROCmXCD
 
 __all__ = (
     "PREFIX",
@@ -96,7 +92,7 @@ class ROCmPlugin(AbstractComputePlugin):
                 raise RuntimeError("Unsupported ROCm version {}.{}.{}", major, minor, patch)
             log.info("Running on ROCm {}.{}.{}", major, minor, patch)
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             libhip.get_device_count()
             log.info("ROCm acceleration is enabled.")
         except (ImportError, NoRocmDeviceError, GenericRocmError):
@@ -226,10 +222,10 @@ class ROCmPlugin(AbstractComputePlugin):
                         util_total += gpu_util
                         util_stats[device.device_id] = Measurement(Decimal(gpu_util), Decimal(100))
 
-            except (RocmUtilFetchError, RocmMemFetchError) as e:
+            except (RocmUtilFetchError, RocmMemFetchError):
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to query ROCm devices")
                 self.enabled = False
         return [
             NodeMeasurement(
@@ -276,10 +272,10 @@ class ROCmPlugin(AbstractComputePlugin):
                             "mem_used": mem_used,
                             "mem_total": mem_total,
                         }
-            except (RocmUtilFetchError, RocmMemFetchError) as e:
+            except (RocmUtilFetchError, RocmMemFetchError):
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to query ROCm devices")
                 self.enabled = False
                 return []
 

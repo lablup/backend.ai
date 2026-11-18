@@ -190,8 +190,6 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
         if name is None:
             faker = Faker()
             name = f"pysdk-{faker.user_name()}"
-        else:
-            name = name
 
         ######
         envs = prepare_env_arg(env)
@@ -482,8 +480,6 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
         """
         if name is None:
             name = f"pysdk-{secrets.token_hex(5)}"
-        else:
-            name = name
 
         envs = prepare_env_arg(env) if len(env) > 0 or no_env else undefined
         parsed_resources = (
@@ -1033,7 +1029,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 pbar.display(data["message"])
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
+                                completion_msg_func = lambda error_msg=error_msg: print_fail(
                                     f"Error during the operation: {error_msg}",
                                 )
                             case BgtaskStatus.CANCELLED:
@@ -1046,7 +1042,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 if errors:
                                     for error in errors:
                                         print_fail(f"Error reported: {error}")
-                                    completion_msg_func = lambda: print_warn(
+                                    completion_msg_func = lambda errors=errors: print_warn(
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:

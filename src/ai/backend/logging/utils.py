@@ -83,7 +83,10 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
                 "stacklevel": stacklevel,
                 "extra": extra,
             }
-            msg, context_kwargs = self.process(msg, context_kwargs)  # type: ignore
+            msg, processed_kwargs = self.process(
+                msg, cast(MutableMapping[str, Any], context_kwargs)
+            )
+            context_kwargs = cast(ContextKWArgs, processed_kwargs)
             if not isinstance(msg, str):
                 raise TypeError("msg must be a string after processing")
             user_kwargs["extra"] = context_kwargs["extra"]

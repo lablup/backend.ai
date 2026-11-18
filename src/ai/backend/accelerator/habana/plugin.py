@@ -12,20 +12,13 @@ import aiodocker
 import pyhlml
 import trafaret as t
 
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-
-from . import __version__
-from .types import AbstractGaudiDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -47,6 +40,9 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+from . import __version__
+from .types import AbstractGaudiDevice
 
 __all__ = (
     "PREFIX",
@@ -101,7 +97,7 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
             self._driver_version = pyhlml.hlmlGetDriverVersion().decode()
             log.info("Running on Habana Driver {}", self._driver_version)
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             await self.prepare_networks()
             log.info("Gaudi acceleration is enabled.")
         except RuntimeError as e:
@@ -173,10 +169,10 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                     mem_stats[device.device_id] = Measurement(Decimal(mem_used), Decimal(mem_total))
                     util_total += gpu_util
                     util_stats[device.device_id] = Measurement(Decimal(gpu_util), Decimal(100))
-            except RuntimeError as e:
+            except RuntimeError:
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to query Gaudi devices")
                 self.enabled = False
         return [
             NodeMeasurement(
@@ -223,10 +219,10 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                         "mem_used": mem_info.used,
                         "mem_total": mem_info.total,
                     }
-            except RuntimeError as e:
+            except RuntimeError:
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception("failed to query Gaudi devices")
                 self.enabled = False
                 return []
 

@@ -239,7 +239,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
                     except sa.exc.InterfaceError:
                         log.warning(
-                            f"DB Connnection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
+                            "DB Connnection for lock(id: {:d}) has already been closed. Skip unlock",
+                            lock_id,
                         )
 
 

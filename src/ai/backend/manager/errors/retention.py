@@ -18,7 +18,7 @@ from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.repository import RepositoryError
 
 
-class RetentionCategoryNotSupportedError(RepositoryError):
+class RetentionCategoryNotSupportedError(RepositoryError, web.HTTPInternalServerError):
     """Raised when a retention category has no code-side cleanup wired.
 
     A defensive guard: every :class:`RetentionCategory` is mapped in the

@@ -12,14 +12,7 @@ import aiodocker
 import trafaret as t
 
 from ai.backend.accelerator.furiosa import __version__
-
-from .rngd_api import LibraryError, RngdAPI
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -47,6 +40,8 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+
+from .rngd_api import LibraryError, RngdAPI
 
 PREFIX = "rngd"
 _NPU_INDEX_RE = re.compile(r"/dev/rngd/npu(\d+)")
@@ -102,7 +97,7 @@ class RngdPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("RNGD acceleration is enabled.")
         except ImportError:
             log.warning("could not find Furiosa devices.")

@@ -1080,7 +1080,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     console_items.append(("media", (o["type"], o["data"])))
                 elif rec.msg_type in outgoing_msg_types:
                     # FIXME: currently mypy cannot handle dynamic specialization of literals.
-                    console_items.append((rec.msg_type, rec.data))  # type: ignore
+                    console_items.append((cast(ConsoleItemType, rec.msg_type), cast(str, rec.data)))
 
             if last_stdout.tell():
                 console_items.append(("stdout", last_stdout.getvalue()))

@@ -10,23 +10,15 @@ from typing import (
 import aiodocker
 import trafaret as t
 from aiodocker import Docker
-
-from ai.backend.accelerator.tenstorrent import __version__
-from ai.backend.accelerator.tenstorrent.utils import resolve_pci_sysfs_path
-
-from .types import TTn300Device
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
 from tt_smi.tt_smi_backend import TTSMIBackend
 from tt_tools_common.utils_common.tools_utils import (
     PciChip,
     detect_chips_with_callback,
 )
 
+from ai.backend.accelerator.tenstorrent import __version__
+from ai.backend.accelerator.tenstorrent.utils import resolve_pci_sysfs_path
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -54,10 +46,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .types import TTn300Device
+
 PREFIX = "tt-n300"
 VALID_CARD_TYPE = "n300"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TTn300Plugin(AbstractComputePlugin):
@@ -88,7 +82,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("Tenstorrent acceleration is enabled.")
         except ImportError:
             log.warning("could not find Tenstorrent devices with VID 1eff.")

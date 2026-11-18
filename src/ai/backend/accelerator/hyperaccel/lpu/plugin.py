@@ -10,14 +10,7 @@ from typing import (
 import aiodocker
 import trafaret as t
 
-from . import __version__, lpu_api
-from .types import LPUDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -43,11 +36,14 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from . import __version__, lpu_api
+from .types import LPUDevice
+
 PREFIX = "hyperaccel-lpu"
 SLOT_NAME = "hyperaccel-lpu.device"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class LPUPlugin(AbstractComputePlugin):
@@ -73,7 +69,7 @@ class LPUPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("LPU acceleration is enabled.")
         except ImportError:
             log.warning("could not find LPU.")

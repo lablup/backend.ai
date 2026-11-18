@@ -65,7 +65,7 @@ def setup_prometheus_multiprocess_dir(
     try:
         multiprocess_dir.mkdir(parents=True, exist_ok=True)
     except PermissionError:
-        log.error(
+        log.exception(
             "Cannot create prometheus multiprocess dir %s — permission denied. "
             "Ensure the directory is writable by the current user.",
             multiprocess_dir,

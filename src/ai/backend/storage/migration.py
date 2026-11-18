@@ -152,7 +152,7 @@ async def upgrade_2_to_3(
                     )
                     quota_scope_map[row["id"]] = row["quota_scope_id"]
 
-                log.info("checking {} ...".format(", ".join(map(str, folder_ids))))
+                log.info("checking {} ...", ", ".join(map(str, folder_ids)))
 
             for folder_id in folder_ids:
                 try:

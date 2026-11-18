@@ -143,7 +143,7 @@ class OSInfo(RichCast):
     distro_variants: set[str]
 
     @override
-    def __rich__(self) -> ConsoleRenderable:
+    def __rich__(self) -> Text:
         variants = [self.distro, *sorted(self.distro_variants)]
         variant = ", ".join(variants)
         return Text.from_markup(f"[bold cyan]{self.platform} [not bold](variant: {variant})[/]")
