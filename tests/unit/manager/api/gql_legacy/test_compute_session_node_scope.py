@@ -54,6 +54,7 @@ class TestComputeSessionNodeScopeCondition:
     def db_session(self) -> MagicMock:
         session = MagicMock()
         session.scalar = AsyncMock(return_value=None)
+        session.scalars = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
         return session
 
     @pytest.fixture
@@ -80,6 +81,7 @@ class TestComputeSessionNodeScopeCondition:
             ctx.scheduler_repository.get_domain_id_by_name = AsyncMock(return_value=_DOMAIN_ID)
             ctx.processors.permission_controller.scoped_get_held_permissions.run = held_permissions
             ctx.config_provider.config.manager.rbac.enforcement_enabled = enforcement_enabled
+            ctx.config_provider.config.api.max_gql_connection_page_size = None
             info = MagicMock(spec=graphene.ResolveInfo)
             info.context = ctx
             return info
@@ -239,3 +241,45 @@ class TestComputeSessionNodeScopeCondition:
         )
 
         assert node is None
+
+    async def test_the_scope_bounds_both_the_page_and_the_count(
+        self,
+        make_info: Callable[[UserRole], graphene.ResolveInfo],
+        db_session: MagicMock,
+        held_permissions: AsyncMock,
+    ) -> None:
+        self._grant(
+            held_permissions, {ProjectSessionTarget(project_id=_PROJECT_ID): Permission.READ}
+        )
+
+        await ComputeSessionNode.get_accessible_connection(
+            make_info(UserRole.ADMIN),
+            ProjectScope(_PROJECT_ID),
+            ComputeSessionPermission.READ_ATTRIBUTE,
+            offset=0,
+            first=10,
+        )
+
+        page: sa.Select[tuple[object]] = db_session.scalars.await_args.args[0]
+        count: sa.Select[tuple[object]] = db_session.scalar.await_args.args[0]
+        for stmt in (page, count):
+            assert stmt.whereclause is not None
+            assert _PROJECT_ID in _bound_values(stmt.whereclause)
+
+    async def test_a_permission_other_than_read_attribute_returns_an_empty_page(
+        self,
+        make_info: Callable[[UserRole], graphene.ResolveInfo],
+        db_session: MagicMock,
+        held_permissions: AsyncMock,
+    ) -> None:
+        result = await ComputeSessionNode.get_accessible_connection(
+            make_info(UserRole.ADMIN),
+            DomainScope("default"),
+            ComputeSessionPermission.DELETE_SESSION,
+            offset=0,
+            first=10,
+        )
+
+        assert result.node_list == []
+        assert result.total_count == 0
+        db_session.scalars.assert_not_awaited()
