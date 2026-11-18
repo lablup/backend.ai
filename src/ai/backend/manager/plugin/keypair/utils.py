@@ -41,6 +41,15 @@ def decode_jwt_token(val: str, secret: str) -> Mapping[str, Any]:
     return result
 
 
+def has_access_key_claim(val: str) -> bool:
+    """Whether the value is a JWT carrying `access_key`, read without verifying it; only for routing."""
+    try:
+        claims = jwt.decode(val, options={"verify_signature": False})
+    except jwt.PyJWTError:
+        return False
+    return "access_key" in claims
+
+
 def serialize_stoken(
     data: STokenData, secret: str, ttl_seconds: int = DEFAULT_STOKEN_TTL_SECONDS
 ) -> str:
