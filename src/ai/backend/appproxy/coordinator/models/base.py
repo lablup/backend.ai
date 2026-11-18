@@ -43,7 +43,6 @@ convention = {
     "pk": "pk_%(table_name)s",
 }
 metadata_obj = sa.MetaData(naming_convention=convention)
-T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
 Base = declarative_base(metadata=metadata_obj)

@@ -1448,6 +1448,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
 
+    @staticmethod
     async def resolve_agent_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3264,6 +3265,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             last,
         )
 
+    @staticmethod
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,

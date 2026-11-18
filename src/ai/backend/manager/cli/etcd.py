@@ -180,17 +180,17 @@ def delete(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> 
                 if prefix:
                     prefix_data = await etcd.get_prefix(key, scope=scope)
                     if not prefix_data:
-                        log.info(f"No keys found to delete with prefix: {key}")
+                        log.info("No keys found to delete with prefix: {}", key)
                         return
                     await etcd.delete_prefix(key, scope=scope)
-                    log.info(f"All keys starting with '{key}' successfully deleted.")
+                    log.info("All keys starting with '{}' successfully deleted.", key)
                 else:
                     single_data = await etcd.get(key, scope=scope)
                     if single_data is None:
-                        log.info(f"No key found to delete: {key}")
+                        log.info("No key found to delete: {}", key)
                         return
                     await etcd.delete(key, scope=scope)
-                    log.info(f"Key '{key}' successfully deleted.")
+                    log.info("Key '{}' successfully deleted.", key)
             except Exception:
                 log.exception("An error occurred.")
 

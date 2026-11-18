@@ -612,16 +612,14 @@ class AgentRPCServer(aobject):
                 if "kernel-uid" in container_etcd_config_raw:
                     container_updates["kernel_uid"] = container_etcd_config_raw["kernel-uid"]
                     log.info(
-                        "etcd: container-config: kernel-uid={}".format(
-                            container_etcd_config_raw["kernel-uid"]
-                        )
+                        "etcd: container-config: kernel-uid={}",
+                        container_etcd_config_raw["kernel-uid"],
                     )
                 if "kernel-gid" in container_etcd_config_raw:
                     container_updates["kernel_gid"] = container_etcd_config_raw["kernel-gid"]
                     log.info(
-                        "etcd: container-config: kernel-gid={}".format(
-                            container_etcd_config_raw["kernel-gid"]
-                        )
+                        "etcd: container-config: kernel-gid={}",
+                        container_etcd_config_raw["kernel-gid"],
                     )
 
                 self.local_config.update(container_update=container_updates)

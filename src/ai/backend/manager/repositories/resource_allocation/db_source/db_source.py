@@ -247,8 +247,8 @@ class ResourceAllocationDBSource:
             total_free: list[SlotQuantity] = []
             agent_free_list: list[list[SlotQuantity]] = []
 
-            for aid in agent_capacity:
-                total_capacity = add_quantities(total_capacity, agent_capacity[aid])
+            for aid, capacity in agent_capacity.items():
+                total_capacity = add_quantities(total_capacity, capacity)
                 total_used = add_quantities(total_used, agent_used[aid])
                 total_free = add_quantities(total_free, agent_free[aid])
                 agent_free_list.append(agent_free[aid])

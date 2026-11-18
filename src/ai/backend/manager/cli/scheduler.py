@@ -52,7 +52,7 @@ def last_execution_time(
                 # Scan for all manager scheduler keys
                 keys = await redis_conn_set.live.scan_keys(f"manager.{_manager_id}.*")
                 if len(keys) == 0:
-                    log.warn(
+                    log.warning(
                         "Failed to fetch scheduler information manager {}. Please check if you have mentioned manager ID correctly and the specified manager is up and running.",
                         manager_id,
                     )
@@ -68,7 +68,7 @@ def last_execution_time(
                 redis_key = f"manager.{_manager_id}.{scheduler_name}"
                 exists = await redis_conn_set.live.exists([redis_key])
                 if exists == 0:
-                    log.warn(
+                    log.warning(
                         "Failed to fetch scheduler information of {} on manager {}. Please check if you have mentioned both manager ID and scheduler name correctly.",
                         scheduler_name,
                         manager_id,

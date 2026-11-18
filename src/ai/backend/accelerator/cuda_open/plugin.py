@@ -305,7 +305,7 @@ class CUDAPlugin(AbstractComputePlugin):
             self.device_mask = [*raw_device_mask.split(",")]
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("CUDA acceleration is enabled.")
         except ImportError:
             log.warning("could not load the CUDA runtime library.")

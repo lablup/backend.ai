@@ -335,7 +335,7 @@ class BaseRunner(metaclass=ABCMeta):
             kspecs = kernelspec_mgr.get_all_specs()
             for kname in kspecs:
                 if self.jupyter_kspec_name in kname:
-                    log.debug("starting " + kname + " kernel...")
+                    log.debug("starting %s kernel...", kname)
                     self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
                     await self.kernel_mgr.start_kernel()
                     if not await self.kernel_mgr.is_alive():
@@ -369,7 +369,7 @@ class BaseRunner(metaclass=ABCMeta):
         if self.kernel_mgr and await self.kernel_mgr.is_alive():
             if self.kernel_client is None:
                 raise RuntimeError("Kernel client is not initialized")
-            log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
+            log.info("shutting down %s kernel...", self.jupyter_kspec_name)
             await self.kernel_mgr.shutdown_kernel()
             self.kernel_client.stop_channels()
             if await self.kernel_mgr.is_alive():

@@ -35,6 +35,7 @@ class BulkRemoveCircuitsRequestModel(BackendAISchema):
     circuit_ids: Annotated[list[UUID], Field(description="Comma separated list of Circuit UUIDs.")]
 
     @validator("circuit_ids", pre=True)
+    @classmethod
     def split_comma_separated(cls, v: object) -> object:
         if isinstance(v, str):
             v = v.strip()

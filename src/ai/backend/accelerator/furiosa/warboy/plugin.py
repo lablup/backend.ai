@@ -88,7 +88,7 @@ class WarboyPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("Warboy acceleration is enabled.")
         except ImportError:
             log.warning("could not find Furiosa devices.")
