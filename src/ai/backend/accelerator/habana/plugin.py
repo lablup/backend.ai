@@ -97,7 +97,7 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
             self._driver_version = pyhlml.hlmlGetDriverVersion().decode()
             log.info("Running on Habana Driver {}", self._driver_version)
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             await self.prepare_networks()
             log.info("Gaudi acceleration is enabled.")
         except RuntimeError as e:

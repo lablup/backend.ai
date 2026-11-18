@@ -19,7 +19,6 @@ pure_python_mods = (
 def _filtered_writestr(
     self: WheelFile, zinfo_or_arcname: ZipInfo | str, bytes: bytes, compress_type: int | None = None
 ) -> None:
-    global exclude_source_files
     if exclude_source_files:
         if isinstance(zinfo_or_arcname, str):
             fn = zinfo_or_arcname

@@ -244,7 +244,7 @@ class MockPlugin(AbstractComputePlugin):
         # Detect devices.
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices (mocked):\n" + pformat(detected_devices))
+            log.info("detected devices (mocked):\n{}", pformat(detected_devices))
             log.info("{} acceleration is enabled.", self.key)
         except ImportError:
             log.warning("{} acceleration is disabled.", self.key)

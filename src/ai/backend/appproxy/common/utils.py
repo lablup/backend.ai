@@ -102,7 +102,7 @@ async def call_non_bursty(
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.
     """
-    global _burst_last_call, _burst_times, _burst_counts
+    global _burst_last_call
     if inspect.iscoroutine(coro):
         # Coroutine objects may not be called before garbage-collected
         # as this function throttles the frequency of invocation.
@@ -319,7 +319,7 @@ class BackendAIAccessLogger(AccessLogger):
             return
 
         if "request_id" not in request:
-            self.logger.warn("Request ID not set at request object!")
+            self.logger.warning("Request ID not set at request object!")
             prepend_to_log = ""
         else:
             prepend_to_log = f"#{request['request_id']} "
@@ -342,7 +342,8 @@ class BackendAIAccessLogger(AccessLogger):
                     dct[k2] = value
                     extra[k1] = dct
 
-            self.logger.info((prepend_to_log + self._log_format) % tuple(values), extra=extra)
+            message = (prepend_to_log + self._log_format) % tuple(values)
+            self.logger.info("%s", message, extra=extra)
         except Exception:
             self.logger.exception("Error in logging")
 

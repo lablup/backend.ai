@@ -49,10 +49,9 @@ def generate_latest_multiprocess() -> bytes:
                 )
                 return generate_latest(registry)
             except Exception:
-                log.error(
+                log.exception(
                     "Failed to recover prometheus multiprocess dir: %s",
                     multiprocess_dir,
-                    exc_info=True,
                 )
         return b""
 

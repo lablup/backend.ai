@@ -92,7 +92,7 @@ class ROCmPlugin(AbstractComputePlugin):
                 raise RuntimeError("Unsupported ROCm version {}.{}.{}", major, minor, patch)
             log.info("Running on ROCm {}.{}.{}", major, minor, patch)
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             libhip.get_device_count()
             log.info("ROCm acceleration is enabled.")
         except (ImportError, NoRocmDeviceError, GenericRocmError):

@@ -9,4 +9,5 @@ warnings.warn(
     "Please import BraceStyleAdapter from ai.backend.logging "
     "instead of ai.backend.common.logging_utils",
     DeprecationWarning,
+    stacklevel=2,
 )

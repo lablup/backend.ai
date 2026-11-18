@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
@@ -120,3 +121,30 @@ class TestDeploymentStorageSource:
                 vfolder_location,
                 ["deployment-config.yaml"],
             )
+
+    async def test_read_failure_is_logged_and_next_candidate_is_used(
+        self,
+        deployment_storage_source: DeploymentStorageSource,
+        fetch_file_content: AsyncMock,
+        vfolder_location: VFolderLocation,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        fetch_file_content.side_effect = [
+            RuntimeError("read failed"),
+            b"image: example/image:latest\n",
+        ]
+
+        with caplog.at_level(logging.ERROR):
+            result = await deployment_storage_source.fetch_deployment_config(
+                vfolder_location,
+                ["deployment-config.yaml", "deployment-config.yml"],
+            )
+
+        assert result is not None
+        assert result.image == "example/image:latest"
+        assert fetch_file_content.await_count == 2
+        failures = [
+            r for r in caplog.records if "Failed to read deployment config file" in r.getMessage()
+        ]
+        assert len(failures) == 1
+        assert failures[0].exc_info is not None

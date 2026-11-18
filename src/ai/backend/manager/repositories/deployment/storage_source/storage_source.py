@@ -1,5 +1,6 @@
 """Storage source implementation for deployment repository."""
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
@@ -11,10 +12,13 @@ from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo, VFolderID
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.deployment.types import FetchedModelDefinition
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DeploymentDefinitionFileReadError
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,11 @@ class DeploymentStorageSource:
                     volume_name, str(vfid), filename
                 )
             except Exception:
+                log.exception(
+                    "Failed to read deployment config file (vfolder_id={}, filename={})",
+                    vfolder_location.id,
+                    filename,
+                )
                 continue
             if not raw_bytes:
                 continue

@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     TypeVar,
+    override,
 )
 
 import aiofiles
@@ -278,6 +279,11 @@ class FstabEntry:
         self.d = d
         self.p = p
 
+    @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
+
+    @override
     def __eq__(self, o: Any) -> bool:
         return str(self) == str(o)
 

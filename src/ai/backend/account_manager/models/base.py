@@ -84,9 +84,6 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator[uuid.UUID]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
-
-
 class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.

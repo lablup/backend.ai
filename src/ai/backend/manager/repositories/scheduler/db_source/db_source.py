@@ -607,12 +607,12 @@ class ScheduleDBSource:
             )
 
         # Ensure keypairs with only SFTP sessions still appear
-        for ak in sftp_sessions_by_keypair:
+        for ak, sftp_sessions in sftp_sessions_by_keypair.items():
             if ak not in occupancy_by_keypair:
                 occupancy_by_keypair[ak] = KeypairOccupancy(
                     occupied_slots=[],
                     session_count=0,
-                    sftp_session_count=len(sftp_sessions_by_keypair[ak]),
+                    sftp_session_count=len(sftp_sessions),
                 )
 
         occupancy_by_user = {

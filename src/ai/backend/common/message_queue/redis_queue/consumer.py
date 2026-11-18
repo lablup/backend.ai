@@ -208,7 +208,7 @@ class RedisConsumer(AbstractConsumer):
                 await self._client.done_stream_message(stream_key, self._group_name, msg_id)
                 break
             except Exception:
-                continue  # Try next stream if this one fails
+                log.debug("Failed to ack the message on stream {}; trying next", stream_key)
 
     @override
     async def close(self) -> None:

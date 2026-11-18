@@ -193,7 +193,7 @@ async def rescan_images(
         try:
             result = await rescan_images_func(db, registry_or_image, project)
             for error in result.errors:
-                log.error(f"Failed to scan registries: {error}")
+                log.error("Failed to scan registries: {}", error)
         except Exception:
             log.exception("Unknown error occurred")
 
@@ -245,7 +245,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
                 print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
-            log.exception(f"No images were found with alias: {alias}")
+            log.exception("No images were found with alias: {}", alias)
         except Exception:
             log.exception("An error occurred")
 
