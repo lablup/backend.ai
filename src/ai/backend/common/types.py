@@ -915,6 +915,11 @@ class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     def __str__(self) -> str:
         return str(self._address)
 
+    @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
+
+    @override
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
@@ -1165,6 +1170,11 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __neg__(self) -> ResourceSlot:
         return type(self)({k: -v for k, v in self.data.items()})
 
+    @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
+
+    @override
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True

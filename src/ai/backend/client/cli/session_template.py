@@ -212,7 +212,7 @@ def delete(template_id: str, force: bool, owner_access_key: str | None) -> None:
             result = input()
             if result.strip() != "y":
                 print_info("Aborting.")
-                exit()
+                sys.exit()
         try:
             _ = template.delete()
             print_info(f"Task template {template.template_id} deleted")

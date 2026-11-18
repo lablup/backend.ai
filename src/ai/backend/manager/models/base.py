@@ -157,8 +157,6 @@ FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
 }
 
 
-T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
-T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 

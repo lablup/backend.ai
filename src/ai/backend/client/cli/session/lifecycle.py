@@ -190,8 +190,6 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
         if name is None:
             faker = Faker()
             name = f"pysdk-{faker.user_name()}"
-        else:
-            name = name
 
         ######
         envs = prepare_env_arg(env)
@@ -482,8 +480,6 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
         """
         if name is None:
             name = f"pysdk-{secrets.token_hex(5)}"
-        else:
-            name = name
 
         envs = prepare_env_arg(env) if len(env) > 0 or no_env else undefined
         parsed_resources = (
