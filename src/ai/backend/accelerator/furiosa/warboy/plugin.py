@@ -26,7 +26,6 @@ from ai.backend.agent.stats import (
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
-from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,

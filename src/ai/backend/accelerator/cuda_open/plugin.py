@@ -48,7 +48,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.structured import StructuredLogger
 
 from . import __version__
 from .nvidia import LibraryError, libcudart, libnvml
