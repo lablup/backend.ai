@@ -86,7 +86,7 @@ async def _create_kernels(server: AgentRPCServer, num_kernels: int) -> Any:
     args: tuple[Any, ...] = (
         str(uuid.uuid4()),
         [str(k) for k in kernel_ids],
-        [{} for _ in kernel_ids],
+        [{"image": {"canonical": image_ref.canonical}} for _ in kernel_ids],
         {},
         dict.fromkeys(kernel_ids, image_ref),
     )
