@@ -117,7 +117,7 @@ async def exception_middleware(
         log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
         raise e
     except Exception as e:
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+        log.exception("Uncaught exception in HTTP request handlers")
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc()) from e
         raise InternalServerError() from e
@@ -232,7 +232,9 @@ def build_root_app(
                 yield
         except Exception as e:
             exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+            log.exception(
+                "Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info
+            )
 
     async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
         for cctx in app["_cctx_instances"]:

@@ -52,8 +52,8 @@ class ReporterHub(AbstractReporter):
             for reporter in target_reporters:
                 try:
                     await reporter.report_started(message)
-                except Exception as e:
-                    log.error("reporter.report_started failed: {}", e)
+                except Exception:
+                    log.exception("reporter.report_started failed")
 
     async def _report_finished(self) -> None:
         while not self._closed:
@@ -62,8 +62,8 @@ class ReporterHub(AbstractReporter):
             for reporter in target_reporters:
                 try:
                     await reporter.report_finished(message)
-                except Exception as e:
-                    log.error("reporter.report_finished failed: {}", e)
+                except Exception:
+                    log.exception("reporter.report_finished failed")
 
     async def close(self) -> None:
         if self._closed:

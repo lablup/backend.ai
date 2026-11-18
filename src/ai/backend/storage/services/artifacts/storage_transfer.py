@@ -206,8 +206,8 @@ class StorageTransferManager:
                 log.warning(
                     "Cross-filesystem move fallback: manually removed source {}", source_path
                 )
-            except Exception as e:
-                log.error("Failed to cleanup source after move: {}", e)
+            except Exception:
+                log.exception("Failed to cleanup source after move")
                 raise
 
         # Cleanup empty artifact directories
@@ -332,6 +332,6 @@ class StorageTransferManager:
             # If size comparison is not available, assume success
             return True
 
-        except Exception as e:
-            log.error("Failed to verify transfer: {} -> {}: {}", source_path, dest_path, e)
+        except Exception:
+            log.exception("Failed to verify transfer: {} -> {}", source_path, dest_path)
             return False

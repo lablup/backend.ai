@@ -106,8 +106,8 @@ class ProvisionStage(Stage[TSpec, TResource]):
         try:
             resource = await self._provisioner.setup(spec)
             self._resource = resource
-        except Exception as e:
-            log.error("Failed to setup resource: %s", e)
+        except Exception:
+            log.exception("Failed to setup resource")
         finally:
             self._setup_completed.set()
 

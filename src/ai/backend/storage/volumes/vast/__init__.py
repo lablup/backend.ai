@@ -124,10 +124,9 @@ class VASTQuotaModel(BaseQuotaModel):
                         existing_quota = q
                         break
                 else:
-                    log.error(
-                        "Got invalid parameter error but no quota exists with given quota name ({}). Raise error (orig:{!s})",
+                    log.exception(
+                        "Got invalid parameter error but no quota exists with given quota name ({}). Raise error",
                         quota_name,
-                        e,
                     )
                     raise InvalidQuotaConfig(
                         f"No existing quota found with name {quota_name}"

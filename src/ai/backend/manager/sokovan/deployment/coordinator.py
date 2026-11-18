@@ -468,8 +468,8 @@ class DeploymentCoordinator:
 
         try:
             await handler.post_process(result)
-        except Exception as e:
-            log.error("Error during post-processing for {}: {}", handler.name(), e)
+        except Exception:
+            log.exception("Error during post-processing for {}", handler.name())
 
     async def _handle_status_transitions(
         self,

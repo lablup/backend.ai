@@ -259,8 +259,8 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
                 client_features=default_client_features,
                 api_version=default_api_version,
             )
-        except Exception as e:
-            log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
+        except Exception:
+            log.exception("kernel.init(k:{0}): failed to create code runner", self.kernel_id)
             self.runner = None
             raise
 
@@ -655,7 +655,7 @@ class SocketPair:
             return await self.output_sock.socket.recv_multipart()
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
-                log.exception("Socket invalid (addr: {}, err: {!r})", self.output_sock.addr, e)
+                log.exception("Socket invalid (addr: {})", self.output_sock.addr)
                 raise InvalidSocket from e
 
             raise

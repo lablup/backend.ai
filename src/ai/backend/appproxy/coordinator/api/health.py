@@ -215,8 +215,8 @@ async def get_endpoints_health(request: web.Request) -> PydanticResponse[HealthS
                 )
                 endpoint_statuses.append(endpoint_status)
 
-            except Exception as e:
-                log.error("Failed to find circuit for endpoint {}: {}", endpoint.id, e)
+            except Exception:
+                log.exception("Failed to find circuit for endpoint {}", endpoint.id)
                 # Create empty status for endpoints without circuits
                 endpoint_status = EndpointHealthStatusModel(
                     endpoint_id=endpoint.id,

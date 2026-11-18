@@ -131,12 +131,11 @@ class ArtifactEventHandler:
                 artifact_id,
                 version,
             )
-        except Exception as e:
-            log.error(
-                "Failed to produce artifact download notification for artifact {} revision {}: {}",
+        except Exception:
+            log.exception(
+                "Failed to produce artifact download notification for artifact {} revision {}",
                 artifact_id,
                 version,
-                e,
             )
 
     async def handle_model_import_done(
@@ -221,11 +220,10 @@ class ArtifactEventHandler:
                 await self._artifact_repository.update_artifact_revision_status(
                     revision.id, final_status
                 )
-        except Exception as model_error:
-            log.error(
-                "Failed to process imported model update: {} - {}",
+        except Exception:
+            log.exception(
+                "Failed to process imported model update: {}",
                 event.model_id,
-                model_error,
             )
             final_status = ArtifactStatus.FAILED
 
@@ -299,9 +297,8 @@ class ArtifactEventHandler:
                 artifact.id,
                 model_info.size,
             )
-        except Exception as model_error:
-            log.error(
-                "Failed to process metadata update for model: {} - {}",
+        except Exception:
+            log.exception(
+                "Failed to process metadata update for model: {}",
                 model_info.model_id,
-                model_error,
             )

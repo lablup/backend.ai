@@ -39,11 +39,10 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 pickle.dump(dict(data), f)
             self._last_saved_time = now
             log.debug("Saved kernel registry to {}", str(last_registry_file))
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Failed to save kernel registry to {} (error: {})",
+                "Failed to save kernel registry to {}",
                 str(last_registry_file),
-                str(e),
             )
             try:
                 last_registry_file.unlink()

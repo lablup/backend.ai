@@ -633,10 +633,9 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 await self._dispatch_consumers(msg)
-            except Exception as e:
+            except Exception:
                 log.exception(
-                    "EventDispatcher._consume_loop: unexpected-error, {}",
-                    repr(e),
+                    "EventDispatcher._consume_loop: unexpected-error",
                 )
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
@@ -648,10 +647,9 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 await self._dispatch_subscribers(msg)
-            except Exception as e:
+            except Exception:
                 log.exception(
-                    "EventDispatcher._subscribe_loop: unexpected-error, {}",
-                    repr(e),
+                    "EventDispatcher._subscribe_loop: unexpected-error",
                 )
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.

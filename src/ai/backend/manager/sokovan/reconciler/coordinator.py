@@ -56,8 +56,8 @@ class ReconcilerCoordinator:
                 await stack.enter_async_context(self._lock_factory(stage.lock_id, lock_lifetime))
             try:
                 await stage.run()
-            except Exception as e:
-                log.error("Error while processing lifecycle {}: {}", reconcile_type, e)
+            except Exception:
+                log.exception("Error while processing lifecycle {}", reconcile_type)
 
     async def process_if_needed(self, reconcile_type: str) -> None:
         if not await self._flags.check_mark_needed(reconcile_type):

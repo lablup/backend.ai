@@ -564,10 +564,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     continue
                 try:
                     os.chown(p, int_uid, int_gid)
-                except OSError as e:
-                    log.exception(
-                        "failed to chown {} to {}/{} (error: {})", p, int_uid, int_gid, repr(e)
-                    )
+                except OSError:
+                    log.exception("failed to chown {} to {}/{}", p, int_uid, int_gid)
 
     @override
     async def prepare_scratch(self) -> None:
@@ -2182,7 +2180,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
             return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error('Failed to purge image "{}": {}', request.image, e)
+            log.exception('Failed to purge image "{}"', request.image)
             return PurgeImageResp.failure(image=request.image, error=str(e))
 
     @override

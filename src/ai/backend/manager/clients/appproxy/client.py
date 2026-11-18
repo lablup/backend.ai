@@ -95,12 +95,12 @@ class AppProxyClient:
                 data = await resp.json()
                 return AppProxyStatusResponse.model_validate(data)
         except aiohttp.ClientConnectorError as e:
-            log.error("Failed to connect to app-proxy at {}: {}", self._address, e)
+            log.exception("Failed to connect to app-proxy at {}", self._address)
             raise AppProxyConnectionError(
                 extra_msg=f"Failed to connect to AppProxy at {self._address}"
             ) from e
         except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-            log.error("Failed to parse app-proxy status response from {}: {}", self._address, e)
+            log.exception("Failed to parse app-proxy status response from {}", self._address)
             raise AppProxyResponseError(
                 extra_msg=f"Invalid response from AppProxy at {self._address}"
             ) from e

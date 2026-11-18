@@ -325,11 +325,10 @@ class ScheduleCoordinator:
 
             return True
 
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Error processing lifecycle schedule type {}: {}",
+                "Error processing lifecycle schedule type {}",
                 schedule_type.value,
-                e,
             )
             raise
 
@@ -371,11 +370,10 @@ class ScheduleCoordinator:
 
             return True
 
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Error processing promotion schedule type {}: {}",
+                "Error processing promotion schedule type {}",
                 schedule_type.value,
-                e,
             )
             raise
 
@@ -430,11 +428,10 @@ class ScheduleCoordinator:
 
             return True
 
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Error processing kernel schedule type {}: {}",
+                "Error processing kernel schedule type {}",
                 schedule_type.value,
-                e,
             )
             raise
 
@@ -495,11 +492,10 @@ class ScheduleCoordinator:
             log.debug("[Coordinator] Observer schedule {} completed", schedule_type.value)
             return True
 
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Error processing observer schedule type {}: {}",
+                "Error processing observer schedule type {}",
                 schedule_type.value,
-                e,
             )
             raise
 
@@ -530,11 +526,10 @@ class ScheduleCoordinator:
                     await handler.execute(session_ids)
 
             return True
-        except Exception as e:
+        except Exception:
             log.exception(
-                "Error processing cleanup schedule type {}: {}",
+                "Error processing cleanup schedule type {}",
                 schedule_type.value,
-                e,
             )
             raise
 
@@ -662,11 +657,10 @@ class ScheduleCoordinator:
             target_statuses = self._collect_kernel_target_statuses(transitions, result)
             try:
                 await self._run_kernel_post_processors(result, target_statuses)
-            except Exception as e:
-                log.error(
-                    "Error during kernel post-processing for scaling group {}: {}",
+            except Exception:
+                log.exception(
+                    "Error during kernel post-processing for scaling group {}",
                     scaling_group,
-                    e,
                 )
 
     async def _handle_kernel_result(
@@ -782,11 +776,10 @@ class ScheduleCoordinator:
                 )
                 try:
                     await self._run_post_processors(result, target_statuses)
-                except Exception as e:
-                    log.error(
-                        "Error during common post-processing for scaling group {}: {}",
+                except Exception:
+                    log.exception(
+                        "Error during common post-processing for scaling group {}",
                         scaling_group,
-                        e,
                     )
 
             # Log recorded steps for this scaling group
@@ -872,11 +865,10 @@ class ScheduleCoordinator:
                 target_statuses = {spec.success_status}
                 try:
                     await self._run_post_processors(result, target_statuses)
-                except Exception as e:
-                    log.error(
-                        "Error during common post-processing for scaling group {}: {}",
+                except Exception:
+                    log.exception(
+                        "Error during common post-processing for scaling group {}",
                         scaling_group,
-                        e,
                     )
 
             # Log recorded steps for this scaling group

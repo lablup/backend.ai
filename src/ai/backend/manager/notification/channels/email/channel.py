@@ -91,23 +91,21 @@ class EmailChannel(AbstractNotificationChannel):
                     to_addrs=msg.to_emails,
                 )
         except smtplib.SMTPConnectError as e:
-            log.error(
-                "Failed to connect to SMTP server {}:{}: {}",
+            log.exception(
+                "Failed to connect to SMTP server {}:{}",
                 smtp.host,
                 smtp.port,
-                str(e),
             )
             raise NotificationProcessingFailure(f"SMTP connection failed: {e!s}") from e
         except smtplib.SMTPAuthenticationError as e:
-            log.error(
-                "SMTP authentication failed for user {}: {}",
+            log.exception(
+                "SMTP authentication failed for user {}",
                 auth.username if auth else "unknown",
-                str(e),
             )
             raise NotificationProcessingFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
-            log.error("SMTP error while sending email: {}", str(e))
+            log.exception("SMTP error while sending email")
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
         except Exception as e:
-            log.error("Unexpected error sending email: {}", str(e))
+            log.exception("Unexpected error sending email")
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

@@ -760,11 +760,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     if rollup_function:
                         await rollup_function()
                     rollback_functions.append(future_rollback_function)
-                except Exception as e:
+                except Exception:
                     for rollback_function in rollback_functions[::-1]:
                         if rollback_function:
                             await rollback_function()
-                    log.exception("Error while rollup: {}", e)
+                    log.exception("Error while rollup")
                     raise
 
         arguments: list[
@@ -778,8 +778,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             expose_service_api_response: V1Service = await core_api.create_namespaced_service(
                 "backend-ai", body=expose_service.to_dict()
             )
-        except Exception as e:
-            log.exception("Error while rollup: {}", e)
+        except Exception:
+            log.exception("Error while rollup")
             raise
 
         if expose_service_api_response.spec is None:
@@ -991,8 +991,8 @@ class KubernetesAgent(
                     "backend-ai",
                     body=new_pvc.to_dict(),
                 )
-            except Exception as e:
-                log.exception("Error: {}", e)
+            except Exception:
+                log.exception("Error in the Kubernetes agent")
                 raise
 
     async def fetch_workers(self) -> None:

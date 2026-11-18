@@ -52,10 +52,8 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             config_mgr = ScratchConfig(config_path)
             try:
                 original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
-            except KernelRecoveryDataParseError as e:
-                log.exception(
-                    "Failed to parse recovery data from kernel {}: {}", kernel.kernel_id, str(e)
-                )
+            except KernelRecoveryDataParseError:
+                log.exception("Failed to parse recovery data from kernel {}", kernel.kernel_id)
                 continue
             if original_recovery_data is None:
                 continue

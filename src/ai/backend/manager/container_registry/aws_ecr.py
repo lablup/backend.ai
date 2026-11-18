@@ -63,5 +63,5 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
 
                 if not next_token:
                     break
-        except Exception as e:
-            log.error("Error occurred: {}", e)
+        except Exception:
+            log.exception("Error occurred")

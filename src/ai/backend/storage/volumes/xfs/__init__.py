@@ -317,9 +317,8 @@ class XfsVolume(BaseVolume):
             self._lock_path.touch()
         except OSError as e:
             log.exception(
-                "Failed to create XFS backend lock file at {}: (Error: {})",
+                "Failed to create XFS backend lock file at {}",
                 self._lock_path,
-                e,
             )
             raise InvalidConfigError(
                 f"Cannot create XFS backend lock file at {self._lock_path}"

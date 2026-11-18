@@ -72,8 +72,8 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
                         pprint(item)
             if short:
                 print(tabulate(displayed_items, tablefmt="plain"))
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
@@ -93,8 +93,8 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
             pprint(await image_row.inspect())
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
@@ -114,8 +114,8 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
             await image_row.mark_as_deleted(session)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 async def purge_image(
@@ -142,8 +142,8 @@ async def purge_image(
 
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 async def set_image_resource_limit(
@@ -169,8 +169,8 @@ async def set_image_resource_limit(
             image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 async def rescan_images(
@@ -194,8 +194,8 @@ async def rescan_images(
             result = await rescan_images_func(db, registry_or_image, project)
             for error in result.errors:
                 log.error(f"Failed to scan registries: {error}")
-        except Exception as e:
-            log.exception(f"Unknown error occurred. Error: {e}")
+        except Exception:
+            log.exception("Unknown error occurred")
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
@@ -214,8 +214,8 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
             await ImageAliasRow.create(session, alias, image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
@@ -245,9 +245,9 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
                 print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
-            log.error(f"No images were found with alias: {alias}")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.exception(f"No images were found with alias: {alias}")
+        except Exception:
+            log.exception("An error occurred")
 
 
 def _resolve_architecture(current: bool, architecture: str | None) -> str:
@@ -293,7 +293,7 @@ async def validate_image_canonical(
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: {value}")
 
-        except UnknownImageReference as e:
-            log.error(f"{e}")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except UnknownImageReference:
+            log.exception("Image not found.")
+        except Exception:
+            log.exception("An error occurred")

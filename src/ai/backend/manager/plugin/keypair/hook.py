@@ -170,9 +170,10 @@ class KeypairAuthHookPlugin(HookPlugin):
                         raise Reject("Invalid auth token")
                     user_id = keypair.user
 
-                except Exception as e:
-                    log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken))
-                    log.error(repr(e))
+                except Exception:
+                    log.exception(
+                        "AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken)
+                    )
                     raise Reject("Invalid auth token") from None
 
         else:

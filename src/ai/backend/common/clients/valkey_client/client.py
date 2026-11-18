@@ -431,10 +431,8 @@ class ValkeySentinelClient(AbstractValkeyClient):
     async def _get_master_address(self) -> tuple[str, int] | None:
         try:
             return await self._sentinel.discover_master(self._target.service_name)
-        except Exception as e:
-            log.error(
-                "Failed to discover master for service '{}': {}", self._target.service_name, e
-            )
+        except Exception:
+            log.exception("Failed to discover master for service '{}'", self._target.service_name)
             return None
 
     async def ping(self) -> None:
@@ -749,9 +747,9 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                 except asyncio.CancelledError:
                     # Normal shutdown - don't log as error
                     raise
-                except Exception as e:
+                except Exception:
                     if not self._closed:
-                        log.exception("Error in Valkey connection monitor: {}", e)
+                        log.exception("Error in Valkey connection monitor")
                         continue
                     raise
         finally:

@@ -53,10 +53,9 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteManifest, 
                 await volume.delete_vfolder(manifest.vfolder_id)
         except Exception as e:
             log.exception(
-                "Failed to delete vfolder (volume=%s, vfolder=%s): %s",
+                "Failed to delete vfolder (volume=%s, vfolder=%s)",
                 manifest.volume,
                 manifest.vfolder_id,
-                e,
             )
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(

@@ -125,8 +125,8 @@ class ServiceConfigNode(graphene.ObjectType):  # type: ignore[misc]
             try:
                 node = await task
                 result.append(node)
-            except Exception as exc:
-                log.error("Failed to load service config node: {}", exc)
+            except Exception:
+                log.exception("Failed to load service config node")
 
         return ConnectionResolverResult(
             node_list=result,

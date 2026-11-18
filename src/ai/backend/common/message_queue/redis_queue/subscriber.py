@@ -123,8 +123,8 @@ class RedisSubscriber(AbstractSubscriber):
             except glide.ClosingError:
                 log.info("Client connection closed, stopping read broadcast messages loop")
                 break
-            except Exception as e:
-                log.error("Error while reading broadcast messages: {}", e)
+            except Exception:
+                log.exception("Error while reading broadcast messages")
                 # Add a small delay to avoid tight error loops
                 await asyncio.sleep(1.0)
 

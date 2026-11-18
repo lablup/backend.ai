@@ -57,8 +57,8 @@ class SMTPSender:
                     from_addr=self._config.sender,
                     to_addrs=self._config.recipients,
                 )
-        except Exception as e:
-            log.error("Failed to send email: {}", e)
+        except Exception:
+            log.exception("Failed to send email")
 
 
 class SMTPReporter(AbstractReporter):

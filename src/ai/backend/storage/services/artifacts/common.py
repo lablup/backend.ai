@@ -169,7 +169,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                     metadata={},
                     error=str(e),
                 )
-                log.error("Artifact verification using '{}' failed: {}", verifier_name, e)
+                log.exception("Artifact verification using '{}' failed", verifier_name)
 
         # Create complete verification result
         verification_result = VerificationStepResult(
