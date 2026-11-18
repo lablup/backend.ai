@@ -69,7 +69,7 @@ class LPUPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("LPU acceleration is enabled.")
         except ImportError:
             log.warning("could not find LPU.")

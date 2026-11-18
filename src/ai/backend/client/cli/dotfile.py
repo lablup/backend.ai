@@ -289,7 +289,7 @@ def delete(
             result = input()
             if result.strip() != "y":
                 print_info("Aborting.")
-                exit()
+                sys.exit()
         try:
             _ = dotfile_.delete()
             print_info(f"Dotfile {dotfile_.path} deleted")

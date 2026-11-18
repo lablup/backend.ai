@@ -105,7 +105,7 @@ Generated using BackendAIConfigMeta annotations.
         )
         generator = TOMLGenerator(env=config_env, config=generator_config)
         generator.generate_to_file(ManagerUnifiedConfig, output, header=header_comment.strip())
-        log.info(f"Sample configuration file generated successfully: {output}")
+        log.info("Sample configuration file generated successfully: {}", output)
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
 

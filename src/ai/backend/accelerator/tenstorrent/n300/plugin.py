@@ -82,7 +82,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("Tenstorrent acceleration is enabled.")
         except ImportError:
             log.warning("could not find Tenstorrent devices with VID 1eff.")

@@ -96,7 +96,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         self._enable_rsd = self.atom_config["general"]["enable_rsd"]
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("{} acceleration is enabled.", self.key)
         except ImportError:
             log.warning("could not find {} devices with VID 1eff.", self.key)

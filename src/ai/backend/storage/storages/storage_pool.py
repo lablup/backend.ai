@@ -41,7 +41,9 @@ class StoragePool(AbstractStoragePool):
         # Add Legacy Object Storage instances
         for legacy_storage_config in config.storages:
             log.debug(
-                f"Adding object storage: {legacy_storage_config.name} ({legacy_storage_config.endpoint})"
+                "Adding object storage: {} ({})",
+                legacy_storage_config.name,
+                legacy_storage_config.endpoint,
             )
             storages[legacy_storage_config.name] = ObjectStorage(
                 legacy_storage_config.name, legacy_storage_config
@@ -56,7 +58,9 @@ class StoragePool(AbstractStoragePool):
                             "vfs_storage config is required when storage_type is 'vfs_storage'"
                         )
                     log.info(
-                        f"Adding VFS storage: {storage_name} ({artifact_storage_config.vfs_storage.base_path})"
+                        "Adding VFS storage: {} ({})",
+                        storage_name,
+                        artifact_storage_config.vfs_storage.base_path,
                     )
                     storages[storage_name] = VFSStorage(
                         storage_name, artifact_storage_config.vfs_storage
@@ -68,7 +72,9 @@ class StoragePool(AbstractStoragePool):
                             "object_storage config is required when storage_type is 'object_storage'"
                         )
                     log.debug(
-                        f"Adding object storage: {storage_name} ({artifact_storage_config.object_storage.endpoint})"
+                        "Adding object storage: {} ({})",
+                        storage_name,
+                        artifact_storage_config.object_storage.endpoint,
                     )
                     storages[storage_name] = ObjectStorage(
                         storage_name, artifact_storage_config.object_storage

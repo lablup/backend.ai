@@ -144,8 +144,8 @@ class HealthProbe:
             while self._running:
                 try:
                     await self.check_all()
-                except Exception as e:
-                    log.error("Error in health probe loop: {}", e, exc_info=True)
+                except Exception:
+                    log.exception("Error in health probe loop")
                 finally:
                     await asyncio.sleep(self._options.check_interval)
         except asyncio.CancelledError:
@@ -167,8 +167,8 @@ class HealthProbe:
         except TimeoutError:
             log.warning("Health check timed out for {} after {}s", service_group, checker.timeout)
             return ServiceHealth(results={})
-        except Exception as e:
-            log.error("Health check failed for {}: {}", service_group, e, exc_info=True)
+        except Exception:
+            log.exception("Health check failed for {}", service_group)
             return ServiceHealth(results={})
 
     async def get_connectivity_status(self) -> ConnectivityCheckResponse:

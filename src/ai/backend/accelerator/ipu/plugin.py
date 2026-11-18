@@ -114,7 +114,7 @@ class IPUPlugin(AbstractComputePlugin):
             return
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.info("detected devices:\n{}", pformat(detected_devices))
             log.info("IPU acceleration is enabled.")
         except (ImportError, NoIPUoFConfError):
             log.warning("could not find Graphcore IPUs with gc-monitor command.")
@@ -122,7 +122,7 @@ class IPUPlugin(AbstractComputePlugin):
         try:
             await self.prepare_networks()
         except DockerNetworkError as e:
-            log.warning("error while preparing docker networks: " + e.args[0])
+            log.warning("error while preparing docker networks: {}", e.args[0])
             self.enabled = False
 
     async def list_devices(self) -> list[IPUDevice]:
