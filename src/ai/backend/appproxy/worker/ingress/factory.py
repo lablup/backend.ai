@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ai.backend.appproxy.worker.config import IngressConfig, IngressLayerType
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
+from ai.backend.appproxy.worker.ingress.invalidating import InvalidatingIngressWriter
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
 from ai.backend.appproxy.worker.ingress.validating import ValidatingIngressWriter
@@ -18,7 +19,7 @@ class IngressState:
     reader: LayeredIngressState
     writer: ValidatingIngressWriter | None
     """None when the worker holds no in-memory layer."""
-    in_memory: InMemoryIngressState | None
+    invalidating_writer: InvalidatingIngressWriter | None
 
 
 class IngressStateFactory:
@@ -37,12 +38,14 @@ class IngressStateFactory:
         readers: list[IngressReader] = []
         in_memory: InMemoryIngressState | None = None
         writer: ValidatingIngressWriter | None = None
+        invalidating_writer: InvalidatingIngressWriter | None = None
         for layer_type in self._config.layers:
             match layer_type:
                 case IngressLayerType.IN_MEMORY:
                     in_memory = self._in_memory()
                     readers.append(in_memory)
                     writer = ValidatingIngressWriter(in_memory, self._authority)
+                    invalidating_writer = InvalidatingIngressWriter(in_memory, self._authority)
                 case IngressLayerType.REDIS:
                     readers.append(self._redis())
         if not readers:
@@ -50,7 +53,7 @@ class IngressStateFactory:
         return IngressState(
             reader=LayeredIngressState(readers, in_memory=in_memory),
             writer=writer,
-            in_memory=in_memory,
+            invalidating_writer=invalidating_writer,
         )
 
     def _in_memory(self) -> InMemoryIngressState:

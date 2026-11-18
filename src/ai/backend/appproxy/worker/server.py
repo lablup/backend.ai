@@ -761,12 +761,9 @@ async def handle_ingress_invalidated_event(
     _agent_id: AgentId,
     event: AppProxyIngressInvalidatedEvent,
 ) -> None:
-    in_memory = context.ingress_state.in_memory
-    if in_memory is not None:
-        ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
-        await in_memory.invalidate([
-            key.frontend_key for key in event.keys if key.authority == ingress_authority
-        ])
+    invalidating_writer = context.ingress_state.invalidating_writer
+    if invalidating_writer is not None:
+        await invalidating_writer.apply(event.keys)
 
 
 async def handle_proxy_route_event(

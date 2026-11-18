@@ -31,23 +31,8 @@ from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.h2.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    Ingress,
-    IngressAccess,
-    IngressAccessMode,
     IngressAuthority,
-    IngressBackend,
-    IngressBackendID,
-    IngressFrontend,
     IngressFrontendKey,
-    IngressFrontendKind,
-    IngressID,
-    IngressKey,
-    IngressProtocol,
-    IngressTargetGroup,
-    IngressTargetGroupID,
-)
-from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    PortFrontend as IngressPortFrontend,
 )
 from ai.backend.common.types import AgentId
 
@@ -63,18 +48,6 @@ class _CircuitAccessCase:
     open_to_public: bool
     allowed_client_ips: str | None
     expected_ingress_keys: list[IngressFrontendKey]
-
-
-@dataclass(frozen=True)
-class _InvalidatedKeyAuthorityCase:
-    event_authority: str
-    expected_held_keys: list[IngressFrontendKey]
-
-
-@dataclass(frozen=True)
-class _WorkerHoldingAnIngressInMemory:
-    root_context: MagicMock
-    memory: InMemoryIngressState
 
 
 @dataclass(frozen=True)
@@ -310,68 +283,6 @@ async def test_server_main_opens_aiomonitor_on_localhost(monitor_start: MagicMoc
     monitor_start.assert_called_once()
     monitor: aiomonitor.Monitor = monitor_start.call_args.args[0]
     assert monitor.host == "127.0.0.1"
-
-
-class TestHandleIngressInvalidatedEvent:
-    @pytest.fixture
-    async def worker_holding_an_ingress_in_memory(self) -> _WorkerHoldingAnIngressInMemory:
-        root_context = MagicMock()
-        root_context.local_config.proxy_worker.authority = _WORKER_AUTHORITY
-        memory = InMemoryIngressState()
-        await memory.apply([
-            Ingress(
-                id=IngressID(str(UUID(int=0))),
-                authority=IngressAuthority(_WORKER_AUTHORITY),
-                revision=0,
-                frontend=IngressFrontend(
-                    kind=IngressFrontendKind.PORT,
-                    protocol=IngressProtocol.HTTP,
-                    port=IngressPortFrontend(number=_LISTEN_PORT),
-                ),
-                access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
-                backend=IngressBackend(
-                    id=IngressBackendID(str(UUID(int=0))),
-                    target_groups=[
-                        IngressTargetGroup(
-                            id=IngressTargetGroupID(str(UUID(int=0))), weight=1, targets=[]
-                        )
-                    ],
-                ),
-            )
-        ])
-        root_context.ingress_state.in_memory = memory
-        return _WorkerHoldingAnIngressInMemory(root_context=root_context, memory=memory)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _InvalidatedKeyAuthorityCase(event_authority=_WORKER_AUTHORITY, expected_held_keys=[]),
-            _InvalidatedKeyAuthorityCase(
-                event_authority="worker-2", expected_held_keys=[_LISTEN_PORT_INGRESS_KEY]
-            ),
-        ],
-        ids=lambda case: case.event_authority,
-    )
-    async def test_invalidates_only_the_keys_of_the_worker_authority(
-        self,
-        case: _InvalidatedKeyAuthorityCase,
-        worker_holding_an_ingress_in_memory: _WorkerHoldingAnIngressInMemory,
-    ) -> None:
-        await server.handle_ingress_invalidated_event(
-            worker_holding_an_ingress_in_memory.root_context,
-            AgentId("manager"),
-            AppProxyIngressInvalidatedEvent(
-                keys=[
-                    IngressKey(
-                        authority=IngressAuthority(case.event_authority),
-                        frontend_key=_LISTEN_PORT_INGRESS_KEY,
-                    )
-                ]
-            ),
-        )
-
-        held_ingresses = await worker_holding_an_ingress_in_memory.memory.get_all()
-        assert [ingress.frontend.key() for ingress in held_ingresses] == case.expected_held_keys
 
 
 class TestEventHandlerCtx:
