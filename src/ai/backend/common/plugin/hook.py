@@ -3,9 +3,18 @@ from __future__ import annotations
 import enum
 from abc import ABCMeta, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, override
 
 import attrs
+from aiohttp import web
+
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 
 from . import AbstractPlugin
 
@@ -16,6 +25,7 @@ __all__ = (
     "PASSED",
     "REJECTED",
     "HookHandler",
+    "HookHandlerFailed",
     "HookPlugin",
     "HookResult",
     "HookResults",
@@ -55,6 +65,21 @@ class Reject(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class HookHandlerFailed(BackendAIError, web.HTTPInternalServerError):
+    """Raised by ``dispatch()`` when a hook handler raises an exception other than :class:`Reject`."""
+
+    error_type = "https://api.backend.ai/probs/hook-handler-failed"
+    error_title = "A hook plugin handler failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.HOOK,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
 
 
 class HookResults(enum.Enum):
