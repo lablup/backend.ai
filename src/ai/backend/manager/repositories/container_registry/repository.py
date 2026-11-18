@@ -2,6 +2,7 @@ import logging
 import uuid
 
 import sqlalchemy as sa
+import yarl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import ContainerRegistryType
@@ -225,18 +226,16 @@ class ContainerRegistryRepository:
 
     @container_registry_repository_resilience.apply()
     async def get_known_registries(self) -> dict[str, str]:
+        query = sa.select(
+            ContainerRegistryRow.project,
+            ContainerRegistryRow.registry_name,
+            ContainerRegistryRow.url,
+        ).where(ContainerRegistryRow.project.is_not(None))
         async with self._db.begin_readonly_session_read_committed() as session:
-            known_registries_map = await ContainerRegistryRow.get_known_container_registries(
-                session
-            )
-
-            known_registries = {}
-            for project, registries in known_registries_map.items():
-                for registry_name, url in registries.items():
-                    if project not in known_registries:
-                        known_registries[f"{project}/{registry_name}"] = url.human_repr()
-
-            return known_registries
+            rows = (await session.execute(query)).all()
+        return {
+            f"{row.project}/{row.registry_name}": yarl.URL(row.url).human_repr() for row in rows
+        }
 
     @container_registry_repository_resilience.apply()
     async def get_registry_by_url_and_project(
