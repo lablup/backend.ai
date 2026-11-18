@@ -11232,6 +11232,64 @@
         "title": "PurgeDomainInput",
         "type": "object"
       },
+      "DomainContainerRegistryRelationInput": {
+        "description": "One domain and one container registry, the two ends of a relation.",
+        "properties": {
+          "domain_id": {
+            "description": "ID of the domain.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          },
+          "container_registry_id": {
+            "description": "ID of the container registry.",
+            "format": "uuid",
+            "title": "Container Registry Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain_id",
+          "container_registry_id"
+        ],
+        "title": "DomainContainerRegistryRelationInput",
+        "type": "object"
+      },
+      "NonEmptyList_DomainContainerRegistryRelationInput_": {
+        "items": {
+          "$ref": "#/components/schemas/DomainContainerRegistryRelationInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "CreateDomainContainerRegistryRelationsInput": {
+        "description": "Input for creating relations between domains and container registries.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_DomainContainerRegistryRelationInput_",
+            "description": "The domain and container registry pairs to relate. At least one."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CreateDomainContainerRegistryRelationsInput",
+        "type": "object"
+      },
+      "PurgeDomainContainerRegistryRelationsInput": {
+        "description": "Input for purging relations between domains and container registries.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_DomainContainerRegistryRelationInput_",
+            "description": "The domain and container registry pairs whose relations to purge. At least one."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PurgeDomainContainerRegistryRelationsInput",
+        "type": "object"
+      },
       "DeleteDomainInput": {
         "description": "Input for soft-deleting a domain.",
         "properties": {
@@ -55903,6 +55961,64 @@
         },
         "parameters": [],
         "description": "Permanently purge a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/domains/container-registry-relations/create": {
+      "post": {
+        "operationId": "v2/domains.create_container_registry_relations",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDomainContainerRegistryRelationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create relations between domains and container registries.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/domains/container-registry-relations/purge": {
+      "post": {
+        "operationId": "v2/domains.purge_container_registry_relations",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeDomainContainerRegistryRelationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge relations between domains and container registries.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/domains/delete": {

@@ -12,24 +12,29 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainContainerRegistryRelationsInput,
     CreateDomainInput,
     DomainFilter,
     DomainOrder,
     PartialBulkDeleteDomainsInput,
     PartialBulkRestoreDomainsInput,
     PartialBulkUpdateDomainsInput,
+    PurgeDomainContainerRegistryRelationsInput,
     PurgeDomainInput,
     ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
+    CreateDomainContainerRegistryRelationsPayload,
     DeleteDomainPayload,
     DomainBasicInfo,
+    DomainContainerRegistryRelation,
     DomainLifecycleInfo,
     DomainNode,
     DomainPayload,
     DomainRegistryInfo,
+    PurgeDomainContainerRegistryRelationsPayload,
     PurgeDomainPayload,
     RestoreDomainPayload,
 )
@@ -67,6 +72,12 @@ from ai.backend.manager.models.domain.updaters import (
     DomainSoftDeleteUpdater,
     DomainUpdater,
 )
+from ai.backend.manager.models.domain_container_registry_relation.creators import (
+    DomainContainerRegistryRelationCreator,
+)
+from ai.backend.manager.models.domain_container_registry_relation.purgers import (
+    DomainContainerRegistryRelationPurger,
+)
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
@@ -96,6 +107,10 @@ from ai.backend.manager.services.domain.actions.update_container_registry_relati
 )
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
+from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
+from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
@@ -108,9 +123,11 @@ class DomainAdapter(BaseAdapter):
     """Adapter for domain operations."""
 
     _domain: DomainProcessors
+    _rbac: RbacProcessors
 
-    def __init__(self, domain: DomainProcessors) -> None:
+    def __init__(self, domain: DomainProcessors, rbac: RbacProcessors) -> None:
         self._domain = domain
+        self._rbac = rbac
 
     async def bulk_lookup_names(self, names: Sequence[str]) -> list[DomainID | None]:
         """The id of the domain each name names, ``None`` for a name matching none.
@@ -326,6 +343,60 @@ class DomainAdapter(BaseAdapter):
                 domain_id=domain_id, registry_ids=registry_ids
             )
         )
+
+    async def create_container_registry_relations(
+        self, input: CreateDomainContainerRegistryRelationsInput
+    ) -> CreateDomainContainerRegistryRelationsPayload:
+        """Create a relation for each named pair. The permission is asked of every domain
+        and every registry; a relation that already exists is left as it stands."""
+        result = await self._rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[
+                    RelationPair(
+                        scope=DomainID(item.domain_id),
+                        target=ContainerRegistryID(item.container_registry_id),
+                    )
+                    for item in input.items
+                ],
+                creator=DomainContainerRegistryRelationCreator(),
+            )
+        )
+        created: list[DomainContainerRegistryRelation] = []
+        for relation in result.results:
+            if relation.linked:
+                created.append(
+                    DomainContainerRegistryRelation(
+                        domain_id=relation.pair.scope, container_registry_id=relation.pair.target
+                    )
+                )
+        return CreateDomainContainerRegistryRelationsPayload(items=created)
+
+    async def purge_container_registry_relations(
+        self, input: PurgeDomainContainerRegistryRelationsInput
+    ) -> PurgeDomainContainerRegistryRelationsPayload:
+        """Purge the relation of each named pair. The permission is asked of every domain
+        and every registry; a relation that does not exist is skipped."""
+        result = await self._rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(
+                        scope=DomainID(item.domain_id),
+                        target=ContainerRegistryID(item.container_registry_id),
+                    )
+                    for item in input.items
+                ],
+                purger=DomainContainerRegistryRelationPurger(),
+            )
+        )
+        purged: list[DomainContainerRegistryRelation] = []
+        for relation in result.results:
+            if relation.unlinked:
+                purged.append(
+                    DomainContainerRegistryRelation(
+                        domain_id=relation.pair.scope, container_registry_id=relation.pair.target
+                    )
+                )
+        return PurgeDomainContainerRegistryRelationsPayload(items=purged)
 
     async def _apply_deprecated_is_active(
         self, data: DomainData, is_active: bool | None | Unset
