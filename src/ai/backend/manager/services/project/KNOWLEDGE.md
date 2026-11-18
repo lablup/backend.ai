@@ -1,13 +1,12 @@
 ---
 name: project-service-composition
 type: decision-table
-description: why a project's operations take the shapes they do, why dotfiles are a column of the project row, why membership takes a path of its own, what a personal project changes
+description: why a project's operations take the shapes they do, why membership takes a path of its own, what a personal project changes
 scope: src/ai/backend/manager/services/project
 keywords:
   - GroupProcessors
   - GroupCreator
   - GroupUpdater
-  - GroupDotfilesUpdater
   - assign_users_to_project
   - RoleManagedEntityCreator
   - ProjectType
@@ -33,6 +32,9 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 `backend.ai mgr ops list --concern organization --entity project` prints the wired
 list. Its output answers the entity type, shape, operation, gate and backing.
+
+A project's dotfiles are auto-generated files the project owns. The auto-generated file
+actions serve them, not this service; `services/user/KNOWLEDGE.md` describes those.
 
 ## Personal projects
 
