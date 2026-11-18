@@ -243,6 +243,7 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/versions/305e3ddc20a7_update_auditlog_table.py" = ["TRY400", "TRY401"]
 # __all__ is the sum of the submodules' __all__
 "src/ai/backend/appproxy/coordinator/models/__init__.py" = ["PLE0604"]
+"src/ai/backend/account_manager/models/__init__.py" = ["PLE0604"]
 "src/ai/backend/client/__init__.py" = ["PLE0604"]
 # decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
 "src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
