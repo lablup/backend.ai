@@ -78,6 +78,11 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                     reason=e.reason,
                 )
             except Exception as e:
+                log.exception(
+                    "hook handler failed",
+                    event_name=event_name,
+                    plugin_name=plugin_name,
+                )
                 return HookResult(
                     status=ERROR,
                     src_plugin=plugin_name,
