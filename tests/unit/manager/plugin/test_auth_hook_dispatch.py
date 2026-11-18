@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.data.auth.types import AuthorizingUser
@@ -82,3 +83,20 @@ class TestAuthorizeAfterKeypairReturnsNone:
         assert hook_result.status == PASSED
         assert hook_result.result == _ACTIVE_USER
         assert hook_result.src_plugin == "openid"
+
+
+class TestKeypairHookStartup:
+    async def test_missing_secret_fails_plugin_loading(self) -> None:
+        etcd = MagicMock(spec=AsyncEtcd)
+        etcd.get_prefix = AsyncMock(return_value={})
+        ctx = HookPluginContext(etcd, {})
+
+        with (
+            patch.object(
+                HookPluginContext,
+                "discover_plugins",
+                return_value=[("auth_keypair", KeypairAuthHookPlugin)],
+            ),
+            pytest.raises(BackendAISchemaValidationFailed),
+        ):
+            await ctx.init(context={"webapp": {"openid": {}}}, allowlist={"auth_keypair"})
