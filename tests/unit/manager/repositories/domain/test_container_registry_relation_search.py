@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain_container_registry_relation.row import (
@@ -111,15 +112,22 @@ class TestDomainContainerRegistryRelationSearch:
             (relations.both, relations.other),
         }
 
-    async def test_scoped_search_is_narrowed_by_a_used_registry(
+    async def test_scoped_search_is_narrowed_by_a_registry(
         self, repository: DomainRepository, relations: _Relations
     ) -> None:
-        usage = DomainContainerRegistryRelationSearchableFields.linked.usage
+        registry = DomainContainerRegistryRelationSearchableFields.own.container_registry_id
         result = await repository.scoped_search_container_registry_relations(
             ScopedSearcher(
                 scopes=[DomainContainerRegistryRelationTarget(relations.both)],
-                used_by=[usage.container_registries.uses(relations.other)],
-                searcher=DomainContainerRegistryRelationSearcher(pagination=NoPagination()),
+                used_by=(),
+                searcher=DomainContainerRegistryRelationSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        registry.filter.equals(
+                            UUIDEqualMatchSpec(value=relations.other, negated=False)
+                        )
+                    ],
+                ),
             )
         )
 
@@ -127,14 +135,21 @@ class TestDomainContainerRegistryRelationSearch:
             (relations.both, relations.other)
         ]
 
-    async def test_global_search_reads_every_domain_of_a_used_registry(
+    async def test_global_search_reads_every_domain_of_a_registry(
         self, repository: DomainRepository, relations: _Relations
     ) -> None:
-        usage = DomainContainerRegistryRelationSearchableFields.linked.usage
+        registry = DomainContainerRegistryRelationSearchableFields.own.container_registry_id
         result = await repository.global_search_container_registry_relations(
             GlobalSearcher(
-                used_by=[usage.container_registries.uses(relations.shared)],
-                searcher=DomainContainerRegistryRelationSearcher(pagination=NoPagination()),
+                used_by=(),
+                searcher=DomainContainerRegistryRelationSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        registry.filter.equals(
+                            UUIDEqualMatchSpec(value=relations.shared, negated=False)
+                        )
+                    ],
+                ),
             )
         )
 
