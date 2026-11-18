@@ -82,13 +82,8 @@ if TYPE_CHECKING:
 type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 type DeviceCapacityMap = Mapping[tuple[SlotName, DeviceId], Decimal]
 
-<<<<<<< HEAD
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-known_slot_types: Mapping[SlotName, SlotTypes] = {}
-=======
-log = StructuredLogger(logging.getLogger(__spec__.name))
 known_slot_types: dict[SlotName, SlotTypes] = {}
->>>>>>> d62855f0 (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
 _GPU_ALLOC_RATIO_PRECISION = Decimal("0.0001")
 
 

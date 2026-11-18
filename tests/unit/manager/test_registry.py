@@ -5,12 +5,7 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
-<<<<<<< HEAD
-from typing import Any
-=======
-from datetime import datetime
 from typing import Any, cast
->>>>>>> d62855f0 (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

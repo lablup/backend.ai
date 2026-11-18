@@ -631,18 +631,9 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-<<<<<<< HEAD
-                await self._dispatch_consumers(cast(MQMessage, msg))
-            except Exception as e:
-                log.exception(
-                    "EventDispatcher._consume_loop: unexpected-error, {}",
-                    repr(e),
-                )
-=======
                 await self._dispatch_consumers(msg)
             except Exception:
                 log.exception("event consume loop failed")
->>>>>>> d62855f0 (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
@@ -652,18 +643,9 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-<<<<<<< HEAD
-                await self._dispatch_subscribers(cast(BroadcastMessagePayload, msg))
-            except Exception as e:
-                log.exception(
-                    "EventDispatcher._subscribe_loop: unexpected-error, {}",
-                    repr(e),
-                )
-=======
                 await self._dispatch_subscribers(msg)
             except Exception:
                 log.exception("event subscribe loop failed")
->>>>>>> d62855f0 (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 

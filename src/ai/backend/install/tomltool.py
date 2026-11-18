@@ -32,15 +32,10 @@ def toml_get(filepath: str, key: str) -> str:
             ):
                 table = table[match_index.group("key")][int(index)]
             else:
-<<<<<<< HEAD
-                table = table[k]  # type: ignore
-        return table  # type: ignore
-    except NonExistentKey:
-        raise
-=======
                 table = table[k]
         return cast(str, table)
->>>>>>> d62855f0 (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
+    except NonExistentKey:
+        raise
     finally:
         if isinstance(file, io.BufferedIOBase):
             file.close()

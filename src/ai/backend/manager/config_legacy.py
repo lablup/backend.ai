@@ -98,11 +98,7 @@ manager_local_config_iv = (
             t.Key(
                 "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
             ): tx.Path(type="file"),
-<<<<<<< HEAD
-            t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
-=======
             t.Key("heartbeat-timeout", default=40.0): t.Float(gte=1.0),
->>>>>>> d62855f0 (fix(BAI-787): enable ruff PGH003 and remove bare type: ignore comments (#17178))
             t.Key("secret", default=None): t.Null | t.String,
             t.Key("ssl-enabled", default=False): t.ToBool,
             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
