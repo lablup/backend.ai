@@ -88,7 +88,11 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
                 # pprint(result)
         except TimeoutError:
+<<<<<<< HEAD
             log.error("Timeout occurred while reading the response from ag:{}", agent_id)
+=======
+            log.exception("timed out while reading the response from the agent", agent_id=agent_id)
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
         except Exception:
             log.exception("Exception occurred while reading the response from ag:{}", agent_id)
         finally:

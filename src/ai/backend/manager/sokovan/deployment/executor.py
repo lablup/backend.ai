@@ -210,12 +210,17 @@ class DeploymentExecutor:
                 await self._build_endpoint_item(dep.deployment_info, rev)
                 for dep, rev, _ in group_entries
             ]
+<<<<<<< HEAD
         except BaseException as exc:
             log.error(
                 "Failed to build endpoint items for proxy {}: {}",
                 addr,
                 exc,
             )
+=======
+        except Exception as exc:
+            log.exception("endpoint item build failed", proxy_address=addr)
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
             for deployment, _, _ in group_entries:
                 failures.append(
                     DeploymentExecutionError(
@@ -254,12 +259,17 @@ class DeploymentExecutor:
             dep_id = deployment.deployment_info.id
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
+<<<<<<< HEAD
             except BaseException as exc:
                 log.error(
                     "Failed to persist endpoint URL for deployment {}: {}",
                     dep_id,
                     exc,
                 )
+=======
+            except Exception as exc:
+                log.exception("endpoint URL not persisted", deployment_id=dep_id)
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
                 failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,

@@ -130,9 +130,15 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
                 )
                 pprint(await image_row.inspect())
         except UnknownImageReference:
+<<<<<<< HEAD
             log.exception("Image not found.")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+            log.exception("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
@@ -141,6 +147,7 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
             )
+<<<<<<< HEAD
             async with db.begin_session() as session:
                 image_row = await session.get_one(ImageRow, image.id)
                 await image_row.mark_as_deleted(session)
@@ -148,6 +155,13 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
             log.exception("Image not found.")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+            await ImageDBSource(db, V2DBOpsProvider(db)).mark_image_deleted_by_id(image.id)
+        except (UnknownImageReference, ImageNotFound):
+            log.exception("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
 
 
 async def purge_image(
@@ -176,9 +190,15 @@ async def purge_image(
                 await scanner.untag(image.image_ref)
 
         except UnknownImageReference:
+<<<<<<< HEAD
             log.exception("Image not found.")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+            log.exception("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
 
 
 async def set_image_resource_limit(
@@ -197,9 +217,15 @@ async def set_image_resource_limit(
                 image_row = await session.get_one(ImageRow, image.id)
                 image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
+<<<<<<< HEAD
             log.exception("Image not found.")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+            log.exception("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
 
 
 async def rescan_images(
@@ -228,9 +254,17 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
                 image_row = await session.get_one(ImageRow, image.id)
                 await ImageAliasRow.create(session, alias, image_row)
         except UnknownImageReference:
+<<<<<<< HEAD
             log.exception("Image not found.")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+            log.exception("image not found", image_ref=target)
+        except UniqueConstraintViolationError:
+            log.exception("image alias already exists", image_alias=alias)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
@@ -259,9 +293,15 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
                 print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
+<<<<<<< HEAD
             log.error(f"No images were found with alias: {alias}")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+            log.exception("no images found with the alias", image_alias=alias)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
 
 
 def _resolve_architecture(current: bool, architecture: str | None) -> str:
@@ -306,7 +346,14 @@ async def validate_image_canonical(
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: {value}")
 
+<<<<<<< HEAD
         except UnknownImageReference as e:
             log.error(f"{e}")
         except Exception as e:
             log.exception(f"An error occurred. Error: {e}")
+=======
+        except UnknownImageReference:
+            log.exception("image not found", image_ref=canonical)
+        except Exception:
+            log.exception("image command failed")
+>>>>>>> 6e1df398 (fix(BAI-780): enable ruff TRY400 and TRY401 and log caught exceptions with logging.exception (#17180))
