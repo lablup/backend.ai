@@ -144,8 +144,9 @@ fi
 
 venv=$(mktemp -d)
 trap 'rm -rf "$scratch" "$venv"' EXIT
-uv venv --quiet --allow-existing "$venv"
-uv pip install --quiet --python "$venv" --group pyproject.toml:lint
+python3 -m venv "$venv"
+"$venv/bin/pip" install --quiet --disable-pip-version-check uv
+"$venv/bin/uv" pip install --quiet --python "$venv" --group pyproject.toml:lint
 (
   cd "$scratch"
   python3 "$freeze_script" "$line"

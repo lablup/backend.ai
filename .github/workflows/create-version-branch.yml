@@ -53,8 +53,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.x'
-      - name: Install uv
-        run: pip install uv
       - name: Freeze the cut line and advance NEXT_RELEASE_VERSION on main
         # Set the `NEXT_DEV_VERSION` repository variable (e.g. 27.1.0) before
         # cutting the last line of a year, and clear it afterwards.
