@@ -427,7 +427,7 @@ preview = true  # enable the black's preview style
 [tool.mypy]
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
 strict = true
-mypy_path = "stubs:src:tests/scenario"
+mypy_path = "stubs:src:tests/scenario:tools/flake8-plugins"
 namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.18/bin/python"
