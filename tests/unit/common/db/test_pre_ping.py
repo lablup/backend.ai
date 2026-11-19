@@ -144,6 +144,8 @@ class TestPrePingTimeout:
             stale = (await conn.get_raw_connection()).driver_connection
             await conn.execute(sa.text("SELECT 1"))
         assert stale is not None
+        # driver_connection is the asyncpg connection, or its SQLAlchemy adapter in older versions.
+        stale_connection = getattr(stale, "_connection", stale)
         relay.freeze()
 
         started = time.monotonic()
@@ -158,5 +160,5 @@ class TestPrePingTimeout:
         elapsed = time.monotonic() - started
 
         assert PRE_PING_TIMEOUT <= elapsed < PRE_PING_TIMEOUT + 4
-        assert stale.is_closed()
+        assert stale_connection.is_closed()
         assert fresh is not stale
