@@ -243,7 +243,7 @@ ignore = [
 "typing_extensions.Sentinel" = {msg = "Use UNSET and Unset from ai.backend.common.tristate.unset."}
 
 [tool.ruff.lint.isort]
-known-first-party = ["ai.backend", "bai_scenario"]
+known-first-party = ["ai.backend", "bai_scenario", "flake8_bai"]
 known-local-folder = ["src"]
 known-third-party = ["alembic", "kubernetes"]
 split-on-trailing-comma = true

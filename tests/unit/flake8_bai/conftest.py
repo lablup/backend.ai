@@ -3,6 +3,7 @@ import textwrap
 from collections.abc import Callable
 
 import pytest
+
 from flake8_bai.plugin import Plugin
 
 
