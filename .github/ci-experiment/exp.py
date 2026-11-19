@@ -13,6 +13,7 @@ exp.py batches <list> <workers> <size> <junit-prefix> -- <pytest...>
                                             run the list in batches of <size> files on
                                             <workers> processes, each its own
                                             BACKEND_TEST_EXEC_SLOT
+exp.py fixtures <log>                       print the container fixture setup totals
 """
 
 from __future__ import annotations
@@ -149,6 +150,19 @@ def cmd_batches(listing: str, workers: str, size: str, junit: str, command: list
     return 1 if any(c not in (0, 5) for c in codes) else 0
 
 
+def cmd_fixtures(log: str) -> int:
+    totals: dict[str, list[float]] = {}
+    path = pathlib.Path(log)
+    for line in path.read_text().splitlines() if path.exists() else []:
+        name, seconds = line.split("\t")
+        totals.setdefault(name, []).append(float(seconds))
+    every = [s for v in totals.values() for s in v]
+    out(f"containers\t{sum(every):.1f}s in {len(every)} setups, max {max(every, default=0):.1f}s\t")
+    for name, values in sorted(totals.items()):
+        out(f"{name}\t{sum(values):.1f}s in {len(values)} setups, max {max(values):.1f}s\t")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     match argv:
         case ["time", log, label, "--", *command]:
@@ -167,6 +181,8 @@ def main(argv: list[str]) -> int:
             return cmd_addresses(listing)
         case ["compare", ours, pants]:
             return cmd_compare(ours, pants)
+        case ["fixtures", log]:
+            return cmd_fixtures(log)
         case ["batches", listing, workers, size, junit, "--", *command]:
             return cmd_batches(listing, workers, size, junit, command)
     sys.stderr.write(__doc__ or "")

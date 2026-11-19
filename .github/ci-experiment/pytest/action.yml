@@ -60,12 +60,14 @@ runs:
         $EXP/exp.py shard "$LIST" "$SHARD" "$COUNT" > ../shard.txt
         $EXP/exp.py note "$TIMINGS" "files" "$(wc -l < ../shard.txt)"
         if [ ! -s ../shard.txt ]; then echo "No tests in this shard"; exit 0; fi
-        export PYTHONPATH="$PWD/src:$PWD/tests/scenario:$PWD"
+        export PYTHONPATH="$PWD/src:$PWD/tests/scenario:$PWD:$PWD/$EXP"
+        export EXP_FIXTURE_LOG="$PWD/../fixtures.tsv"
         export BACKEND_BUILD_ROOT="$PWD"
         mkdir -p dist
         # `[test]` in pants.toml: 180s per test, a failed test runs once more.
         pytest=(.venv/bin/python -m pytest --import-mode=importlib
-          --timeout=180 --reruns=1 -vv --no-header --suppress-no-test-exit-code -o junit_family=xunit2 -p no:cacheprovider)
+          --timeout=180 --reruns=1 -vv --no-header --suppress-no-test-exit-code -o junit_family=xunit2 -p no:cacheprovider
+          -p exp_fixture_timer)
         if [ "$WORKERS" = 0 ]; then
           $EXP/exp.py time "$TIMINGS" "pytest $SUITE (1 process)" -- \
             "${pytest[@]}" --junitxml=dist/junit-0.xml $(cat ../shard.txt)
@@ -103,6 +105,7 @@ runs:
             print(f"- FAILED `{name}`")
         EOF
         fi
+        $EXP/exp.py fixtures ../fixtures.tsv | tee -a "$TIMINGS"
         $EXP/exp.py summary "$TIMINGS" "exp-${{ inputs.suite }}" >> "$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@v5
       if: always()
