@@ -14,7 +14,7 @@ Organized by target component: `common/dto/{manager|agent|storage|clients|intern
 
 ## Rules
 
-- All DTOs must inherit from `BaseRequestModel` (Pydantic v2).
+- All DTOs must inherit from `BaseRequestModel` (Pydantic v2; flake8 `BAI201`, on or off in `tools/flake8-plugins/README.md`).
 - No business logic: validation and serialization only.
 - Use only `v2/` DTOs (for example, `common/dto/manager/v2/`). DTOs outside `v2/` are deprecated and must not be used in new code.
 
