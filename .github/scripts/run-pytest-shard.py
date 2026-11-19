@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Run one shard of a test list with pytest, without Pants.
 
-    run-pytest-shard.py --list <file> --shard k/N --mode per-file|batched \\
+    run-pytest-shard.py --list <file> --mode per-file|batched \\
         --junit-dir <dir> --python <python> [--workers <n>] [-- <pytest arguments>]
 
-<file> lists test files, one path per line. The shard holds the files with
-``crc32(path) % N == k``, the split ``plan-ci-targets.py`` plans. ``--workers`` processes
+<file> lists the test files of one shard, one path per line: ``<suite>.<k>.txt`` of
+``plan-ci-targets.py``. ``--workers`` processes
 (default ``os.cpu_count()``) run side by side, each with its own
 ``BACKEND_TEST_EXEC_SLOT``, the container slot of ``tests/README.md``:
 
@@ -32,7 +32,6 @@ import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
-import zlib
 
 TIMEOUT = 180
 RERUNS = 1
@@ -44,14 +43,8 @@ def out(text: str) -> None:
     sys.stdout.flush()
 
 
-def parse_shard(value: str) -> tuple[int, int]:
-    index, _, count = value.partition("/")
-    return int(index), int(count)
-
-
-def select(listing: pathlib.Path, index: int, count: int) -> list[str]:
-    paths = [p.strip() for p in listing.read_text().splitlines() if p.strip()]
-    return [p for p in paths if zlib.crc32(p.encode()) % count == index]
+def read_list(listing: pathlib.Path) -> list[str]:
+    return [p.strip() for p in listing.read_text().splitlines() if p.strip()]
 
 
 def split_batches(files: list[str], mode: str, workers: int) -> list[list[str]]:
@@ -144,7 +137,6 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--list", required=True, type=pathlib.Path)
-    parser.add_argument("--shard", required=True)
     parser.add_argument("--mode", required=True, choices=("per-file", "batched"))
     parser.add_argument("--workers", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--junit-dir", required=True, type=pathlib.Path)
@@ -153,8 +145,7 @@ def main() -> int:
     parser.add_argument("pytest_args", nargs="*")
     args = parser.parse_args()
 
-    index, count = parse_shard(args.shard)
-    files = select(args.list, index, count)
+    files = read_list(args.list)
     if not files:
         out("No tests in this shard")
         return 0
@@ -181,7 +172,7 @@ def main() -> int:
         *args.pytest_args,
     ]
     batches = split_batches(files, args.mode, max(1, args.workers))
-    out(f"shard {args.shard}: {len(files)} files, {len(batches)} processes")
+    out(f"{args.list.name}: {len(files)} files, {len(batches)} processes")
     codes = run_all(batches, max(1, args.workers), command, args.junit_dir, env)
     summary = summarize(args.junit_dir)
     if args.summary is not None:
