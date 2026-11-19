@@ -4,7 +4,11 @@ from collections.abc import Iterator
 from flake8_bai.rules.action_frozen import ActionFrozenRule
 from flake8_bai.rules.action_pair import ActionPairRule
 from flake8_bai.rules.base import Rule, SourcePath
+from flake8_bai.rules.cli_dto_import import CliDtoImportRule
 from flake8_bai.rules.data_frozen import DataFrozenRule
+from flake8_bai.rules.dto_conversion import DtoConversionRule
+from flake8_bai.rules.dto_dataclass import DtoDataclassRule
+from flake8_bai.rules.dto_schema_base import DtoSchemaBaseRule
 from flake8_bai.rules.init_import import InitImportRule
 
 
@@ -16,6 +20,10 @@ class Plugin:
         DataFrozenRule,
         ActionFrozenRule,
         ActionPairRule,
+        DtoDataclassRule,
+        DtoSchemaBaseRule,
+        DtoConversionRule,
+        CliDtoImportRule,
     )
 
     _tree: ast.Module

@@ -58,7 +58,7 @@ Only operations outside the 6-operation pattern use different names:
 - get, delete and purge take the entity identifier (UUID, name) as a positional argument.
 - search filters use `--option` flags: `./bai admin domain search --name-contains foo`
 - Use the `print_result()` helper for JSON output.
-- Lazy-import DTO classes inside the command function.
+- Lazy-import DTO classes inside the command function (flake8 `BAI204`, on or off in `tools/flake8-plugins/README.md`).
 
 ## Adding a new entity
 
