@@ -1,0 +1,89 @@
+name: exp-pytest
+description: Run one shard of a test list with pytest directly, retrying a failed test once.
+inputs:
+  suite:
+    description: unit or component
+    required: true
+  list:
+    description: The test files, one path per line
+    required: true
+  shard:
+    description: This shard's index
+    required: true
+  count:
+    description: The number of shards
+    required: true
+  workers:
+    description: pytest-xdist workers (`--dist loadfile`); 0 runs one process
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.13.18'
+    - name: Restore the venv
+      id: venv
+      uses: actions/cache@v5
+      with:
+        path: .venv
+        key: exp-venv-${{ runner.os }}-${{ hashFiles('python.lock', 'python.lock.metadata') }}-${{ hashFiles('.github/ci-experiment/requirements-extra.txt') }}
+    - name: Build the venv
+      if: steps.venv.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        pip install uv
+        $EXP/exp.py time "$TIMINGS" "venv" -- $EXP/setup-venv.sh 3.13.18 .venv ../venv-work
+    - name: Configure the redis sentinel hostnames
+      if: inputs.suite == 'component'
+      shell: bash
+      run: |
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+    - name: Test
+      shell: bash
+      env:
+        LIST: ${{ inputs.list }}
+        SHARD: ${{ inputs.shard }}
+        COUNT: ${{ inputs.count }}
+        WORKERS: ${{ inputs.workers }}
+        SUITE: ${{ inputs.suite }}
+        VENV_HIT: ${{ steps.venv.outputs.cache-hit }}
+      run: |
+        $EXP/exp.py note "$TIMINGS" "venv cache hit" "$VENV_HIT"
+        $EXP/exp.py shard "$LIST" "$SHARD" "$COUNT" > ../shard.txt
+        $EXP/exp.py note "$TIMINGS" "files" "$(wc -l < ../shard.txt)"
+        if [ ! -s ../shard.txt ]; then echo "No tests in this shard"; exit 0; fi
+        export PYTHONPATH="$PWD/src:$PWD/tests/scenario:$PWD:$PWD/$EXP"
+        export BACKEND_BUILD_ROOT="$PWD"
+        flags=(-p xdist_slot)
+        if [ "$WORKERS" != 0 ]; then flags+=(-n "$WORKERS" --dist loadfile); fi
+        # `[test]` in pants.toml: 180s per test, a failed test runs once more.
+        $EXP/exp.py time "$TIMINGS" "pytest $SUITE" -- \
+          .venv/bin/python -m pytest --import-mode=importlib "${flags[@]}" \
+            --timeout=180 --reruns=1 -vv --no-header --suppress-no-test-exit-code \
+            -o junit_family=xunit2 --junitxml=dist/junit.xml $(cat ../shard.txt)
+    - name: Summarize the failures
+      if: always()
+      shell: bash
+      run: |
+        if [ -f dist/junit.xml ]; then
+          python3 - dist/junit.xml <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+        import sys, xml.etree.ElementTree as ET
+        root = ET.parse(sys.argv[1]).getroot()
+        suites = [root] if root.tag == "testsuite" else list(root)
+        total = {k: sum(int(s.get(k, 0)) for s in suites) for k in ("tests", "failures", "errors", "skipped")}
+        print(f"### Tests: {total}\n")
+        for case in root.iter("testcase"):
+            if case.find("failure") is not None or case.find("error") is not None:
+                print(f"- FAILED `{case.get('classname')}::{case.get('name')}`")
+        EOF
+        fi
+        $EXP/exp.py summary "$TIMINGS" "exp-${{ inputs.suite }}" >> "$GITHUB_STEP_SUMMARY"
+    - uses: actions/upload-artifact@v5
+      if: always()
+      with:
+        name: junit-${{ inputs.suite }}-${{ github.job }}-${{ inputs.shard }}-of-${{ inputs.count }}
+        path: dist/junit.xml
+        if-no-files-found: ignore
