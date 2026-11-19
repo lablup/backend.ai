@@ -203,4 +203,4 @@ and the migration is judged separately.
 
 ## Legacy
 
-- Do not copy `gql_legacy/` (Graphene) patterns: migrating to Strawberry.
+- Do not import `gql_legacy/` or copy its (Graphene) patterns: migrating to Strawberry.

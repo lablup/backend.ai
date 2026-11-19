@@ -478,3 +478,295 @@ warn_required_dynamic_aliases = false
 
 [tool.setuptools.dynamic]
 version = { file = "VERSION" }
+
+[tool.importlinter]
+root_package = "ai.backend"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+id = "manager-layers"
+name = "Manager layer order: api > services > repositories > models"
+type = "layers"
+layers = [
+    "ai.backend.manager.api",
+    "ai.backend.manager.services",
+    "ai.backend.manager.repositories",
+    "ai.backend.manager.models",
+]
+ignore_imports = [
+    "ai.backend.manager.models.alembic.versions.592dedb4a39c_put_auto_generated_files_in_the_graph -> ai.backend.manager.cli.role_fixture",
+    "ai.backend.manager.models.alembic.versions.995eabef0eac_revoke_members_read_on_system_session_environ -> ai.backend.manager.cli.role_fixture",
+    "ai.backend.manager.models.alembic.versions.bf07cae92d86_grant_role_presets_on_system_session_environ -> ai.backend.manager.cli.role_fixture",
+]
+
+[[tool.importlinter.contracts]]
+id = "rest-v2-layer"
+name = "REST v2 imports no models, repositories or services"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.api.rest.v2"]
+forbidden_modules = [
+    "ai.backend.manager.models",
+    "ai.backend.manager.repositories",
+    "ai.backend.manager.services",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-gql-legacy"
+name = "gql and REST v2 import no gql_legacy"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.api.gql", "ai.backend.manager.api.rest.v2"]
+forbidden_modules = ["ai.backend.manager.api.gql_legacy"]
+
+[[tool.importlinter.contracts]]
+id = "services-layer"
+name = "services import no manager.dto or sqlalchemy"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.services"]
+forbidden_modules = ["ai.backend.manager.dto", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+id = "repositories-layer"
+name = "repositories import no manager.dto"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.repositories"]
+forbidden_modules = ["ai.backend.manager.dto"]
+
+[[tool.importlinter.contracts]]
+id = "models-layer"
+name = "models import no server, sokovan, clients or dto"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.models"]
+forbidden_modules = [
+    "ai.backend.manager.server",
+    "ai.backend.manager.sokovan",
+    "ai.backend.manager.clients",
+    "ai.backend.manager.dto",
+]
+
+[[tool.importlinter.contracts]]
+id = "data-layer"
+name = "manager/data imports no upper layer"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.data"]
+forbidden_modules = [
+    "ai.backend.manager.models",
+    "ai.backend.manager.repositories",
+    "ai.backend.manager.services",
+    "ai.backend.manager.api",
+]
+
+[[tool.importlinter.contracts]]
+id = "dto-layer"
+name = "DTOs import no ORM row or data type"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.manager.dto", "ai.backend.common.dto.*"]
+forbidden_modules = ["ai.backend.manager.models", "ai.backend.manager.data"]
+
+[[tool.importlinter.contracts]]
+id = "common-inward"
+name = "common imports no component"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.common"]
+forbidden_modules = [
+    "ai.backend.manager",
+    "ai.backend.agent",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+    "ai.backend.account_manager",
+    "ai.backend.web",
+    "ai.backend.client",
+    "ai.backend.cli",
+    "ai.backend.kernel",
+    "ai.backend.accelerator",
+]
+
+[[tool.importlinter.contracts]]
+id = "common-schema"
+name = "common.schema imports no common.dto or component"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.common.schema"]
+forbidden_modules = [
+    "ai.backend.common.dto",
+    "ai.backend.manager",
+    "ai.backend.agent",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+]
+
+[[tool.importlinter.contracts]]
+id = "common-tristate"
+name = "common.tristate imports no other common module"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.common.tristate"]
+forbidden_modules = ["ai.backend.common.*"]
+
+[[tool.importlinter.contracts]]
+id = "component-independence"
+name = "manager, agent, storage and appproxy are independent"
+type = "independence"
+modules = [
+    "ai.backend.manager",
+    "ai.backend.agent",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+]
+
+[[tool.importlinter.contracts]]
+id = "accelerator-independence"
+name = "accelerator plugins are independent"
+type = "independence"
+modules = ["ai.backend.accelerator.*"]
+
+[[tool.importlinter.contracts]]
+id = "no-accelerator"
+name = "agent and kernel import no accelerator"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.agent", "ai.backend.kernel"]
+forbidden_modules = ["ai.backend.accelerator"]
+
+[[tool.importlinter.contracts]]
+id = "accelerator-kernel-outward"
+name = "accelerator and kernel import no manager, storage, appproxy, web or client"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.accelerator", "ai.backend.kernel"]
+forbidden_modules = [
+    "ai.backend.manager",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+    "ai.backend.web",
+    "ai.backend.client",
+]
+
+[[tool.importlinter.contracts]]
+id = "agent-docker"
+name = "agent docker imports no kubernetes or dummy"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.agent.docker"]
+forbidden_modules = ["ai.backend.agent.kubernetes", "ai.backend.agent.dummy"]
+
+[[tool.importlinter.contracts]]
+id = "agent-kubernetes"
+name = "agent kubernetes imports no docker or dummy"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.agent.kubernetes"]
+forbidden_modules = ["ai.backend.agent.docker", "ai.backend.agent.dummy"]
+
+[[tool.importlinter.contracts]]
+id = "agent-dummy"
+name = "agent dummy imports no docker or kubernetes"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.agent.dummy"]
+forbidden_modules = ["ai.backend.agent.docker", "ai.backend.agent.kubernetes"]
+
+[[tool.importlinter.contracts]]
+id = "storage-no-sqlalchemy"
+name = "storage imports no sqlalchemy"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.storage"]
+forbidden_modules = ["sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+id = "appproxy-independence"
+name = "appproxy coordinator and worker are independent"
+type = "independence"
+modules = ["ai.backend.appproxy.coordinator", "ai.backend.appproxy.worker"]
+
+[[tool.importlinter.contracts]]
+id = "appproxy-common"
+name = "appproxy.common imports no coordinator or worker"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.appproxy.common"]
+forbidden_modules = ["ai.backend.appproxy.coordinator", "ai.backend.appproxy.worker"]
+
+[[tool.importlinter.contracts]]
+id = "appproxy-worker-no-sqlalchemy"
+name = "appproxy worker imports no sqlalchemy"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.appproxy.worker"]
+forbidden_modules = ["sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+id = "client-outward"
+name = "client and cli import no server component"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.client", "ai.backend.cli"]
+forbidden_modules = [
+    "ai.backend.manager",
+    "ai.backend.agent",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+    "ai.backend.account_manager",
+    "ai.backend.web",
+    "ai.backend.kernel",
+    "ai.backend.accelerator",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-client"
+name = "server components, common and cli import no client"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = [
+    "ai.backend.manager",
+    "ai.backend.agent",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+    "ai.backend.account_manager",
+    "ai.backend.kernel",
+    "ai.backend.accelerator",
+    "ai.backend.common",
+    "ai.backend.cli",
+]
+forbidden_modules = ["ai.backend.client"]
+
+[[tool.importlinter.contracts]]
+id = "sdk-v2"
+name = "SDK v2 imports no legacy cli, func, session or output"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.client.v2"]
+forbidden_modules = [
+    "ai.backend.client.cli",
+    "ai.backend.client.func",
+    "ai.backend.client.session",
+    "ai.backend.client.output",
+]
+
+[[tool.importlinter.contracts]]
+id = "legacy-sdk"
+name = "legacy SDK imports no client.cli"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.client.func", "ai.backend.client.session"]
+forbidden_modules = ["ai.backend.client.cli"]
+
+[[tool.importlinter.contracts]]
+id = "cli-v2"
+name = "CLI v2 imports no legacy SDK or aiohttp"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.client.cli.v2"]
+forbidden_modules = [
+    "ai.backend.client.func",
+    "ai.backend.client.session",
+    "aiohttp",
+]

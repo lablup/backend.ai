@@ -36,6 +36,7 @@ non-admin one in `{entity}/commands.py`.
 ## SDK v2 integration
 
 - The CLI calls SDK v2 methods (`registry.{entity}.method()`); direct REST calls are forbidden.
+- Do not import the legacy SDK (`client.func`, `client.session`) or `aiohttp`.
 - SDK client: `client/v2/domains_v2/{entity}.py`
 - SDK registry: `client/v2/v2_registry.py`
 - Register new SDK domain clients in `V2ClientRegistry` with `@cached_property`.

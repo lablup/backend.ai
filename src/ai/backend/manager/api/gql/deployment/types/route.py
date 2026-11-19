@@ -53,8 +53,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus as RouteHealthStatusEnum,
 )
@@ -151,9 +151,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         """Return session global ID if available."""
         if self.session_id is None:
             return None
-        session_global_id = to_global_id(
-            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
-        )
+        session_global_id = to_global_id(Session, UUID(str(self.session_id)))
         return ID(session_global_id)
 
     @gql_added_resolver(

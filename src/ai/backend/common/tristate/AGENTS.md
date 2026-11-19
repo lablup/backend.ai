@@ -7,8 +7,7 @@ Schema declaration and conversion rules are in `common/dto/AGENTS.md`.
 
 ## Dependency direction (leaf)
 
-- Depend only on lower `common` modules.
-- Do not import `manager`, `agent`, `storage`, or `common.dto`.
+- Do not import any other `ai.backend` module, including the rest of `common`.
 
 ## Use
 

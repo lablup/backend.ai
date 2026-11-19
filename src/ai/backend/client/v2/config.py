@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from yarl import URL
@@ -20,6 +21,7 @@ class ClientConfig:
     read_timeout: float = 0
     skip_ssl_verification: bool = False
     cookie_jar: aiohttp.CookieJar | None = field(default=None)
+    cookie_file: Path | None = field(default=None)
 
     @classmethod
     def from_v1_config(cls, api_config: APIConfig) -> ClientConfig:

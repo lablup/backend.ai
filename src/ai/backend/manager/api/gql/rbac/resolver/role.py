@@ -9,7 +9,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -55,9 +54,6 @@ from ai.backend.manager.api.gql.rbac.types.role import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.rbac_models.role.scopes import (
-    ScopedRoleTarget,
-)
 
 # ==================== Query Resolvers ====================
 
@@ -325,8 +321,8 @@ async def project_roles(
     limit: int | None = None,
     offset: int | None = None,
 ) -> RoleConnection | None:
-    result = await info.context.adapters.rbac.search_roles_in_scope(
-        [ScopedRoleTarget(scope=ProjectID(project_id))],
+    result = await info.context.adapters.rbac.project_search_roles(
+        project_id,
         SearchRolesInput(
             usage=usage.to_pydantic() if usage is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,

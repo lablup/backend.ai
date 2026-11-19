@@ -12,4 +12,5 @@ Hardware compute plugins (cuda_open, rocm, habana, furiosa, rebellions, …) are
 
 - Slot names must start with the plugin key (`cuda.device`, not `device`); stat metric keys must be `{key}_*` to avoid collisions across plugins.
 - Pick the alloc map by mode: `DiscretePropertyAllocMap` vs `FractionAllocMap`.
+- A plugin does not import another plugin, `manager`, `storage`, `appproxy`, `web` or `client`.
 - `plugin_config` is dynamic (etcd, live); `local_config` is the daemon TOML (restart only): do not confuse them.

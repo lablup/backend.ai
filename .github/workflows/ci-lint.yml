@@ -77,7 +77,7 @@ jobs:
     - name: Check the import contracts
       run: |
         pip install import-linter==2.16
-        PYTHONPATH=src lint-imports --config .importlinter
+        PYTHONPATH=src lint-imports --config pyproject.toml
     - name: Restore the Pants caches
       uses: ./.github/actions/pants-caches
       with:
