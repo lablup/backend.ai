@@ -386,6 +386,9 @@ enable_error_code = [
     "truthy-bool",
 ]
 warn_unreachable = true
+# The package sits under the py.typed namespace of opentelemetry.instrumentation
+# but leaves AsyncPGInstrumentor.__init__ unannotated
+untyped_calls_exclude = ["opentelemetry.instrumentation.asyncpg"]
 
 # Disable errors in client CLI, web server, and tests
 # Client SDK will be rewritten, so defer all type fixes

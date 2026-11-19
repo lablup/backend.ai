@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import (
     Any,
     Final,
-    cast,
 )
 
 import aiomonitor
@@ -454,9 +453,7 @@ async def server_main(
             StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_client()
             if config_provider.config.otel.trace_db_statements:
-                # The package ships under a py.typed namespace but leaves AsyncPGInstrumentor.__init__ unannotated.
-                construct_asyncpg_instrumentor = cast(Callable[[], Any], AsyncPGInstrumentor)
-                construct_asyncpg_instrumentor().instrument()
+                AsyncPGInstrumentor().instrument()
                 log.info("opentelemetry asyncpg instrumentation initialized")
             root_app.middlewares.insert(0, build_otel_server_middleware())
 
