@@ -93,7 +93,7 @@ not share it.
 | Step | Who |
 |---|---|
 | Create a slot's container | The first process in that slot; later processes in the slot reuse it |
-| Reset between processes | postgres: per-process database `test_db_<token>`; etcd: per-process namespace; redis: FLUSHALL on attach |
+| Reset between processes | postgres: per-file database `test_db_<token>`; etcd: per-process namespace; redis: FLUSHALL on attach |
 | Remove the pool | A detached reaper (flock on `tmp/backend.ai/test-pool/holders`) once no process has held the pool for 20 s |
 
 `BACKEND_TEST_SHARE_CONTAINERS=0` makes each process start and remove its own containers
