@@ -60,7 +60,7 @@ current, see `AGENTS.md` in this directory.
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto: `backport-migration-check.yml` |
 | `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames, and the new manager migrations without a `# Part of:` comment; `allow:migration-edit` records an intended edit, not a missing comment | auto: `migration-edit-check.yml` |
 | `.github/scripts/merge-alembic-heads.sh` | Opens a `skip:changelog` pull request adding an empty merge migration when the manager's alembic graph on `main` has more than one head | auto: `alembic-merge-heads.yml` |
-| `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files, and prints the `--shard` values that hold a target | auto: `ci.yml` |
+| `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files from the changed files and the `ruff analyze graph` import graph, and prints the `--shard` values that hold a target | auto: `ci.yml` |
 | `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto: `ci-lint.yml`, `ci-typecheck.yml`, `ci-test.yml`, `ci-test-scenario.yml` |
 | `.github/scripts/prune-ref-caches.sh` | Deletes the cache entries under a ref that a newer save of the same key prefix superseded | auto: `.github/actions/pants-caches` |
 | `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto: `cleanup-pr-caches.yml` |
