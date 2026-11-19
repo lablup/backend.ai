@@ -35,7 +35,6 @@ from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.cli import LazyGroup
 from ai.backend.common.config import find_config_file
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
@@ -565,11 +564,6 @@ def main(
     else:
         # Click is going to invoke a subcommand.
         pass
-
-
-@main.group(cls=LazyGroup, import_name="ai.backend.manager.api.auth:cli")
-def auth() -> None:
-    pass
 
 
 if __name__ == "__main__":
