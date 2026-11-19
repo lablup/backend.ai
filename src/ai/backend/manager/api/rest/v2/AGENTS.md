@@ -20,8 +20,7 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 - Each handler is injected with an **individual adapter** (not the Adapters registry): call `self._adapter.method()`,
   not `self._adapters.domain.method()`.
 - The Adapter is shared with the GQL layer: do not create a REST-only adapter.
-- Superadmin-only operations (`global_search`, operations of admin-only entities) → `superadmin_required` middleware,
-  others → `auth_required`.
+- `admin_`-prefixed handlers → `superadmin_required` middleware, others → `auth_required`.
 
 ## DTO
 

@@ -101,7 +101,7 @@ Index types:
 
 ## Data Conversion
 
-- Row classes carry no `to_data()`. `{Entity}SearchableFields.own.to_data(row)` builds the data
+- New Row classes do not add `to_data()`. `{Entity}SearchableFields.own.to_data(row)` builds the data
   (`specs/search/AGENTS.md`).
 
 ## Naming Conventions
