@@ -59,6 +59,7 @@ opentelemetry-sdk~=1.45.2
 opentelemetry-exporter-otlp-proto-grpc~=1.45.2
 opentelemetry-instrumentation-aiohttp-client~=0.66b2
 opentelemetry-instrumentation-aiohttp-server~=0.66b2
+opentelemetry-instrumentation-asyncpg~=0.66b2
 opentelemetry-instrumentation-logging~=0.66b2
 pexpect~=4.8
 prometheus-client~=0.21.1

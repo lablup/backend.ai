@@ -55,6 +55,7 @@ from ai.backend.logging.otel import (
     apply_otel_tracer,
     build_otel_server_middleware,
     instrument_aiohttp_client,
+    instrument_asyncpg,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
@@ -451,6 +452,8 @@ async def server_main(
             apply_otel_tracer(otel_spec)
             StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_client()
+            if config_provider.config.otel.trace_db_statements:
+                instrument_asyncpg()
             root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
