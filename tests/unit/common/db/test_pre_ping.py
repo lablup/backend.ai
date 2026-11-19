@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from ai.backend.common.db.connector import PrimaryMemberConnector
 from ai.backend.common.db.pre_ping import PrePingTimeout
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
+
+# Matches the credentials of the `postgres_container` fixture.
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "develove"
+POSTGRES_MAINTENANCE_DB = "testing"
 
 PRE_PING_TIMEOUT = 0.5
 STEP_LIMIT = 10

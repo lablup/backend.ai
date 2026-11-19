@@ -6,9 +6,9 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging import BraceStyleAdapter
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _KEEPALIVE_IDLE_OPT: int | None = getattr(
     socket, "TCP_KEEPIDLE", getattr(socket, "TCP_KEEPALIVE", None)

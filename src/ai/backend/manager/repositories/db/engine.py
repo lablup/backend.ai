@@ -17,7 +17,7 @@ from ai.backend.common.db.pre_ping import PrePingTimeout
 from ai.backend.common.db.socket_options import TCPOptions
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.bootstrap import BootstrapConfig
     from ai.backend.manager.config.unified import DatabaseConfig
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def create_async_engine(

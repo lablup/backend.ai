@@ -9,7 +9,11 @@ import pytest
 from ai.backend.common.db.connector import PrimaryMemberConnector
 from ai.backend.common.db.socket_options import TCPOptions
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
+
+# Matches the credentials of the `postgres_container` fixture.
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "develove"
+POSTGRES_MAINTENANCE_DB = "testing"
 
 OPTIONS = TCPOptions(
     keepalive_idle=7,
