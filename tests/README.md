@@ -85,7 +85,8 @@ pants test --changed-since=HEAD~1
 
 The `etcd_container`, `redis_container` and `postgres_container` fixtures in
 `src/ai/backend/testutils/bootstrap.py` take their containers from a pool with one
-container per (role, Pants execution slot). Pants runs one pytest process per slot at a
+container per (role, execution slot `BACKEND_TEST_EXEC_SLOT`). Pants, and CI's
+`run-pytest-shard.py` for the unit and component suites, run one pytest process per slot at a
 time, so a process reuses the containers that the previous process in its slot left
 running instead of starting new ones. The pool is keyed by checkout path, so worktrees do
 not share it.
