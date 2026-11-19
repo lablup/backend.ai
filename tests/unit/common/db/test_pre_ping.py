@@ -144,7 +144,6 @@ class TestPrePingTimeout:
             stale = (await conn.get_raw_connection()).driver_connection
             await conn.execute(sa.text("SELECT 1"))
         assert stale is not None
-        stale_connection = stale._connection
         relay.freeze()
 
         started = time.monotonic()
@@ -159,5 +158,5 @@ class TestPrePingTimeout:
         elapsed = time.monotonic() - started
 
         assert PRE_PING_TIMEOUT <= elapsed < PRE_PING_TIMEOUT + 4
-        assert stale_connection.is_closed()
+        assert stale.is_closed()
         assert fresh is not stale
