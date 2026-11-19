@@ -2,10 +2,10 @@ import asyncio
 import logging
 import re
 import uuid
-from collections.abc import Callable, Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, ClassVar, Final, cast, override
+from typing import ClassVar, Final, override
 
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
@@ -14,7 +14,6 @@ from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
 from opentelemetry.propagate import extract
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
@@ -152,13 +151,6 @@ def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
 def instrument_aiohttp_client() -> None:
     AioHttpClientInstrumentor().instrument()
     log.info("opentelemetry aiohttp client instrumentation initialized")
-
-
-def instrument_asyncpg() -> None:
-    # The package ships under a py.typed namespace but leaves AsyncPGInstrumentor.__init__ unannotated.
-    construct_asyncpg_instrumentor = cast(Callable[[], Any], AsyncPGInstrumentor)
-    construct_asyncpg_instrumentor().instrument()
-    log.info("opentelemetry asyncpg instrumentation initialized")
 
 
 def _record_response_status(span: trace.Span, status: int) -> None:
