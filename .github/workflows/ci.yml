@@ -161,11 +161,8 @@ jobs:
         path: dist/ci-targets
 
   typecheck:
-    # `contents: read`: only type-checks
-    # `actions: write`: `pants-caches` deletes superseded caches
     permissions:
       contents: read
-      actions: write
     needs: plan-targets
     # Always runs on a tag push: a skipped `typecheck` skips `release` even past `lint-and-typecheck`.
     if: >-
@@ -175,7 +172,6 @@ jobs:
     with:
       targets-artifact: ci-targets
       annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   lint-and-typecheck:
     needs: [check-build-and-lint, plan-targets, typecheck]
