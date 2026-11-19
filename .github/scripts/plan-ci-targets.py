@@ -32,12 +32,16 @@ line. A test is a file a ``python_tests`` of its ``BUILD`` owns; its address is
 
 The changed files are ``git diff --name-only <rev>``. The dependents come from
 ``ruff analyze graph --direction dependents src tests stubs`` (``RUFF_GRAPH_VERSION``),
-which holds the import edges only; the ``.pyi`` files of ``stubs/`` are nodes of it.
+which holds the import edges only (``--isolated``, so the ``[tool.ruff]`` excludes of
+``pyproject.toml`` do not drop a directory such as ``plugins``); the ``.pyi`` files of
+``stubs/`` are nodes of it. The nodes must equal the ``.py`` and ``.pyi`` files that
+``git ls-files src tests stubs`` lists, or the script fails and prints the difference.
+A full typecheck lists those tracked files.
 The graph gets the edges Pants adds on top of import inference:
 
 - a non-empty ``__init__.py`` to every module under it
 - a ``conftest.py`` to every test under it
-- a file a ``BUILD`` target in ``tests/`` lists in ``dependencies`` to that target's files
+- a file a ``BUILD`` target in ``src/`` or ``tests/`` lists in ``dependencies`` to that target's files
 
 Changed files that are not Python source:
 
@@ -180,7 +184,7 @@ def parse_build(root: pathlib.Path, build: pathlib.Path) -> list[Target]:
 
 def load_targets(root: pathlib.Path) -> list[Target]:
     targets: list[Target] = []
-    for build in sorted((root / "tests").rglob("BUILD")):
+    for build in sorted([*(root / "src").rglob("BUILD"), *(root / "tests").rglob("BUILD")]):
         targets.extend(parse_build(root, build))
     return targets
 
@@ -203,17 +207,21 @@ def map_test_owners(targets: list[Target]) -> dict[str, Target]:
 def dependency_files(
     dep: str, every: set[str], targets: list[Target]
 ) -> tuple[str | None, set[str]]:
-    """The files a ``dependencies`` entry names, and the target it names when it is a generator."""
+    """The files a ``dependencies`` entry names, and the target it names when it is a generator.
+
+    An address that names no ``python_*`` target of a BUILD (a resource, a requirement)
+    names no files.
+    """
     if dep.startswith(("//", "!")):
         return None, set()
     path, _, name = dep.partition(":")
     if path.endswith(".py"):
         return None, {path} & every
-    # A `python_sources` of a directory holds its own files, not its subdirectories.
-    named = [t for t in targets if t.directory == path and t.name == name and name]
-    if named:
-        return dep, set().union(*(t.files for t in named))
-    return dep, {f for f in every if parent(f) == path}
+    name = name or pathlib.PurePosixPath(path).name
+    named = [t for t in targets if t.directory == path and t.name in (name, None)]
+    if t_files := set().union(*(t.files for t in named)) & every:
+        return dep, t_files
+    return None, set()
 
 
 def build_edges(every: set[str], targets: list[Target]) -> dict[str, set[str]]:
@@ -244,6 +252,7 @@ def ruff_graph() -> dict[str, set[str]]:
             f"ruff@{RUFF_GRAPH_VERSION}",
             "analyze",
             "graph",
+            "--isolated",
             "--direction",
             "dependents",
             "--config",
@@ -258,6 +267,16 @@ def ruff_graph() -> dict[str, set[str]]:
     )
     raw = json.loads(result.stdout)
     return {k: {d for d in v if is_source(d)} for k, v in raw.items() if is_source(k)}
+
+
+def tracked_sources() -> set[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "src", "tests", "stubs"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    return {f for f in result.stdout.splitlines() if is_source(f)}
 
 
 def add_pants_edges(
@@ -351,6 +370,14 @@ def main() -> int:
     tests = set(owners)
     graph = ruff_graph()
     every = set(graph)
+    tracked = tracked_sources()
+    if every != tracked:
+        missing = sorted(tracked - every)
+        extra = sorted(every - tracked)
+        raise PlanError(
+            f"the ruff graph and `git ls-files` differ: {len(missing)} files missing from the "
+            f"graph {missing[:20]}, {len(extra)} not tracked {extra[:20]}"
+        )
     add_pants_edges(graph, root, targets, tests)
 
     changed = changed_files(args.base_ref)
@@ -365,7 +392,7 @@ def main() -> int:
     sources = changed_sources(changed, every)
     direct, transitive = dependents(graph, sources)
     files: dict[str, list[str]] = {
-        "typecheck": sorted(f for f in (every if typecheck_all else transitive) if is_py(f))
+        "typecheck": sorted(f for f in (tracked if typecheck_all else transitive) if is_py(f))
     }
     if full_run:
         for suite in SUITES:
