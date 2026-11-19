@@ -1,4 +1,4 @@
-"""Write specs for the SSH keypairs a user holds."""
+"""Write specs for the SSH keys a user holds."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class TestSeedSSHKeypairOf(TestSeedFieldCreator[UserData, SSHKeypairData]):
+class TestSeedSSHKeyOf(TestSeedFieldCreator[UserData, SSHKeypairData]):
     """An SSH public key the user holds, with no private key."""
 
     public_key: str

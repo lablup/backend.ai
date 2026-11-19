@@ -8,28 +8,28 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.ssh_keypair.response import SSHKeypairNode
-from ai.backend.manager.api.adapters.ssh_keypair.adapter import SSHKeypairAdapter
+from ai.backend.common.dto.manager.v2.ssh_key.response import SSHKeyNode
+from ai.backend.manager.api.adapters.ssh_key.adapter import SSHKeyAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.ssh_keypair import (
+from bai_scenario.components.ssh_key import (
     EXTRA_PUBLIC_KEY,
     SomeoneWithSSHKeys,
     SSHKeyholder,
-    TheSSHKeypairNode,
+    TheSSHKeyNode,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SwitchingStep = Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+type SwitchingStep = Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 
 
 @dataclass(frozen=True)
-class SwitchingToMyOtherKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]):
+class SwitchingToMyOtherKey(When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]):
     """default 가 아닌 자기 SSH 키를 default 로 지정한다."""
 
     @override
@@ -46,14 +46,14 @@ class SwitchingToMyOtherKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode
         )
 
     @override
-    async def call(self, adapter: SSHKeypairAdapter, laid: SSHKeyholder) -> SSHKeypairNode:
+    async def call(self, adapter: SSHKeyAdapter, laid: SSHKeyholder) -> SSHKeyNode:
         with ActingAs(laid.caller):
             return await adapter.switch_default(laid.extra_key().id)
 
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateSwitchesTheirDefault(
-    Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+    Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 ):
     started: datetime
 
@@ -77,17 +77,17 @@ class AUserGrantedUpdateSwitchesTheirDefault(
         return SomeoneWithSSHKeys(permissions=(Permission.READ, Permission.UPDATE))
 
     @override
-    def when(self) -> When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]:
+    def when(self) -> When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]:
         return SwitchingToMyOtherKey()
 
     @override
-    def then(self) -> Then[SSHKeyholder, SSHKeypairNode]:
-        return TheSSHKeypairNode(started=self.started, public_key=EXTRA_PUBLIC_KEY, is_default=True)
+    def then(self) -> Then[SSHKeyholder, SSHKeyNode]:
+        return TheSSHKeyNode(started=self.started, public_key=EXTRA_PUBLIC_KEY, is_default=True)
 
 
 @dataclass(frozen=True)
 class AUserGrantedReadMayNotSwitchTheirDefault(
-    Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+    Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 ):
     @override
     def summary(self) -> str:
@@ -109,11 +109,11 @@ class AUserGrantedReadMayNotSwitchTheirDefault(
         return SomeoneWithSSHKeys(permissions=(Permission.READ,))
 
     @override
-    def when(self) -> When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]:
+    def when(self) -> When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]:
         return SwitchingToMyOtherKey()
 
     @override
-    def then(self) -> Then[SSHKeyholder, SSHKeypairNode]:
+    def then(self) -> Then[SSHKeyholder, SSHKeyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
@@ -125,6 +125,6 @@ SCENARIOS: list[SwitchingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_switching_default(
-    scenario: SwitchingStep, adapter: SSHKeypairAdapter, engine: ExtendedAsyncSAEngine
+    scenario: SwitchingStep, adapter: SSHKeyAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

@@ -8,26 +8,26 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.ssh_keypair.request import MyUploadSSHKeypairInput
-from ai.backend.common.dto.manager.v2.ssh_keypair.response import SSHKeypairNode
-from ai.backend.manager.api.adapters.ssh_keypair.adapter import SSHKeypairAdapter
+from ai.backend.common.dto.manager.v2.ssh_key.request import MyUploadSSHKeyInput
+from ai.backend.common.dto.manager.v2.ssh_key.response import SSHKeyNode
+from ai.backend.manager.api.adapters.ssh_key.adapter import SSHKeyAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.keypair import InvalidSSHPublicKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.ssh_keypair import (
+from bai_scenario.components.ssh_key import (
     DEFAULT_PUBLIC_KEY,
     SomeoneWithSSHKeys,
     SSHKeyholder,
-    TheSSHKeypairNode,
+    TheSSHKeyNode,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type UploadingStep = Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+type UploadingStep = Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 
 ANOTHER_PUBLIC_KEY = (
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICuqqTj6Ee2CFRyYHeq1INgqKdEoYvyazZPR69RTWOJI"
@@ -39,7 +39,7 @@ NOT_A_PUBLIC_KEY = "not-an-ssh-public-key"
 
 
 @dataclass(frozen=True)
-class UploadingMyKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]):
+class UploadingMyKey(When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]):
     """자기 SSH 키를 업로드한다."""
 
     public_key: str = DEFAULT_PUBLIC_KEY
@@ -61,14 +61,14 @@ class UploadingMyKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]):
         )
 
     @override
-    async def call(self, adapter: SSHKeypairAdapter, laid: SSHKeyholder) -> SSHKeypairNode:
+    async def call(self, adapter: SSHKeyAdapter, laid: SSHKeyholder) -> SSHKeyNode:
         with ActingAs(laid.caller):
-            return await adapter.my_upload(MyUploadSSHKeypairInput(public_key=self.public_key))
+            return await adapter.my_upload(MyUploadSSHKeyInput(public_key=self.public_key))
 
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateUploadsTheirFirstKey(
-    Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+    Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 ):
     started: datetime
 
@@ -92,19 +92,19 @@ class AUserGrantedUpdateUploadsTheirFirstKey(
         return SomeoneWithSSHKeys(permissions=(Permission.UPDATE,), holds_keys=False)
 
     @override
-    def when(self) -> When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]:
+    def when(self) -> When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]:
         return UploadingMyKey()
 
     @override
-    def then(self) -> Then[SSHKeyholder, SSHKeypairNode]:
-        return TheSSHKeypairNode(
+    def then(self) -> Then[SSHKeyholder, SSHKeyNode]:
+        return TheSSHKeyNode(
             started=self.started, public_key=DEFAULT_PUBLIC_KEY, is_default=True, seeded=False
         )
 
 
 @dataclass(frozen=True)
 class AUserHoldingADefaultUploadsANonDefaultKey(
-    Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+    Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 ):
     started: datetime
 
@@ -128,19 +128,19 @@ class AUserHoldingADefaultUploadsANonDefaultKey(
         return SomeoneWithSSHKeys(permissions=(Permission.UPDATE,))
 
     @override
-    def when(self) -> When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]:
+    def when(self) -> When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]:
         return UploadingMyKey(public_key=ANOTHER_PUBLIC_KEY)
 
     @override
-    def then(self) -> Then[SSHKeyholder, SSHKeypairNode]:
-        return TheSSHKeypairNode(
+    def then(self) -> Then[SSHKeyholder, SSHKeyNode]:
+        return TheSSHKeyNode(
             started=self.started, public_key=ANOTHER_PUBLIC_KEY, is_default=False, seeded=False
         )
 
 
 @dataclass(frozen=True)
 class AUserGrantedReadMayNotUploadAKey(
-    Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+    Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 ):
     @override
     def summary(self) -> str:
@@ -162,17 +162,17 @@ class AUserGrantedReadMayNotUploadAKey(
         return SomeoneWithSSHKeys(permissions=(Permission.READ,), holds_keys=False)
 
     @override
-    def when(self) -> When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]:
+    def when(self) -> When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]:
         return UploadingMyKey()
 
     @override
-    def then(self) -> Then[SSHKeyholder, SSHKeypairNode]:
+    def then(self) -> Then[SSHKeyholder, SSHKeyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AValueThatIsNotAPublicKeyIsRejected(
-    Scenario[TestSeedingSession, SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]
+    Scenario[TestSeedingSession, SSHKeyholder, SSHKeyAdapter, SSHKeyNode]
 ):
     @override
     def summary(self) -> str:
@@ -194,11 +194,11 @@ class AValueThatIsNotAPublicKeyIsRejected(
         return SomeoneWithSSHKeys(permissions=(Permission.UPDATE,), holds_keys=False)
 
     @override
-    def when(self) -> When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]:
+    def when(self) -> When[SSHKeyholder, SSHKeyAdapter, SSHKeyNode]:
         return UploadingMyKey(public_key=NOT_A_PUBLIC_KEY)
 
     @override
-    def then(self) -> Then[SSHKeyholder, SSHKeypairNode]:
+    def then(self) -> Then[SSHKeyholder, SSHKeyNode]:
         return TheCallIsRefused(InvalidSSHPublicKey)
 
 
@@ -212,6 +212,6 @@ SCENARIOS: list[UploadingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_uploading(
-    scenario: UploadingStep, adapter: SSHKeypairAdapter, engine: ExtendedAsyncSAEngine
+    scenario: UploadingStep, adapter: SSHKeyAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

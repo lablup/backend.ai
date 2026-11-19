@@ -207,11 +207,11 @@ from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
-from ai.backend.manager.repositories.ssh_keypair.repository import SSHKeypairRepository
+from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
-from ai.backend.manager.services.ssh_keypair.service import SSHKeypairService
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
+from ai.backend.manager.services.ssh_key.service import SSHKeyService
 from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     ETCD_PASSWORD,
@@ -1798,16 +1798,14 @@ def processor_registry(
 
 
 @pytest.fixture()
-def ssh_keypair_processors(
+def ssh_key_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-) -> SSHKeypairProcessors:
+) -> SSHKeyProcessors:
     """The SSH keypair processors, which the user adapter reads the default public key through."""
-    return SSHKeypairProcessors(
+    return SSHKeyProcessors(
         processor_registry.group(GroupMeta(UserEntityType())),
-        SSHKeypairService(
-            SSHKeypairRepository(V2DBOpsProvider(database_engine)), SSHKeyValidator()
-        ),
+        SSHKeyService(SSHKeyRepository(V2DBOpsProvider(database_engine)), SSHKeyValidator()),
     )
 
 

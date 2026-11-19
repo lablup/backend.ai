@@ -1,4 +1,4 @@
-"""Request DTOs for SSH keypair DTO v2."""
+"""Request DTOs for SSH key DTO v2."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
-__all__ = ("MyUploadSSHKeypairInput",)
+__all__ = ("MyUploadSSHKeyInput",)
 
 
-class MyUploadSSHKeypairInput(BaseRequestModel):
-    """A public key the caller uploads to their own SSH keypairs."""
+class MyUploadSSHKeyInput(BaseRequestModel):
+    """A public key the caller uploads to their own SSH keys."""
 
     public_key: str = Field(
         description=(

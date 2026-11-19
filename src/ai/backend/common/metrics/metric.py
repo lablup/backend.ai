@@ -486,7 +486,7 @@ class LayerType(enum.StrEnum):
     SCHEDULING_HISTORY_REPOSITORY = "scheduling_history_repository"
     SERVICE_CATALOG_REPOSITORY = "service_catalog_repository"
     SESSION_REPOSITORY = "session_repository"
-    SSH_KEYPAIR_REPOSITORY = "ssh_keypair_repository"
+    SSH_KEY_REPOSITORY = "ssh_key_repository"
     STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
     STORAGE_STATUS_REPOSITORY = "storage_status_repository"
     USER_REPOSITORY = "user_repository"

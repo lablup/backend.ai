@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
-from ai.backend.common.dto.manager.v2.ssh_keypair.response import SSHKeypairNode
+from ai.backend.common.dto.manager.v2.ssh_key.response import SSHKeyNode
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.data.user.types import UserData
@@ -27,7 +27,7 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant
 from bai_scenario.seeds.domain.domain import TestSeedDomain
-from bai_scenario.seeds.ssh_keypair.ssh_keypair import TestSeedSSHKeypairOf
+from bai_scenario.seeds.ssh_key.ssh_key import TestSeedSSHKeyOf
 
 DEFAULT_PUBLIC_KEY = (
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII3oEkCHOFCltBkvsATl1upB3yfnsmzsvEhpbiVrYOQv"
@@ -98,10 +98,10 @@ class SomeoneWithSSHKeys(Given[Any, SSHKeyholder]):
         default = extra = None
         if self.holds_keys:
             default = await seeding.adding(
-                TestSeedSSHKeypairOf(public_key=DEFAULT_PUBLIC_KEY, is_default=True), caller
+                TestSeedSSHKeyOf(public_key=DEFAULT_PUBLIC_KEY, is_default=True), caller
             )
             extra = await seeding.adding(
-                TestSeedSSHKeypairOf(public_key=EXTRA_PUBLIC_KEY, is_default=False), caller
+                TestSeedSSHKeyOf(public_key=EXTRA_PUBLIC_KEY, is_default=False), caller
             )
         if self.permissions:
             await seeding.within(AGrant.on_user(caller, caller, *self.permissions))
@@ -113,7 +113,7 @@ class SomeoneWithSSHKeys(Given[Any, SSHKeyholder]):
 
 
 @dataclass(frozen=True)
-class TheSSHKeypairNode(Then[SSHKeyholder, SSHKeypairNode]):
+class TheSSHKeyNode(Then[SSHKeyholder, SSHKeyNode]):
     """방금 다룬 SSH 키가 통째로 온다.
 
     ``seeded`` 가 거짓이면 이번 호출이 새로 만든 키라서 id 를 견줄 행이 없다.
@@ -129,7 +129,7 @@ class TheSSHKeypairNode(Then[SSHKeyholder, SSHKeypairNode]):
         return Says("SSH 키 전체가 응답으로 옵니다", english="the whole SSH key comes back")
 
     @override
-    def look(self, laid: SSHKeyholder, answered: Answered[SSHKeypairNode]) -> list[Verdict]:
+    def look(self, laid: SSHKeyholder, answered: Answered[SSHKeyNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Same("raised", answered.raised, None)]

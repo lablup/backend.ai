@@ -48,7 +48,7 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
-from ai.backend.manager.repositories.ssh_keypair.repository import SSHKeypairRepository
+from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -58,8 +58,8 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
-from ai.backend.manager.services.ssh_keypair.service import SSHKeypairService
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
+from ai.backend.manager.services.ssh_key.service import SSHKeyService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
@@ -148,11 +148,11 @@ async def adapter(
         registry.group(GroupMeta(ContainerRegistryEntityType())),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
-    ssh_keypair = SSHKeypairProcessors(
+    ssh_key = SSHKeyProcessors(
         registry.group(GroupMeta(UserEntityType())),
-        SSHKeypairService(SSHKeypairRepository(V2DBOpsProvider(engine)), SSHKeyValidator()),
+        SSHKeyService(SSHKeyRepository(V2DBOpsProvider(engine)), SSHKeyValidator()),
     )
-    return UserAdapter(user, domain, config.config.auth, key_pool, ssh_keypair)
+    return UserAdapter(user, domain, config.config.auth, key_pool, ssh_key)
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-"""A user with SSH keypairs in each state, run against a real database."""
+"""A user with SSH keys in each state, run against a real database."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ssh_keypair.repository import SSHKeypairRepository
+from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
 from ai.backend.testutils.db import with_tables
 
 
@@ -35,8 +35,8 @@ def ops_provider(db: ExtendedAsyncSAEngine) -> V2DBOpsProvider:
 
 
 @pytest.fixture
-def repository(ops_provider: V2DBOpsProvider) -> SSHKeypairRepository:
-    return SSHKeypairRepository(ops_provider)
+def repository(ops_provider: V2DBOpsProvider) -> SSHKeyRepository:
+    return SSHKeyRepository(ops_provider)
 
 
 @pytest.fixture
@@ -91,12 +91,12 @@ async def user_id(db: ExtendedAsyncSAEngine) -> UserID:
 
 
 @pytest.fixture
-async def default_id(repository: SSHKeypairRepository, user_id: UserID) -> SSHKeypairID:
+async def default_id(repository: SSHKeyRepository, user_id: UserID) -> SSHKeypairID:
     return (await repository.upload(user_id, "pub-default")).id
 
 
 @pytest.fixture
 async def other_id(
-    repository: SSHKeypairRepository, user_id: UserID, default_id: SSHKeypairID
+    repository: SSHKeyRepository, user_id: UserID, default_id: SSHKeypairID
 ) -> SSHKeypairID:
     return (await repository.upload(user_id, "pub-other")).id

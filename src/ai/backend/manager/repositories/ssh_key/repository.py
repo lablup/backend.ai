@@ -8,24 +8,22 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
-from ai.backend.manager.errors.ssh_keypair import SSHKeypairNotFound
+from ai.backend.manager.errors.ssh_keypair import SSHKeyNotFound
 from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.ssh_keypair.queriers import (
     DefaultSSHKeypairQuerier,
-    SSHKeypairQuerier,
+    SSHKeyQuerier,
 )
 from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
 from ai.backend.manager.models.ssh_keypair.updaters import (
-    SSHKeypairDefaultClearUpdater,
-    SSHKeypairDefaultSetUpdater,
+    SSHKeyDefaultClearUpdater,
+    SSHKeyDefaultSetUpdater,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-ssh_keypair_repository_resilience = Resilience(
+ssh_key_repository_resilience = Resilience(
     policies=[
-        MetricPolicy(
-            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.SSH_KEYPAIR_REPOSITORY)
-        ),
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.SSH_KEY_REPOSITORY)),
         RetryPolicy(
             RetryArgs(
                 max_retries=10,
@@ -38,15 +36,15 @@ ssh_keypair_repository_resilience = Resilience(
 )
 
 
-class SSHKeypairRepository:
-    """The SSH keypairs of a user, one of them the default the sessions use."""
+class SSHKeyRepository:
+    """The SSH keys of a user, one of them the default the sessions use."""
 
     _ops: V2DBOpsProvider
 
     def __init__(self, ops_provider: V2DBOpsProvider) -> None:
         self._ops = ops_provider
 
-    @ssh_keypair_repository_resilience.apply()
+    @ssh_key_repository_resilience.apply()
     async def upload(self, user_id: UserID, public_key: str) -> SSHKeypairData:
         """Add a public key to the user. It becomes the default only when the user has none."""
         async with self._ops.write_ops() as w:
@@ -60,17 +58,17 @@ class SSHKeypairRepository:
                 ),
             )
 
-    @ssh_keypair_repository_resilience.apply()
-    async def switch_default(self, ssh_keypair_id: SSHKeypairID) -> SSHKeypairData:
-        """Make one SSH keypair its user's default, unmarking the previous one."""
+    @ssh_key_repository_resilience.apply()
+    async def switch_default(self, ssh_key_id: SSHKeypairID) -> SSHKeypairData:
+        """Make one SSH key its user's default, unmarking the previous one."""
         async with self._ops.write_ops() as w:
-            target = await w.query_field_data(SSHKeypairQuerier(ssh_keypair_id=ssh_keypair_id))
+            target = await w.query_field_data(SSHKeyQuerier(ssh_key_id=ssh_key_id))
             if target is None:
-                raise SSHKeypairNotFound(f"SSH keypair {ssh_keypair_id} not found")
+                raise SSHKeyNotFound(f"SSH key {ssh_key_id} not found")
             await w.batch_update_in_scopes(
-                [UserSSHKeypairTarget(user_id=target.user_id)], SSHKeypairDefaultClearUpdater()
+                [UserSSHKeypairTarget(user_id=target.user_id)], SSHKeyDefaultClearUpdater()
             )
-            switched = await w.update_data(SSHKeypairDefaultSetUpdater(ssh_keypair_id))
+            switched = await w.update_data(SSHKeyDefaultSetUpdater(ssh_key_id))
             if switched is None:
-                raise SSHKeypairNotFound(f"SSH keypair {ssh_keypair_id} not found")
+                raise SSHKeyNotFound(f"SSH key {ssh_key_id} not found")
             return switched

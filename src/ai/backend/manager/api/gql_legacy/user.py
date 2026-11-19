@@ -57,7 +57,7 @@ from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_query,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.ssh_keypair.actions.search import SearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.actions.search import SearchSSHKeypairsAction
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -1119,7 +1119,7 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         action: CreateUserAction = props.to_action(email, graph_ctx, domain_id)
 
         action_result = await graph_ctx.processors.user.create_user.run(action)
-        ssh_keypairs = await graph_ctx.processors.ssh_keypair.search.run(
+        ssh_keypairs = await graph_ctx.processors.ssh_key.search.run(
             SearchSSHKeypairsAction(
                 user_ids=[UserID(action_result.data.user.id)],
                 searcher=SSHKeypairSearcher(

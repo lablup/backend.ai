@@ -1,4 +1,4 @@
-"""The SSH keypairs of a user and their default, run against a real database."""
+"""The SSH keys of a user and their default, run against a real database."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ssh_keypair.repository import SSHKeypairRepository
+from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
 
 
-class TestSSHKeypairRepository:
+class TestSSHKeyRepository:
     async def _defaults(self, db: ExtendedAsyncSAEngine, user_id: UserID) -> list[SSHKeypairID]:
         async with db.begin_readonly_session() as session:
             rows = await session.execute(
@@ -28,7 +28,7 @@ class TestSSHKeypairRepository:
 
     async def test_upload_with_a_default_keeps_the_default(
         self,
-        repository: SSHKeypairRepository,
+        repository: SSHKeyRepository,
         db: ExtendedAsyncSAEngine,
         user_id: UserID,
         default_id: SSHKeypairID,
@@ -40,7 +40,7 @@ class TestSSHKeypairRepository:
 
     async def test_switch_default_leaves_one_default(
         self,
-        repository: SSHKeypairRepository,
+        repository: SSHKeyRepository,
         db: ExtendedAsyncSAEngine,
         user_id: UserID,
         other_id: SSHKeypairID,

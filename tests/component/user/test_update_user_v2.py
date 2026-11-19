@@ -121,7 +121,7 @@ def server_module_registries(
         domain_processors,
         auth_config=config_provider.config.auth,
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-        ssh_keypair=MagicMock(),
+        ssh_key=MagicMock(),
     )
     return [
         register_admin_routes(

@@ -1,21 +1,21 @@
 ---
-name: ssh-keypair-service-shapes
+name: ssh-key-service-shapes
 type: decision-table
-description: SSH keypair knowledge: why it is its own package, how upload and switch_default keep one default per user, why switch_default needs READ and UPDATE, the legacy SSH APIs still on the user service
-scope: src/ai/backend/manager/services/ssh_keypair
-keywords: [SSHKeypairProcessors, SSHKeypairService, SSHKeypairRepository, UploadSSHKeypairAction, SwitchDefaultSSHKeypairAction, SSHKeypairDefaultSetUpdater, uq_ssh_keypairs_is_default]
+description: SSH key knowledge: why it is its own package, how upload and switch_default keep one default per user, why switch_default needs READ and UPDATE, the legacy SSH APIs still on the user service
+scope: src/ai/backend/manager/services/ssh_key
+keywords: [SSHKeyProcessors, SSHKeyService, SSHKeyRepository, UploadSSHKeyAction, SwitchDefaultSSHKeyAction, SSHKeyDefaultSetUpdater, uq_ssh_keypairs_is_default]
 sources:
-  - src/ai/backend/manager/services/ssh_keypair
-  - src/ai/backend/manager/repositories/ssh_keypair
+  - src/ai/backend/manager/services/ssh_key
+  - src/ai/backend/manager/repositories/ssh_key
   - src/ai/backend/manager/models/ssh_keypair
-  - src/ai/backend/manager/api/adapters/ssh_keypair
+  - src/ai/backend/manager/api/adapters/ssh_key
 generated:
   by: claude-code/opus-5.5
   at: 2026-11-19
 status: stable
 ---
 
-# SSH keypair service: Knowledge
+# SSH key service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
@@ -30,8 +30,8 @@ It is its own package so the SSH key operations stop living in the user and auth
 
 | Field | Backing | Authorized against |
 |---|---|---|
-| `upload` | `SSHKeypairService.upload` | the user named in the action |
-| `switch_default` | `SSHKeypairService.switch_default` | the owning user, read by `LookupSSHKeypairOwnerAction` |
+| `upload` | `SSHKeyService.upload` | the user named in the action |
+| `switch_default` | `SSHKeyService.switch_default` | the owning user, read by `LookupSSHKeypairOwnerAction` |
 | `search` | ops (`atomic_bulk_scoped_search_ops`) | every user named |
 
 ## A user has at most one default
@@ -41,7 +41,7 @@ It is its own package so the SSH key operations stop living in the user and auth
 | `upload` | The new key becomes the default only when the user has none |
 | `switch_default` | Unmarks the previous default and marks the named key |
 
-- Two writes racing on the default hit `uq_ssh_keypairs_is_default`, which the creator and the set updater map to `DefaultSSHKeypairConflict`.
+- Two writes racing on the default hit `uq_ssh_keypairs_is_default`, which the creator and the set updater map to `DefaultSSHKeyConflict`.
 
 ## switch_default needs READ and UPDATE on the owner
 
@@ -51,6 +51,6 @@ It is its own package so the SSH key operations stop living in the user and auth
 
 ## The legacy SSH APIs still run on the user and auth services
 
-- REST v1 `/auth/ssh-keypair` and the admin `*SshKeypairV2` GQL fields still call `UserRepository.replace_default_ssh_keypair` and its siblings.
+- REST v1 `/auth/ssh-keypair` and the admin `*SshKeypairV2` GQL fields still call `UserRepository.replace_default_ssh_key` and its siblings.
 - They overwrite the default by purge and create, and identify the user by access key.
 - They move here when those APIs are deprecated.

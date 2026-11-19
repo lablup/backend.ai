@@ -131,8 +131,8 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.ssh_keypair.actions.search import SearchSSHKeypairsAction
-from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
+from ai.backend.manager.services.ssh_key.actions.search import SearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
@@ -205,7 +205,7 @@ class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
     _user: UserProcessors
-    _ssh_keypair: SSHKeypairProcessors
+    _ssh_key: SSHKeyProcessors
     _domain: DomainProcessors
     _auth_config: AuthConfig
     _key_provider_pool: KeyProviderPool
@@ -216,10 +216,10 @@ class UserAdapter(BaseAdapter):
         domain: DomainProcessors,
         auth_config: AuthConfig,
         key_provider_pool: KeyProviderPool,
-        ssh_keypair: SSHKeypairProcessors,
+        ssh_key: SSHKeyProcessors,
     ) -> None:
         self._user = user
-        self._ssh_keypair = ssh_keypair
+        self._ssh_key = ssh_key
         self._domain = domain
         self._auth_config = auth_config
         self._key_provider_pool = key_provider_pool
@@ -984,7 +984,7 @@ class UserAdapter(BaseAdapter):
         unique_ids = list(dict.fromkeys(user_ids))
         if not unique_ids:
             return {}
-        result = await self._ssh_keypair.search.run(
+        result = await self._ssh_key.search.run(
             SearchSSHKeypairsAction(
                 user_ids=unique_ids,
                 searcher=SSHKeypairSearcher(

@@ -72,7 +72,7 @@ from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -136,7 +136,7 @@ def server_module_registries(
     user_processors: UserProcessors,
     domain_processors: DomainProcessors,
     config_provider: ManagerConfigProvider,
-    ssh_keypair_processors: SSHKeypairProcessors,
+    ssh_key_processors: SSHKeyProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for user-domain tests."""
     user_registry = register_user_routes(
@@ -168,7 +168,7 @@ def server_module_registries(
             key_provider_pool=KeyProviderPool(
                 providers=[], write_provider_type=KeyProviderType.PLAIN
             ),
-            ssh_keypair=ssh_keypair_processors,
+            ssh_key=ssh_key_processors,
         )
     )
     v2_registry = RouteRegistry.create("v2", route_deps.cors_options)

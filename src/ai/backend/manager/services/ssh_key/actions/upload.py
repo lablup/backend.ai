@@ -12,7 +12,7 @@ from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 
 
 @dataclass(frozen=True)
-class UploadSSHKeypairAction(BaseSingleEntityAction):
+class UploadSSHKeyAction(BaseSingleEntityAction):
     """Upload a public key to a user. It becomes the default only when the user has none."""
 
     user_id: UserID
@@ -34,5 +34,5 @@ class UploadSSHKeypairAction(BaseSingleEntityAction):
 
 
 @dataclass(frozen=True)
-class UploadSSHKeypairActionResult:
-    ssh_keypair: SSHKeypairData
+class UploadSSHKeyActionResult:
+    ssh_key: SSHKeypairData

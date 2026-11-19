@@ -17,7 +17,7 @@ from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSe
 
 __all__ = (
     "DefaultSSHKeypairQuerier",
-    "SSHKeypairQuerier",
+    "SSHKeyQuerier",
 )
 
 
@@ -40,10 +40,10 @@ class DefaultSSHKeypairQuerier(OwnedFieldQuerier[UserID, SSHKeypairRow, SSHKeypa
 
 
 @dataclass
-class SSHKeypairQuerier(FieldQuerier[SSHKeypairRow, SSHKeypairData]):
+class SSHKeyQuerier(FieldQuerier[SSHKeypairRow, SSHKeypairData]):
     """One SSH keypair by its id."""
 
-    ssh_keypair_id: SSHKeypairID
+    ssh_key_id: SSHKeypairID
 
     @override
     def row_class(self) -> type[SSHKeypairRow]:
@@ -55,7 +55,7 @@ class SSHKeypairQuerier(FieldQuerier[SSHKeypairRow, SSHKeypairData]):
 
     @override
     def target_id_value(self) -> SSHKeypairID:
-        return self.ssh_keypair_id
+        return self.ssh_key_id
 
     @override
     def to_data(self, row: SSHKeypairRow) -> SSHKeypairData:

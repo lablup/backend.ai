@@ -1,6 +1,6 @@
-## ssh_keypair
+## ssh_key
 
-[adapter](/src/ai/backend/manager/api/adapters/ssh_keypair/adapter.py)
+[adapter](/src/ai/backend/manager/api/adapters/ssh_key/adapter.py)
 
 Scenario: complete
 
@@ -28,7 +28,7 @@ Scenario: complete
 
 <a id="uploading-a-user-granted-update-uploads-their-first-key-as-the-default"></a>
 
-#### [a-user-granted-update-uploads-their-first-key-as-the-default](/tests/scenario/bai_scenario/manager/ssh_keypair/test_uploading.py): pass
+#### [a-user-granted-update-uploads-their-first-key-as-the-default](/tests/scenario/bai_scenario/manager/ssh_key/test_uploading.py): pass
 
 when a user granted UPDATE on their own user and holding no SSH key uploads one, it comes back as the default
 
@@ -48,7 +48,7 @@ Given
 
 When
 
-- SSHKeypairAdapter.my_upload: user-1 uploads their own SSH key
+- SSHKeyAdapter.my_upload: user-1 uploads their own SSH key
 
 Then
 
@@ -60,7 +60,7 @@ Then
 
 <a id="uploading-a-user-holding-a-default-uploads-a-key-that-is-not-the-default"></a>
 
-#### [a-user-holding-a-default-uploads-a-key-that-is-not-the-default](/tests/scenario/bai_scenario/manager/ssh_keypair/test_uploading.py): pass
+#### [a-user-holding-a-default-uploads-a-key-that-is-not-the-default](/tests/scenario/bai_scenario/manager/ssh_key/test_uploading.py): pass
 
 when a user granted UPDATE on their own user and already holding a default SSH key uploads one, it comes back as not the default
 
@@ -82,7 +82,7 @@ Given
 
 When
 
-- SSHKeypairAdapter.my_upload: user-1 uploads their own SSH key
+- SSHKeyAdapter.my_upload: user-1 uploads their own SSH key
 
 Then
 
@@ -94,7 +94,7 @@ Then
 
 <a id="uploading-a-user-granted-read-may-not-upload-a-key"></a>
 
-#### [a-user-granted-read-may-not-upload-a-key](/tests/scenario/bai_scenario/manager/ssh_keypair/test_uploading.py): pass
+#### [a-user-granted-read-may-not-upload-a-key](/tests/scenario/bai_scenario/manager/ssh_key/test_uploading.py): pass
 
 when a user granted only READ on their own user tries to upload an SSH key, it is rejected for lack of permission
 
@@ -114,7 +114,7 @@ Given
 
 When
 
-- SSHKeypairAdapter.my_upload: user-1 uploads their own SSH key
+- SSHKeyAdapter.my_upload: user-1 uploads their own SSH key
 
 Then
 
@@ -123,7 +123,7 @@ Then
 
 <a id="uploading-a-value-that-is-not-a-public-key-is-rejected"></a>
 
-#### [a-value-that-is-not-a-public-key-is-rejected](/tests/scenario/bai_scenario/manager/ssh_keypair/test_uploading.py): pass
+#### [a-value-that-is-not-a-public-key-is-rejected](/tests/scenario/bai_scenario/manager/ssh_key/test_uploading.py): pass
 
 even a user granted UPDATE on their own user is rejected when the value they upload is not a public key
 
@@ -143,7 +143,7 @@ Given
 
 When
 
-- SSHKeypairAdapter.my_upload: user-1 uploads a value that is not a public key as their SSH key
+- SSHKeyAdapter.my_upload: user-1 uploads a value that is not a public key as their SSH key
 
 Then
 
@@ -154,7 +154,7 @@ Then
 
 <a id="switching_default-a-user-granted-update-switches-their-default-key"></a>
 
-#### [a-user-granted-update-switches-their-default-key](/tests/scenario/bai_scenario/manager/ssh_keypair/test_switching_default.py): pass
+#### [a-user-granted-update-switches-their-default-key](/tests/scenario/bai_scenario/manager/ssh_key/test_switching_default.py): pass
 
 when a user granted READ and UPDATE on their own user sets their SSH key that is not the default as the default, that key comes back as the default
 
@@ -177,7 +177,7 @@ Given
 
 When
 
-- SSHKeypairAdapter.switch_default: user-1 sets their SSH key that is not the default as the default
+- SSHKeyAdapter.switch_default: user-1 sets their SSH key that is not the default as the default
 
 Then
 
@@ -189,7 +189,7 @@ Then
 
 <a id="switching_default-a-user-granted-read-may-not-switch-their-default-key"></a>
 
-#### [a-user-granted-read-may-not-switch-their-default-key](/tests/scenario/bai_scenario/manager/ssh_keypair/test_switching_default.py): pass
+#### [a-user-granted-read-may-not-switch-their-default-key](/tests/scenario/bai_scenario/manager/ssh_key/test_switching_default.py): pass
 
 when a user granted only READ on their own user tries to set their SSH key as the default, it is rejected for lack of permission
 
@@ -211,7 +211,7 @@ Given
 
 When
 
-- SSHKeypairAdapter.switch_default: user-1 sets their SSH key that is not the default as the default
+- SSHKeyAdapter.switch_default: user-1 sets their SSH key that is not the default as the default
 
 Then
 
