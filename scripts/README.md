@@ -39,7 +39,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python and BUILD files with the ruff of the `lint` group of `pyproject.toml`, installed into `dist/lint-venv` | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python and BUILD files, and `flake8` over the staged Python files, with the `lint` group of `pyproject.toml` installed into `dist/lint-venv` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 
