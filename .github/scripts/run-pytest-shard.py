@@ -5,7 +5,8 @@
         --junit-dir <dir> --python <python> [--workers <n>] [-- <pytest arguments>]
 
 <file> lists the test files of one shard, one path per line: ``<suite>.<k>.txt`` of
-``plan-ci-targets.py``. ``--workers`` processes
+``plan-ci-targets.py``. ``PYTHONPATH`` is the ``[tool.mypy] mypy_path`` entries of
+``pyproject.toml`` except ``stubs``, then the repository root. ``--workers`` processes
 (default ``os.cpu_count()``) run side by side, each with its own
 ``BACKEND_TEST_EXEC_SLOT``, the container slot of ``tests/README.md``:
 
@@ -31,6 +32,7 @@ import subprocess
 import sys
 import threading
 import time
+import tomllib
 import xml.etree.ElementTree as ET
 
 TIMEOUT = 180
@@ -41,6 +43,13 @@ OK_CODES = (0, 5)
 def out(text: str) -> None:
     sys.stdout.write(f"{text}\n")
     sys.stdout.flush()
+
+
+def python_path(root: pathlib.Path) -> str:
+    """The source roots of ``[tool.mypy] mypy_path`` without ``stubs``, then ``root``."""
+    config = tomllib.loads((root / "pyproject.toml").read_text())
+    entries = config["tool"]["mypy"]["mypy_path"].split(":")
+    return ":".join([*(str(root / e) for e in entries if e != "stubs"), str(root)])
 
 
 def read_list(listing: pathlib.Path) -> list[str]:
@@ -153,7 +162,7 @@ def main() -> int:
     root = pathlib.Path.cwd()
     env = {
         **os.environ,
-        "PYTHONPATH": f"{root}/src:{root}/tests/scenario:{root}",
+        "PYTHONPATH": python_path(root),
         "BACKEND_BUILD_ROOT": str(root),
     }
     command = [
