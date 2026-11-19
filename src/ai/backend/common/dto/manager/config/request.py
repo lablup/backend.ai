@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dotfile import DotfilePath
+from ai.backend.common.dotfile import validate_dotfile_path
 from ai.backend.common.dto.manager.config.types import (
     MAXIMUM_DOTFILE_PATH_LENGTH,
     MAXIMUM_DOTFILE_SIZE,
@@ -64,8 +64,7 @@ class CreateUserDotfileRequest(BaseRequestModel):
     @field_validator("path")
     @classmethod
     def validate_path(cls, value: str) -> str:
-        DotfilePath(value)
-        return value
+        return validate_dotfile_path(value)
 
 
 class GetUserDotfileRequest(BaseRequestModel):
