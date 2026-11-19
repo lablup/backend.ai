@@ -11,21 +11,23 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.reconnect import ValkeyReconnectErrorClassifier
 from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.data.artifact.types import (
     ArtifactDownloadTrackingData,
     DownloadProgressData,
     FileDownloadProgressData,
 )
-from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
-    BackoffStrategy,
     MetricArgs,
     MetricPolicy,
     Resilience,
-    RetryArgs,
-    RetryPolicy,
+)
+from ai.backend.common.resilience.policies.retry import (
+    ReconnectRetryArgs,
+    ReconnectRetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.structured import StructuredLogger
@@ -36,14 +38,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 valkey_artifact_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_ARTIFACT)),
-        RetryPolicy(
-            RetryArgs(
-                max_retries=3,
-                retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.FIXED,
-                non_retryable_exceptions=(BackendAIError,),
-            )
-        ),
+        ReconnectRetryPolicy(ReconnectRetryArgs(classifier=ValkeyReconnectErrorClassifier())),
     ]
 )
 
