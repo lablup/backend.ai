@@ -54,6 +54,8 @@ The spec bases live in `models/specs/`: read `models/specs/AGENTS.md` before tou
 
 ## No logic in Row classes
 
+- A Row class holds only `to_*`/`from_*` conversion methods and dunder methods; a property,
+  classmethod, staticmethod or SQLAlchemy-decorated method counts too (flake8 `BAI302`, on or off in `tools/flake8-plugins/README.md`).
 - Do not add query-builder methods to Row classes: that belongs to `repositories/db_source/`.
 - Do not add business-logic methods: that belongs to `services/`.
 - `session/row.py` has legacy query methods, but do not follow that pattern.
