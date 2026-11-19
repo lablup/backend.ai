@@ -20,7 +20,7 @@ on:
         type: string
         required: true
       targets-artifact:
-        description: The artifact holding `<suite>.txt`, the tests to run, one file path per line
+        description: The artifact holding `<suite>.<k>.txt`, the tests of shard k, one file path per line
         type: string
         required: true
       sentinel-hosts:
@@ -69,7 +69,7 @@ jobs:
         MODE: ${{ inputs.suite == 'unit' && 'per-file' || 'batched' }}
         PYTHON: ${{ steps.venv.outputs.python }}
       run: |
-        .github/scripts/run-pytest-shard.py --list "dist/ci-targets/$SUITE.txt" --shard "$SHARD" \
+        .github/scripts/run-pytest-shard.py --list "dist/ci-targets/$SUITE.${SHARD%/*}.txt" \
           --mode "$MODE" --junit-dir dist/junit --python "$PYTHON" --summary "$GITHUB_STEP_SUMMARY"
     - name: Upload the junit reports
       if: always()

@@ -1,0 +1,106 @@
+name: test-record
+
+# Run every unit and component test on each push to main and save the run time of each
+# test file as `test-durations.json` for `ci.yml`'s `plan-targets` to restore.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A running job finishes; of the waiting ones only the latest runs.
+concurrency:
+  group: test-record
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      unit-shards: ${{ steps.plan.outputs.unit-shards }}
+      component-shards: ${{ steps.plan.outputs.component-shards }}
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        # Depth 2 holds `HEAD^1`, the revision `--base-ref` needs.
+        fetch-depth: 2
+        lfs: false
+    - name: Install uv
+      run: pip install uv
+    - name: Plan every unit and component test
+      id: plan
+      run: |
+        .github/scripts/plan-ci-targets.py --base-ref HEAD^1 --full-run \
+          --out dist/ci-targets | tee -a "$GITHUB_OUTPUT"
+    - name: Upload the targets
+      uses: actions/upload-artifact@v5
+      with:
+        name: ci-targets
+        path: dist/ci-targets
+
+  unit:
+    needs: plan
+    if: needs.plan.outputs.unit-shards != '[]'
+    uses: ./.github/workflows/ci-pytest.yml
+    with:
+      suite: unit
+      shards: ${{ needs.plan.outputs.unit-shards }}
+      runner: ubuntu-latest
+      targets-artifact: ci-targets
+
+  component:
+    needs: plan
+    if: needs.plan.outputs.component-shards != '[]'
+    uses: ./.github/workflows/ci-pytest.yml
+    with:
+      suite: component
+      shards: ${{ needs.plan.outputs.component-shards }}
+      runner: ubuntu-latest
+      sentinel-hosts: true
+      targets-artifact: ci-targets
+
+  record:
+    needs: [plan, unit, component]
+    # The times are saved whether or not a test failed.
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Deleting the cache entries a save superseded.
+      actions: write
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+        lfs: false
+    - name: Download the junit reports
+      uses: actions/download-artifact@v5
+      with:
+        pattern: junit-*
+        path: dist/junit
+    - name: Sum the run time of each test file
+      run: .github/scripts/compute-test-durations.py --junit-dir dist/junit --out test-durations.json
+    - name: Save the durations
+      id: save
+      uses: actions/cache/save@v5
+      with:
+        path: test-durations.json
+        key: test-durations-main-${{ github.sha }}
+    - name: Delete the durations the save superseded
+      if: steps.save.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        REF: ${{ github.ref }}
+        KEY: test-durations-main-${{ github.sha }}
+      run: .github/scripts/prune-ref-caches.sh "$REPO" "$REF" test-durations-main- "$KEY"
+    - name: Fail on test failures
+      if: needs.unit.result != 'success' && needs.unit.result != 'skipped' || needs.component.result != 'success' && needs.component.result != 'skipped'
+      run: exit 1
