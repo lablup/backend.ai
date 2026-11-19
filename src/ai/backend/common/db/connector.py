@@ -6,7 +6,12 @@ from typing import Any
 
 import asyncpg
 
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
+=======
+from ai.backend.common.db.socket_options import TCPOptions
+from ai.backend.logging.structured import StructuredLogger
+>>>>>>> ecc5a76f8 (fix(BA-8246): fail unresponsive database connections with TCP keepalive and a pre-ping timeout (#17244))
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -20,6 +25,7 @@ class PrimaryMemberConnector:
     _members: list[tuple[str, int]]
     _connect_timeout: float
     _connect_kwargs: dict[str, Any]
+    _tcp_options: TCPOptions | None
     _start: int
 
     def __init__(
@@ -31,6 +37,7 @@ class PrimaryMemberConnector:
         database: str,
         connect_timeout: float,
         connect_kwargs: Mapping[str, Any],
+        tcp_options: TCPOptions | None = None,
     ) -> None:
         self._members = list(members)
         self._connect_timeout = connect_timeout
@@ -40,6 +47,7 @@ class PrimaryMemberConnector:
             "password": password,
             "database": database,
         }
+        self._tcp_options = tcp_options
         self._start = 0
 
     async def connect(self) -> asyncpg.Connection:
@@ -59,6 +67,8 @@ class PrimaryMemberConnector:
                 log.warning("database member connection failed (addr: {}, reason: {!r})", addr, e)
                 last_error = e
                 continue
+            if self._tcp_options is not None:
+                self._apply_tcp_options(conn, self._tcp_options)
             try:
                 in_hot_standby = await self._in_hot_standby(conn)
             except (OSError, asyncpg.PostgresError) as e:
@@ -77,6 +87,11 @@ class PrimaryMemberConnector:
         if last_error is not None:
             raise last_error
         raise asyncpg.TargetServerAttributeNotMatched("None of the cluster members is a primary")
+
+    def _apply_tcp_options(self, conn: asyncpg.Connection, options: TCPOptions) -> None:
+        sock = conn._transport.get_extra_info("socket")
+        if sock is not None:
+            options.apply(sock)
 
     async def _in_hot_standby(self, conn: asyncpg.Connection) -> bool:
         # PostgreSQL 14+ reports in_hot_standby at startup.
