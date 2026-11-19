@@ -36,7 +36,6 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     RouteData,
     RouteHealthStatus,
     RouteStatus,
@@ -63,6 +62,7 @@ from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRe
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionError,
     RouteExecutionResult,
+    RouteProvisionTarget,
 )
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
@@ -123,11 +123,23 @@ class RouteExecutor:
             with RouteRecorderContext.shared_step("load_deployment_config"):
                 deployment_ids = {route.deployment_id for route in routes}
                 deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
-                deployment_map = {dep.id: dep for dep in deployments}
             with RouteRecorderContext.shared_step("load_session_groups"):
                 session_group_map = await self._deployment_repo.fetch_route_session_group_ids({
                     route.route_id for route in routes
                 })
+            with RouteRecorderContext.shared_step("load_designated_agents"):
+                designated_agent_map = (
+                    await self._deployment_repo.fetch_designated_agent_ids_by_deployment_ids(
+                        deployment_ids
+                    )
+                )
+            target_map = {
+                deployment.id: RouteProvisionTarget(
+                    deployment=deployment,
+                    designated_agents=designated_agent_map.get(deployment.id, []),
+                )
+                for deployment in deployments
+            }
 
         route_session_ids: dict[UUID, SessionId] = {}
         successes: list[RouteData] = []
@@ -137,9 +149,7 @@ class RouteExecutor:
         for route in routes:
             with with_log_context(route_id=route.route_id, deployment_id=route.deployment_id):
                 try:
-                    session_id = await self._provision_route(
-                        route, deployment_map, session_group_map
-                    )
+                    session_id = await self._provision_route(route, target_map, session_group_map)
                     if session_id is not None:
                         route_session_ids[route.route_id] = session_id
                     successes.append(route)
@@ -1135,7 +1145,7 @@ class RouteExecutor:
     async def _provision_route(
         self,
         route: RouteData,
-        deployment_map: Mapping[DeploymentID, DeploymentInfo],
+        target_map: Mapping[DeploymentID, RouteProvisionTarget],
         session_group_map: Mapping[ReplicaID, SessionGroupID],
     ) -> SessionId | None:
         """Provision a single route by creating a session.
@@ -1158,11 +1168,12 @@ class RouteExecutor:
                 return None
 
             with recorder.step("enqueue_session"):
-                deployment = deployment_map.get(route.deployment_id)
-                if deployment is None:
+                target = target_map.get(route.deployment_id)
+                if target is None:
                     raise EndpointNotFound(
                         f"Deployment not found for deployment {route.deployment_id}"
                     )
+                deployment = target.deployment
 
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
                     deployment,
@@ -1176,6 +1187,7 @@ class RouteExecutor:
                     route_id=route.route_id,
                     target_revision=target_revision,
                     session_group_id=session_group_map.get(route.route_id),
+                    designated_agents=target.designated_agents,
                 )
                 return await self._scheduling_controller.enqueue_session_from_draft(draft)
 

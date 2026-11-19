@@ -41,6 +41,10 @@ from ai.backend.manager.repositories.ops.v2.reconciler.provider import Reconcile
 from ai.backend.testutils.db import with_tables
 
 
+def _agent_ids(agent_uuids: list[AgentUUID]) -> list[AgentId]:
+    return sorted(AgentId(f"i-{agent_uuid.hex[:12]}") for agent_uuid in agent_uuids)
+
+
 class TestDeploymentDesignatedAgents:
     @pytest.fixture
     async def db_with_cleanup(
@@ -176,8 +180,8 @@ class TestDeploymentDesignatedAgents:
 
         await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
-        designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
-        assert set(designated[deployment_id]) == set(agent_uuids[:2])
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids({deployment_id})
+        assert designated[deployment_id] == _agent_ids(agent_uuids[:2])
 
     async def test_replacing_again_drops_the_agents_left_out(
         self,
@@ -190,8 +194,8 @@ class TestDeploymentDesignatedAgents:
 
         await repository.set_designated_agents(deployment_id, {agent_uuids[2]})
 
-        designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
-        assert designated[deployment_id] == [agent_uuids[2]]
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids({deployment_id})
+        assert designated[deployment_id] == _agent_ids([agent_uuids[2]])
 
     async def test_replacing_with_none_clears_the_designation(
         self,
@@ -204,7 +208,7 @@ class TestDeploymentDesignatedAgents:
 
         await repository.set_designated_agents(deployment_id, set())
 
-        designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == []
 
     @pytest.mark.parametrize(
@@ -231,9 +235,11 @@ class TestDeploymentDesignatedAgents:
         with_agents, without_agents = deployment_ids
         await repository.set_designated_agents(with_agents, set(agent_uuids[:2]))
 
-        designated = await repository.fetch_designated_agents_by_deployment_ids(set(deployment_ids))
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids(
+            set(deployment_ids)
+        )
 
-        assert set(designated[with_agents]) == set(agent_uuids[:2])
+        assert designated[with_agents] == _agent_ids(agent_uuids[:2])
         assert designated[without_agents] == []
 
     async def test_deleting_the_deployment_deletes_its_designation(
@@ -268,5 +274,23 @@ class TestDeploymentDesignatedAgents:
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(sa.delete(AgentRow).where(AgentRow.uuid == agent_uuids[0]))
 
-        designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
-        assert designated[deployment_id] == [agent_uuids[1]]
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids({deployment_id})
+        assert designated[deployment_id] == _agent_ids([agent_uuids[1]])
+
+    async def test_fetching_agent_ids_maps_uuids_to_agent_ids_in_order(
+        self,
+        repository: DeploymentRepository,
+        deployment_ids: list[DeploymentID],
+        agent_uuids: list[AgentUUID],
+    ) -> None:
+        with_agents, without_agents = deployment_ids
+        await repository.set_designated_agents(with_agents, set(agent_uuids[:2]))
+
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids(
+            set(deployment_ids)
+        )
+
+        assert designated == {
+            with_agents: sorted(AgentId(f"i-{u.hex[:12]}") for u in agent_uuids[:2]),
+            without_agents: [],
+        }
