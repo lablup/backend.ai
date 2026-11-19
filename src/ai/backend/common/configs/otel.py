@@ -6,6 +6,7 @@ from pydantic import AliasChoices, Field
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = ("OTELConfig",)
 
@@ -89,5 +90,23 @@ class OTELConfig(BaseConfigSchema):
             ),
             added_version="26.2.0",
             example=ConfigExample(local="512", prod="4096"),
+        ),
+    ]
+    trace_db_statements: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("trace-db-statements", "trace_db_statements"),
+            serialization_alias="trace-db-statements",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to record a span for every SQL statement sent through asyncpg, "
+                "carrying the statement text without its parameter values. "
+                "Applies to the manager only, and only when `enabled` is true. "
+                "A statement run with no enclosing span records no span."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="false"),
         ),
     ]

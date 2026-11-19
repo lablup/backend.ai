@@ -33,6 +33,7 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
+from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
 from setproctitle import setproctitle
 
 from ai.backend.common.config import find_config_file
@@ -451,6 +452,9 @@ async def server_main(
             apply_otel_tracer(otel_spec)
             StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_client()
+            if config_provider.config.otel.trace_db_statements:
+                AsyncPGInstrumentor().instrument()
+                log.info("opentelemetry asyncpg instrumentation initialized")
             root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
