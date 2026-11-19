@@ -31,6 +31,10 @@ from .actions.get_task_template import (
     GetTaskTemplateAction,
     GetTaskTemplateActionResult,
 )
+from .actions.global_list_cluster_templates import (
+    GlobalListClusterTemplatesAction,
+    GlobalListClusterTemplatesActionResult,
+)
 from .actions.global_list_task_templates import (
     GlobalListTaskTemplatesAction,
     GlobalListTaskTemplatesActionResult,
@@ -76,6 +80,9 @@ class TemplateProcessors:
         CreateClusterTemplateAction, CreateClusterTemplateActionResult
     ]
     list_cluster: ScopeActionProcessor[ListClusterTemplatesAction, ListClusterTemplatesActionResult]
+    global_list_cluster: GlobalActionProcessor[
+        GlobalListClusterTemplatesAction, GlobalListClusterTemplatesActionResult
+    ]
     get_cluster: SingleEntityActionProcessor[
         GetClusterTemplateAction, GetClusterTemplateActionResult
     ]
@@ -104,6 +111,9 @@ class TemplateProcessors:
             CreateClusterTemplateAction, service.create_cluster_template
         )
         self.list_cluster = group.scope(ListClusterTemplatesAction, service.list_cluster_templates)
+        self.global_list_cluster = group.global_scope(
+            GlobalListClusterTemplatesAction, service.global_list_cluster_templates
+        )
         self.get_cluster = group.single_entity(
             GetClusterTemplateAction, service.get_cluster_template
         )

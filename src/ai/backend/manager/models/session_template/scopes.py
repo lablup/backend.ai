@@ -1,0 +1,98 @@
+"""Operation scopes for session templates."""
+
+from __future__ import annotations
+
+from abc import ABC
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, override
+
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.queries import user_scope_reaches
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
+
+__all__ = (
+    "ProjectSessionTemplateTarget",
+    "SessionTemplateTarget",
+    "UserSessionTemplateTarget",
+)
+
+
+class SessionTemplateTarget(ScopeTarget, ABC):
+    pass
+
+
+@dataclass(frozen=True)
+class ProjectSessionTemplateTarget(SessionTemplateTarget):
+    """The session templates of one project."""
+
+    project_id: ProjectID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        project_id = self.project_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return scope_membership_exists(
+                ProjectEntityType(), project_id, SessionTemplateEntityType(), SessionTemplateRow.id
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=ProjectRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserSessionTemplateTarget(SessionTemplateTarget):
+    """The session templates one user owns."""
+
+    user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return user_scope_reaches(user_id, SessionTemplateEntityType(), SessionTemplateRow.id)
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_id,
+                error=UserNotFound(f"User {self.user_id} not found"),
+            ),
+        ]

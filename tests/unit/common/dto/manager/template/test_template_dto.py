@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.dto.manager.template.request import (
     CreateClusterTemplateRequest,
     CreateSessionTemplateRequest,
@@ -39,10 +42,15 @@ from ai.backend.common.exception import BackendAISchemaValidationFailed
 _NOW = datetime.now(UTC)
 
 
+_PROJECT_ID = ProjectID(UUID(int=1))
+_PROJECT_ID_TEXT = str(_PROJECT_ID)
+_TEMPLATE_ID = SessionTemplateID(UUID(int=2))
+
+
 class TestTemplatePathParam:
     def test_basic_instantiation(self) -> None:
-        param = TemplatePathParam(template_id="abc123")
-        assert param.template_id == "abc123"
+        param = TemplatePathParam.model_validate({"template_id": str(_TEMPLATE_ID)})
+        assert param.template_id == _TEMPLATE_ID
 
 
 class TestCreateSessionTemplateRequest:
@@ -88,14 +96,17 @@ class TestListSessionTemplatesRequest:
         assert req.group_id is None
 
     def test_with_values(self) -> None:
-        req = ListSessionTemplatesRequest(all=True, group_id="some-group-id")
+        req = ListSessionTemplatesRequest.model_validate({
+            "all": True,
+            "group_id": _PROJECT_ID_TEXT,
+        })
         assert req.all is True
-        assert req.group_id == "some-group-id"
+        assert req.group_id == _PROJECT_ID
 
     @pytest.mark.parametrize("alias", ["group_id", "groupId"])
     def test_group_id_alias(self, alias: str) -> None:
-        req = ListSessionTemplatesRequest.model_validate({alias: "gid-123"})
-        assert req.group_id == "gid-123"
+        req = ListSessionTemplatesRequest.model_validate({alias: _PROJECT_ID_TEXT})
+        assert req.group_id == _PROJECT_ID
 
 
 class TestGetSessionTemplateRequest:
@@ -172,8 +183,8 @@ class TestListClusterTemplatesRequest:
 
     @pytest.mark.parametrize("alias", ["group_id", "groupId"])
     def test_group_id_alias(self, alias: str) -> None:
-        req = ListClusterTemplatesRequest.model_validate({alias: "gid-456"})
-        assert req.group_id == "gid-456"
+        req = ListClusterTemplatesRequest.model_validate({alias: _PROJECT_ID_TEXT})
+        assert req.group_id == _PROJECT_ID
 
 
 class TestGetClusterTemplateRequest:

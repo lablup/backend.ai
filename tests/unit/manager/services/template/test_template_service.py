@@ -5,8 +5,8 @@ Tests the service layer with mocked repository operations.
 
 from __future__ import annotations
 
-import json
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -15,9 +15,17 @@ import pytest
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.session_template.types import TemplateType
+from ai.backend.manager.data.session_template.types import (
+    SessionTemplateData,
+    SessionTemplateWithOwnerEmailAndProjectName,
+    TemplateType,
+)
 from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
+from ai.backend.manager.models.session_template.scopes import (
+    ProjectSessionTemplateTarget,
+    UserSessionTemplateTarget,
+)
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 from ai.backend.manager.services.template.actions.create_cluster_template import (
@@ -39,6 +47,9 @@ from ai.backend.manager.services.template.actions.get_cluster_template import (
 from ai.backend.manager.services.template.actions.get_task_template import (
     GetTaskTemplateAction,
 )
+from ai.backend.manager.services.template.actions.global_list_cluster_templates import (
+    GlobalListClusterTemplatesAction,
+)
 from ai.backend.manager.services.template.actions.global_list_task_templates import (
     GlobalListTaskTemplatesAction,
 )
@@ -55,6 +66,52 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
+
+_REQUESTER_ID = UserID(uuid.UUID(int=1))
+_JOINED_PROJECT_ID = ProjectID(uuid.UUID(int=2))
+_GROUP_ID_FILTER = ProjectID(uuid.UUID(int=3))
+_TEMPLATE_IN_SCOPES = SessionTemplateWithOwnerEmailAndProjectName(
+    template=SessionTemplateData(
+        id=SessionTemplateID(uuid.UUID(int=10)),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        is_active=True,
+        domain_name="default",
+        group_id=_JOINED_PROJECT_ID,
+        user_uuid=_REQUESTER_ID,
+        type=TemplateType.TASK,
+        name="in-scopes",
+        template={},
+    ),
+    owner_email="requester@example.com",
+    project_name="joined-project",
+)
+_TEMPLATE_IN_GLOBAL = SessionTemplateWithOwnerEmailAndProjectName(
+    template=SessionTemplateData(
+        id=SessionTemplateID(uuid.UUID(int=11)),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        is_active=True,
+        domain_name="default",
+        group_id=None,
+        user_uuid=UserID(uuid.UUID(int=20)),
+        type=TemplateType.TASK,
+        name="in-global",
+        template={},
+    ),
+    owner_email="someone@example.com",
+    project_name=None,
+)
+
+_STORED_CLUSTER_TEMPLATE = SessionTemplateData(
+    id=SessionTemplateID(uuid.UUID(int=12)),
+    created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    is_active=True,
+    domain_name="default",
+    group_id=_JOINED_PROJECT_ID,
+    user_uuid=_REQUESTER_ID,
+    type=TemplateType.CLUSTER,
+    name="stored-cluster",
+    template={"spec": {"nodes": []}, "metadata": {"name": "stored-cluster"}},
+)
 
 
 def _template_id(name: str) -> SessionTemplateID:
@@ -116,7 +173,7 @@ class TestCreateTaskTemplateAction:
         return {
             "domain_name": "default",
             "requesting_project": ProjectID(uuid.uuid4()),
-            "requester_uuid": uuid.uuid4(),
+            "requester_uuid": UserID(uuid.uuid4()),
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,
             "requester_domain": "default",
@@ -129,12 +186,10 @@ class TestCreateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        owner_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
+        owner_uuid = UserID(uuid.uuid4())
+        group_id = ProjectID(uuid.uuid4())
         mock_repo.resolve_owner = AsyncMock(return_value=(owner_uuid, group_id))
-        mock_repo.create_task_templates = AsyncMock(
-            return_value=[{"id": "abc123", "user": owner_uuid.hex}]
-        )
+        mock_repo.create_task_templates = AsyncMock(return_value=None)
 
         action = CreateTaskTemplateAction(
             **base_action_kwargs,
@@ -142,9 +197,10 @@ class TestCreateTaskTemplateAction:
         )
         result = await service.create_task_template(action)
 
+        items_arg = mock_repo.create_task_templates.call_args[0][1]
         assert len(result.created) == 1
-        assert result.created[0].id == "abc123"
-        assert result.created[0].user == owner_uuid.hex
+        assert result.created[0].id == items_arg[0]["id"]
+        assert result.created[0].user == owner_uuid
         mock_repo.create_task_templates.assert_called_once()
 
     async def test_batch_creation_multiple_items(
@@ -153,19 +209,14 @@ class TestCreateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        owner1 = uuid.uuid4()
-        owner2 = uuid.uuid4()
-        group1 = uuid.uuid4()
-        group2 = uuid.uuid4()
-        default_owner = uuid.uuid4()
-        default_group = uuid.uuid4()
+        owner1 = UserID(uuid.uuid4())
+        owner2 = UserID(uuid.uuid4())
+        group1 = ProjectID(uuid.uuid4())
+        group2 = ProjectID(uuid.uuid4())
+        default_owner = UserID(uuid.uuid4())
+        default_group = ProjectID(uuid.uuid4())
         mock_repo.resolve_owner = AsyncMock(return_value=(default_owner, default_group))
-        mock_repo.create_task_templates = AsyncMock(
-            return_value=[
-                {"id": "id1", "user": owner1.hex},
-                {"id": "id2", "user": owner2.hex},
-            ]
-        )
+        mock_repo.create_task_templates = AsyncMock(return_value=None)
 
         action = CreateTaskTemplateAction(
             **base_action_kwargs,
@@ -198,7 +249,9 @@ class TestCreateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
 
         bad_template = _make_valid_task_template()
         bad_template["kind"] = "invalid_kind"
@@ -216,7 +269,9 @@ class TestCreateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
 
         template = _make_valid_task_template()
         template["spec"]["mounts"] = {"my-vfolder": "/home/work/.ssh"}
@@ -234,12 +289,10 @@ class TestCreateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        override_owner = uuid.uuid4()
-        override_group = uuid.uuid4()
+        override_owner = UserID(uuid.uuid4())
+        override_group = ProjectID(uuid.uuid4())
         mock_repo.resolve_owner = AsyncMock(return_value=(override_owner, override_group))
-        mock_repo.create_task_templates = AsyncMock(
-            return_value=[{"id": "x", "user": override_owner.hex}]
-        )
+        mock_repo.create_task_templates = AsyncMock(return_value=None)
 
         base_action_kwargs["owner_access_key"] = "OVERRIDE_KEY"
         action = CreateTaskTemplateAction(
@@ -251,7 +304,7 @@ class TestCreateTaskTemplateAction:
         mock_repo.resolve_owner.assert_called_once()
         call_kwargs = mock_repo.resolve_owner.call_args
         assert call_kwargs[1]["owner_access_key"] == "OVERRIDE_KEY"
-        assert result.created[0].user == override_owner.hex
+        assert result.created[0].user == override_owner
 
     async def test_name_from_metadata_when_not_provided(
         self,
@@ -259,8 +312,10 @@ class TestCreateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
-        mock_repo.create_task_templates = AsyncMock(return_value=[{"id": "x", "user": "u"}])
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
+        mock_repo.create_task_templates = AsyncMock(return_value=None)
 
         action = CreateTaskTemplateAction(
             **base_action_kwargs,
@@ -283,51 +338,18 @@ class TestGetTaskTemplateAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_returns_full_data(
+    async def test_returns_the_stored_template(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        user_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
-        template_data = _make_valid_task_template()
-        mock_repo.get_task_template = AsyncMock(
-            return_value={
-                "template": template_data,
-                "name": "test-template",
-                "user_uuid": user_uuid,
-                "group_id": group_id,
-            }
-        )
+        mock_repo.get_task_template = AsyncMock(return_value=_TEMPLATE_IN_SCOPES.template)
 
-        action = GetTaskTemplateAction(template_id=_template_id("tmpl-123"))
+        action = GetTaskTemplateAction(template_id=_TEMPLATE_IN_SCOPES.template.id)
         result = await service.get_task_template(action)
 
-        assert result.template == template_data
-        assert result.name == "test-template"
-        assert result.user_uuid == user_uuid
-        assert result.group_id == group_id
-
-    async def test_json_string_template_parsed(
-        self,
-        service: TemplateService,
-        mock_repo: MagicMock,
-    ) -> None:
-        template_data = _make_valid_task_template()
-        mock_repo.get_task_template = AsyncMock(
-            return_value={
-                "template": json.dumps(template_data),
-                "name": "test",
-                "user_uuid": uuid.uuid4(),
-                "group_id": uuid.uuid4(),
-            }
-        )
-
-        action = GetTaskTemplateAction(template_id=_template_id("tmpl-123"))
-        result = await service.get_task_template(action)
-
-        assert isinstance(result.template, dict)
-        assert result.template["kind"] == "taskTemplate"
+        assert result.template == _TEMPLATE_IN_SCOPES.template
+        mock_repo.get_task_template.assert_called_once_with(_TEMPLATE_IN_SCOPES.template.id)
 
     async def test_nonexistent_id_raises_not_found(
         self,
@@ -344,42 +366,41 @@ class TestGetTaskTemplateAction:
 class TestListTaskTemplatesAction:
     @pytest.fixture
     def mock_repo(self) -> MagicMock:
-        return MagicMock(spec=TemplateRepository)
+        repo = MagicMock(spec=TemplateRepository)
+        repo.joined_project_ids = AsyncMock(return_value=[_JOINED_PROJECT_ID])
+        repo.list_templates_in_scopes = AsyncMock(return_value=[_TEMPLATE_IN_SCOPES])
+        return repo
 
     @pytest.fixture
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_returns_only_the_accessible_templates(
+    async def test_lists_the_requester_and_their_joined_projects(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        user_uuid = uuid.uuid4()
-        entries = [{"name": "my-task"}]
-        mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
-
-        action = ListTaskTemplatesAction(
-            user_uuid=UserID(user_uuid),
-            user_role=UserRole.USER,
-            domain_name="default",
+        result = await service.list_task_templates(
+            ListTaskTemplatesAction(user_uuid=_REQUESTER_ID, group_id_filter=_GROUP_ID_FILTER)
         )
-        result = await service.list_task_templates(action)
 
-        assert result.entries == entries
-        mock_repo.list_accessible_templates.assert_called_once_with(
+        assert result.entries == [_TEMPLATE_IN_SCOPES]
+        mock_repo.list_templates_in_scopes.assert_called_once_with(
             TemplateType.TASK,
-            user_uuid,
-            UserRole.USER,
-            "default",
-            allowed_types=["user", "group"],
+            [
+                UserSessionTemplateTarget(user_id=_REQUESTER_ID),
+                ProjectSessionTemplateTarget(project_id=_JOINED_PROJECT_ID),
+            ],
+            _GROUP_ID_FILTER,
         )
 
 
 class TestGlobalListTaskTemplatesAction:
     @pytest.fixture
     def mock_repo(self) -> MagicMock:
-        return MagicMock(spec=TemplateRepository)
+        repo = MagicMock(spec=TemplateRepository)
+        repo.list_templates_in_global = AsyncMock(return_value=[_TEMPLATE_IN_GLOBAL])
+        return repo
 
     @pytest.fixture
     def service(self, mock_repo: MagicMock) -> TemplateService:
@@ -390,16 +411,10 @@ class TestGlobalListTaskTemplatesAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        requester_id = UserID(uuid.uuid4())
-        entries = [{"name": "t1"}, {"name": "t2"}]
-        mock_repo.list_task_templates = AsyncMock(return_value=entries)
+        result = await service.global_list_task_templates(GlobalListTaskTemplatesAction())
 
-        result = await service.global_list_task_templates(
-            GlobalListTaskTemplatesAction(requester_id=requester_id)
-        )
-
-        assert result.entries == entries
-        mock_repo.list_task_templates.assert_called_once_with(requester_id)
+        assert result.entries == [_TEMPLATE_IN_GLOBAL]
+        mock_repo.list_templates_in_global.assert_called_once_with(TemplateType.TASK)
 
 
 class TestUpdateTaskTemplateAction:
@@ -417,7 +432,7 @@ class TestUpdateTaskTemplateAction:
             "template_id": _template_id("tmpl-existing"),
             "domain_name": "default",
             "requesting_project": ProjectID(uuid.uuid4()),
-            "requester_uuid": uuid.uuid4(),
+            "requester_uuid": UserID(uuid.uuid4()),
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,
             "requester_domain": "default",
@@ -431,7 +446,9 @@ class TestUpdateTaskTemplateAction:
         base_action_kwargs: dict[str, Any],
     ) -> None:
         mock_repo.task_template_exists = AsyncMock(return_value=True)
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
         mock_repo.update_task_template = AsyncMock(return_value=1)
 
         action = UpdateTaskTemplateAction(
@@ -465,7 +482,9 @@ class TestUpdateTaskTemplateAction:
         base_action_kwargs: dict[str, Any],
     ) -> None:
         mock_repo.task_template_exists = AsyncMock(return_value=True)
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
 
         bad_template = _make_valid_task_template()
         bad_template["kind"] = "wrong_kind"
@@ -484,7 +503,9 @@ class TestUpdateTaskTemplateAction:
         base_action_kwargs: dict[str, Any],
     ) -> None:
         mock_repo.task_template_exists = AsyncMock(return_value=True)
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
         mock_repo.update_task_template = AsyncMock(return_value=0)
 
         action = UpdateTaskTemplateAction(
@@ -517,7 +538,7 @@ class TestDeleteTaskTemplateAction:
 
         assert result is not None
         mock_repo.soft_delete_template.assert_called_once_with(
-            str(_template_id("tmpl-to-delete")), TemplateType.TASK
+            _template_id("tmpl-to-delete"), TemplateType.TASK
         )
 
     async def test_nonexistent_raises_not_found(
@@ -558,23 +579,23 @@ class TestCreateClusterTemplateAction:
         return {
             "domain_name": "default",
             "requesting_project": ProjectID(uuid.uuid4()),
-            "requester_uuid": uuid.uuid4(),
+            "requester_uuid": UserID(uuid.uuid4()),
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,
             "requester_domain": "default",
             "owner_access_key": None,
         }
 
-    async def test_valid_cluster_returns_id_and_owner_hex(
+    async def test_valid_cluster_returns_id_and_owner(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        owner_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
+        owner_uuid = UserID(uuid.uuid4())
+        group_id = ProjectID(uuid.uuid4())
         mock_repo.resolve_owner = AsyncMock(return_value=(owner_uuid, group_id))
-        mock_repo.create_cluster_template = AsyncMock(return_value="cluster-tmpl-id")
+        mock_repo.create_cluster_template = AsyncMock(return_value=_template_id("cluster-1"))
 
         action = CreateClusterTemplateAction(
             **base_action_kwargs,
@@ -582,8 +603,8 @@ class TestCreateClusterTemplateAction:
         )
         result = await service.create_cluster_template(action)
 
-        assert result.id == "cluster-tmpl-id"
-        assert result.user == owner_uuid.hex
+        assert result.id == _template_id("cluster-1")
+        assert result.user == owner_uuid
 
     async def test_no_master_node_raises_invalid_argument(
         self,
@@ -591,7 +612,9 @@ class TestCreateClusterTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
 
         template = _make_valid_cluster_template()
         template["spec"]["nodes"] = [
@@ -611,7 +634,9 @@ class TestCreateClusterTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
 
         template = _make_valid_cluster_template()
         template["spec"]["nodes"][0]["replicas"] = 2
@@ -629,7 +654,9 @@ class TestCreateClusterTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.resolve_owner = AsyncMock(
+            return_value=(UserID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        )
 
         template = _make_valid_cluster_template()
         template["kind"] = "wrongKind"
@@ -651,18 +678,17 @@ class TestGetClusterTemplateAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_returns_full_specification(
+    async def test_returns_the_stored_template(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        template_data = {"spec": {"nodes": []}, "metadata": {"name": "test"}}
-        mock_repo.get_cluster_template = AsyncMock(return_value=template_data)
+        mock_repo.get_cluster_template = AsyncMock(return_value=_STORED_CLUSTER_TEMPLATE)
 
-        action = GetClusterTemplateAction(template_id=_template_id("cluster-1"))
+        action = GetClusterTemplateAction(template_id=_STORED_CLUSTER_TEMPLATE.id)
         result = await service.get_cluster_template(action)
 
-        assert result.template == template_data
+        assert result.template == _STORED_CLUSTER_TEMPLATE
 
     async def test_nonexistent_raises_not_found(
         self,
@@ -679,90 +705,55 @@ class TestGetClusterTemplateAction:
 class TestListClusterTemplatesAction:
     @pytest.fixture
     def mock_repo(self) -> MagicMock:
-        return MagicMock(spec=TemplateRepository)
+        repo = MagicMock(spec=TemplateRepository)
+        repo.joined_project_ids = AsyncMock(return_value=[_JOINED_PROJECT_ID])
+        repo.list_templates_in_scopes = AsyncMock(return_value=[_TEMPLATE_IN_SCOPES])
+        return repo
 
     @pytest.fixture
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_superadmin_list_all_returns_domain_wide(
+    async def test_lists_the_requester_and_their_joined_projects(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        user_uuid = uuid.uuid4()
-        entries = [{"name": "cluster-1"}, {"name": "cluster-2"}]
-        mock_repo.list_cluster_templates_all = AsyncMock(return_value=entries)
-
-        action = ListClusterTemplatesAction(
-            user_uuid=UserID(user_uuid),
-            user_role=UserRole.SUPERADMIN,
-            domain_name="default",
-            is_superadmin=True,
-            list_all=True,
-            group_id_filter=None,
+        result = await service.list_cluster_templates(
+            ListClusterTemplatesAction(user_uuid=_REQUESTER_ID, group_id_filter=_GROUP_ID_FILTER)
         )
-        result = await service.list_cluster_templates(action)
 
-        assert len(result.entries) == 2
-        mock_repo.list_cluster_templates_all.assert_called_once_with(user_uuid)
-
-    async def test_regular_user_returns_accessible_only(
-        self,
-        service: TemplateService,
-        mock_repo: MagicMock,
-    ) -> None:
-        user_uuid = uuid.uuid4()
-        entries = [{"name": "my-cluster"}]
-        mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
-
-        action = ListClusterTemplatesAction(
-            user_uuid=UserID(user_uuid),
-            user_role=UserRole.USER,
-            domain_name="default",
-            is_superadmin=False,
-            list_all=False,
-            group_id_filter=None,
-        )
-        result = await service.list_cluster_templates(action)
-
-        assert len(result.entries) == 1
-        mock_repo.list_accessible_templates.assert_called_once_with(
+        assert result.entries == [_TEMPLATE_IN_SCOPES]
+        mock_repo.list_templates_in_scopes.assert_called_once_with(
             TemplateType.CLUSTER,
-            user_uuid,
-            UserRole.USER,
-            "default",
-            allowed_types=["user", "group"],
-            group_id_filter=None,
+            [
+                UserSessionTemplateTarget(user_id=_REQUESTER_ID),
+                ProjectSessionTemplateTarget(project_id=_JOINED_PROJECT_ID),
+            ],
+            _GROUP_ID_FILTER,
         )
 
-    async def test_group_id_filter_works(
+
+class TestGlobalListClusterTemplatesAction:
+    @pytest.fixture
+    def mock_repo(self) -> MagicMock:
+        repo = MagicMock(spec=TemplateRepository)
+        repo.list_templates_in_global = AsyncMock(return_value=[_TEMPLATE_IN_GLOBAL])
+        return repo
+
+    @pytest.fixture
+    def service(self, mock_repo: MagicMock) -> TemplateService:
+        return TemplateService(repository=mock_repo)
+
+    async def test_returns_every_template(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        user_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
-        mock_repo.list_accessible_templates = AsyncMock(return_value=[])
+        result = await service.global_list_cluster_templates(GlobalListClusterTemplatesAction())
 
-        action = ListClusterTemplatesAction(
-            user_uuid=UserID(user_uuid),
-            user_role=UserRole.USER,
-            domain_name="default",
-            is_superadmin=False,
-            list_all=False,
-            group_id_filter=group_id,
-        )
-        await service.list_cluster_templates(action)
-
-        mock_repo.list_accessible_templates.assert_called_once_with(
-            TemplateType.CLUSTER,
-            user_uuid,
-            UserRole.USER,
-            "default",
-            allowed_types=["user", "group"],
-            group_id_filter=group_id,
-        )
+        assert result.entries == [_TEMPLATE_IN_GLOBAL]
+        mock_repo.list_templates_in_global.assert_called_once_with(TemplateType.CLUSTER)
 
 
 class TestUpdateClusterTemplateAction:
@@ -862,7 +853,7 @@ class TestDeleteClusterTemplateAction:
 
         assert result is not None
         mock_repo.soft_delete_template.assert_called_once_with(
-            str(_template_id("cluster-to-delete")), TemplateType.CLUSTER
+            _template_id("cluster-to-delete"), TemplateType.CLUSTER
         )
 
     async def test_nonexistent_raises_not_found(

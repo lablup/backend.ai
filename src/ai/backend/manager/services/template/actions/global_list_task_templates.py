@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, override
+from dataclasses import dataclass
+from typing import override
 
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.session_template.types import (
+    SessionTemplateWithOwnerEmailAndProjectName,
+)
 
 from .base import TemplateGlobalAction
 
@@ -12,8 +14,6 @@ from .base import TemplateGlobalAction
 @dataclass(frozen=True)
 class GlobalListTaskTemplatesAction(TemplateGlobalAction):
     """List the task templates of every user and project."""
-
-    requester_id: UserID
 
     @override
     @classmethod
@@ -28,4 +28,4 @@ class GlobalListTaskTemplatesAction(TemplateGlobalAction):
 
 @dataclass(frozen=True)
 class GlobalListTaskTemplatesActionResult:
-    entries: list[dict[str, Any]] = field(default_factory=list)
+    entries: list[SessionTemplateWithOwnerEmailAndProjectName]

@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Mapping
-from typing import Any, Literal, Self
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Literal, Self, override
 from uuid import UUID
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BackendAISchema, SessionTypes
 from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -140,3 +146,27 @@ class ClusterTemplate(_TemplateDocument):
                 f"One and only one {DEFAULT_ROLE} node must be created per cluster",
             )
         return self
+
+
+@dataclass(frozen=True)
+class SessionTemplateData(EntityData):
+    id: SessionTemplateID
+    created_at: datetime
+    is_active: bool | None
+    domain_name: str
+    group_id: ProjectID | None
+    user_uuid: UserID
+    type: TemplateType
+    name: str | None
+    template: dict[str, Any]
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
+
+
+@dataclass(frozen=True)
+class SessionTemplateWithOwnerEmailAndProjectName:
+    template: SessionTemplateData
+    owner_email: str | None
+    project_name: str | None

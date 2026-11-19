@@ -10,6 +10,8 @@ from typing import Literal
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
 
 __all__ = (
     # Path params
@@ -32,7 +34,7 @@ __all__ = (
 class TemplatePathParam(BaseRequestModel):
     """Path parameter for template endpoints."""
 
-    template_id: str = Field(description="Template ID from URL path")
+    template_id: SessionTemplateID = Field(description="Template ID from URL path")
 
 
 # --- Session Template Requests ---
@@ -65,7 +67,7 @@ class ListSessionTemplatesRequest(BaseRequestModel):
         default=False,
         description="List all templates (superadmin only)",
     )
-    group_id: str | None = Field(
+    group_id: ProjectID | None = Field(
         default=None,
         validation_alias=AliasChoices("group_id", "groupId"),
         description="Filter by group ID",
@@ -144,7 +146,7 @@ class ListClusterTemplatesRequest(BaseRequestModel):
         default=False,
         description="List all templates (superadmin only)",
     )
-    group_id: str | None = Field(
+    group_id: ProjectID | None = Field(
         default=None,
         validation_alias=AliasChoices("group_id", "groupId"),
         description="Filter by group ID",

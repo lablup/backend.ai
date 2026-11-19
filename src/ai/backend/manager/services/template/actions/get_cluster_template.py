@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.session_template.types import SessionTemplateData
 
 from .base import TemplateAction
 
@@ -27,4 +28,4 @@ class GetClusterTemplateAction(TemplateAction):
 class GetClusterTemplateActionResult:
     """Result of getting a cluster template."""
 
-    template: dict[str, Any]
+    template: SessionTemplateData

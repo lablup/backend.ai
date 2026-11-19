@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.session_template.types import SessionTemplateData
 
 from .base import TemplateAction
 
@@ -28,7 +28,4 @@ class GetTaskTemplateAction(TemplateAction):
 class GetTaskTemplateActionResult:
     """Result of getting a task template."""
 
-    template: dict[str, Any]
-    name: str
-    user_uuid: uuid.UUID
-    group_id: uuid.UUID
+    template: SessionTemplateData
