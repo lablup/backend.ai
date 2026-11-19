@@ -1,4 +1,6 @@
-from tests.unit.flake8_bai.conftest import Lint
+from collections.abc import Callable
+
+type Lint = Callable[[str, str], list[tuple[int, str]]]
 
 DATA_TYPES = "src/ai/backend/manager/data/agent/types.py"
 

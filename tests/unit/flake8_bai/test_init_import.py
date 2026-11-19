@@ -1,4 +1,6 @@
-from tests.unit.flake8_bai.conftest import Lint
+from collections.abc import Callable
+
+type Lint = Callable[[str, str], list[tuple[int, str]]]
 
 MANAGER_INIT = "src/ai/backend/manager/services/agent/__init__.py"
 

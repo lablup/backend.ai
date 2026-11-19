@@ -1,4 +1,6 @@
-from tests.unit.flake8_bai.conftest import Lint
+from collections.abc import Callable
+
+type Lint = Callable[[str, str], list[tuple[int, str]]]
 
 ACTION_FILE = "src/ai/backend/manager/services/agent/actions/get.py"
 

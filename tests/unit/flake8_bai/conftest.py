@@ -1,17 +1,13 @@
 import ast
 import textwrap
-from typing import Protocol
+from collections.abc import Callable
 
 import pytest
 from flake8_bai.plugin import Plugin
 
 
-class Lint(Protocol):
-    def __call__(self, filename: str, source: str) -> list[tuple[int, str]]: ...
-
-
 @pytest.fixture
-def lint() -> Lint:
+def lint() -> Callable[[str, str], list[tuple[int, str]]]:
     """Run the plugin on `source` as `filename`; return `(line, code)` per violation."""
 
     def run(filename: str, source: str) -> list[tuple[int, str]]:
