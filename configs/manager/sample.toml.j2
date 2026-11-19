@@ -72,6 +72,30 @@
   # indefinite blocking.
   # Added in 25.8.0
   lock-conn-timeout = 30.0
+  # Seconds a database connection is idle before TCP keepalive probes start.
+  # Together with tcp-keepalive-interval and tcp-keepalive-count, it detects a
+  # database member that stopped responding while a query is running.
+  # Added in 26.10.0
+  tcp-keepalive-idle = 10
+  # Seconds between TCP keepalive probes of a database connection.
+  # Added in 26.10.0
+  tcp-keepalive-interval = 5
+  # Number of unanswered TCP keepalive probes after which a database connection
+  # is closed.
+  # Added in 26.10.0
+  tcp-keepalive-count = 3
+  # Seconds that sent data of a database connection may stay unacknowledged
+  # before the connection is closed (TCP_USER_TIMEOUT). Keep it equal to tcp-
+  # keepalive-idle + tcp-keepalive-interval * tcp-keepalive-count, as the
+  # connection is closed by this value instead of the keepalive count. 0 uses
+  # the system default. Applied on Linux only.
+  # Added in 26.10.0
+  tcp-user-timeout = 25
+  # Timeout in seconds for the pre-ping of a pooled connection. When it expires,
+  # the connection is terminated and the pool connects again. Applies when pool-
+  # pre-ping is enabled.
+  # Added in 26.10.0
+  pre-ping-timeout = 5.0
 
   # Addresses of the PostgreSQL cluster members. List every member of an HA
   # cluster, or a single address of a standalone server or a proxy in front of
