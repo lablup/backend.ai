@@ -17,3 +17,8 @@ python_requirements(
         "Cython": ["Cython"],
     },
 )
+python_requirements(
+    name="reqs-flake8",
+    source="flake8-requirements.txt",
+    resolve="flake8",
+)

@@ -72,8 +72,6 @@ jobs:
       run: python ./scripts/test_freeze_release_version.py
     - name: Check the changelog fragment names
       run: python ./scripts/validate-changelog-fragments.py
-    - name: Check the manager package __init__ files hold no imports
-      run: python ./scripts/check-init-imports.py src/ai/backend/manager
     - name: Check the import contracts
       run: |
         pip install import-linter==2.16

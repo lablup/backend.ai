@@ -6,6 +6,7 @@ backend_packages = [
     "pants.backend.python.typecheck.mypy",
     "pants.backend.shell",
     "pants.backend.experimental.python",
+    "pants.backend.python.lint.flake8",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
     "setupgen",
@@ -48,6 +49,7 @@ root_patterns = [
     "/tests/scenario",
     "/stubs",
     "/tools/pants-plugins",
+    "/tools/flake8-plugins",
 ]
 
 [subprocess-environment]
@@ -102,6 +104,7 @@ pants-plugins = "tools/pants-plugins.lock"
 coverage-py = "tools/coverage-py.lock"
 towncrier = "tools/towncrier.lock"
 setuptools = "tools/setuptools.lock"
+flake8 = "tools/flake8.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
@@ -131,6 +134,11 @@ known_versions = [
 [update-build-files]
 # ruff formats BUILD files (pyproject.toml).
 fmt = false
+
+[flake8]
+install_from_resolve = "flake8"
+config = ".flake8"
+source_plugins = ["tools/flake8-plugins/flake8_bai"]
 
 [pytest]
 install_from_resolve = "python-default"
