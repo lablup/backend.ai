@@ -65,6 +65,11 @@ The spec bases live in `models/specs/`: read `models/specs/AGENTS.md` before tou
   by the spec's type (rationale: `KNOWLEDGE.md`).
 - Do not open a db session to manipulate Rows directly: the implementation belongs in a repository.
 
+## Connection start retry
+
+- `ExtendedAsyncSAEngine` connections (`ReconnectingAsyncConnection`) retry `start()` with `ReconnectRetryPolicy` within `reconnect-timeout`. Every `begin*()` and `connect()` call goes through it.
+- A statement or COMMIT on a started connection is not retried. Serialization (`40001`) retries stay in `execute_with_txn_retry`.
+
 ## Id column defaults
 
 - Give every id column a `server_default`. Do not mint the value in Python.

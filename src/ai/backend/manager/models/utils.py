@@ -31,7 +31,9 @@ from tenacity import (
     wait_exponential,
 )
 
+from ai.backend.common.db.reconnect import PostgresReconnectErrorClassifier
 from ai.backend.common.exception import DatabaseError
+from ai.backend.common.resilience.policies.retry import ReconnectRetryArgs, ReconnectRetryPolicy
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
@@ -43,11 +45,29 @@ column_constraints = ["nullable", "index", "unique", "primary_key"]
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
 
 
+class ReconnectingAsyncConnection(SAConnection):
+    """
+    A connection that retries its start while the database is unreachable or its leader changes.
+    The start covers the pool checkout, a new connection and the pre-ping.
+    Statements run on the started connection are not retried.
+    """
+
+    @override
+    async def start(self, is_ctxmanager: bool = False) -> SAConnection:
+        engine = self.engine
+        if not isinstance(engine, ExtendedAsyncSAEngine):
+            return await super().start(is_ctxmanager)
+        return await engine.reconnect_policy.execute(super().start, is_ctxmanager)
+
+
 class ExtendedAsyncSAEngine(SAEngine):
     """
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
+    _connection_cls = ReconnectingAsyncConnection
+
+    reconnect_policy: ReconnectRetryPolicy
     _txn_concurrency_threshold: int
     _readonly_txn_over_threshold: bool
     _generic_txn_over_threshold: bool
@@ -57,6 +77,11 @@ class ExtendedAsyncSAEngine(SAEngine):
         self.lock_conn_timeout: float | None = (
             kwargs.pop("_lock_conn_timeout", 0) or None
         )  # Convert 0 to `None`
+        reconnect_timeout: float | None = kwargs.pop("_reconnect_timeout", None)
+        retry_args = ReconnectRetryArgs(classifier=PostgresReconnectErrorClassifier())
+        if reconnect_timeout is not None:
+            retry_args.timeout = reconnect_timeout
+        self.reconnect_policy = ReconnectRetryPolicy(retry_args)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
