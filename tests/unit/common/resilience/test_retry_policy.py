@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import time
+from typing import override
 
 import pytest
 
 from ai.backend.common.resilience.policies.retry import (
     BackoffStrategy,
+    ReconnectErrorClassifier,
+    ReconnectRetryArgs,
+    ReconnectRetryPolicy,
     ResilienceRetryError,
     RetryArgs,
     RetryPolicy,
@@ -178,3 +182,142 @@ class TestRetryPolicy:
         assert elapsed_time >= 0.3
         # Should not exceed much more since delays are capped
         assert elapsed_time < 1.0
+
+
+class _ConnectionLostClassifier(ReconnectErrorClassifier):
+    @override
+    def is_reconnect_error(self, error: BaseException) -> bool:
+        return isinstance(error, ConnectionError)
+
+
+class TestReconnectRetryPolicy:
+    async def test_recovers_within_timeout(self) -> None:
+        call_count = 0
+
+        @Resilience(
+            policies=[
+                ReconnectRetryPolicy(
+                    ReconnectRetryArgs(
+                        classifier=_ConnectionLostClassifier(),
+                        timeout=5.0,
+                        initial_delay=0.01,
+                        max_delay=0.02,
+                    )
+                )
+            ]
+        ).apply()
+        async def operation() -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 4:
+                raise ConnectionError("lost")
+            return "ok"
+
+        assert await operation() == "ok"
+        assert call_count == 4
+
+    async def test_raises_last_error_past_timeout(self) -> None:
+        call_count = 0
+
+        @Resilience(
+            policies=[
+                ReconnectRetryPolicy(
+                    ReconnectRetryArgs(
+                        classifier=_ConnectionLostClassifier(),
+                        timeout=0.1,
+                        initial_delay=0.01,
+                        max_delay=0.02,
+                    )
+                )
+            ]
+        ).apply()
+        async def operation() -> str:
+            nonlocal call_count
+            call_count += 1
+            raise ConnectionError(f"lost {call_count}")
+
+        with pytest.raises(ConnectionError) as exc_info:
+            await operation()
+
+        assert call_count > 1
+        assert str(exc_info.value) == f"lost {call_count}"
+
+    async def test_non_reconnect_error_raises_on_first_failure(self) -> None:
+        call_count = 0
+
+        @Resilience(
+            policies=[
+                ReconnectRetryPolicy(ReconnectRetryArgs(classifier=_ConnectionLostClassifier()))
+            ]
+        ).apply()
+        async def operation() -> str:
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("not a reconnect error")
+
+        with pytest.raises(ValueError):
+            await operation()
+
+        assert call_count == 1
+
+    async def test_delay_grows_and_stops_at_max_delay(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        delays: list[float] = []
+
+        async def fake_sleep(delay: float) -> None:
+            delays.append(delay)
+
+        monkeypatch.setattr("ai.backend.common.resilience.policies.retry.asyncio.sleep", fake_sleep)
+        call_count = 0
+
+        @Resilience(
+            policies=[
+                ReconnectRetryPolicy(
+                    ReconnectRetryArgs(
+                        classifier=_ConnectionLostClassifier(),
+                        timeout=1000.0,
+                        initial_delay=0.1,
+                        max_delay=0.5,
+                    )
+                )
+            ]
+        ).apply()
+        async def operation() -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 6:
+                raise ConnectionError("lost")
+            return "ok"
+
+        assert await operation() == "ok"
+        assert delays == [0.1, 0.2, 0.4, 0.5, 0.5, 0.5]
+
+    async def test_delay_is_capped_by_remaining_time(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        delays: list[float] = []
+
+        async def fake_sleep(delay: float) -> None:
+            delays.append(delay)
+
+        monkeypatch.setattr("ai.backend.common.resilience.policies.retry.asyncio.sleep", fake_sleep)
+
+        @Resilience(
+            policies=[
+                ReconnectRetryPolicy(
+                    ReconnectRetryArgs(
+                        classifier=_ConnectionLostClassifier(),
+                        timeout=0.05,
+                        initial_delay=10.0,
+                        max_delay=10.0,
+                    )
+                )
+            ]
+        ).apply()
+        async def operation() -> str:
+            raise ConnectionError("lost")
+
+        with pytest.raises(ConnectionError):
+            await operation()
+
+        assert delays
+        assert max(delays) <= 0.05
