@@ -11,13 +11,8 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
-<<<<<<< HEAD
-from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED, HookPluginContext
-=======
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
-from ai.backend.common.plugin.hook_context import HookPluginContext
->>>>>>> d61a3433 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
+from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.manager.data.auth.types import AuthorizingUser
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.plugin.keypair.hook import KeypairAuthHookPlugin

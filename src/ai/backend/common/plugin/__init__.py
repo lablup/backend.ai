@@ -11,15 +11,9 @@ from weakref import WeakSet
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.etcd import AbstractKVStore
-<<<<<<< HEAD
-from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import prepare_wheelhouse, scan_entrypoints
-=======
-from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.plugin.entrypoint import scan_entrypoints
->>>>>>> d61a3433 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -198,11 +192,8 @@ class BasePluginContext[P: AbstractPlugin]:
             try:
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
-<<<<<<< HEAD
-=======
-            except (ValidationError, BackendAISchemaValidationFailed):
+            except BackendAISchemaValidationFailed:
                 raise
->>>>>>> d61a3433 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
             except Exception:
                 log.exception("error during initialization of plugin: {}", plugin_name)
                 continue
@@ -228,14 +219,7 @@ class BasePluginContext[P: AbstractPlugin]:
             new_config = await self.etcd.get_prefix(
                 f"config/plugins/{self._group_key}/{plugin_name}/",
             )
-<<<<<<< HEAD
             await self.plugins[plugin_name].update_plugin_config(new_config)
-=======
-            try:
-                await self.plugins[plugin_name].update_plugin_config(new_config)
-            except (ValidationError, BackendAISchemaValidationFailed):
-                log.exception("plugin configuration validation failed", plugin_name=plugin_name)
->>>>>>> d61a3433 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
 
     async def watch_config_changes(self, plugin_name: str) -> None:
         wtask = asyncio.create_task(self._watcher(plugin_name))
