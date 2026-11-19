@@ -14,6 +14,12 @@
 - **Do not interpolate `${{ }}` into a shell command.** `env:` carries the value safely as far as the shell: from there hand it to the script as a quoted argument (`env: TAG: ${{ github.ref_name }}` → `run: scripts/foo.py "$TAG"`), so the script never learns the variable's name. A tag name, a branch name and a comment body are all written by someone else.
 - **Pin a third-party action to a commit SHA with a `# vN` comment beside it.** `actions/*` may use a major tag.
 
+## Typecheck
+
+- `ci-typecheck.yml` runs `mypy` from the `python-venv` action on the `.py` and `.pyi` files of `typecheck.txt`. It restores `.mypy_cache` and never saves it.
+- `mypy-cache.yml` saves `.mypy_cache` as `mypy-main-<sha>` after a full `mypy src tests` on each push to main, and deletes the older `mypy-main-*` entries. Only a push to main saves it.
+- A Pants source root `mypy` needs goes in `mypy_path` of `pyproject.toml`.
+
 ## Where a decision goes
 
 | In the workflow | In the script |

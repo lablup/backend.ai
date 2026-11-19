@@ -21,7 +21,7 @@
 # `gh auth login` elsewhere. Run it against the live repository:
 #
 #   .github/scripts/prune-ref-caches.sh lablup/backend.ai refs/heads/main \
-#     pants-mypy-Linux- pants-mypy-Linux-<sha> --dry-run
+#     mypy-main- mypy-main-<sha> --dry-run
 set -e
 
 usage() {
