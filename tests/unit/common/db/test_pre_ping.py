@@ -107,6 +107,8 @@ async def engine(relay: _Relay) -> AsyncIterator[AsyncEngine]:
 
 
 class TestPrePingTimeout:
+    # pytest-timeout ends a hung test with a stack dump, whatever the event loop is doing.
+    @pytest.mark.timeout(60)
     async def test_responding_connection_is_reused(self, engine: AsyncEngine) -> None:
         async with engine.connect() as conn:
             first = (await conn.get_raw_connection()).driver_connection
@@ -116,6 +118,7 @@ class TestPrePingTimeout:
             assert (await conn.execute(sa.text("SELECT 1"))).scalar() == 1
         assert first is second
 
+    @pytest.mark.timeout(60)
     async def test_unresponsive_connection_is_terminated_and_replaced(
         self,
         engine: AsyncEngine,
