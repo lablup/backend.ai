@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.engine import Connection
 
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.deployment_preset import (
@@ -334,7 +336,14 @@ class TestReadingBackWhatSqlComputed:
     ) -> None:
         verbs: list[str] = []
 
-        def record(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        def record(
+            conn: Connection,
+            cursor: Any,
+            statement: str,
+            parameters: Any,
+            context: Any,
+            executemany: bool,
+        ) -> None:
             if "deployment_revision_presets" in statement:
                 verbs.append(statement.split()[0].upper())
 
@@ -351,7 +360,14 @@ class TestReadingBackWhatSqlComputed:
     ) -> None:
         verbs: list[str] = []
 
-        def record(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        def record(
+            conn: Connection,
+            cursor: Any,
+            statement: str,
+            parameters: Any,
+            context: Any,
+            executemany: bool,
+        ) -> None:
             if "deployment_revision_presets" in statement:
                 verbs.append(statement.split()[0].upper())
 

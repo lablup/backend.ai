@@ -257,7 +257,7 @@ def execute(
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.execute(preset_id, request)
-            print(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
+            click.echo(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
         finally:
             await registry.close()
 
