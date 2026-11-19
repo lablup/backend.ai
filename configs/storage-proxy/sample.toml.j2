@@ -370,7 +370,7 @@
       # Configuration for the periodic read of the agent's volume declarations,
       # which decides the volumes the agent checks.
       # Added in 26.10.0
-      [volume.<name>.volume-status-check.read-declaration]
+      [volume.{{ volume_name }}.volume-status-check.read-declaration]
         # Seconds between two reads of the agent's volume declarations from
         # Valkey.
         # Added in 26.10.0
