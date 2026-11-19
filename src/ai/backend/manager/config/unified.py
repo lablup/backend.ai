@@ -509,7 +509,7 @@ class DatabaseConfig(BaseConfigSchema):
     tcp_user_timeout: Annotated[
         int,
         Field(
-            default=30,
+            default=25,
             ge=0,
             validation_alias=AliasChoices("tcp-user-timeout", "tcp_user_timeout"),
             serialization_alias="tcp-user-timeout",
@@ -518,10 +518,12 @@ class DatabaseConfig(BaseConfigSchema):
             description=(
                 "Seconds that sent data of a database connection may stay unacknowledged "
                 "before the connection is closed (TCP_USER_TIMEOUT). "
+                "Keep it equal to tcp-keepalive-idle + tcp-keepalive-interval * tcp-keepalive-count, "
+                "as the connection is closed by this value instead of the keepalive count. "
                 "0 uses the system default. Applied on Linux only."
             ),
             added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(local="30", prod="30"),
+            example=ConfigExample(local="25", prod="25"),
         ),
     ]
     pre_ping_timeout: Annotated[

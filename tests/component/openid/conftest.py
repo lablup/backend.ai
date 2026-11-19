@@ -343,7 +343,7 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
         tcp_keepalive_idle=10,
         tcp_keepalive_interval=5,
         tcp_keepalive_count=3,
-        tcp_user_timeout=30,
+        tcp_user_timeout=25,
         pre_ping_timeout=5.0,
     )
 
