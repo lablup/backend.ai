@@ -1,16 +1,6 @@
 [flake8]
-# Only the repository plugin's rules (tools/flake8-plugins/flake8_bai/codes.py); ruff covers the rest.
-select = BAI
-# tools/flake8-plugins/flake8_bai/baseline.txt: violations in main when their rule was added
-bai-baseline = baseline.txt
-per-file-ignores =
-    # These __init__.py files hold code and keep their imports
-    src/ai/backend/manager/__init__.py: BAI001
-    src/ai/backend/manager/actions/monitors/__init__.py: BAI001
-    src/ai/backend/manager/actions/validators/rbac/__init__.py: BAI001
-    src/ai/backend/manager/models/login_session/__init__.py: BAI001
-    src/ai/backend/manager/models/minilang/__init__.py: BAI001
-    src/ai/backend/manager/models/rbac/__init__.py: BAI001
+# The repository plugin's rules that are on (tools/flake8-plugins/README.md); ruff covers the rest.
+select = BAI001
 
 [flake8:local-plugins]
 extension =
