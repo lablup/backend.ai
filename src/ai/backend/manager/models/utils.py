@@ -558,5 +558,5 @@ def agg_to_array(
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 
 
-def is_db_retry_error(e: Exception) -> bool:
+def is_db_retry_error(e: Exception) -> str:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
