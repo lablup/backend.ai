@@ -56,8 +56,9 @@
   # Whether to test connections with a lightweight ping before using them. Helps
   # detect stale or disconnected connections before they cause application
   # errors. Adds a small overhead per connection checkout but improves
-  # reliability. Recommended for production environments with network
-  # instability.
+  # reliability. When disabled, a broken connection left in the pool fails at
+  # its first query, not at the connection start, and is outside the reconnect-
+  # timeout retry.
   # Added in 25.8.0
   pool-pre-ping = true
   # Maximum number of additional connections to create beyond the pool_size. Set
@@ -96,6 +97,11 @@
   # pre-ping is enabled.
   # Added in 26.10.0
   pre-ping-timeout = 5.0
+  # Time limit in seconds for retrying a database connection start that fails
+  # with a connection error or an error during a leader change. When it expires,
+  # the last error is raised.
+  # Added in 26.10.0
+  reconnect-timeout = 60.0
 
   # Addresses of the PostgreSQL cluster members. List every member of an HA
   # cluster, or a single address of a standalone server or a proxy in front of

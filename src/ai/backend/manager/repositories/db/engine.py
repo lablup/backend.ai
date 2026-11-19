@@ -32,6 +32,7 @@ def create_async_engine(
     *args: Any,
     _txn_concurrency_threshold: int = 0,
     _lock_conn_timeout: int = 0,
+    _reconnect_timeout: float | None = None,
     async_creator: Callable[[], Awaitable[asyncpg.Connection]] | None = None,
     **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
@@ -47,6 +48,7 @@ def create_async_engine(
         sync_engine,
         _txn_concurrency_threshold=_txn_concurrency_threshold,
         _lock_conn_timeout=_lock_conn_timeout,
+        _reconnect_timeout=_reconnect_timeout,
     )
 
 
@@ -109,6 +111,7 @@ async def connect_database(
             2,
         ),
         _lock_conn_timeout=int(db_config.lock_conn_timeout),
+        _reconnect_timeout=db_config.reconnect_timeout,
     )
     FailedBeginInvalidator().listen(db.sync_engine)
     if db_config.pool_pre_ping:

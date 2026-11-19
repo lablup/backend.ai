@@ -338,6 +338,7 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
         pool_size=4,
         pool_recycle=-1,
         pool_pre_ping=False,
+        reconnect_timeout=60.0,
         max_overflow=4,
         lock_conn_timeout=0,
         tcp_keepalive_idle=10,

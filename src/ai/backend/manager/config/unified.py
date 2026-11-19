@@ -404,7 +404,7 @@ class DatabaseConfig(BaseConfigSchema):
     pool_pre_ping: Annotated[
         bool,
         Field(
-            default=False,
+            default=True,
             validation_alias=AliasChoices("pool-pre-ping", "pool_pre_ping"),
             serialization_alias="pool-pre-ping",
         ),
@@ -413,10 +413,11 @@ class DatabaseConfig(BaseConfigSchema):
                 "Whether to test connections with a lightweight ping before using them. "
                 "Helps detect stale or disconnected connections before they cause application errors. "
                 "Adds a small overhead per connection checkout but improves reliability. "
-                "Recommended for production environments with network instability."
+                "When disabled, a broken connection left in the pool fails at its first query, "
+                "not at the connection start, and is outside the reconnect-timeout retry."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="false", prod="true"),
+            example=ConfigExample(local="true", prod="true"),
         ),
     ]
     max_overflow: Annotated[
@@ -542,6 +543,24 @@ class DatabaseConfig(BaseConfigSchema):
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="5", prod="5"),
+        ),
+    ]
+    reconnect_timeout: Annotated[
+        float,
+        Field(
+            default=60.0,
+            gt=0,
+            validation_alias=AliasChoices("reconnect-timeout", "reconnect_timeout"),
+            serialization_alias="reconnect-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Time limit in seconds for retrying a database connection start that fails "
+                "with a connection error or an error during a leader change. "
+                "When it expires, the last error is raised."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="60", prod="60"),
         ),
     ]
 
