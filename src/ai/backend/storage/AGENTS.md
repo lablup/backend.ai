@@ -11,7 +11,6 @@
 ## Exceptions
 
 - All exceptions must inherit from `StorageProxyError` (which inherits from `BackendAIError`).
-- `storage/exception.py` is legacy: do not add new exceptions here.
 - Put new exceptions only in `storage/errors/`, organized by feature: `object.py`, `quota.py`, `vfolder.py`,
   `volume.py`, `process.py`.
 

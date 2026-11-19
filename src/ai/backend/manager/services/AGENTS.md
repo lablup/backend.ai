@@ -86,6 +86,7 @@ grows a branch; the generic services take no hook or callback that could hide a 
 
 ## What does not belong here
 
-- SQL queries or ORM operations.
+- SQL queries or ORM operations: do not import `sqlalchemy`.
+- `manager.dto` imports.
 - HTTP request/response handling.
 - Direct DB session creation (`begin_session()` / `begin_readonly_session()`).

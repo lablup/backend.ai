@@ -12,7 +12,8 @@
 ## What does not belong here
 
 - Component-specific logic (manager session management, agent kernel handling, etc.).
-- Imports from `manager/`, `agent/`, `storage/`; dependencies must flow inward only.
+- Imports from `manager/`, `agent/`, `storage/`, `appproxy/`, `account_manager/`, `web/`, `client/`, `cli/`, `kernel/`,
+  `accelerator/`; dependencies must flow inward only.
 
 ## Adding to this package
 

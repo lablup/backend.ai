@@ -2,9 +2,9 @@
 
 [background](/src/ai/backend/manager/api/adapters/rbac/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/rbac/adapter.py)
 
-Scenario: incomplete 11 / 37
+Scenario: incomplete 11 / 38
 
-- built from ops (22)
+- built from ops (23)
   - admin_search_permissions_gql: representative success ✓ · representative rejection ✓
   - admin_search_roles_gql: representative success ✓ · representative rejection ✓
   - batch_load_permissions_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -20,6 +20,7 @@ Scenario: incomplete 11 / 37
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - project_search_roles: representative success ✓ · representative rejection ✓
   - purge: representative success ✓ · representative rejection ✓
   - purge_permission: representative success ✓ · representative rejection ✓
   - restore: representative success ✓ · representative rejection ✓
@@ -150,6 +151,13 @@ Scenario: incomplete 11 / 37
 | [when a user granted nothing tries to edit several roles in one call, none is edited and all come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-roles) | answered |
 | [when the status of several soft-deleted roles is changed to ACTIVE in one call, they are restored and all come back active](#partial_bulk_editing-editing-status-to-active-restores-several-roles) | answered |
 | [when the superadmin changes the description of several roles in one call, all come back with the new description and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-roles-at-once) | answered |
+
+**project_search_roles**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted role read permission in a project searches the roles of that project leaving one role's name out, the roles the filter keeps come back in name order and the role outside the project is not listed](#searching-a-user-granted-role-read-searches-a-project) | answered |
+| [a user granted nothing cannot search the roles of a project](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
 **purge**
 
@@ -1676,6 +1684,115 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - successes[1].deleted_at = None
+
+### project_search_roles
+
+<a id="searching-a-user-granted-role-read-searches-a-project"></a>
+
+#### [a-user-granted-role-read-searches-a-project](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
+
+when a user granted role read permission in a project searches the roles of that project leaving one role's name out, the roles the filter keeps come back in name order and the role outside the project is not listed
+
+Given
+
+- 2 custom roles in one project and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-2: applies only within the scope it is granted in
+  - Role excluded-1: applies only within the scope it is granted in
+  - Role beyond-1: applies only within the scope it is granted in
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
+
+When
+
+- RBACAdapter.project_search_roles: user-1 searches the roles of project project-1
+
+Then
+
+- the project roles the filter keeps come back in name order
+  - items count = 3
+  - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].name = 'grant-1'
+  - items[0].description = None
+  - items[0].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - items[0].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - items[0].auto_assign = False
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: same as the id of the project the role sits in
+  - items[0].role_preset_id = None
+  - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the role seeded in advance
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[0].deleted_at = None
+  - items[1].name = 'role-1'
+  - items[1].description = None
+  - items[1].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - items[1].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - items[1].auto_assign = False
+  - items[1].scope_type = 'project'
+  - items[1].scope_id: same as the id of the project the role sits in
+  - items[1].role_preset_id = None
+  - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the role seeded in advance
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[1].deleted_at = None
+  - items[2].name = 'role-2'
+  - items[2].description = None
+  - items[2].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - items[2].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - items[2].auto_assign = False
+  - items[2].scope_type = 'project'
+  - items[2].scope_id: same as the id of the project the role sits in
+  - items[2].role_preset_id = None
+  - items[2].id: skipped: the database generates it
+  - items[2].entity_id: same as the id of the role seeded in advance
+  - items[2].created_at: the time this run wrote
+  - items[2].updated_at: the time this run wrote
+  - items[2].deleted_at = None
+
+<a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
+
+#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
+
+a user granted nothing cannot search the roles of a project
+
+Given
+
+- 2 custom roles in one project and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-2: applies only within the scope it is granted in
+  - Role excluded-1: applies only within the scope it is granted in
+  - Role beyond-1: applies only within the scope it is granted in
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RBACAdapter.project_search_roles: user-1 searches the roles of project project-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### purge
 

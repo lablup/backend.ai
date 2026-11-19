@@ -84,3 +84,4 @@
 
 - Business logic / domain validation (belongs to services/).
 - Exposing `Row` directly: convert to a `data/` type before returning.
+- `manager.dto` imports.

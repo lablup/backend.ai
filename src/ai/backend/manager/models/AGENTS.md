@@ -9,6 +9,8 @@
 Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy: do not add new ones.
 
+Do not import `manager.server`, `manager.sokovan`, `manager.clients` or `manager.dto`.
+
 Domains migrated to the v2 specs add them next to `row.py`: `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
 reads, `scopes.py` for the scopes that filter the row.

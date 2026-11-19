@@ -9,6 +9,8 @@ CLI v2 → SDK v2 (domains_v2/) → REST v2 API (/v2/...)
 Place SDK v2 domain clients in `client/v2/domains_v2/{entity}.py`.
 Each client class inherits from `BaseDomainClient` and uses `self._client.typed_request()`.
 
+SDK v2 does not import `client.cli`, `client.func`, `client.session` or `client.output`.
+
 ## Naming conventions
 
 - admin methods: `admin_search()`, `admin_create()`, `admin_update()`, `admin_delete()`, `admin_purge()`

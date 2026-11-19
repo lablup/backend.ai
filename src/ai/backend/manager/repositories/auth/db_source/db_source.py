@@ -95,9 +95,12 @@ class LoginSessionCreationResult:
     session_token: str
 
 
+type VerifiedUser = sa.RowMapping
+
+
 @dataclass(frozen=True)
 class CredentialVerificationResult:
-    user: sa.RowMapping
+    user: VerifiedUser
     active_sessions: list[ActiveSessionInfo]  # ordered by created_at ASC
 
 
