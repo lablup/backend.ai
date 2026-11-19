@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 
 import pytest
 import sqlalchemy as sa
@@ -14,6 +15,19 @@ from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
 
 PRE_PING_TIMEOUT = 0.5
+STEP_LIMIT = 10
+
+
+async def _bounded[T](step: Awaitable[T], name: str) -> T:
+    """Fails with the stacks of all tasks when the step does not finish."""
+    try:
+        async with asyncio.timeout(STEP_LIMIT):
+            return await step
+    except TimeoutError:
+        out = io.StringIO()
+        for task in asyncio.all_tasks():
+            task.print_stack(file=out)
+        raise AssertionError(f"{name} did not finish in {STEP_LIMIT}s\n{out.getvalue()}") from None
 
 
 class _Relay:
@@ -81,7 +95,7 @@ async def relay(postgres_container: tuple[str, HostPortPair]) -> AsyncIterator[_
     relay = _Relay(addr)
     await relay.start()
     yield relay
-    await relay.close()
+    await _bounded(relay.close(), "relay close")
 
 
 @pytest.fixture
@@ -103,7 +117,7 @@ async def engine(relay: _Relay) -> AsyncIterator[AsyncEngine]:
     )
     PrePingTimeout(PRE_PING_TIMEOUT).listen(engine.sync_engine)
     yield engine
-    await engine.dispose()
+    await _bounded(engine.dispose(), "engine dispose")
 
 
 class TestPrePingTimeout:
@@ -132,10 +146,14 @@ class TestPrePingTimeout:
         relay.freeze()
 
         started = time.monotonic()
-        async with asyncio.timeout(PRE_PING_TIMEOUT + 5):
+
+        async def checkout() -> object:
             async with engine.connect() as conn:
                 fresh = (await conn.get_raw_connection()).driver_connection
                 assert (await conn.execute(sa.text("SELECT 1"))).scalar() == 1
+                return fresh
+
+        fresh = await _bounded(checkout(), "checkout")
         elapsed = time.monotonic() - started
 
         assert PRE_PING_TIMEOUT <= elapsed < PRE_PING_TIMEOUT + 4
