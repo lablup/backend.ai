@@ -16,12 +16,11 @@ component.txt  ``tests/component/`` test files among the direct dependents
 typecheck.txt  ``.py`` files among the transitive dependents
 ============== =========================================================
 
-The direct dependents of a changed file are its importers plus what Pants adds
-on top of import inference:
+The graph gets the edges Pants adds on top of import inference:
 
-- every module under a changed non-empty ``__init__.py``
-- every test under a changed ``conftest.py``
-- the tests of a ``BUILD`` whose explicit ``dependencies`` name a changed file
+- a non-empty ``__init__.py`` to every module under it
+- a ``conftest.py`` to every test under it
+- a file a ``tests/`` BUILD target lists in ``dependencies`` to that target's files
 """
 
 from __future__ import annotations
@@ -33,6 +32,7 @@ import re
 import sys
 
 TEST_NAME = re.compile(r"(^test_.*\.py$)|(.*_test\.py$)|(^tests\.py$)")
+TARGET = re.compile(r"\b(python_tests|python_test_utils)\(")
 DEPENDENCY = re.compile(r'"([^"]+)"')
 
 
@@ -40,34 +40,47 @@ def is_test(path: str) -> bool:
     return TEST_NAME.match(pathlib.PurePosixPath(path).name) is not None
 
 
-def files_under(files: set[str], directory: str) -> set[str]:
-    prefix = f"{directory}/" if directory else ""
-    return {f for f in files if f.startswith(prefix)}
+def parent(path: str) -> str:
+    return pathlib.PurePosixPath(path).parent.as_posix()
 
 
-def build_dependency_owners(root: pathlib.Path) -> dict[str, list[str]]:
-    """Map each test directory to the paths its BUILD lists in `dependencies`."""
-    owners: dict[str, list[str]] = {}
-    for build in sorted((root / "tests").rglob("BUILD")):
-        text = build.read_text()
-        start = text.find("dependencies")
-        if start < 0:
-            continue
-        block = text[start : text.find("]", start)]
-        deps = [d for d in DEPENDENCY.findall(block) if not d.startswith("//")]
-        if deps:
-            owners[build.parent.relative_to(root).as_posix()] = deps
-    return owners
+def under(files: set[str], directory: str) -> set[str]:
+    return {f for f in files if f.startswith(f"{directory}/")}
 
 
-def dependency_matches(dep: str, changed: str) -> bool:
-    path, _, name = dep.partition(":")
-    if path.endswith(".py"):
-        return changed == path
+def dependency_files(dep: str, every: set[str], by_parent: dict[str, set[str]]) -> set[str]:
+    target, _, name = dep.partition(":")
+    if target.endswith(".py"):
+        return {target} & every
     if name in ("", "src"):
         # The `python_sources` of a directory: its own files, not its subdirectories.
-        return pathlib.PurePosixPath(changed).parent.as_posix() == path
-    return changed.startswith(f"{path}/")
+        return by_parent.get(target, set())
+    return under(every, target)
+
+
+def build_edges(root: pathlib.Path, every: set[str]) -> dict[str, set[str]]:
+    """Map a dependency named in a tests/ BUILD to the files of the target naming it."""
+    edges: dict[str, set[str]] = {}
+    by_parent: dict[str, set[str]] = {}
+    for f in every:
+        by_parent.setdefault(parent(f), set()).add(f)
+    for build in sorted((root / "tests").rglob("BUILD")):
+        directory = build.parent.relative_to(root).as_posix()
+        own = by_parent.get(directory, set())
+        text = build.read_text()
+        calls = list(TARGET.finditer(text))
+        for i, call in enumerate(calls):
+            body = text[call.end() : calls[i + 1].start() if i + 1 < len(calls) else len(text)]
+            start = body.find("dependencies")
+            if start < 0:
+                continue
+            block = body[start : body.find("]", start)]
+            deps = [d for d in DEPENDENCY.findall(block) if not d.startswith("//")]
+            owners = {f for f in own if is_test(f) == (call.group(1) == "python_tests")}
+            for dep in deps:
+                for path in dependency_files(dep, every, by_parent):
+                    edges.setdefault(path, set()).update(owners)
+    return edges
 
 
 def main() -> int:
@@ -80,36 +93,26 @@ def main() -> int:
     parser.add_argument("--root", default=pathlib.Path(), type=pathlib.Path)
     args = parser.parse_args()
 
-    graph: dict[str, list[str]] = json.loads(args.graph.read_text())
+    graph = {k: set(v) for k, v in json.loads(args.graph.read_text()).items()}
     every = set(graph)
-    changed = {line.strip() for line in args.changed.read_text().splitlines() if line.strip()}
-    changed_py = {c for c in changed if c in every}
+    for f in every:
+        name = pathlib.PurePosixPath(f).name
+        if name == "__init__.py" and (args.root / f).read_text().strip():
+            graph[f] |= under(every, parent(f)) - {f}
+        elif name == "conftest.py":
+            graph[f] |= {t for t in under(every, parent(f)) if is_test(t)}
+    for f, owners in build_edges(args.root, every).items():
+        graph[f] |= owners
 
+    changed = {line.strip() for line in args.changed.read_text().splitlines() if line.strip()}
+    changed_py = changed & every
     direct = set(changed_py)
     for c in changed_py:
-        direct.update(graph[c])
-        name = pathlib.PurePosixPath(c).name
-        if name == "__init__.py" and (args.root / c).read_text().strip():
-            direct |= files_under(every, pathlib.PurePosixPath(c).parent.as_posix())
-    for f in changed_py:
-        if pathlib.PurePosixPath(f).name == "conftest.py":
-            direct |= {
-                t
-                for t in files_under(every, pathlib.PurePosixPath(f).parent.as_posix())
-                if is_test(t)
-            }
-    for test_dir, deps in build_dependency_owners(args.root).items():
-        if any(dependency_matches(d, c) for d in deps for c in changed):
-            direct |= {
-                t
-                for t in every
-                if pathlib.PurePosixPath(t).parent.as_posix() == test_dir and is_test(t)
-            }
-
+        direct |= graph[c]
     transitive = set(direct)
     queue = list(direct)
     while queue:
-        for d in graph.get(queue.pop(), []):
+        for d in graph.get(queue.pop(), set()):
             if d not in transitive:
                 transitive.add(d)
                 queue.append(d)

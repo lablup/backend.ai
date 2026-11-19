@@ -5,7 +5,7 @@
 #   setup-venv.sh <python-version> <venv-dir> <work-dir>
 #
 # Installs the requirements the lock was generated from, constrained to the locked
-# versions, plus pytest-xdist and pytest-rerunfailures, which the lock does not hold.
+# versions, plus pytest-rerunfailures, which the lock does not hold.
 # Prints the number of installed packages whose version differs from the lock.
 set -euo pipefail
 

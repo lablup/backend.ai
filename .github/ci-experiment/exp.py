@@ -9,14 +9,21 @@ exp.py requirements <python.lock.metadata>  print the requirements the lock was 
 exp.py shard <list> <index> <count>         print the paths with crc32(path) % count == index
 exp.py addresses <list>                     print the files of Pants addresses
 exp.py compare <ours> <pants>               print the paths only one of the lists holds
+exp.py batches <list> <workers> <size> <junit-prefix> -- <pytest...>
+                                            run the list in batches of <size> files on
+                                            <workers> processes, each its own
+                                            BACKEND_TEST_EXEC_SLOT
 """
 
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import queue
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 import zlib
@@ -99,6 +106,49 @@ def cmd_compare(ours: str, pants: str) -> int:
     return 0
 
 
+def cmd_batches(listing: str, workers: str, size: str, junit: str, command: list[str]) -> int:
+    files = read_list(listing)
+    step = int(size)
+    batches = queue.Queue[tuple[int, list[str]]]()
+    for k, start in enumerate(range(0, len(files), step)):
+        batches.put((k, files[start : start + step]))
+    codes: list[int] = []
+    lock = threading.Lock()
+
+    def work(slot: int) -> None:
+        env = {**os.environ, "BACKEND_TEST_EXEC_SLOT": str(slot)}
+        while True:
+            try:
+                k, batch = batches.get_nowait()
+            except queue.Empty:
+                return
+            start = time.monotonic()
+            result = subprocess.run(
+                [*command, f"--junitxml={junit}-{k}.xml", *batch],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+            elapsed = time.monotonic() - start
+            with lock:
+                codes.append(result.returncode)
+                out(
+                    f"::group::batch {k} slot {slot} {len(batch)} files {elapsed:.1f}s exit {result.returncode}"
+                )
+                out(result.stdout)
+                out("::endgroup::")
+                out(f"batch {k}: {len(batch)} files, {elapsed:.1f}s, exit {result.returncode}")
+
+    threads = [threading.Thread(target=work, args=(slot,)) for slot in range(int(workers))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return 1 if any(c not in (0, 5) for c in codes) else 0
+
+
 def main(argv: list[str]) -> int:
     match argv:
         case ["time", log, label, "--", *command]:
@@ -117,6 +167,8 @@ def main(argv: list[str]) -> int:
             return cmd_addresses(listing)
         case ["compare", ours, pants]:
             return cmd_compare(ours, pants)
+        case ["batches", listing, workers, size, junit, "--", *command]:
+            return cmd_batches(listing, workers, size, junit, command)
     sys.stderr.write(__doc__ or "")
     return 2
 
