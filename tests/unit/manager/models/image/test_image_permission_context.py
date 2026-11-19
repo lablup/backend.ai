@@ -38,7 +38,7 @@ from ai.backend.manager.models.image.row import (
     ImageRow,
 )
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy.row import (

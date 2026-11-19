@@ -7,9 +7,9 @@ python_sources(
     ],
     # Resources read at run time, attached to the file that reads them.
     overrides={
-        "__init__.py": {"dependencies": [":version"]},
         "api/rest/app.py": {"dependencies": [":vendor"]},
         "cli/dbschema.py": {"dependencies": [":revision-history"]},
+        "version.py": {"dependencies": [":version"]},
     },
 )
 

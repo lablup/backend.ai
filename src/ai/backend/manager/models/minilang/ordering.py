@@ -7,8 +7,12 @@ from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
-
-from . import JSONFieldItem, OrderSpecItem, ORMFieldItem, get_col_from_table
+from ai.backend.manager.models.minilang.field_spec import (
+    JSONFieldItem,
+    OrderSpecItem,
+    ORMFieldItem,
+    get_col_from_table,
+)
 
 __all__ = (
     "ColumnMapType",

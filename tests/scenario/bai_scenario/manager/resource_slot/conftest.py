@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

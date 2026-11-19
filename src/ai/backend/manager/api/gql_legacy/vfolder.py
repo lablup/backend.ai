@@ -52,11 +52,11 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     ScopeType,
     SystemScope,
 )

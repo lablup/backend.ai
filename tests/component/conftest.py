@@ -85,7 +85,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
@@ -108,7 +108,7 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
 from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware

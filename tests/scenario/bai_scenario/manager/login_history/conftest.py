@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators

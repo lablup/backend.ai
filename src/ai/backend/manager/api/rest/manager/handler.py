@@ -28,7 +28,6 @@ from ai.backend.common.dto.manager.manager_api.request import (
 from ai.backend.common.dto.manager.manager_api.response import ManagerStatusResponse
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
@@ -40,6 +39,7 @@ from ai.backend.manager.services.manager_admin.actions.perform_scheduler_ops imp
 from ai.backend.manager.services.manager_admin.actions.update_status import (
     UpdateManagerStatusAction,
 )
+from ai.backend.manager.version import __version__
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors

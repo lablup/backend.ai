@@ -48,6 +48,7 @@ root_patterns = [
     "/tests/scenario",
     "/stubs",
     "/tools/pants-plugins",
+    "/tools/flake8-plugins",
 ]
 
 [subprocess-environment]

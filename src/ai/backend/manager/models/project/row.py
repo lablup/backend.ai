@@ -46,7 +46,7 @@ from ai.backend.manager.models.base import (
     VFolderHostPermissionColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -60,7 +60,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac import ContainerRegistryScope
+    from ai.backend.manager.models.rbac.base import ContainerRegistryScope
     from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

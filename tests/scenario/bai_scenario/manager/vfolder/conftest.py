@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck

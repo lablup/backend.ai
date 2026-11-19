@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.usage_bucket import (
     ProjectUsageBucketFieldType,
     UserUsageBucketFieldType,
 )
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

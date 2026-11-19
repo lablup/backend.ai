@@ -31,13 +31,14 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-# ruff from the `lint` group of pyproject.toml, in a gitignored venv
+# ruff and flake8 from the `lint` group of pyproject.toml, in a gitignored venv
 install_lint_venv() {
   uv venv --quiet --allow-existing dist/lint-venv
   uv pip install --quiet --python dist/lint-venv --group pyproject.toml:lint
 }
 install_lint_venv
 RUFF=(dist/lint-venv/bin/ruff)
+FLAKE8=(dist/lint-venv/bin/flake8)
 
 EXIT_CODE=0
 
@@ -55,6 +56,13 @@ fi
 echo "✓ Linting..."
 if ! "${RUFF[@]}" check --force-exclude "${PY_FILES[@]}"; then
   echo "❌ Linting failed"
+  EXIT_CODE=1
+fi
+
+# 3. Repository rules (tools/flake8-plugins)
+echo "✓ Checking repository rules..."
+if ! "${FLAKE8[@]}" "${PY_FILES[@]}"; then
+  echo "❌ Repository rules failed"
   EXIT_CODE=1
 fi
 

@@ -8,7 +8,7 @@ import pytest
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

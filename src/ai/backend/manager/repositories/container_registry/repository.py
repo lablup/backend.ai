@@ -37,7 +37,7 @@ from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryUpdater,
 )
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider

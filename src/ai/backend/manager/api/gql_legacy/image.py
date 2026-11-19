@@ -57,13 +57,13 @@ from ai.backend.manager.models.image.scopes import (
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher, ReferenceImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.minilang import EnumFieldItem
+from ai.backend.manager.models.minilang.field_spec import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
-from ai.backend.manager.models.rbac import ScopeType
+from ai.backend.manager.models.rbac.base import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole

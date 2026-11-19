@@ -61,7 +61,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     LegacyEndpointUpdater,
 )
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow

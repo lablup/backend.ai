@@ -18,7 +18,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators

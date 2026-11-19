@@ -12,7 +12,7 @@ from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log.row import (
     AuditLogRow,
 )
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 

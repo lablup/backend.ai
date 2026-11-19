@@ -30,7 +30,7 @@ from ai.backend.manager.models.base import (
     VFolderHostPermissionColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,

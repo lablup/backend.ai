@@ -17,7 +17,7 @@ dataclasses (established pattern); for new code, do not add re-exports: import t
 
 ## Type rules
 
-- Every data class must be a `@dataclass(frozen=True)`.
+- Every data class must be a `@dataclass(frozen=True)` (flake8 `BAI101`, on or off in `tools/flake8-plugins/README.md`).
 - Allowed imports: Python stdlib, `ai.backend.common.types`, `ai.backend.common.data` and `ai.backend.manager.data`.
   Nothing else.
 - Do not import from `manager/models/`, `manager/repositories/`, `manager/services/`, or external frameworks (`pydantic`,

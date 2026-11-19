@@ -66,8 +66,8 @@ from ai.backend.manager.dependencies.composer import (
     DependencyResources,
     ManagerDependencyComposer,
 )
+from ai.backend.manager.version import __version__
 
-from . import __version__
 from .api.rest.app import _mount_registry_tree
 from .api.rest.internal.tree import build_internal_api_routes
 from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks

@@ -45,7 +45,7 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

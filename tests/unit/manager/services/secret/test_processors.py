@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEn
 from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

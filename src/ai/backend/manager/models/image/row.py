@@ -62,7 +62,7 @@ from ai.backend.manager.models.domain_container_registry_relation.row import (
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
