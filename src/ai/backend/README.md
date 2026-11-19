@@ -301,7 +301,7 @@ pants export --resolve=python-default
 pants generate-lockfiles --resolve=python-default
 
 # Run linting
-pants lint ::
+scripts/ruff.sh check
 
 # Run type checking
 pants check ::

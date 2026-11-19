@@ -75,7 +75,7 @@ scripts/release.sh --lts {target_version} [webui_version]
 2. Downloads WebUI release (if `webui_version` provided)
 3. Updates `VERSION` file
 4. Freezes `NEXT_RELEASE_VERSION` placeholders to the actual version (stable releases only; skipped for `rc`/`a`/`b`/`dev`/`post`)
-   - Then runs `ruff check --fix` and `ruff format` on the frozen files through `uvx`, with the ruff version from `pants.toml`. The script does not run pants; the release PR's CI runs `pants tailor` and `pants check`
+   - Then runs `ruff check --fix` and `ruff format` on the frozen files through `scripts/ruff.sh`, with the ruff version from `pyproject.toml`. The script does not run pants; the release PR's CI runs `pants tailor` and `pants check`
 5. Runs `scripts/run-towncrier.py {target_version}`, which consumes the `changes/` fragments into `CHANGELOG/{major}.{minor}.md` (skipped entirely when there are no fragments)
 6. Runs `.github/scripts/update-maintained-versions.sh {target_version}`, which registers the line when the target is an `X.Y.0rc1` cut and retires the lines that are due: an LTS line once its recorded `retire_after` has passed, a regular line as soon as any newer line exists.
    **Report its output to the user**: a retirement means that version stops receiving backports and drops out of the installer channel selection from that point on.

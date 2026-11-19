@@ -245,13 +245,9 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 
-As of Pantsbuild 2.24, self-contained tool binaries are auto-exported into ``dist/export/bin/``
-when executing ``pants export`` command with whatever arguments.
-For example, the Ruff executable is exported as ``dist/export/bin/ruff``.
-Other tools that require Python virtualenv (e.g., Mypy) are still exported as virtualenvs.
-
-For Pantsbuild 2.23 or older, the tool binaries are exported as regular Python virtualenvs like
-``dist/export/python/virtualenvs/ruff/3.13.18/bin/ruff``.
+Ruff runs outside Pants. Install the version that ``[tool.ruff] required-version`` in ``pyproject.toml`` pins,
+e.g., ``uv tool install 'ruff==0.14.0'``, and point the editor at that ``ruff`` executable.
+``scripts/ruff.sh`` runs the pinned version through ``uvx``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -350,7 +346,7 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 
    let s:cwd = getcwd()
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/bin/ruff'
+   let g:ale_python_ruff_executable = 'ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
@@ -371,9 +367,9 @@ as basedpyright shares most configurations with pyright).
      "python.linting.mypyEnabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy",
      "python.linting.ruffEnabled": true,
-     "python.linting.ruffPath": "dist/export/bin/ruff",
+     "python.linting.ruffPath": "ruff",
      "python.formatting.provider": "ruff",
-     "python.formatting.ruffPath": "dist/export/bin/ruff",
+     "python.formatting.ruffPath": "ruff",
    }
 
 .. code-block:: json5
@@ -392,7 +388,7 @@ as basedpyright shares most configurations with pyright).
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.path": "/abs/path/to/dist/export/bin/ruff",  // absolute path
+     "ruff.path": "/abs/path/to/ruff",  // absolute path
      "ruff.nativeServer": true,
    }
 

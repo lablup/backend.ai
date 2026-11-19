@@ -2,8 +2,8 @@
 """
 Validate ANN (flake8-annotations) linter rule compliance.
 
-This script checks if files comply with ANN linter rules by running pants lint
-and parsing the output for ANN violations. It's useful for validating batches
+This script checks if files comply with ANN linter rules by running ruff
+(`scripts/ruff.sh`) and parsing the output for ANN violations. It's useful for validating batches
 of files during incremental linter rule enablement.
 
 Note: This script uses the ANN rules configured in pyproject.toml. To check
@@ -25,15 +25,14 @@ import sys
 from pathlib import Path
 
 
-def run_pants_lint(path: Path) -> tuple[int, str]:
-    """Run pants lint and return (return_code, output)."""
-    # Global options must come before the goal
+def run_ruff_check(project_root: Path, path: Path) -> tuple[int, str]:
+    """Run ruff check and return (return_code, output)."""
     cmd = [
-        "pants",
-        "--no-colors",
-        "--no-dynamic-ui",
-        "lint",
-        str(path) + "::",
+        str(project_root / "scripts" / "ruff.sh"),
+        "check",
+        "--output-format",
+        "concise",
+        str(path),
     ]
 
     try:
@@ -42,18 +41,16 @@ def run_pants_lint(path: Path) -> tuple[int, str]:
             capture_output=True,
             text=True,
             check=False,
+            cwd=project_root,
         )
         return (result.returncode, result.stdout + result.stderr)
-    except FileNotFoundError:
-        print("Error: 'pants' command not found. Make sure Pantsbuild is installed.", file=sys.stderr)
-        return (127, "")
     except Exception as e:
-        print(f"Error running pants lint: {e}", file=sys.stderr)
+        print(f"Error running ruff check: {e}", file=sys.stderr)
         return (1, str(e))
 
 
 def parse_violations(output: str) -> list[tuple[str, str, str]]:
-    """Parse pants lint output to extract ANN violations.
+    """Parse ruff check output to extract ANN violations.
 
     Returns list of (file, rule, message) tuples.
     """
@@ -110,10 +107,10 @@ def main() -> int:
         return 1
 
     print(f"Validating: {rel_path}")
-    print(f"Running pants lint with configured ANN rules...")
+    print("Running ruff check with the configured ANN rules...")
     print()
 
-    return_code, output = run_pants_lint(path)
+    return_code, output = run_ruff_check(project_root, path)
 
     # Parse violations
     violations = parse_violations(output)

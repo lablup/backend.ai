@@ -104,11 +104,16 @@ jobs:
       env:
         ANNOTATE: ${{ inputs.annotate }}
       run: |
+        pip install uv
         if [ "$ANNOTATE" == "true" ]; then
-          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+          FORMAT=github
         else
-          echo "(skipping matchers for fork pull request)"
+          FORMAT=full
         fi
+        # Every file, every run: the paths and rules are in pyproject.toml.
+        scripts/ruff.sh format --check
+        scripts/ruff.sh check --output-format="$FORMAT"
+        # Only the visibility rules are left in pants lint.
         pants lint --changed-since=$BASE_REF
     - name: Decide whether this run saves the caches
       id: cache-save

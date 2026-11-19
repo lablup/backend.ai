@@ -83,10 +83,16 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
+required-version = "==0.14.0"
 line-length = 100
 src = ["src"]
+# BUILD files are formatted as Python and not linted (`lint.exclude`).
+extend-include = ["**/BUILD"]
+# The paths pants_ignore keeps out of Pants (pants.toml).
+extend-exclude = ["docs", "plugins", "proposals", "scripts", "tools/pants-plugins", "wheelhouse"]
 
 [tool.ruff.lint]
+exclude = ["**/BUILD"]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
 select = [
     "E",      # pycodestyle errors: PEP8 style violations
@@ -148,6 +154,7 @@ select = [
     "PT003",  # flake8-pytest-style: `scope="function"` is implied in `@pytest.fixture`
     "PT019",  # flake8-pytest-style: a fixture without value is requested with `usefixtures`
     "PT030",  # flake8-pytest-style: `pytest.warns()` needs `match` for a broad warning class
+    "INP001", # flake8-no-pep420: a package directory needs __init__.py
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -240,6 +247,11 @@ known-third-party = ["alembic", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
+# INP001: directories read by path, not imported as packages
+"tests/**" = ["INP001"]
+"stubs/**" = ["INP001"]
+"src/ai/backend/appproxy/coordinator/models/alembic/versions/*.py" = ["INP001"]
+"tools/build-macros.py" = ["INP001"]
 # unset.py defines UNSET and Unset from pydantic MISSING
 "src/ai/backend/common/tristate/unset.py" = ["TID251"]
 # released migration cannot be edited in place

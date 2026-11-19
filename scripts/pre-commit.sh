@@ -19,10 +19,10 @@ cd "$(git rev-parse --show-toplevel)"
 PY_FILES=()
 while IFS= read -r -d '' f; do
   PY_FILES+=("$f")
-done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py' '*.pyi')
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py' '*.pyi' 'BUILD' '*/BUILD')
 
 if [ ${#PY_FILES[@]} -eq 0 ]; then
-  echo "No staged Python files; skipping ruff."
+  echo "No staged Python or BUILD files; skipping ruff."
   exit 0
 fi
 
@@ -31,12 +31,11 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
-RUFF=(uvx "ruff@${RUFF_VERSION}")
+RUFF=(scripts/ruff.sh)
 
 EXIT_CODE=0
 
-echo "Running pre-commit checks (ruff ${RUFF_VERSION})..."
+echo "Running pre-commit checks ($("${RUFF[@]}" --version))..."
 
 # 1. Auto-format
 echo "✓ Formatting..."

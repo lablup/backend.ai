@@ -61,14 +61,13 @@ if [[ "$TARGET_VERSION" =~ (rc|a|b|dev)[0-9]+ ]]; then
 else
     echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
     python3 scripts/freeze_release_version.py "${TARGET_VERSION}" || exit 1
-    RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
     FROZEN=()
     while IFS= read -r -d '' f; do
         FROZEN+=("$f")
     done < <(git diff --name-only -z -- 'src/*.py')
     if [ ${#FROZEN[@]} -gt 0 ]; then
-        uvx "ruff@${RUFF_VERSION}" check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
-        uvx "ruff@${RUFF_VERSION}" format --quiet --force-exclude "${FROZEN[@]}"
+        scripts/ruff.sh check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
+        scripts/ruff.sh format --quiet --force-exclude "${FROZEN[@]}"
     fi
 fi
 
