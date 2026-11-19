@@ -58,7 +58,7 @@ current, see `AGENTS.md` in this directory.
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto: `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto: `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto: `backport-migration-check.yml` |
-| `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames; `allow:migration-edit` records an intended one | auto: `migration-edit-check.yml` |
+| `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames, and the new manager migrations without a `# Part of:` comment; `allow:migration-edit` records an intended edit, not a missing comment | auto: `migration-edit-check.yml` |
 | `.github/scripts/merge-alembic-heads.sh` | Opens a `skip:changelog` pull request adding an empty merge migration when the manager's alembic graph on `main` has more than one head | auto: `alembic-merge-heads.yml` |
 | `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files, and prints the `--shard` values that hold a target | auto: `ci.yml` |
 | `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto: `ci-lint.yml`, `ci-typecheck.yml`, `ci-test.yml`, `ci-test-scenario.yml` |
