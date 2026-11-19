@@ -87,6 +87,8 @@ class _Relay:
                 await asyncio.Event().wait()
             dst.write(data)
             await dst.drain()
+        # Pass the end of the stream on, as asyncpg waits for the server to close on close().
+        dst.close()
 
 
 @pytest.fixture
