@@ -101,7 +101,7 @@ def dump_history(_cli_ctx: CLIContext, alembic_config: str, output: str) -> None
     from alembic.script import ScriptDirectory
 
     from ai.backend.common.json import pretty_json_str
-    from ai.backend.manager import __version__
+    from ai.backend.manager.version import __version__
 
     alembic_cfg = Config(alembic_config)
     script = ScriptDirectory.from_config(alembic_cfg)

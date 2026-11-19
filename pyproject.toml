@@ -7,7 +7,7 @@ dynamic = ["version"]
 lint = ["ruff==0.14.0"]
 
 [tool.towncrier]
-package = "ai.backend.manager"  # reference point for getting __version__
+package = "ai.backend.manager.version"  # reference point for getting __version__
 # Releases go to the per-version-branch file instead: scripts/run-towncrier.py
 # overrides this with CHANGELOG/<version>.md on every run. The value is kept
 # because towncrier picks the markdown template from this suffix, and because
@@ -276,8 +276,6 @@ split-on-trailing-comma = true
 "src/ai/backend/common/logging_utils.py" = ["TID251"]
 "tests/unit/logging/test_adapter.py" = ["TID251"]
 "src/ai/backend/account_manager/**/*.py" = ["TID251"]
-# a manager __init__.py holds no import (flake8 BAI001), so pathlib is not available
-"src/ai/backend/manager/__init__.py" = ["PTH123"]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
