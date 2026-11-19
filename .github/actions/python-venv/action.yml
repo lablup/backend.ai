@@ -1,0 +1,45 @@
+name: python-venv
+description: >-
+  Build the virtualenv holding the python-default resolve at the versions
+  python.lock pins, without Pants, and cache it by the lock and the build script.
+outputs:
+  venv:
+    description: Path of the virtualenv directory
+    value: ${{ steps.paths.outputs.venv }}
+  python:
+    description: Path of the python executable in the virtualenv
+    value: ${{ steps.paths.outputs.python }}
+runs:
+  using: composite
+  steps:
+    - name: Read the Python version from pants.toml
+      id: paths
+      shell: bash
+      run: |
+        VERSION=$(sed -nE 's/.*CPython==([0-9.]+).*/\1/p' pants.toml | head -n 1)
+        VENV="dist/export/python/virtualenvs/python-default/$VERSION"
+        {
+          echo "version=$VERSION"
+          echo "venv=$VENV"
+          echo "python=$VENV/bin/python"
+        } >> "$GITHUB_OUTPUT"
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: ${{ steps.paths.outputs.version }}
+
+    - name: Install uv
+      shell: bash
+      run: python -m pip install uv
+
+    - name: Restore the venv
+      id: cache
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.paths.outputs.venv }}
+        key: python-venv-${{ runner.os }}-${{ steps.paths.outputs.version }}-${{ hashFiles('python.lock', 'python.lock.metadata', 'scripts/setup-venv.py') }}
+
+    - name: Build the venv
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: scripts/setup-venv.py
