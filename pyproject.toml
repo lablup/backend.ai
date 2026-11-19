@@ -12,6 +12,25 @@ flake8-bai = { path = "tools/flake8-plugins", editable = true }
 [tool.flake8]
 # The repository plugin's rules that are on (tools/flake8-plugins/README.md); ruff covers the rest.
 select = ["BAI001"]
+filename = ["*.py", "*.pyi"]
+# The paths pants_ignore keeps out of Pants (pants.toml) and the gitignored directories, since
+# flake8 does not read .gitignore. A directory pattern ends in /* so that it also excludes a file
+# named on the command line (the pre-commit hook).
+extend-exclude = [
+    "./.*",
+    "./*/.*",
+    "./dist/*",
+    "./docker/*",
+    "./docs/*",
+    "./plugins/*",
+    "./proposals/*",
+    "./scripts/*",
+    "./tools/pants-plugins/*",
+    "./wheelhouse/*",
+    "./venv/*",
+    "./*/venv/*",
+    "./*.egg-info/*",
+]
 
 [tool.towncrier]
 package = "ai.backend.manager.version"  # reference point for getting __version__

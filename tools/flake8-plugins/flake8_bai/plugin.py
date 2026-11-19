@@ -9,10 +9,8 @@ from flake8_bai.rules.init_import import InitImportRule
 
 
 class Plugin:
-    """flake8 entry point (`[flake8:local-plugins]` in `.flake8`)."""
+    """flake8 entry point (`flake8.extension` in `tools/flake8-plugins/pyproject.toml`)."""
 
-    name = "flake8-bai"
-    version = "0.1.0"
     rule_types: tuple[type[Rule], ...] = (
         InitImportRule,
         DataFrozenRule,

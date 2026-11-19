@@ -60,18 +60,10 @@ if ! "${RUFF[@]}" check --force-exclude "${PY_FILES[@]}"; then
 fi
 
 # 3. Repository rules (tools/flake8-plugins)
-PY_ONLY=()
-for f in "${PY_FILES[@]}"; do
-  case "$f" in
-    *.py | *.pyi) PY_ONLY+=("$f") ;;
-  esac
-done
-if [ ${#PY_ONLY[@]} -gt 0 ]; then
-  echo "✓ Checking repository rules..."
-  if ! "${FLAKE8[@]}" "${PY_ONLY[@]}"; then
-    echo "❌ Repository rules failed"
-    EXIT_CODE=1
-  fi
+echo "✓ Checking repository rules..."
+if ! "${FLAKE8[@]}" "${PY_FILES[@]}"; then
+  echo "❌ Repository rules failed"
+  EXIT_CODE=1
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then

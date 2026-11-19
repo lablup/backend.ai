@@ -112,7 +112,7 @@ jobs:
         # Every file, every run: the version, paths and rules are in pyproject.toml.
         ruff format --check
         ruff check --output-format="$FORMAT"
-        flake8 src tests stubs
+        flake8
         # Only the visibility rules are left in pants lint.
         pants lint --changed-since=$BASE_REF
     - name: Decide whether this run saves the caches

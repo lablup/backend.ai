@@ -48,7 +48,7 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 ### Git Pre-commit Hook (`scripts/pre-commit.sh`)
 - Runs on every `git commit`
 - Runs `ruff format` and `ruff check` on staged Python and BUILD files with the ruff of the `lint` group, installed into `dist/lint-venv`
-- Runs `flake8` (the repository rules, see Flake8 below) on the staged Python files
+- Runs `flake8` (the repository rules, see Flake8 below) on the same staged files
 - A file that `ruff format` rewrites blocks the commit; stage it and commit again
 - Visibility rules run only in CI (`pants lint`)
 - CI handles type checking and tests (`ci.yml` lint-and-typecheck and test jobs)
@@ -67,8 +67,8 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 
 ### Flake8
 - Runs the repository rules that ruff cannot express (`tools/flake8-plugins/README.md`), outside Pants
-- The `lint` group installs flake8 and the plugin; `[tool.flake8]` in `pyproject.toml` selects the rules that are on
-- CI checks `src`, `tests` and `stubs` on every run
+- The `lint` group installs flake8 and the plugin; `[tool.flake8]` in `pyproject.toml` holds the rules that are on and the paths
+- CI checks every file on every run
 
 ## Running Pants Commands
 
@@ -103,7 +103,7 @@ dist/lint-venv/bin/ruff format
 dist/lint-venv/bin/ruff check --fix
 
 # Check the repository rules
-dist/lint-venv/bin/flake8 src tests stubs
+dist/lint-venv/bin/flake8
 
 # Check the visibility rules
 pants lint --changed-since=HEAD~1
