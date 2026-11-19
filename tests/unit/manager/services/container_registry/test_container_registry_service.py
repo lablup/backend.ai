@@ -24,7 +24,6 @@ from ai.backend.manager.clients.container_registry.base import (
 from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
-from ai.backend.manager.container_registry.factory import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
 )
@@ -652,9 +651,10 @@ class TestRescanImages:
             images=[sample_image_data], errors=[]
         )
 
-        with patch.object(get_container_registry_cls(sample_registry_row), "__new__") as mock_cls:
-            mock_cls.return_value = mock_scanner
-
+        with patch(
+            "ai.backend.manager.services.container_registry.service.get_container_registry_cls",
+            return_value=MagicMock(return_value=mock_scanner),
+        ):
             action = RescanImagesAction(
                 registry="registry.example.com",
                 project="test-project",
@@ -707,9 +707,10 @@ class TestRescanImages:
             images=[sample_image_data], errors=["Failed to scan some/image:tag"]
         )
 
-        with patch.object(get_container_registry_cls(sample_registry_row), "__new__") as mock_cls:
-            mock_cls.return_value = mock_scanner
-
+        with patch(
+            "ai.backend.manager.services.container_registry.service.get_container_registry_cls",
+            return_value=MagicMock(return_value=mock_scanner),
+        ):
             action = RescanImagesAction(
                 registry="registry.example.com",
                 project="test-project",
@@ -735,9 +736,10 @@ class TestRescanImages:
         mock_scanner = AsyncMock()
         mock_scanner.rescan_single_registry.return_value = MagicMock(images=[], errors=[])
 
-        with patch.object(get_container_registry_cls(sample_registry_row), "__new__") as mock_cls:
-            mock_cls.return_value = mock_scanner
-
+        with patch(
+            "ai.backend.manager.services.container_registry.service.get_container_registry_cls",
+            return_value=MagicMock(return_value=mock_scanner),
+        ):
             action = RescanImagesAction(
                 registry="registry.example.com", project=None, progress_reporter=AsyncMock()
             )
