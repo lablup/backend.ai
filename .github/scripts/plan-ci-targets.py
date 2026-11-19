@@ -31,9 +31,9 @@ line. A test is a file a ``python_tests`` of its ``BUILD`` owns; its address is
 ``<file>:<name>``, or ``<file>`` when the target has no name.
 
 The changed files are ``git diff --name-only <rev>``. The dependents come from
-``ruff analyze graph --direction dependents src tests`` (``RUFF_GRAPH_VERSION``),
-which holds the import edges only. The graph gets the edges Pants adds on top of
-import inference:
+``ruff analyze graph --direction dependents src tests stubs`` (``RUFF_GRAPH_VERSION``),
+which holds the import edges only; the ``.pyi`` files of ``stubs/`` are nodes of it.
+The graph gets the edges Pants adds on top of import inference:
 
 - a non-empty ``__init__.py`` to every module under it
 - a ``conftest.py`` to every test under it
@@ -43,8 +43,10 @@ Changed files that are not Python source:
 
 - ``python.lock``, ``python.lock.metadata``: a full run
 - ``pyproject.toml``, ``pants.toml``, a file under ``stubs/``: every ``.py`` is typechecked
-- a file under ``src/`` or ``tests/`` that is not ``.py``: the ``.py`` files of its
-  directory count as changed
+- a ``BUILD`` under ``src/``: a full run
+- any other file under ``src/`` or ``tests/`` that is not ``.py`` or a ``.md``, ``.rst``
+  document (a ``BUILD`` under ``tests/`` included): the ``.py`` files of its directory
+  count as changed
 
 A suite gets one shard per ``SHARD_FLOOR`` tests, at most ``SHARD_LIMIT``. Pants
 assigns a test to ``crc32(address) % N``, so a shard no test lands in is left out.
@@ -68,7 +70,7 @@ import zlib
 from collections.abc import Iterable
 
 RUFF_GRAPH_VERSION = "0.17.5"
-RUFF_GRAPH_CONFIG = 'src = ["src", "tests/scenario", "."]'
+RUFF_GRAPH_CONFIG = 'src = ["src", "tests/scenario", "stubs", "."]'
 
 SUITES = ("unit", "component", "integration", "scenario")
 SHARD_LIMIT = {"unit": 6, "component": 6, "integration": 2, "scenario": 6}
@@ -82,6 +84,7 @@ SCENARIO_COMPONENT = re.compile(r"^tests/scenario/bai_scenario/manager/([^/]+)/"
 FULL_RUN_FILES = {"python.lock", "python.lock.metadata"}
 TYPECHECK_ALL_FILES = {"pyproject.toml", "pants.toml"}
 TYPECHECK_ALL_DIRS = ("stubs/",)
+DOC_SUFFIXES = (".md", ".rst")
 
 DEFAULT_SOURCES = {
     "python_tests": ["test_*.py", "*_test.py", "tests.py"],
@@ -116,6 +119,10 @@ def parent(path: str) -> str:
 
 def is_py(path: str) -> bool:
     return path.endswith(".py")
+
+
+def is_source(path: str) -> bool:
+    return path.endswith((".py", ".pyi"))
 
 
 def under(files: Iterable[str], directory: str) -> set[str]:
@@ -243,13 +250,14 @@ def ruff_graph() -> dict[str, set[str]]:
             RUFF_GRAPH_CONFIG,
             "src",
             "tests",
+            "stubs",
         ],
         check=True,
         stdout=subprocess.PIPE,
         text=True,
     )
     raw = json.loads(result.stdout)
-    return {k: {d for d in v if is_py(d)} for k, v in raw.items() if is_py(k)}
+    return {k: {d for d in v if is_source(d)} for k, v in raw.items() if is_source(k)}
 
 
 def add_pants_edges(
@@ -291,7 +299,7 @@ def changed_sources(changed: list[str], every: set[str]) -> set[str]:
     """The ``.py`` files of the graph that the changed files stand for."""
     files = {f for f in changed if f in every}
     for f in changed:
-        if f.startswith(("src/", "tests/")) and not is_py(f):
+        if f.startswith(("src/", "tests/")) and not is_py(f) and not f.endswith(DOC_SUFFIXES):
             files |= {s for s in every if parent(s) == parent(f)}
     return files
 
@@ -346,7 +354,10 @@ def main() -> int:
     add_pants_edges(graph, root, targets, tests)
 
     changed = changed_files(args.base_ref)
-    full_run = args.full_run or any(f in FULL_RUN_FILES for f in changed)
+    full_run = args.full_run or any(
+        f in FULL_RUN_FILES or (f.startswith("src/") and pathlib.PurePosixPath(f).name == "BUILD")
+        for f in changed
+    )
     typecheck_all = full_run or any(
         f in TYPECHECK_ALL_FILES or f.startswith(TYPECHECK_ALL_DIRS) for f in changed
     )
