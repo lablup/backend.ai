@@ -24,6 +24,7 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
 # ---------------------------------------------------------------------------
@@ -126,6 +127,7 @@ def server_module_registries(
     route_deps: RouteDeps,
     user_processors: UserProcessors,
     domain_processors: DomainProcessors,
+    ssh_keypair_processors: SSHKeypairProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Register user REST routes + real strawberry GQL for keypair-ops tests."""
@@ -143,7 +145,7 @@ def server_module_registries(
         mock_processors.domain,
         auth_config=None,  # type: ignore[arg-type]
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-        ssh_keypair=mock_processors.ssh_keypair,
+        ssh_keypair=ssh_keypair_processors,
     )
 
     user_registry = register_user_routes(

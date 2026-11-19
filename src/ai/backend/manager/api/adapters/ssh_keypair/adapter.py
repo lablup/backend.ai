@@ -50,6 +50,7 @@ class SSHKeypairAdapter(BaseAdapter):
     def _to_node(data: SSHKeypairData) -> SSHKeypairNode:
         return SSHKeypairNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             public_key=data.public_key,
             is_default=data.is_default,
