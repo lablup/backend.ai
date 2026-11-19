@@ -41,7 +41,8 @@ The graph gets the edges Pants adds on top of import inference:
 
 - a non-empty ``__init__.py`` to every module under it
 - a ``conftest.py`` to every test under it
-- a file a ``BUILD`` target in ``src/`` or ``tests/`` lists in ``dependencies`` to that target's files
+- a file a ``BUILD`` target in ``src/`` or ``tests/`` lists in ``dependencies`` to that target's files,
+  or, listed in an ``overrides`` entry, to the files that entry names
 
 Changed files that are not Python source:
 
@@ -94,6 +95,7 @@ DEFAULT_SOURCES = {
     "python_tests": ["test_*.py", "*_test.py", "tests.py"],
     "python_test_utils": ["conftest.py"],
     "python_sources": ["*.py", "!test_*.py", "!*_test.py", "!tests.py", "!conftest.py"],
+    "files": [],
 }
 
 
@@ -102,16 +104,29 @@ class PlanError(Exception):
 
 
 class Target:
-    """A ``python_tests``, ``python_test_utils`` or ``python_sources`` call of a BUILD."""
+    """A ``python_tests``, ``python_test_utils``, ``python_sources`` or ``files`` call of a BUILD."""
+
+    kind: str
+    directory: str
+    name: str | None
+    files: set[str]
+    # The files a ``dependencies`` list applies to, with the list: the whole target, and
+    # each ``overrides`` entry for the files it names.
+    dep_groups: list[tuple[set[str], list[str]]]
 
     def __init__(
-        self, kind: str, directory: str, name: str | None, files: set[str], deps: list[str]
+        self,
+        kind: str,
+        directory: str,
+        name: str | None,
+        files: set[str],
+        dep_groups: list[tuple[set[str], list[str]]],
     ) -> None:
         self.kind = kind
         self.directory = directory
         self.name = name
         self.files = files
-        self.deps = deps
+        self.dep_groups = dep_groups
 
     def address(self, file: str) -> str:
         return file if self.name is None else f"{file}:{self.name}"
@@ -158,6 +173,11 @@ def matching_files(root: pathlib.Path, directory: str, patterns: list[str]) -> s
     return included - excluded
 
 
+def qualify(dep: str, directory: str) -> str:
+    """Write the ``:name`` address of a BUILD with the directory in front."""
+    return f"{directory}{dep}" if dep.startswith(":") else dep
+
+
 def parse_build(root: pathlib.Path, build: pathlib.Path) -> list[Target]:
     directory = build.parent.relative_to(root).as_posix()
     where = build.relative_to(root).as_posix()
@@ -175,10 +195,19 @@ def parse_build(root: pathlib.Path, build: pathlib.Path) -> list[Target]:
         name = literal(call, "name", None, where)
         sources = literal(call, "sources", DEFAULT_SOURCES[kind], where)
         deps = literal(call, "dependencies", [], where)
+        overrides = literal(call, "overrides", {}, where)
         if not isinstance(sources, list) or not isinstance(deps, list):
             raise PlanError(f"{where}: `sources` and `dependencies` must be lists")
+        if not isinstance(overrides, dict):
+            raise PlanError(f"{where}: `overrides` must be a dict")
         files = {f for f in matching_files(root, directory, sources) if is_py(f)}
-        targets.append(Target(kind, directory, name, files, deps))
+        groups = [(files, [qualify(d, directory) for d in deps])]
+        for key, value in overrides.items():
+            override_deps = value.get("dependencies", []) if isinstance(value, dict) else []
+            keys = [key] if isinstance(key, str) else list(key)
+            named = matching_files(root, directory, keys) & files
+            groups.append((named, [qualify(d, directory) for d in override_deps]))
+        targets.append(Target(kind, directory, name, files, groups))
     return targets
 
 
@@ -209,8 +238,8 @@ def dependency_files(
 ) -> tuple[str | None, set[str]]:
     """The files a ``dependencies`` entry names, and the target it names when it is a generator.
 
-    An address that names no ``python_*`` target of a BUILD (a resource, a requirement)
-    names no files.
+    An address that names no ``python_*`` or ``files`` target of a BUILD (a resource, a
+    requirement) names no files.
     """
     if dep.startswith(("//", "!")):
         return None, set()
@@ -233,15 +262,16 @@ def build_edges(every: set[str], targets: list[Target]) -> dict[str, set[str]]:
     """
     edges: dict[str, set[str]] = {}
     for target in targets:
-        for dep in target.deps:
-            generator, files = dependency_files(dep, every, targets)
-            for f in files:
-                if generator is None:
-                    edges.setdefault(f, set()).update(target.files)
-                else:
-                    edges.setdefault(f, set()).add(generator)
-            if generator is not None and files:
-                edges.setdefault(generator, set()).update(target.files)
+        for owners, deps in target.dep_groups:
+            for dep in deps:
+                generator, files = dependency_files(dep, every, targets)
+                for f in files:
+                    if generator is None:
+                        edges.setdefault(f, set()).update(owners)
+                    else:
+                        edges.setdefault(f, set()).add(generator)
+                if generator is not None and files:
+                    edges.setdefault(generator, set()).update(owners)
     return edges
 
 
