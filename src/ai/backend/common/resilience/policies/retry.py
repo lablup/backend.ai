@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+import time
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Final, ParamSpec, TypeVar, cast, override
@@ -151,3 +153,74 @@ class RetryPolicy(Policy):
             case _:
                 # Fixed delay
                 return self._retry_delay
+
+
+class ReconnectErrorClassifier(ABC):
+    """Decides whether an error means the connection was lost or the leader is changing."""
+
+    @abstractmethod
+    def is_reconnect_error(self, error: BaseException) -> bool:
+        raise NotImplementedError
+
+
+@dataclass
+class ReconnectRetryArgs:
+    """Arguments for ReconnectRetryPolicy."""
+
+    classifier: ReconnectErrorClassifier
+    timeout: float = 60.0
+    initial_delay: float = 0.1
+    max_delay: float = 2.0
+
+
+class ReconnectRetryPolicy(Policy):
+    """
+    Retries a call that failed with a reconnect error until the time window ends.
+
+    The delay starts at ``initial_delay``, doubles up to ``max_delay`` and never
+    exceeds the remaining time. Past the window, the last error is raised.
+    Errors the classifier does not judge as reconnect errors are raised at once.
+    """
+
+    _classifier: ReconnectErrorClassifier
+    _timeout: float
+    _initial_delay: float
+    _max_delay: float
+
+    def __init__(self, args: ReconnectRetryArgs) -> None:
+        self._classifier = args.classifier
+        self._timeout = args.timeout
+        self._initial_delay = args.initial_delay
+        self._max_delay = args.max_delay
+
+    @override
+    async def execute(
+        self,
+        next_call: Callable[P, Awaitable[R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        started = time.monotonic()
+        delay = self._initial_delay
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                return await next_call(*args, **kwargs)
+            except Exception as e:
+                if not self._classifier.is_reconnect_error(e):
+                    raise
+                remaining = self._timeout - (time.monotonic() - started)
+                if remaining <= 0:
+                    raise
+                wait = min(delay, remaining)
+                log.warning(
+                    "reconnect retry",
+                    attempt_count=attempt,
+                    retry_delay=wait,
+                    remaining_time=remaining,
+                    error_repr=repr(e),
+                    operation_name=get_current_operation(),
+                )
+                await asyncio.sleep(wait)
+                delay = min(delay * 2, self._max_delay)
