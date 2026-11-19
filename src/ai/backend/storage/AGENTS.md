@@ -10,7 +10,8 @@
 
 ## Exceptions
 
-- All exceptions must inherit from `StorageProxyError` (which inherits from `BackendAIError`).
+- Every exception inherits `BackendAIError` and the aiohttp HTTP exception of its status (`web.HTTPNotFound`, ...).
+  `StorageProxyError` is the generic internal error, not a base class.
 - Put new exceptions only in `storage/errors/`, organized by feature: `object.py`, `quota.py`, `vfolder.py`,
   `volume.py`, `process.py`.
 

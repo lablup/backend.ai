@@ -20,7 +20,6 @@
 
 ## Method naming
 
-- Getters use the entity name without `get_`: `user(id)`, `session(id)`.
 - The standard 6: `create` / `{entity}` / `search` / `update` / `delete` / `purge`.
 
 ## Data access
@@ -41,13 +40,13 @@
   every form of it are forbidden, with no exception. Take ops from a provider's
   `write_ops()` / `read_ops()`. The transaction boundary has to belong to the provider,
   or nothing ties the work to the transaction the method opened.
-- Inject a provider into a repository, never a session, never an engine. A
+- Inject a provider into a new repository, never a session, never an engine. A
   repository holding an engine can open a session inside itself, which breaks the rule above. The new path is `V2DBOpsProvider`.
+  A repository that already takes an engine keeps it until it moves to a provider; add no engine use to it.
 - A primitive only one domain uses does not go on the general ops. Write ops extending
   `V2WriteOps` and a provider extending `V2DBOpsProvider` that overrides `write_ops()`,
   and inject that provider only into the repositories needing the primitive
   (`ops/v2/reconciler/`, `ops/v2/user/`, `ops/rbac/`).
-- Separating into a repository is the default; internal operations may use db directly.
 - ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger).
   A single spec owns only a single table.
 - Do not do multi-table writes inside a spec. A row owned by another is written with a `FieldCreator` /
@@ -71,8 +70,8 @@
 
 - The isolation level is always READ COMMITTED.
 - Complete the work within a single method that received ops, so the transaction is guaranteed.
-- When using db directly, handle repository methods at once per service/operation. Split only when there is a clear layer
-  boundary, and align repository methods to the service operation.
+- In a repository that already takes an engine, handle repository methods at once per service/operation.
+  Split only when there is a clear layer boundary, and align repository methods to the service operation.
 - Create db sessions only in public methods, and reuse them only in private methods.
 
 ## OperationScope

@@ -266,39 +266,24 @@ async def list_domain_fair_shares(
 
 Admin operations require superadmin privileges.
 
-**Permission Check:**
+**Route registration** (`rest/v2/{entity}/registry.py`):
 ```python
-from ai.backend.manager.api.exceptions import InsufficientPermission
-
-
-def _check_superadmin(request: web.Request) -> None:
-    """Check if request user is superadmin."""
-    user_role = request["user"]["role"]
-    if user_role != "superadmin":
-        raise InsufficientPermission("Superadmin required")
+reg.add("POST", "", handler.admin_create, middlewares=[superadmin_required])
 ```
 
 **Handler Usage:**
 ```python
-@api_handler
-async def admin_create_domain(
-    request: web.Request,
-    body: BodyParam[CreateDomainRequest],
-) -> CreateDomainResponse:
-    """Create domain (superadmin only)."""
-    _check_superadmin(request)
-
-    processors = request.app["processors"].domain
-    action = CreateDomainAction(
-        name=body.name,
-        description=body.description,
-    )
-
-    result = await processors.create_domain.execute(action)
-    return CreateDomainResponse(domain_id=result.domain_id)
+async def admin_create(
+    self,
+    body: BodyParam[CreateDomainInput],
+    ctx: UserContext,
+) -> APIResponse:
+    """Create a new domain (superadmin only)."""
+    result = await self._adapter.create(body.parsed)
+    return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 ```
 
-**Pattern**: function name `admin_{operation}_{entity}`, first line `_check_superadmin()`
+**Pattern**: handler name `admin_{operation}`, registered with the `superadmin_required` middleware
 
 ### Pagination Pattern
 

@@ -18,7 +18,8 @@ dataclasses (established pattern); for new code, do not add re-exports: import t
 ## Type rules
 
 - Every data class must be a `@dataclass(frozen=True)`.
-- Allowed imports: Python stdlib and `ai.backend.common.types`. Nothing else.
+- Allowed imports: Python stdlib, `ai.backend.common.types`, `ai.backend.common.data` and `ai.backend.manager.data`.
+  Nothing else.
 - Do not import from `manager/models/`, `manager/repositories/`, `manager/services/`, or external frameworks (`pydantic`,
   `sqlalchemy`, `aiohttp`).
 

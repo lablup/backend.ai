@@ -13,7 +13,7 @@
 | `admin_*` | 모든 scope 에 걸친 global 동작 | superadmin |
 | bare global 조회(get/search) | public 조회, 인증된 모든 사용자에게 제공 | 인증됨 |
 | scoped 동작(`scoped/search` 경로) | 호출자가 전달한 scope 에 걸친 동작 하나 | scope 별 RBAC |
-| `my_*` | self-service. 호출자가 scope 이다 | 인증됨(adapter 가 user 를 식별한다) |
+| `my_*` | self-service. 호출자가 scope 이다 | 인증됨(handler 가 `current_user()` 를 scope 에 넣는다) |
 
 ## v1 surface 를 동결한다
 
