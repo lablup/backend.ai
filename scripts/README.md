@@ -39,7 +39,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python files, with the ruff version from `pants.toml` | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python and BUILD files with the ruff of the `lint` group of `pyproject.toml`, installed into `dist/lint-venv` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 
@@ -100,9 +100,9 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
-| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh`, `pre-commit.sh`, `release.sh` |
+| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh` |
 | `python.sh` | Runs a plain Python command through the uv-managed interpreter | person; `install-dev.sh` |
-| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `pre-commit.sh`, `release.sh` |
+| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `install-dev.sh` |
 | `add_future_annotations.py` | Adds the missing `from __future__ import annotations` imports | person |
 | `validate_ann_compliance.py` | Reports the ANN (flake8-annotations) violations of a path | person |
 | `run_mypy_subset.sh` | Runs `pants check` over a subset of paths | person |

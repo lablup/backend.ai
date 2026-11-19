@@ -47,7 +47,7 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 
 ### Git Pre-commit Hook (`scripts/pre-commit.sh`)
 - Runs on every `git commit`
-- Runs `ruff format` and `ruff check` on staged Python files through `uvx`, with the ruff version from `pants.toml`
+- Runs `ruff format` and `ruff check` on staged Python and BUILD files with the ruff of the `lint` group, installed into `dist/lint-venv`
 - A file that `ruff format` rewrites blocks the commit; stage it and commit again
 - Visibility rules run only in CI (`pants lint`)
 - CI handles type checking and tests (`ci.yml` lint-and-typecheck and test jobs)
@@ -57,6 +57,12 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 - Runs on every `git push`
 - Runs `scripts/knowledge/check_words.py` against the PR's base branch (`HEAD~1` without `gh`)
 - Does not run pants; CI runs lint, type checking and tests
+
+### Ruff
+- Runs outside Pants. `pyproject.toml` holds the version (`[dependency-groups] lint`), the rules and the paths (`[tool.ruff]`)
+- CI, the pre-commit hook and `scripts/release.sh` install it with `uv pip install --group pyproject.toml:lint`; the hook and `release.sh` into `dist/lint-venv`
+- CI checks every file on every run; `pants lint` runs only the visibility rules
+- BUILD files are formatted by ruff and not linted; `pants update-build-files` does not format them
 
 ## Running Pants Commands
 
@@ -80,13 +86,17 @@ pants {subcommand} {targets} -- {arguments-passed-to-spawned-processes}
 
 ### Code Quality
 ```bash
-# Format code
-pants fmt ::
+# Install the pinned ruff
+uv venv --allow-existing dist/lint-venv
+uv pip install --python dist/lint-venv --group pyproject.toml:lint
 
-# Fix auto-fixable issues (removes unused imports, etc.)
-pants fix ::
+# Format code (Python and BUILD files)
+dist/lint-venv/bin/ruff format
 
-# Lint code
+# Lint code and fix auto-fixable issues
+dist/lint-venv/bin/ruff check --fix
+
+# Check the visibility rules
 pants lint --changed-since=HEAD~1
 
 # Type check
@@ -100,7 +110,7 @@ pants test tests/manager::
 
 **Lock Files:**
 - `python.lock` - Main source tree dependencies (python-default)
-- `tools/*.lock` - Tool-specific dependencies (mypy, ruff, black, pytest)
+- `tools/*.lock` - Tool-specific dependencies (coverage-py, towncrier, setuptools, pants plugins)
 
 **Commands:**
 ```bash
