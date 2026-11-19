@@ -14,6 +14,11 @@ exp.py batches <list> <workers> <size> <junit-prefix> -- <pytest...>
                                             <workers> processes, each its own
                                             BACKEND_TEST_EXEC_SLOT
 exp.py fixtures <log>                       print the container fixture setup totals
+exp.py existing <list>                      print the paths of the list that exist
+exp.py forced <changed> <suite>             print the changed files that make testmon run
+                                            the whole list of <suite>
+exp.py selected <collect-output> <out>      write the files of `pytest --co -q` test ids to
+                                            <out>, print the file and test counts
 """
 
 from __future__ import annotations
@@ -163,6 +168,37 @@ def cmd_fixtures(log: str) -> int:
     return 0
 
 
+def cmd_existing(listing: str) -> int:
+    for path in read_list(listing):
+        if pathlib.Path(path).is_file():
+            out(path)
+    return 0
+
+
+def cmd_forced(changed: str, suite: str) -> int:
+    # testmon sees the code a test runs, not what a conftest does at import time or what
+    # a BUILD, pyproject.toml or python.lock decides.
+    scope = pathlib.PurePosixPath("tests", suite)
+    for path in read_list(changed):
+        p = pathlib.PurePosixPath(path)
+        in_scope = p.parts[0] != "tests" or p.parent in scope.parents or scope in p.parents
+        if path in ("pyproject.toml", "python.lock", "python.lock.metadata") or (
+            p.name in ("conftest.py", "BUILD") and in_scope
+        ):
+            out(path)
+    return 0
+
+
+def cmd_selected(collected: str, output: str) -> int:
+    tests = [
+        line.strip() for line in pathlib.Path(collected).read_text().splitlines() if "::" in line
+    ]
+    files = sorted({test.split("::", 1)[0] for test in tests})
+    pathlib.Path(output).write_text("".join(f"{path}\n" for path in files))
+    out(f"{len(files)} files, {len(tests)} tests")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     match argv:
         case ["time", log, label, "--", *command]:
@@ -183,6 +219,12 @@ def main(argv: list[str]) -> int:
             return cmd_compare(ours, pants)
         case ["fixtures", log]:
             return cmd_fixtures(log)
+        case ["existing", listing]:
+            return cmd_existing(listing)
+        case ["forced", changed, suite]:
+            return cmd_forced(changed, suite)
+        case ["selected", collected, output]:
+            return cmd_selected(collected, output)
         case ["batches", listing, workers, size, junit, "--", *command]:
             return cmd_batches(listing, workers, size, junit, command)
     sys.stderr.write(__doc__ or "")

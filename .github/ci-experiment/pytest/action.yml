@@ -20,6 +20,20 @@ inputs:
     description: Files per process when `workers` is not 0; `auto` makes two batches per process
     required: false
     default: '1'
+  testmon:
+    description: >-
+      `seed` records testmon data in `.testmon/data.db`; `select` runs only the tests that
+      data selects, or the whole list when `exp.py forced` names a changed file
+    required: false
+    default: ''
+  changed:
+    description: 'The changed files, one path per line, for `testmon: select`'
+    required: false
+    default: ''
+  venv-key:
+    description: The venv cache key, for a job that checks out another revision
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -31,7 +45,7 @@ runs:
       uses: actions/cache@v5
       with:
         path: .venv
-        key: exp-venv-${{ runner.os }}-${{ hashFiles('python.lock', 'python.lock.metadata') }}-${{ hashFiles('.github/ci-experiment/requirements-extra.txt') }}
+        key: ${{ inputs.venv-key || format('exp-venv-{0}-{1}-{2}', runner.os, hashFiles('python.lock', 'python.lock.metadata'), hashFiles('.github/ci-experiment/requirements-extra.txt')) }}
     - name: Build the venv
       if: steps.venv.outputs.cache-hit != 'true'
       shell: bash
@@ -55,6 +69,8 @@ runs:
         SIZE: ${{ inputs.batch-size }}
         SUITE: ${{ inputs.suite }}
         VENV_HIT: ${{ steps.venv.outputs.cache-hit }}
+        TESTMON: ${{ inputs.testmon }}
+        CHANGED: ${{ inputs.changed }}
       run: |
         $EXP/exp.py note "$TIMINGS" "venv cache hit" "$VENV_HIT"
         $EXP/exp.py shard "$LIST" "$SHARD" "$COUNT" > ../shard.txt
@@ -68,6 +84,36 @@ runs:
         pytest=(.venv/bin/python -m pytest --import-mode=importlib
           --timeout=180 --reruns=1 -vv --no-header --suppress-no-test-exit-code -o junit_family=xunit2 -p no:cacheprovider
           -p exp_fixture_timer)
+        export TESTMON_DATAFILE="$PWD/.testmon/data.db"
+        case "$TESTMON" in
+          seed)
+            pytest+=(--testmon)
+            mkdir -p .testmon
+            # Processes that create the sqlite file at once fail on `PRAGMA journal_mode = WAL`
+            # with "database is locked"; once it exists, they write it at once.
+            "${pytest[@]}" --co -q "$(head -1 ../shard.txt)" > /dev/null
+            ;;
+          select)
+            if [ ! -f "$TESTMON_DATAFILE" ]; then echo "::error::No testmon data"; exit 1; fi
+            # `tests/conftest.py` adds `-m 'not integration'`, which turns testmon's own
+            # selection off; `--testmon-forceselect` keeps both. A copy, as `--co` writes the data.
+            cp "$TESTMON_DATAFILE" ../select.db
+            TESTMON_DATAFILE="$PWD/../select.db" $EXP/exp.py time "$TIMINGS" "testmon select" -- \
+              .venv/bin/python -m pytest --import-mode=importlib -p no:cacheprovider -W ignore \
+              --suppress-no-test-exit-code --testmon-forceselect --co -q $(cat ../shard.txt) \
+              > dist/testmon-collected.txt
+            $EXP/exp.py note "$TIMINGS" "testmon selected" "$($EXP/exp.py selected dist/testmon-collected.txt dist/testmon-selected.txt)"
+            forced=$($EXP/exp.py forced "$CHANGED" "$SUITE" | tr '\n' ' ')
+            if [ -n "$forced" ]; then
+              $EXP/exp.py note "$TIMINGS" "whole list" "$forced"
+            else
+              cp dist/testmon-selected.txt ../shard.txt
+              pytest+=(--testmon-forceselect)
+              $EXP/exp.py note "$TIMINGS" "files to run" "$(wc -l < ../shard.txt)"
+              if [ ! -s ../shard.txt ]; then echo "testmon selected no tests"; exit 0; fi
+            fi
+            ;;
+        esac
         if [ "$WORKERS" = 0 ]; then
           $EXP/exp.py time "$TIMINGS" "pytest $SUITE (1 process)" -- \
             "${pytest[@]}" --junitxml=dist/junit-0.xml $(cat ../shard.txt)
@@ -111,5 +157,7 @@ runs:
       if: always()
       with:
         name: junit-${{ inputs.suite }}-${{ github.job }}-${{ inputs.shard }}-of-${{ inputs.count }}
-        path: dist/junit-*.xml
+        path: |
+          dist/junit-*.xml
+          dist/testmon-*.txt
         if-no-files-found: ignore

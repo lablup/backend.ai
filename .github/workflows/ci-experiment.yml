@@ -265,16 +265,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        # The 2-, 3- and 4-shard rows ran up to 178790f142; one shard is testmon's baseline.
         - {count: 1, shard: 0}
-        - {count: 2, shard: 0}
-        - {count: 2, shard: 1}
-        - {count: 3, shard: 0}
-        - {count: 3, shard: 1}
-        - {count: 3, shard: 2}
-        - {count: 4, shard: 0}
-        - {count: 4, shard: 1}
-        - {count: 4, shard: 2}
-        - {count: 4, shard: 3}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -328,16 +320,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        # The 2-, 3- and 4-shard rows ran up to 178790f142; one shard is testmon's baseline.
         - {count: 1, shard: 0, workers: 4}
-        - {count: 2, shard: 0, workers: 4}
-        - {count: 2, shard: 1, workers: 4}
-        - {count: 3, shard: 0, workers: 4}
-        - {count: 3, shard: 1, workers: 4}
-        - {count: 3, shard: 2, workers: 4}
-        - {count: 4, shard: 0, workers: 4}
-        - {count: 4, shard: 1, workers: 4}
-        - {count: 4, shard: 2, workers: 4}
-        - {count: 4, shard: 3, workers: 4}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -386,3 +370,106 @@ jobs:
         count: ${{ matrix.count }}
         workers: ${{ matrix.workers }}
         batch-size: auto
+
+  # Stands in for a job on main: runs `exp-plan`'s lists on the base revision with testmon
+  # and saves its data under the base sha.
+  exp-testmon-seed:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    needs: exp-plan
+    name: exp-testmon-seed (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    env:
+      EXP: .exp
+    outputs:
+      base: ${{ steps.base.outputs.sha }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - {suite: unit, size: '1'}
+        - {suite: component, size: auto}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+        lfs: false
+    - name: Compute the venv key
+      id: venv-key
+      env:
+        KEY: exp-venv-${{ runner.os }}-${{ hashFiles('python.lock', 'python.lock.metadata') }}-${{ hashFiles('.github/ci-experiment/requirements-extra.txt') }}
+      run: echo "key=$KEY" >> "$GITHUB_OUTPUT"
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/targets
+    - name: Check out the base revision
+      id: base
+      env:
+        SUITE: ${{ matrix.suite }}
+      run: |
+        echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+        # The base does not hold the experiment scripts.
+        cp -r .github/ci-experiment ../ci-experiment
+        git checkout --quiet HEAD^1
+        cp -r ../ci-experiment "$EXP"
+        $EXP/exp.py existing "dist/targets/$SUITE.txt" > ../base-list.txt
+        $EXP/exp.py note "$TIMINGS" "files on the base" "$(wc -l < ../base-list.txt)"
+    - name: Look up the testmon data
+      id: lookup
+      uses: actions/cache/restore@v5
+      with:
+        path: .testmon
+        key: exp-testmon-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
+        lookup-only: true
+    - uses: ./.exp/pytest
+      if: steps.lookup.outputs.cache-hit != 'true'
+      with:
+        suite: ${{ matrix.suite }}
+        list: ../base-list.txt
+        shard: '0'
+        count: '1'
+        workers: '4'
+        batch-size: ${{ matrix.size }}
+        testmon: seed
+        venv-key: ${{ steps.venv-key.outputs.key }}
+    - name: Save the testmon data
+      if: always() && steps.lookup.outputs.cache-hit != 'true' && hashFiles('.testmon/data.db') != ''
+      uses: actions/cache/save@v5
+      with:
+        path: .testmon
+        key: exp-testmon-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
+
+  exp-testmon-select:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    needs: [exp-plan, exp-testmon-seed]
+    name: exp-testmon-select (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - {suite: unit, size: '1'}
+        - {suite: component, size: auto}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/targets
+    - name: Restore the testmon data
+      uses: actions/cache/restore@v5
+      with:
+        path: .testmon
+        key: exp-testmon-${{ matrix.suite }}-${{ needs.exp-testmon-seed.outputs.base }}
+    - uses: ./.github/ci-experiment/pytest
+      with:
+        suite: ${{ matrix.suite }}
+        list: dist/targets/${{ matrix.suite }}.txt
+        shard: '0'
+        count: '1'
+        workers: '4'
+        batch-size: ${{ matrix.size }}
+        testmon: select
+        changed: dist/targets/changed.txt
