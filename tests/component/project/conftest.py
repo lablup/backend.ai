@@ -106,6 +106,7 @@ from ai.backend.manager.services.rbac.service import (
     RbacRoleService,
     RbacRosterService,
 )
+from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -250,6 +251,7 @@ def server_module_registries(
     domain_processors: DomainProcessors,
     permission_controller_processors: PermissionControllerProcessors,
     rbac_processors: RbacProcessors,
+    ssh_keypair_processors: SSHKeypairProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 project, user, and RBAC routes for testing."""
     processors = MagicMock(spec=Processors)
@@ -270,6 +272,7 @@ def server_module_registries(
             processors.domain,
             config_provider.config.auth,
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+            ssh_keypair_processors,
         )
     )
     rbac_handler = V2RBACHandler(

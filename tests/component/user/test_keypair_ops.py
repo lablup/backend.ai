@@ -143,6 +143,7 @@ def server_module_registries(
         mock_processors.domain,
         auth_config=None,  # type: ignore[arg-type]
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ssh_keypair=mock_processors.ssh_keypair,
     )
 
     user_registry = register_user_routes(

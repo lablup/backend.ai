@@ -1,4 +1,4 @@
-"""Service actions for the SSH keypair a user owns."""
+"""The lookups reading the user an SSH keypair belongs to."""
 
 from __future__ import annotations
 
@@ -7,18 +7,12 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
-from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
-from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.ssh_keypair.lookups import SSHKeypairOwnerLookup
-from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
-from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
-from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 
 
 @dataclass(frozen=True)
@@ -92,28 +86,3 @@ class LookupBulkSSHKeypairOwnerAction(LookupBulkFieldOwnerOpsAction[SSHKeypairID
     @override
     def to_owner_lookup(self) -> SSHKeypairOwnerLookup:
         return SSHKeypairOwnerLookup()
-
-
-@dataclass(frozen=True)
-class SearchSSHKeypairsAction(BulkScopedSearchOpsAction[SSHKeypairRow, SSHKeypairData]):
-    """Page through the SSH keypairs of the users named, combined with OR."""
-
-    user_ids: Sequence[UserID]
-    searcher: SSHKeypairSearcher
-
-    @override
-    def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return tuple(self.user_ids)
-
-    @override
-    def operation_scopes(self) -> Sequence[OperationScope]:
-        return [UserSSHKeypairTarget(user_id=user_id) for user_id in self.user_ids]
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "search_ssh_keypairs"
-
-    @override
-    def to_searcher(self) -> SSHKeypairSearcher:
-        return self.searcher

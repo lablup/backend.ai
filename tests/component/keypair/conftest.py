@@ -40,6 +40,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 
@@ -77,6 +78,7 @@ def user_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     user_processors: UserProcessors,
+    ssh_keypair_processors: SSHKeypairProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 keypair REST routes for testing."""
     processors = MagicMock(spec=Processors)
@@ -87,6 +89,7 @@ def server_module_registries(
         MagicMock(),
         auth_config=MagicMock(),
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ssh_keypair=ssh_keypair_processors,
     )
 
     handler = V2KeypairHandler(adapter=adapter)

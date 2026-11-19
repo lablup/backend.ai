@@ -126,6 +126,7 @@ from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import 
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
+from ai.backend.manager.repositories.ssh_keypair.repository import SSHKeypairRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.app_config.processors import (
@@ -302,6 +303,8 @@ from ai.backend.manager.services.session.resource_allocation.service import (
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
 from ai.backend.manager.services.session_group.service import SessionGroupService
+from ai.backend.manager.services.ssh_keypair.processors import SSHKeypairProcessors
+from ai.backend.manager.services.ssh_keypair.service import SSHKeypairService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
@@ -608,6 +611,9 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         events=EventsService(args.db),
         system_session_environ=SystemSessionEnvironService(
             repositories.system_session_environ.repository
+        ),
+        ssh_keypair=SSHKeypairService(
+            SSHKeypairRepository(repositories.v2_ops_provider), args.ssh_key_validator
         ),
     )
 
@@ -973,6 +979,10 @@ def create_processors(
                 LookupBulkBootstrapScriptOwnerAction,
             ),
             services.user,
+        ),
+        ssh_keypair=SSHKeypairProcessors(
+            organization_groups.group(GroupMeta(UserEntityType())),
+            services.ssh_keypair,
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             session_groups.group(GroupMeta(IdleCheckerEntityType())),

@@ -8,13 +8,17 @@ from typing import Any, override
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
-from ai.backend.manager.models.specs.querier import OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import FieldQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 
-__all__ = ("DefaultSSHKeypairQuerier",)
+__all__ = (
+    "DefaultSSHKeypairQuerier",
+    "SSHKeypairQuerier",
+)
 
 
 @dataclass
@@ -29,6 +33,29 @@ class DefaultSSHKeypairQuerier(OwnedFieldQuerier[UserID, SSHKeypairRow, SSHKeypa
     @override
     def owner_id_column(self) -> InstrumentedAttribute[Any]:
         return SSHKeypairRow.user_id
+
+    @override
+    def to_data(self, row: SSHKeypairRow) -> SSHKeypairData:
+        return SSHKeypairSearchableFields.own.to_data(row)
+
+
+@dataclass
+class SSHKeypairQuerier(FieldQuerier[SSHKeypairRow, SSHKeypairData]):
+    """One SSH keypair by its id."""
+
+    ssh_keypair_id: SSHKeypairID
+
+    @override
+    def row_class(self) -> type[SSHKeypairRow]:
+        return SSHKeypairRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return SSHKeypairRow.id
+
+    @override
+    def target_id_value(self) -> SSHKeypairID:
+        return self.ssh_keypair_id
 
     @override
     def to_data(self, row: SSHKeypairRow) -> SSHKeypairData:
