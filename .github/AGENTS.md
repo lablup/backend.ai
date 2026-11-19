@@ -49,6 +49,6 @@ Worked examples: `scripts/sync-changelog-to-main.sh` (arguments, `--dry-run`, pl
 
 `ci-pytest.yml` runs `unit` and `component` with `scripts/run-pytest-shard.py` in the venv of `actions/python-venv`, without Pants.
 
-- The script selects the shard's files and runs `--workers` pytest processes side by side, each with its own `BACKEND_TEST_EXEC_SLOT`. `unit` runs one process per file, `component` batches of files (`workers` * 2 of them).
+- The script selects the shard's files and runs `--workers` pytest processes side by side, each with its own `BACKEND_TEST_EXEC_SLOT`. Both run batches of files (`workers` * 2 of them).
 - The pytest options follow `[test]` in `pants.toml`: `--timeout=180`, `--reruns=1`.
 - Each process writes a junit report, uploaded as the artifact `junit-<suite>-<job index>`. The script writes the totals and the failed tests to the job summary and prints an `::error` annotation for each failed test.

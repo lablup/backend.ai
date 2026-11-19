@@ -104,8 +104,9 @@ instead.
 
 `tests/component/BUILD` and `tests/unit/common/BUILD` set `batch_compatibility_tag`
 (`component`, `unit-common`) for every `python_tests` target under them, so Pants runs
-up to `[test].batch_size` files in one pytest process. Files in a batch share one database, etcd namespace and redis, so a
-test must clean up what its fixtures wrote.
+up to `[test].batch_size` files in one pytest process. CI runs `unit` and `component` in batches
+too (`.github/scripts/run-pytest-shard.py --mode batched`). Postgres gets a new database per file; files in a batch share
+the etcd namespace and redis, so a test must clean up what its fixtures wrote there.
 
 | Rule | |
 |---|---|

@@ -17,8 +17,8 @@
 The pytest options are those of the ``[test]`` section of ``pants.toml``: a 180 second
 timeout per test and one rerun of a failed test. Each process writes
 ``<junit-dir>/junit-<n>.xml``. Exit code 1 when a process exits with a code other than
-0 and 5 (no tests collected). The totals and the failed tests go to the file named by
-``--summary`` (default: print them) and each failed test is a ``::error`` annotation.
+0 and 5 (no tests collected). The totals, the sum of the process times and the failed
+tests go to the file named by ``--summary`` (default: print them) and each failed test is a ``::error`` annotation.
 """
 
 from __future__ import annotations
@@ -67,11 +67,11 @@ def run_all(
     command: list[str],
     junit_dir: pathlib.Path,
     env: dict[str, str],
-) -> list[int]:
+) -> list[tuple[int, float]]:
     pending: queue.Queue[tuple[int, list[str]]] = queue.Queue()
     for n, batch in enumerate(batches):
         pending.put((n, batch))
-    codes: list[int] = []
+    results: list[tuple[int, float]] = []
     lock = threading.Lock()
 
     def work(slot: int) -> None:
@@ -92,7 +92,7 @@ def run_all(
             elapsed = time.monotonic() - started
             title = batch[0] if len(batch) == 1 else f"{len(batch)} files from {batch[0]}"
             with lock:
-                codes.append(result.returncode)
+                results.append((result.returncode, elapsed))
                 out(f"::group::{title} (slot {slot}, {elapsed:.1f}s, exit {result.returncode})")
                 out(result.stdout)
                 out("::endgroup::")
@@ -102,7 +102,7 @@ def run_all(
         t.start()
     for t in threads:
         t.join()
-    return codes
+    return results
 
 
 def source_file(classname: str) -> str:
@@ -115,7 +115,7 @@ def source_file(classname: str) -> str:
     return classname.replace(".", "/") + ".py"
 
 
-def summarize(junit_dir: pathlib.Path) -> str:
+def summarize(junit_dir: pathlib.Path, times: list[float]) -> str:
     total = dict.fromkeys(("tests", "failures", "errors", "skipped"), 0)
     failed: list[tuple[str, str]] = []
     for path in sorted(junit_dir.glob("junit-*.xml")):
@@ -131,6 +131,9 @@ def summarize(junit_dir: pathlib.Path) -> str:
     lines = [
         f"### Tests: {total['tests']} run, {total['failures']} failed, "
         f"{total['errors']} errors, {total['skipped']} skipped",
+        "",
+        f"Process time: {sum(times):.0f}s in total over {len(times)} processes, "
+        f"longest {max(times, default=0.0):.0f}s",
         "",
     ]
     for file, name in sorted(failed):
@@ -182,14 +185,14 @@ def main() -> int:
     ]
     batches = split_batches(files, args.mode, max(1, args.workers))
     out(f"shard {args.shard}: {len(files)} files, {len(batches)} processes")
-    codes = run_all(batches, max(1, args.workers), command, args.junit_dir, env)
-    summary = summarize(args.junit_dir)
+    results = run_all(batches, max(1, args.workers), command, args.junit_dir, env)
+    summary = summarize(args.junit_dir, [elapsed for _, elapsed in results])
     if args.summary is not None:
         with args.summary.open("a") as f:
             f.write(summary)
     else:
         out(summary)
-    return 1 if any(c not in OK_CODES for c in codes) else 0
+    return 1 if any(code not in OK_CODES for code, _ in results) else 0
 
 
 if __name__ == "__main__":
