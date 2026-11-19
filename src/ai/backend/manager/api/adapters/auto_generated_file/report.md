@@ -5,21 +5,13 @@
 Scenario: complete
 
 - built from ops (3)
-  - delete_default_auto_generated_file: representative success ✓ · representative rejection ✓
   - get_default_auto_generated_file_by_path: representative success ✓ · representative rejection ✓
   - list_default_auto_generated_files: representative success ✓ · representative rejection ✓
+  - purge_default_auto_generated_file: representative success ✓ · representative rejection ✓
 - ops + direct implementation (1)
   - update_default_auto_generated_file: success present 1 · rejection present 2 (scope_search_ops, single_entity)
 - direct implementation (1)
-  - create_auto_generated_file: success present 1 · rejection present 2 (scope)
-
-**delete_default_auto_generated_file**
-
-| scenario | verdict |
-|---|---|
-| [when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone](#config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one) | answered |
-| [a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file) | rejected |
-| [when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found](#config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
+  - create_default_auto_generated_file: success present 1 · rejection present 2 (scope)
 
 **get_default_auto_generated_file_by_path**
 
@@ -39,6 +31,14 @@ Scenario: complete
 | [a user holding no permission who tries to list their own auto-generated files is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-list-their-auto-generated-files) | rejected |
 | [a user holding only READ on the domain who tries to list the domain's auto-generated files is rejected for lack of permission](#organization_files-a-user-granted-only-domain-read-may-not-list-its-auto-generated-files) | rejected |
 
+**purge_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone](#config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one) | answered |
+| [a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file) | rejected |
+| [when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found](#config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
+
 **update_default_auto_generated_file**
 
 | scenario | verdict |
@@ -47,105 +47,13 @@ Scenario: complete
 | [a user holding no permission who tries to change their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-update-an-auto-generated-file) | rejected |
 | [when a user holding READ and UPDATE changes an auto-generated file not set as default, it is rejected as not found](#config_files-updating-an-auto-generated-file-that-is-not-set-as-default-is-not-found) | rejected |
 
-**create_auto_generated_file**
+**create_default_auto_generated_file**
 
 | scenario | verdict |
 |---|---|
 | [when a user holding CREATE on their own auto-generated files writes one, an empty response comes back, and the file holds its content as revision 1 and is set as the default of its path](#config_files-a-user-granted-create-on-their-auto-generated-files-writes-one) | answered |
 | [a user holding no permission who tries to write their own auto-generated file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-write-an-auto-generated-file) | rejected |
 | [when a user holding CREATE tries to write an auto-generated file where the manager keeps its own, input validation rejects it](#config_files-an-auto-generated-file-in-a-place-the-manager-keeps-is-refused) | rejected |
-
-### delete_default_auto_generated_file
-
-<a id="config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one"></a>
-
-#### [a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one](/tests/scenario/bai_scenario/manager/auto_generated_file/test_config_files.py): pass
-
-when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone
-
-Given
-
-- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
-  - Default auto-generated file .vimrc: set as the default of its path
-  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
-    - Role config-file-role-1: applies only within the scope it is granted in
-    - Role config-file-role-1: READ allowed on every auto_generated_file
-    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
-    - regular user user-1: holds Role config-file-role-1
-
-When
-
-- AutoGeneratedFileAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
-
-Then
-
-- a response saying it was deleted comes back
-  - response = {'success': True}
-
-<a id="config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file"></a>
-
-#### [a-user-granted-nothing-may-not-delete-an-auto-generated-file](/tests/scenario/bai_scenario/manager/auto_generated_file/test_config_files.py): pass
-
-a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission
-
-Given
-
-- one domain and one user, the user holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- AutoGeneratedFileAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-<a id="config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
-
-#### [deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/auto_generated_file/test_config_files.py): pass
-
-when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found
-
-Given
-
-- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
-  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
-    - Role config-file-role-1: applies only within the scope it is granted in
-    - Role config-file-role-1: READ allowed on every auto_generated_file
-    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
-    - regular user user-1: holds Role config-file-role-1
-
-When
-
-- AutoGeneratedFileAdapter.delete_default_auto_generated_file: user-1 deletes one of their own auto-generated files
-
-Then
-
-- the call is rejected
-  - rejected: DotfileNotFound
 
 ### get_default_auto_generated_file_by_path
 
@@ -392,6 +300,98 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### purge_default_auto_generated_file
+
+<a id="config_files-a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one"></a>
+
+#### [a-user-granted-read-and-hard-delete-on-their-auto-generated-files-deletes-the-default-one](/tests/scenario/bai_scenario/manager/auto_generated_file/test_config_files.py): pass
+
+when a user holding READ and HARD_DELETE deletes an auto-generated file set as default, a response saying it was deleted comes back, and the file and its revisions are gone
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Default auto-generated file .vimrc: set as the default of its path
+  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- AutoGeneratedFileAdapter.purge_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- a response saying it was deleted comes back
+  - response = {'success': True}
+
+<a id="config_files-a-user-granted-nothing-may-not-delete-an-auto-generated-file"></a>
+
+#### [a-user-granted-nothing-may-not-delete-an-auto-generated-file](/tests/scenario/bai_scenario/manager/auto_generated_file/test_config_files.py): pass
+
+a user holding no permission who tries to delete their own auto-generated file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- AutoGeneratedFileAdapter.purge_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found"></a>
+
+#### [deleting-an-auto-generated-file-that-is-not-set-as-default-is-not-found](/tests/scenario/bai_scenario/manager/auto_generated_file/test_config_files.py): pass
+
+when a user holding READ and HARD_DELETE deletes an auto-generated file not set as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Auto-generated file .vimrc: permission 644
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+    - Role config-file-role-1: applies only within the scope it is granted in
+    - Role config-file-role-1: READ allowed on every auto_generated_file
+    - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
+    - regular user user-1: holds Role config-file-role-1
+
+When
+
+- AutoGeneratedFileAdapter.purge_default_auto_generated_file: user-1 deletes one of their own auto-generated files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
 ### update_default_auto_generated_file
 
 <a id="config_files-a-user-granted-read-and-update-on-their-auto-generated-files-updates-the-default-one"></a>
@@ -486,7 +486,7 @@ Then
 - the call is rejected
   - rejected: DotfileNotFound
 
-### create_auto_generated_file
+### create_default_auto_generated_file
 
 <a id="config_files-a-user-granted-create-on-their-auto-generated-files-writes-one"></a>
 
@@ -510,7 +510,7 @@ Given
 
 When
 
-- AutoGeneratedFileAdapter.create_auto_generated_file: user-1 writes one of their own auto-generated files
+- AutoGeneratedFileAdapter.create_default_auto_generated_file: user-1 writes one of their own auto-generated files
 
 Then
 
@@ -537,7 +537,7 @@ Given
 
 When
 
-- AutoGeneratedFileAdapter.create_auto_generated_file: user-1 writes one of their own auto-generated files
+- AutoGeneratedFileAdapter.create_default_auto_generated_file: user-1 writes one of their own auto-generated files
 
 Then
 
@@ -566,7 +566,7 @@ Given
 
 When
 
-- AutoGeneratedFileAdapter.create_auto_generated_file: user-1 tries to write an auto-generated file where the manager keeps its own
+- AutoGeneratedFileAdapter.create_default_auto_generated_file: user-1 tries to write an auto-generated file where the manager keeps its own
 
 Then
 
