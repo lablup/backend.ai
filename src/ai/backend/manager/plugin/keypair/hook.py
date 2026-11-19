@@ -10,10 +10,11 @@ from typing import Any, cast, override
 import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dateutil_parse
+from pydantic import Field
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, BackendAISchema
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
@@ -41,7 +42,15 @@ def _mask_token(token: str) -> str:
     return f"sha256:{digest}...(len={len(token)})"
 
 
+class KeypairAuthHookConfig(BackendAISchema):
+    secret: str = Field(description="Secret key used for verifying keypair sTokens.")
+
+
 class KeypairAuthHookPlugin(HookPlugin):
+    require_explicit_allow = True
+
+    _config: KeypairAuthHookConfig
+
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
         self.plugin_config = plugin_config_checker.check(self.plugin_config)
@@ -58,7 +67,10 @@ class KeypairAuthHookPlugin(HookPlugin):
 
     @override
     async def init(self, context: Any = None) -> None:
-        pass
+        # context is the etcd "config/plugins" tree; a missing secret fails startup.
+        self._config = KeypairAuthHookConfig.model_validate(
+            nmget(context or {}, "webapp.keypair_auth") or {}
+        )
 
     @override
     async def cleanup(self) -> None:
@@ -122,9 +134,6 @@ class KeypairAuthHookPlugin(HookPlugin):
     ) -> Any:
         root_app = request.app["_root_app"]
         auth_repository = cast(AuthRepository, root_app["_auth_repository"])
-        config_provider = root_app["_config_provider"]
-        shared_config = await config_provider.legacy_etcd_config_loader.load()
-        plugin_config = nmget(shared_config, "plugins.webapp.keypair_auth")
         auth_token_name = self.plugin_config["auth_token_name"]
 
         try:
@@ -134,9 +143,8 @@ class KeypairAuthHookPlugin(HookPlugin):
 
         stoken = params[auth_token_name]
         if stoken:
-            secret = plugin_config["secret"]
             try:
-                payload = deserialize_stoken(stoken, secret)
+                payload = deserialize_stoken(stoken, self._config.secret)
                 owner = await auth_repository.lookup(
                     KeypairAccessKeyUserLookup(AccessKey(payload.access_key))
                 )
@@ -167,9 +175,10 @@ class KeypairAuthHookPlugin(HookPlugin):
                         raise Reject("Invalid auth token")
                     user_id = signing_material.user_id
 
-                except Exception as e:
-                    log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken))
-                    log.error(repr(e))
+                except Exception:
+                    log.exception(
+                        "AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken)
+                    )
                     raise Reject("Invalid auth token") from None
 
         else:
