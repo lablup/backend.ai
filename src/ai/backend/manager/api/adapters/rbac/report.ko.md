@@ -2,9 +2,9 @@
 
 [배경](/src/ai/backend/manager/api/adapters/rbac/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/rbac/adapter.py)
 
-시나리오: 미완성 11 / 37
+시나리오: 미완성 11 / 38
 
-- ops 구성 (22)
+- ops 구성 (23)
   - admin_search_permissions_gql: 대표 성공 ✓ · 대표 거부 ✓
   - admin_search_roles_gql: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_permissions_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
@@ -20,6 +20,7 @@
   - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - partial_bulk_restore: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - project_search_roles: 대표 성공 ✓ · 대표 거부 ✓
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - purge_permission: 대표 성공 ✓ · 대표 거부 ✓
   - restore: 대표 성공 ✓ · 대표 거부 ✓
@@ -150,6 +151,13 @@
 | [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-roles) | 성공 |
 | [soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 변경하면, restore 되어 모두 활성으로 옵니다](#partial_bulk_editing-editing-status-to-active-restores-several-roles) | 성공 |
 | [superadmin 이 역할 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-edits-several-roles-at-once) | 성공 |
+
+**project_search_roles**
+
+| 시나리오 | 판정 |
+|---|---|
+| [대상 프로젝트에서 역할 읽기 권한을 받은 사용자가 한 역할의 이름을 빼는 조건으로 그 프로젝트의 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 오고 프로젝트 밖에 둔 역할은 빠집니다](#searching-a-user-granted-role-read-searches-a-project) | 성공 |
+| [아무 권한도 받지 않은 사용자는 프로젝트의 역할을 검색할 수 없습니다](#searching-a-user-granted-nothing-may-not-search-a-project) | 거부 |
 
 **purge**
 
@@ -1676,6 +1684,115 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].updated_at: 이 실행이 쓴 시각
   - successes[1].deleted_at = None
+
+### project_search_roles
+
+<a id="searching-a-user-granted-role-read-searches-a-project"></a>
+
+#### [a-user-granted-role-read-searches-a-project](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
+
+대상 프로젝트에서 역할 읽기 권한을 받은 사용자가 한 역할의 이름을 빼는 조건으로 그 프로젝트의 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 오고 프로젝트 밖에 둔 역할은 빠집니다
+
+Given
+
+- 한 프로젝트에 둔 커스텀 역할 2개와, 다른 도메인에 사는 user 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 excluded-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 beyond-1: 부여된 스코프 안에서만 적용됩니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
+
+When
+
+- RBACAdapter.project_search_roles: user-1이 프로젝트 project-1 의 역할을 검색합니다
+
+Then
+
+- 필터가 고른 프로젝트의 역할이 이름 순으로 옵니다
+  - items count = 3
+  - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].name = 'grant-1'
+  - items[0].description = None
+  - items[0].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - items[0].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - items[0].auto_assign = False
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: 역할을 둔 프로젝트의 id 와 같다
+  - items[0].role_preset_id = None
+  - items[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[0].entity_id: 미리 저장한 역할의 id 와 같다
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[0].deleted_at = None
+  - items[1].name = 'role-1'
+  - items[1].description = None
+  - items[1].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - items[1].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - items[1].auto_assign = False
+  - items[1].scope_type = 'project'
+  - items[1].scope_id: 역할을 둔 프로젝트의 id 와 같다
+  - items[1].role_preset_id = None
+  - items[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[1].entity_id: 미리 저장한 역할의 id 와 같다
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - items[1].deleted_at = None
+  - items[2].name = 'role-2'
+  - items[2].description = None
+  - items[2].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - items[2].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - items[2].auto_assign = False
+  - items[2].scope_type = 'project'
+  - items[2].scope_id: 역할을 둔 프로젝트의 id 와 같다
+  - items[2].role_preset_id = None
+  - items[2].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[2].entity_id: 미리 저장한 역할의 id 와 같다
+  - items[2].created_at: 이 실행이 쓴 시각
+  - items[2].updated_at: 이 실행이 쓴 시각
+  - items[2].deleted_at = None
+
+<a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
+
+#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
+
+아무 권한도 받지 않은 사용자는 프로젝트의 역할을 검색할 수 없습니다
+
+Given
+
+- 한 프로젝트에 둔 커스텀 역할 2개와, 다른 도메인에 사는 user 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 excluded-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 beyond-1: 부여된 스코프 안에서만 적용됩니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- RBACAdapter.project_search_roles: user-1이 프로젝트 project-1 의 역할을 검색합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### purge
 
