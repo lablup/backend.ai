@@ -116,4 +116,4 @@ async def test_retry_txn_as_code_block() -> None:
             with attempt:
                 retry_count += 1
                 raise DBAPIError(None, None, orig)
-    assert retry_count > 3
+    assert retry_count > 4
