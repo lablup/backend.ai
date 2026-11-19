@@ -15,6 +15,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `install-dev.sh` | Installs a full source setup: Pants, halfstack, configs, git hooks | person; `integration.yml` |
+| `setup-venv.py` | Builds the python-default virtualenv from `python.lock` without Pants, at the path `pants export` writes (`--venv <dir>` overrides) and fails when a package differs from the lock | person; `.github/actions/python-venv` |
 | `check-docker.py` | Verifies the Docker and Compose setup and reports the preferred Pants exec root | auto: `install-dev.sh` |
 | `configure-minio.sh` | Configures the MinIO bucket used by the `storage` halfstack profile | auto: sourced by `install-dev.sh` |
 | `delete-dev.sh` | Tears down what `install-dev.sh` created | person |
