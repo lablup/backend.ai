@@ -419,7 +419,7 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: .testmon
-        key: exp-testmon-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
+        key: exp-testmon-v2-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
         lookup-only: true
     - uses: ./.exp/pytest
       if: steps.lookup.outputs.cache-hit != 'true'
@@ -437,7 +437,7 @@ jobs:
       uses: actions/cache/save@v5
       with:
         path: .testmon
-        key: exp-testmon-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
+        key: exp-testmon-v2-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
 
   exp-testmon-select:
     if: startsWith(github.head_ref, 'ci-exp/')
@@ -462,7 +462,7 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: .testmon
-        key: exp-testmon-${{ matrix.suite }}-${{ needs.exp-testmon-seed.outputs.base }}
+        key: exp-testmon-v2-${{ matrix.suite }}-${{ needs.exp-testmon-seed.outputs.base }}
     - uses: ./.github/ci-experiment/pytest
       with:
         suite: ${{ matrix.suite }}

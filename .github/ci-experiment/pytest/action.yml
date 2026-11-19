@@ -76,7 +76,11 @@ runs:
         $EXP/exp.py shard "$LIST" "$SHARD" "$COUNT" > ../shard.txt
         $EXP/exp.py note "$TIMINGS" "files" "$(wc -l < ../shard.txt)"
         if [ ! -s ../shard.txt ]; then echo "No tests in this shard"; exit 0; fi
-        export PYTHONPATH="$PWD/src:$PWD/tests/scenario:$PWD:$PWD/$EXP"
+        # Outside the rootdir, where testmon does not record the plugin as a dependency
+        # of every test (it sits in `.exp` on the base and `$EXP` on the head).
+        mkdir -p "$RUNNER_TEMP/exp-plugins"
+        cp "$EXP/exp_fixture_timer.py" "$RUNNER_TEMP/exp-plugins/"
+        export PYTHONPATH="$PWD/src:$PWD/tests/scenario:$PWD:$RUNNER_TEMP/exp-plugins"
         export EXP_FIXTURE_LOG="$PWD/../fixtures.tsv"
         export BACKEND_BUILD_ROOT="$PWD"
         mkdir -p dist
@@ -107,8 +111,9 @@ runs:
             if [ -n "$forced" ]; then
               $EXP/exp.py note "$TIMINGS" "whole list" "$forced"
             else
+              # Whole files: testmon runs the selected tests ordered by duration, and
+              # `test_vfolder_repository.py` fails in that order.
               cp dist/testmon-selected.txt ../shard.txt
-              pytest+=(--testmon-forceselect)
               $EXP/exp.py note "$TIMINGS" "files to run" "$(wc -l < ../shard.txt)"
               if [ ! -s ../shard.txt ]; then echo "testmon selected no tests"; exit 0; fi
             fi
