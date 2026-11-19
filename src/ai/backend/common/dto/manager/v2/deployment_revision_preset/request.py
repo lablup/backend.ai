@@ -20,11 +20,11 @@ from ai.backend.common.dto.manager.v2.common import (
     NonEmptyList,
     OrderDirection,
     ResourceSlotEntryInput,
+    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput,
     PresetValueInput,
-    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,

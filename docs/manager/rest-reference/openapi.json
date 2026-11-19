@@ -37186,6 +37186,18 @@
             "default": null,
             "description": "Login session token for proxy auth.",
             "title": "Login Session Token"
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceArgumentInterpolationInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Variable syntax of the service arguments. Omit to use the default `${{ }}` and `{ }`."
           }
         },
         "required": [

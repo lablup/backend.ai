@@ -1325,11 +1325,13 @@ class SessionService:
         else:
             raise AppNotFound(f"{session_data.name}:{service}")
 
-        opts: MutableMapping[str, None | str | list[str]] = {}
+        opts: MutableMapping[str, Any] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
             opts["envs"] = load_json(envs)
+        if action.interpolation is not None:
+            opts["interpolation"] = action.interpolation.model_dump()
 
         if info.agent_id is None:
             raise AgentNotAllocated(f"Session {session_id} main kernel has no agent allocated")

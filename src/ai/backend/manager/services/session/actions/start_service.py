@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import (
@@ -15,6 +16,7 @@ class StartServiceAction(SessionAction):
     port: int | None
     arguments: str | None  # json_string
     envs: str | None  # json_string
+    interpolation: ServiceArgumentInterpolation | None = None
 
     @override
     @classmethod

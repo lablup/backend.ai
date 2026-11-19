@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.common import (
     MountItemInput,
     NonEmptyList,
     ResourceSlotEntryInput,
+    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.kernel_group.request import (
@@ -589,6 +590,13 @@ class StartSessionServiceInput(BaseRequestModel):
     )
     login_session_token: str | None = Field(
         default=None, description="Login session token for proxy auth."
+    )
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
+            "Omit to use the default `${{ }}` and `{ }`."
+        ),
     )
 
 
