@@ -157,7 +157,7 @@ class TestLeaderElectionDependency:
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.EventProducerTask")
     async def test_the_agent_lost_check_runs_under_the_election(
         self,
-        _mock_event_producer_task: MagicMock,
+        mock_event_producer_task: MagicMock,
         mock_leader_cron_class: MagicMock,
         mock_election_class: MagicMock,
         mock_leader_client_class: MagicMock,

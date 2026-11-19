@@ -145,6 +145,9 @@ select = [
     "ASYNC",  # flake8-async: async/await best practices
     "PTH",    # flake8-use-pathlib: use pathlib instead of os.path
     "ARG",    # flake8-unused-arguments: unused function arguments
+    "PT003",  # flake8-pytest-style: `scope="function"` is implied in `@pytest.fixture`
+    "PT019",  # flake8-pytest-style: a fixture without value is requested with `usefixtures`
+    "PT030",  # flake8-pytest-style: `pytest.warns()` needs `match` for a broad warning class
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -272,9 +275,19 @@ split-on-trailing-comma = true
 # PLC0415 (import-outside-toplevel) exceptions for CLI lazy loading:
 # - CLI modules are allowed to use print for user-facing output and lazy imports for startup performance
 "src/ai/backend/cli/**/*.py" = ["T20", "PLC0415"]
-"src/ai/backend/*/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/*/cli/**/*.py" = ["PLC0415"]
 "src/ai/backend/*/*/cli/**/*.py" = ["T20", "PLC0415"]
-"src/ai/backend/client/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/account_manager/cli/**/*.py" = ["T20"]
+"src/ai/backend/agent/cli/**/*.py" = ["T20"]
+"src/ai/backend/manager/cli/**/*.py" = ["T20"]
+"src/ai/backend/storage/cli/**/*.py" = ["T20"]
+"src/ai/backend/test/cli/**/*.py" = ["T20"]
+"src/ai/backend/web/cli/**/*.py" = ["T20"]
+# - Client CLI v2 does not print; the interactive chat and the legacy CLI (all but v2/) do.
+#   `*` in these globs also matches `/`.
+"src/ai/backend/client/cli/[!v]*.py" = ["T20"]
+"src/ai/backend/client/cli/vfolder.py" = ["T20"]
+"src/ai/backend/client/cli/v2/deployment/chat/*.py" = ["T20"]
 "src/ai/backend/plugin/cli.py" = ["T20", "PLC0415"]
 # - Client output module is designed for console printing and uses lazy imports for optional dependencies
 "src/ai/backend/client/output/*.py" = ["T20", "PLC0415"]
@@ -329,8 +342,8 @@ split-on-trailing-comma = true
 # - Logging modules use lazy imports for optional driver dependencies (logstash, graylog, otel)
 "src/ai/backend/logging/logger.py" = ["PLC0415"]
 "src/ai/backend/logging/utils.py" = ["PLC0415"]
-# - Test files may use print for debugging, have flexible type annotations, and unused fixtures
-"tests/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+# - Test files may use print for debugging and have unused fixtures
+"tests/**/*.py" = ["T20", "S101", "ARG", "PTH", "ASYNC"]
 # domain_factory imports the domains table lazily to avoid registering DomainRow
 # on the global SQLAlchemy registry for tests that never use a domain.
 "tests/unit/manager/repositories/conftest.py" = ["PLC0415"]

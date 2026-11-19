@@ -32,7 +32,7 @@ def queue_args() -> RedisMQArgs:
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def redis_queue(
     redis_container: tuple[str, HostPortPair], queue_args: RedisMQArgs
 ) -> AsyncGenerator[RedisQueue]:
