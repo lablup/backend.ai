@@ -683,13 +683,15 @@ class TestThePortsAStartTakes:
     async def test_a_cooldown_part_way_leaves_the_ports_already_taken_on_the_kernel(
         self, tmp_path: Path
     ) -> None:
-        pool = PortPool((30000, 30001), cooldown_sec=60)
-        pool.release(30001)
-        ctx = self._context(tmp_path, pool)
-        kernel = _StartKernel()
+        # A fixed clock: the unused port is past its cooldown whatever the host's uptime.
+        with patch("ai.backend.agent.port_pool.monotonic", return_value=1000.0):
+            pool = PortPool((30000, 30001), cooldown_sec=60)
+            pool.release(30001)
+            ctx = self._context(tmp_path, pool)
+            kernel = _StartKernel()
 
-        with pytest.raises(PortPoolExhaustedError):
-            await self._start(ctx, kernel)
+            with pytest.raises(PortPoolExhaustedError):
+                await self._start(ctx, kernel)
 
         assert kernel["host_ports"] == [30000]
 
