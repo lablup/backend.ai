@@ -38,7 +38,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 
 ## Registries and Artifacts
 
-- **container-registry**: admin(search, create, update, delete)
+- **container-registry**: user(scoped-search) | admin(search, create, update, delete)
 - **artifact**: user(get, update, delete, restore) | admin(search, purge)
   - user sub: revision(get, approve, reject, cancel-import, cleanup)
 - **artifact-registry**: user(get) | admin(search, create, update, delete)

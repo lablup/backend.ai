@@ -71,7 +71,7 @@ Check options with `--help`.
 
 ### Registries and Artifacts
 
-- **container-registry**: user(empty group) | admin(search, create, update, delete)
+- **container-registry**: user(scoped-search) | admin(search, create, update, delete)
 - **artifact**: user(get, update, delete, restore | sub revision: get, approve, reject, cancel-import, cleanup) | admin(search)
 - **artifact-registry**: user(get)
 - **huggingface-registry**: user(create, get, search, update, delete), no admin variant
