@@ -29,7 +29,7 @@ class PrometheusClientDependency(
     async def provide(self, setup_input: ManagerUnifiedConfig) -> AsyncIterator[PrometheusClient]:
         client_pool = ClientPool(tcp_client_session_factory)
         client = PrometheusClient(
-            endpoint=f"http://{setup_input.metric.address.to_legacy()}/api/v1/",
+            endpoint=setup_input.metric.prometheus_api_url,
             client_pool=client_pool,
             container_metric_query_builder=ContainerMetricQueryBuilder(
                 setup_input.metric.timewindow

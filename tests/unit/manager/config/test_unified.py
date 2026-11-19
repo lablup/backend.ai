@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -17,6 +19,43 @@ def test_config_validation_supports_field_name_and_alias() -> None:
 
     config = MetricConfig.model_validate({"addr": "127.0.0.1:9090"}, by_name=True)
     assert config.address == HostPortPair(host="127.0.0.1", port=9090)
+
+
+@dataclass(frozen=True)
+class _PrometheusApiUrlCase:
+    metric_config: Mapping[str, str]
+    expected_url: str
+
+
+class TestMetricConfigPrometheusApiUrl:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _PrometheusApiUrlCase(
+                metric_config={"addr": "127.0.0.1:9090"},
+                expected_url="http://127.0.0.1:9090/api/v1/",
+            ),
+            _PrometheusApiUrlCase(
+                metric_config={"addr": "127.0.0.1:9090", "api-path-prefix": "/prometheus"},
+                expected_url="http://127.0.0.1:9090/prometheus/api/v1/",
+            ),
+            _PrometheusApiUrlCase(
+                metric_config={"addr": "127.0.0.1:9090", "api-path-prefix": "/prometheus/"},
+                expected_url="http://127.0.0.1:9090/prometheus/api/v1/",
+            ),
+        ],
+        ids=lambda case: f"prefix={case.metric_config.get('api-path-prefix', 'unset')}",
+    )
+    def test_puts_the_path_prefix_before_the_api(self, case: _PrometheusApiUrlCase) -> None:
+        config = MetricConfig.model_validate(case.metric_config, by_name=True)
+
+        assert config.prometheus_api_url == case.expected_url
+
+    def test_rejects_a_path_prefix_without_a_leading_slash(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            MetricConfig.model_validate(
+                {"addr": "127.0.0.1:9090", "api-path-prefix": "prometheus"}, by_name=True
+            )
 
 
 def _unknown_field_warnings(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:

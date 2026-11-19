@@ -2328,6 +2328,23 @@ class MetricConfig(BaseConfigSchema):
             example=ConfigExample(local="127.0.0.1:9090", prod="prometheus.backend.svc:9090"),
         ),
     ]
+    api_path_prefix: Annotated[
+        str,
+        Field(
+            default="",
+            validation_alias=AliasChoices("api-path-prefix", "api_path_prefix"),
+            serialization_alias="api-path-prefix",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "URL path in front of the Prometheus HTTP API (`/api/v1`) on the metric server. "
+                "Leave it empty for Prometheus. Set `/prometheus` for Grafana Mimir, which serves "
+                "the Prometheus HTTP API under that path."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="/prometheus"),
+        ),
+    ]
     timewindow: Annotated[
         str,
         Field(default=DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW),
@@ -2347,6 +2364,17 @@ class MetricConfig(BaseConfigSchema):
     @field_serializer("address")
     def _serialize_addr(self, addr: HostPortPair | None, _info: Any) -> str | None:
         return None if addr is None else f"{addr.host}:{addr.port}"
+
+    @field_validator("api_path_prefix")
+    @classmethod
+    def _validate_api_path_prefix(cls, prefix: str) -> str:
+        if prefix and not prefix.startswith("/"):
+            raise ValueError("api-path-prefix must be empty or start with '/'")
+        return prefix.rstrip("/")
+
+    @property
+    def prometheus_api_url(self) -> str:
+        return f"http://{self.address.to_legacy()}{self.api_path_prefix}/api/v1/"
 
 
 class IdleCheckerConfig(BaseConfigSchema):
