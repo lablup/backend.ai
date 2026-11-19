@@ -66,8 +66,8 @@ else
         FROZEN+=("$f")
     done < <(git diff --name-only -z -- 'src/*.py')
     if [ ${#FROZEN[@]} -gt 0 ]; then
-        scripts/ruff.sh check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
-        scripts/ruff.sh format --quiet --force-exclude "${FROZEN[@]}"
+        uvx ruff@0.14.0 check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
+        uvx ruff@0.14.0 format --quiet --force-exclude "${FROZEN[@]}"
     fi
 fi
 

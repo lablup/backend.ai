@@ -246,8 +246,8 @@ For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 
 Ruff runs outside Pants. Install the version that ``[tool.ruff] required-version`` in ``pyproject.toml`` pins,
-e.g., ``uv tool install 'ruff==0.14.0'``, and point the editor at that ``ruff`` executable.
-``scripts/ruff.sh`` runs the pinned version through ``uvx``.
+e.g., ``uv tool install 'ruff==0.14.0'``, and point the editor at that ``ruff`` executable,
+or run it as ``uvx ruff@<version>``.
 
 Currently we have the following Python tools to configure in this way:
 

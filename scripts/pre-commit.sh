@@ -31,11 +31,11 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-RUFF=(scripts/ruff.sh)
+RUFF=(uvx ruff@0.14.0)
 
 EXIT_CODE=0
 
-echo "Running pre-commit checks ($("${RUFF[@]}" --version))..."
+echo "Running pre-commit checks (ruff 0.14.0)..."
 
 # 1. Auto-format
 echo "✓ Formatting..."

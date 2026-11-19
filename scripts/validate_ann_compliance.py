@@ -3,7 +3,7 @@
 Validate ANN (flake8-annotations) linter rule compliance.
 
 This script checks if files comply with ANN linter rules by running ruff
-(`scripts/ruff.sh`) and parsing the output for ANN violations. It's useful for validating batches
+(`uvx ruff@0.14.0`) and parsing the output for ANN violations. It's useful for validating batches
 of files during incremental linter rule enablement.
 
 Note: This script uses the ANN rules configured in pyproject.toml. To check
@@ -28,7 +28,8 @@ from pathlib import Path
 def run_ruff_check(project_root: Path, path: Path) -> tuple[int, str]:
     """Run ruff check and return (return_code, output)."""
     cmd = [
-        str(project_root / "scripts" / "ruff.sh"),
+        "uvx",
+        "ruff@0.14.0",
         "check",
         "--output-format",
         "concise",
