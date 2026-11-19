@@ -42,7 +42,7 @@ The spec bases live in `models/specs/`: read `models/specs/AGENTS.md` before tou
 - Only graph edge rows (`entity_memberships`, `scope_bindings`) reference `virtual_entities.id`
   by foreign key. A row attached to an entity (`entity_labels`, `entity_invitations`) carries the
   `(entity_type, entity_id)` pair.
-- A node id never goes on a `data/` type. A Row's `to_data()` names the entity as an `EntityIdentifier`.
+- A node id never goes on a `data/` type. The data built from a row names the entity as an `EntityIdentifier`.
 
 ## Singleton scopes (`global_entities`)
 

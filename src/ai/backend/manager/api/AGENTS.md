@@ -20,9 +20,11 @@
 
 ## Naming and scope
 
+- These prefixes name REST handlers. Adapter operations follow `api/adapters/AGENTS.md`.
 - superadmin only: `admin_` prefix + call `_check_superadmin(request)` on the first line.
 - scoped: currently a `{scope}_` prefix (for example `domain_search_users`). A `scoped_` prefix with the scope as a request field is under consideration (see scoped search REST URL below).
-- self-service: `my_` prefix (for example `my_keypairs`). The Adapter resolves the user internally.
+- self-service: `my_` prefix (for example `my_keypairs`). The handler puts the user id from `current_user()` in the scope
+  and calls the adapter's scoped operation.
   - REST URL `/v2/{entity}/my/{operation}`: the entity comes first, `my` is the scope qualifier.
 
 **search: always two variants**

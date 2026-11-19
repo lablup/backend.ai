@@ -20,7 +20,8 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 - Each handler is injected with an **individual adapter** (not the Adapters registry): call `self._adapter.method()`,
   not `self._adapters.domain.method()`.
 - The Adapter is shared with the GQL layer: do not create a REST-only adapter.
-- `admin_`-prefixed adapter methods → `superadmin_required` middleware, non-admin → `auth_required`.
+- Superadmin-only operations (`global_search`, operations of admin-only entities) → `superadmin_required` middleware,
+  others → `auth_required`.
 
 ## DTO
 
@@ -30,6 +31,7 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 
 ## Naming and scope
 
+- These prefixes name REST handlers. Adapter operations follow `api/adapters/AGENTS.md`.
 - superadmin only: `admin_` prefix + `superadmin_required` middleware.
 - scoped: currently a `{scope}_` prefix. See the scoped search URL below for the planned `scoped_` prefix.
 - self-service at `/v2/{entity}/my/`: the entity comes first, `my` is the scope qualifier.
