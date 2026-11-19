@@ -6,12 +6,8 @@ from typing import Any
 
 import asyncpg
 
-<<<<<<< HEAD
-from ai.backend.logging import BraceStyleAdapter
-=======
 from ai.backend.common.db.socket_options import TCPOptions
-from ai.backend.logging.structured import StructuredLogger
->>>>>>> ecc5a76f (fix(BA-8246): fail unresponsive database connections with TCP keepalive and a pre-ping timeout (#17244))
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
