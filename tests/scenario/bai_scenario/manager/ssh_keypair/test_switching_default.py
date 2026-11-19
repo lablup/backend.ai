@@ -48,8 +48,7 @@ class SwitchingToMyOtherKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode
     @override
     async def call(self, adapter: SSHKeypairAdapter, laid: SSHKeyholder) -> SSHKeypairNode:
         with ActingAs(laid.caller):
-            payload = await adapter.switch_default(laid.extra_key().id)
-        return payload.ssh_keypair
+            return await adapter.switch_default(laid.extra_key().id)
 
 
 @dataclass(frozen=True)

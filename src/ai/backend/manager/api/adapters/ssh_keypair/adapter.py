@@ -5,12 +5,8 @@ from __future__ import annotations
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.dto.manager.v2.ssh_keypair.request import UploadMySSHKeypairInput
-from ai.backend.common.dto.manager.v2.ssh_keypair.response import (
-    SSHKeypairNode,
-    SwitchDefaultSSHKeypairPayload,
-    UploadMySSHKeypairPayload,
-)
+from ai.backend.common.dto.manager.v2.ssh_keypair.request import MyUploadSSHKeypairInput
+from ai.backend.common.dto.manager.v2.ssh_keypair.response import SSHKeypairNode
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SSHPublicKey
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -28,7 +24,7 @@ class SSHKeypairAdapter(BaseAdapter):
     def __init__(self, ssh_keypair: SSHKeypairProcessors) -> None:
         self._ssh_keypair = ssh_keypair
 
-    async def upload_my(self, input: UploadMySSHKeypairInput) -> UploadMySSHKeypairPayload:
+    async def my_upload(self, input: MyUploadSSHKeypairInput) -> SSHKeypairNode:
         """Upload a public key to the current user."""
         me = current_user()
         if me is None:
@@ -38,13 +34,13 @@ class SSHKeypairAdapter(BaseAdapter):
                 user_id=UserID(me.user_id), public_key=SSHPublicKey(input.public_key)
             )
         )
-        return UploadMySSHKeypairPayload(ssh_keypair=self._to_node(result.ssh_keypair))
+        return self._to_node(result.ssh_keypair)
 
-    async def switch_default(self, ssh_keypair_id: SSHKeypairID) -> SwitchDefaultSSHKeypairPayload:
+    async def switch_default(self, ssh_keypair_id: SSHKeypairID) -> SSHKeypairNode:
         result = await self._ssh_keypair.switch_default.run(
             SwitchDefaultSSHKeypairAction(ssh_keypair_id=ssh_keypair_id)
         )
-        return SwitchDefaultSSHKeypairPayload(ssh_keypair=self._to_node(result.ssh_keypair))
+        return self._to_node(result.ssh_keypair)
 
     @staticmethod
     def _to_node(data: SSHKeypairData) -> SSHKeypairNode:

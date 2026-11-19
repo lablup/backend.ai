@@ -8,7 +8,7 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.ssh_keypair.request import UploadMySSHKeypairInput
+from ai.backend.common.dto.manager.v2.ssh_keypair.request import MyUploadSSHKeypairInput
 from ai.backend.common.dto.manager.v2.ssh_keypair.response import SSHKeypairNode
 from ai.backend.manager.api.adapters.ssh_keypair.adapter import SSHKeypairAdapter
 from ai.backend.manager.data.permission.types import Permission
@@ -46,7 +46,7 @@ class UploadingMyKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]):
 
     @override
     def operation(self) -> str:
-        return "upload_my"
+        return "my_upload"
 
     @override
     def describe(self, laid: SSHKeyholder) -> str:
@@ -63,8 +63,7 @@ class UploadingMyKey(When[SSHKeyholder, SSHKeypairAdapter, SSHKeypairNode]):
     @override
     async def call(self, adapter: SSHKeypairAdapter, laid: SSHKeyholder) -> SSHKeypairNode:
         with ActingAs(laid.caller):
-            payload = await adapter.upload_my(UploadMySSHKeypairInput(public_key=self.public_key))
-        return payload.ssh_keypair
+            return await adapter.my_upload(MyUploadSSHKeypairInput(public_key=self.public_key))
 
 
 @dataclass(frozen=True)

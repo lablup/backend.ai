@@ -6,10 +6,10 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
-__all__ = ("UploadMySSHKeypairInput",)
+__all__ = ("MyUploadSSHKeypairInput",)
 
 
-class UploadMySSHKeypairInput(BaseRequestModel):
+class MyUploadSSHKeypairInput(BaseRequestModel):
     """A public key the caller uploads to their own SSH keypairs."""
 
     public_key: str = Field(

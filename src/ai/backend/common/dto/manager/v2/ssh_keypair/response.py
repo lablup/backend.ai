@@ -10,11 +10,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
-__all__ = (
-    "UploadMySSHKeypairPayload",
-    "SSHKeypairNode",
-    "SwitchDefaultSSHKeypairPayload",
-)
+__all__ = ("SSHKeypairNode",)
 
 
 class SSHKeypairNode(BaseResponseModel):
@@ -27,15 +23,3 @@ class SSHKeypairNode(BaseResponseModel):
     user_id: UUID = Field(description="The id of the user the SSH keypair belongs to.")
     public_key: str = Field(description="The SSH public key.")
     is_default: bool = Field(description="Whether sessions use this SSH keypair.")
-
-
-class UploadMySSHKeypairPayload(BaseResponseModel):
-    """The SSH keypair the upload made."""
-
-    ssh_keypair: SSHKeypairNode = Field(description="The uploaded SSH keypair.")
-
-
-class SwitchDefaultSSHKeypairPayload(BaseResponseModel):
-    """The SSH keypair that became the default."""
-
-    ssh_keypair: SSHKeypairNode = Field(description="The new default SSH keypair.")
