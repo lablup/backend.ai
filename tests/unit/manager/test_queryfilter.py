@@ -13,7 +13,7 @@ from sqlalchemy.orm import declarative_base
 
 from ai.backend.manager.api.gql_legacy.schema import GQLExceptionMiddleware
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem
+from ai.backend.manager.models.minilang.field_spec import ArrayFieldItem, JSONFieldItem
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 
 

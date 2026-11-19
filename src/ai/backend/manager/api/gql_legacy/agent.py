@@ -35,11 +35,11 @@ from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.keypair.row import keypairs
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.row import groups
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     ScopeType,
 )
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow

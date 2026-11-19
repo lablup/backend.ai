@@ -17,7 +17,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 )
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,

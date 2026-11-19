@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
@@ -35,7 +35,7 @@ from ai.backend.manager.actions.v2.scope.validator.rbac import (
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow

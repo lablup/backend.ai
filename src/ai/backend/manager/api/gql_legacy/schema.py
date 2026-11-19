@@ -82,7 +82,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.rbac import ContainerRegistryScope
+from ai.backend.manager.models.rbac.base import ContainerRegistryScope
 from ai.backend.manager.models.session.row import SessionRow
 
 from .container_registry import (
@@ -145,7 +145,7 @@ from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
 )
-from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac.base import ProjectScope, ScopeType, SystemScope
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,

@@ -27,7 +27,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityTy
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (

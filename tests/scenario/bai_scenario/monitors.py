@@ -12,7 +12,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta

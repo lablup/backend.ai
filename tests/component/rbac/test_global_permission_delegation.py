@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import ProcessorDependencies
 from ai.backend.manager.actions.validators.build import build_action_validators

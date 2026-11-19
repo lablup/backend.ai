@@ -26,7 +26,7 @@ from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor

@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.config.provider import ManagerConfigProvider

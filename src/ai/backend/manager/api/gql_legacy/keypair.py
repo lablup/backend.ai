@@ -45,7 +45,7 @@ __all__ = (
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user.row import UserRole

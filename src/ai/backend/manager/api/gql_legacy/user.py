@@ -29,7 +29,7 @@ from ai.backend.manager.data.user.types import (
     UserData,
 )
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.minilang import (
+from ai.backend.manager.models.minilang.field_spec import (
     ExternalTableFilterSpec,
     FieldSpecItem,
     OrderSpecItem,

@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryEn
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

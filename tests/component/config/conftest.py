@@ -28,7 +28,7 @@ from ai.backend.common.dto.manager.config import (
     DeleteUserDotfileRequest,
 )
 from ai.backend.common.plugin.hook_context import HookPluginContext
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

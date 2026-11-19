@@ -32,7 +32,7 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

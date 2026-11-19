@@ -30,7 +30,7 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,

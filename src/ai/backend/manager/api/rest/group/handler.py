@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.group.request import (
 )
 from ai.backend.common.dto.manager.group.response import ReadRegistryQuotaResponse
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.services.container_registry.actions.create_registry_quota import (
     CreateRegistryQuotaAction,
 )

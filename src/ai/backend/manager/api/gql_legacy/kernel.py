@@ -37,7 +37,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.minilang import JSONFieldItem
+from ai.backend.manager.models.minilang.field_spec import JSONFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,

@@ -25,7 +25,7 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,

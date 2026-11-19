@@ -40,7 +40,11 @@ from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
-from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import (
+    EnumFieldItem,
+    FieldSpecItem,
+    OrderSpecItem,
+)
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.creators import ProjectCreator
@@ -56,7 +60,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.virtual_entity.queries import (
@@ -102,7 +106,7 @@ from .gql_relay import (
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac import ContainerRegistryScope, ScopeType
+    from ai.backend.manager.models.rbac.base import ContainerRegistryScope, ScopeType
 
     from .scaling_group import ScalingGroup
     from .schema import GraphQueryContext

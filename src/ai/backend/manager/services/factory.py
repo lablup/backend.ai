@@ -76,7 +76,7 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

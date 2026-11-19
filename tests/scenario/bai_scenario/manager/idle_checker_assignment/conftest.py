@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,

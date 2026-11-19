@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import ProcessorDependencies
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (

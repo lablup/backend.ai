@@ -21,7 +21,7 @@ from ai.backend.manager.actions.v2.scope.validator.rbac import (
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider

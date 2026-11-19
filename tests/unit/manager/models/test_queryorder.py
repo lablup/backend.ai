@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.minilang import ORMFieldItem
+from ai.backend.manager.models.minilang.field_spec import ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.utils import agg_to_array
 

@@ -16,7 +16,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     PredefinedRole,
     ProjectScope,
     get_predefined_roles_in_scope,

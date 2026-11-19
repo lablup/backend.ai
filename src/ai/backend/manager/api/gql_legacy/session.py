@@ -49,11 +49,15 @@ from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAP
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
+from ai.backend.manager.models.minilang.field_spec import (
+    ArrayFieldItem,
+    JSONFieldItem,
+    ORMFieldItem,
+)
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import ScopeType, SystemScope
+from ai.backend.manager.models.rbac.base import ScopeType, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_session_allocations,

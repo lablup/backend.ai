@@ -28,7 +28,7 @@ from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryGlobalUpdater
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,

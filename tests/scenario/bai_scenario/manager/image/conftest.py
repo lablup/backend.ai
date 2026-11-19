@@ -14,7 +14,7 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,

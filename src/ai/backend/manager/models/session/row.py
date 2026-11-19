@@ -90,7 +90,7 @@ from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryF
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -98,7 +98,7 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
     get_predefined_roles_in_scope,
 )
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
