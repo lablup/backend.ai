@@ -14,7 +14,7 @@ from ai.backend.manager.services.ssh_key.actions.lookup_owner import (
     LookupBulkSSHKeypairOwnerAction,
     LookupSSHKeypairOwnerAction,
 )
-from ai.backend.manager.services.ssh_key.actions.search import SearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.actions.search import ScopedSearchSSHKeypairsAction
 from ai.backend.manager.services.ssh_key.actions.switch_default import (
     SwitchDefaultSSHKeyAction,
     SwitchDefaultSSHKeyActionResult,
@@ -32,7 +32,9 @@ class SSHKeyProcessors:
     owning user answers."""
 
     fields: LookupFieldGroup[SSHKeypairData]
-    search: BulkActionProcessor[SearchSSHKeypairsAction, ScopedFieldsOpsResult[SSHKeypairData]]
+    scoped_search: BulkActionProcessor[
+        ScopedSearchSSHKeypairsAction, ScopedFieldsOpsResult[SSHKeypairData]
+    ]
     upload: SingleEntityActionProcessor[UploadSSHKeyAction, UploadSSHKeyActionResult]
     switch_default: SingleFieldActionProcessor[
         SwitchDefaultSSHKeyAction, SwitchDefaultSSHKeyActionResult
@@ -45,7 +47,9 @@ class SSHKeyProcessors:
             LookupSSHKeypairOwnerAction,
             LookupBulkSSHKeypairOwnerAction,
         )
-        self.search = self.fields.atomic_bulk_scoped_search_ops(SearchSSHKeypairsAction)
+        self.scoped_search = self.fields.atomic_bulk_scoped_search_ops(
+            ScopedSearchSSHKeypairsAction
+        )
         self.upload = group.single_entity(UploadSSHKeyAction, service.upload)
         self.switch_default = self.fields.single_field(
             SwitchDefaultSSHKeyAction, service.switch_default

@@ -112,6 +112,7 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
 from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
@@ -131,7 +132,7 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.ssh_key.actions.search import SearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.actions.search import ScopedSearchSSHKeypairsAction
 from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
@@ -984,9 +985,9 @@ class UserAdapter(BaseAdapter):
         unique_ids = list(dict.fromkeys(user_ids))
         if not unique_ids:
             return {}
-        result = await self._ssh_key.search.run(
-            SearchSSHKeypairsAction(
-                user_ids=unique_ids,
+        result = await self._ssh_key.scoped_search.run(
+            ScopedSearchSSHKeypairsAction(
+                targets=[UserSSHKeypairTarget(user_id=user_id) for user_id in unique_ids],
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=len(unique_ids)),
                     conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
