@@ -315,15 +315,18 @@ jobs:
   exp-component:
     if: startsWith(github.head_ref, 'ci-exp/') && needs.exp-plan.outputs.component != '0'
     needs: exp-plan
-    name: exp-component (exp ${{ matrix.shard }}/${{ matrix.count }})
+    name: exp-component (exp ${{ matrix.shard }}/${{ matrix.count }}, ${{ matrix.workers }} proc)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-        - {count: 1, shard: 0}
-        - {count: 2, shard: 0}
-        - {count: 2, shard: 1}
+        - {count: 1, shard: 0, workers: 0}
+        - {count: 2, shard: 0, workers: 0}
+        - {count: 2, shard: 1, workers: 0}
+        - {count: 1, shard: 0, workers: 4}
+        - {count: 2, shard: 0, workers: 4}
+        - {count: 2, shard: 1, workers: 4}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -338,20 +341,24 @@ jobs:
         list: dist/targets/component.txt
         shard: ${{ matrix.shard }}
         count: ${{ matrix.count }}
-        workers: '0'
+        workers: ${{ matrix.workers }}
+        batch-size: auto
 
   exp-component-pants-list:
     if: startsWith(github.head_ref, 'ci-exp/') && needs.exp-pants-targets.outputs.component-differs == 'true'
     needs: exp-pants-targets
-    name: exp-component (pants list ${{ matrix.shard }}/${{ matrix.count }})
+    name: exp-component (pants list ${{ matrix.shard }}/${{ matrix.count }}, ${{ matrix.workers }} proc)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-        - {count: 1, shard: 0}
-        - {count: 2, shard: 0}
-        - {count: 2, shard: 1}
+        - {count: 1, shard: 0, workers: 0}
+        - {count: 2, shard: 0, workers: 0}
+        - {count: 2, shard: 1, workers: 0}
+        - {count: 1, shard: 0, workers: 4}
+        - {count: 2, shard: 0, workers: 4}
+        - {count: 2, shard: 1, workers: 4}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -366,4 +373,5 @@ jobs:
         list: dist/targets/component.txt
         shard: ${{ matrix.shard }}
         count: ${{ matrix.count }}
-        workers: '0'
+        workers: ${{ matrix.workers }}
+        batch-size: auto

@@ -17,7 +17,7 @@ inputs:
     description: Processes to spread batches of files across; 0 runs the shard in one process
     required: true
   batch-size:
-    description: Files per process when `workers` is not 0
+    description: Files per process when `workers` is not 0; `auto` makes two batches per process
     required: false
     default: '1'
 runs:
@@ -73,6 +73,10 @@ runs:
           # pytest-xdist refuses a run whose workers collect different test ids (some
           # tests draw a parametrize id at random), and unit files sharing a process
           # see each other's DB changes; Pants runs one unit file per process.
+          if [ "$SIZE" = auto ]; then
+            files=$(wc -l < ../shard.txt)
+            SIZE=$(( (files + WORKERS * 2 - 1) / (WORKERS * 2) ))
+          fi
           $EXP/exp.py note "$TIMINGS" "batch size" "$SIZE"
           $EXP/exp.py time "$TIMINGS" "pytest $SUITE ($WORKERS processes)" -- \
             $EXP/exp.py batches ../shard.txt "$WORKERS" "$SIZE" dist/junit -- "${pytest[@]}"
