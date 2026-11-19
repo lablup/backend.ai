@@ -6,7 +6,7 @@ on:
   workflow_call:
     inputs:
       targets-artifact:
-        description: The artifact holding `typecheck.txt`, the targets to check, one address per line
+        description: The artifact holding `typecheck.txt`, the targets to check, one file path per line
         type: string
         required: true
       annotate:

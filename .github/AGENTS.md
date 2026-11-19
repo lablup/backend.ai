@@ -26,3 +26,13 @@
 A script whose decision cannot be reproduced by running it by hand is in the wrong shape.
 
 Worked examples: `scripts/sync-changelog-to-main.sh` (arguments, `--dry-run`, plain output) and `scripts/update-maintained-versions.sh` (arguments, in-place rewrite, `TODAY=` to pin the clock).
+
+## CI target plan
+
+`scripts/plan-ci-targets.py` (job `plan-targets` of `ci.yml`) plans the targets of typecheck and each test suite without Pants. Its docstring holds the selection rules.
+
+- The changed files are `git diff --name-only <base-ref>`; the dependents come from `ruff analyze graph --direction dependents` (`RUFF_GRAPH_VERSION`) over `src`, `tests` and `stubs`; the `.pyi` files of `stubs/` are graph nodes. ruff runs with `--isolated` so the `extend-exclude` of `pyproject.toml` does not drop directories; the script fails when the graph nodes differ from `git ls-files src tests stubs` (`.py`, `.pyi`), and a full typecheck lists those files.
+- The graph gets three edges Pants adds to import inference: a non-empty `__init__.py` to the modules under it, a `conftest.py` to the tests under it, and a `src/` or `tests/` BUILD `dependencies` entry (also one in an `overrides` entry, for the files it names) to the files of the target listing it. An entry naming a target by address reaches the target's files in two steps, as it does in Pants.
+- `python.lock`, `python.lock.metadata`, a `BUILD` under `src/` changed: full run. `pyproject.toml`, `pants.toml`, `stubs/` changed: typecheck of every `.py`. Any other file under `src/` or `tests/` that is not `.py`, `.md` or `.rst` changed (a `BUILD` under `tests/` included): the `.py` files of its directory count as changed.
+- The script reads the `python_tests`, `python_test_utils` and `python_sources` calls of the `src/` and `tests/` BUILD files itself and fails on a BUILD it cannot read or on a test file two `python_tests` own.
+- The spec files keep Pants addresses (tests) and file paths (typecheck), so `ci-typecheck.yml`, `ci-test.yml` and `ci-test-scenario.yml` stay the same.

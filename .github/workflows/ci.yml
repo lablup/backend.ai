@@ -142,32 +142,11 @@ jobs:
         # Depth 2 holds `base-ref`.
         fetch-depth: 2
         lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> "$GITHUB_ENV"
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Restore the Pants caches
-      uses: ./.github/actions/pants-caches
-      with:
-        mode: restore
-    - name: Install the Pants launcher
-      uses: ./.github/actions/pants-launcher
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
-      with:
-        named-caches-hash: disable
-        cache-lmdb-store: 'false'
+    - name: Install uv
+      run: pip install uv
     - name: Plan the targets and shards
       id: plan
       env:
-        # The dependents map holds about 6.5GiB; above the limit pantsd drops it and
-        # the next run of the planner builds it again.
-        PANTS_PANTSD_MAX_MEMORY_USAGE: 10GiB
         BASE_REF: ${{ needs.detect-changes.outputs.base-ref }}
         FULL_RUN: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
       run: |
@@ -180,12 +159,6 @@ jobs:
       with:
         name: ci-targets
         path: dist/ci-targets
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.plan-targets.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
 
   typecheck:
     # `contents: read`: only type-checks
