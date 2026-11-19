@@ -86,12 +86,8 @@ async def _webapp_shutdown(app: web.Application) -> None:
 
 
 class KeypairAuthWebAppPlugin(WebappPlugin):
-<<<<<<< HEAD
-=======
     require_explicit_allow = True
 
-    @override
->>>>>>> d61a34338 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
     async def init(self, context: Any = None) -> None:
         pass
 

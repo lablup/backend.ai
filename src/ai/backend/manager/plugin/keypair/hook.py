@@ -15,10 +15,7 @@ from pydantic import Field
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
-<<<<<<< HEAD
-=======
-from ai.backend.common.types import AccessKey, BackendAISchema
->>>>>>> d61a34338 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
+from ai.backend.common.types import BackendAISchema
 from ai.backend.common.utils import nmget
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
@@ -131,14 +128,7 @@ class KeypairAuthHookPlugin(HookPlugin):
         params: Mapping[str, Any],
     ) -> Any:
         root_app = request.app["_root_app"]
-<<<<<<< HEAD
         db = root_app["_db"]
-        config_provider = root_app["_config_provider"]
-        shared_config = await config_provider.legacy_etcd_config_loader.load()
-        plugin_config = nmget(shared_config, "plugins.webapp.keypair_auth")
-=======
-        auth_repository = cast(AuthRepository, root_app["_auth_repository"])
->>>>>>> d61a34338 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
         auth_token_name = self.plugin_config["auth_token_name"]
 
         try:
@@ -149,16 +139,10 @@ class KeypairAuthHookPlugin(HookPlugin):
         stoken = params[auth_token_name]
         if stoken:
             try:
-<<<<<<< HEAD
-                payload = deserialize_stoken(stoken, secret)
+                payload = deserialize_stoken(stoken, self._config.secret)
                 query = sa.select(KeyPairRow).where(
                     KeyPairRow.access_key == payload.access_key,
                     KeyPairRow.is_active.is_(True),
-=======
-                payload = deserialize_stoken(stoken, self._config.secret)
-                owner = await auth_repository.lookup(
-                    KeypairAccessKeyUserLookup(AccessKey(payload.access_key))
->>>>>>> d61a34338 (fix(BA-9058): let OpenID sToken login pass the keypair auth hook (#17211))
                 )
                 async with db.begin_readonly_session() as db_session:
                     keypair_row = await db_session.scalar(query)
