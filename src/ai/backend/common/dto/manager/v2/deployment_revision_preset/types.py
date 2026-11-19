@@ -10,9 +10,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelHealthCheckInfoDTO,
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
-    ServiceArgumentInterpolationInfoDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class DeploymentRevisionPresetOrderField(StrEnum):
@@ -72,13 +70,6 @@ class PresetModelServiceConfigInfoDTO(BaseResponseModel):
     )
     health_check: ModelHealthCheckInfoDTO | None = Field(
         default=None, description="Health check configuration for the model service."
-    )
-    interpolation: ServiceArgumentInterpolationInfoDTO | None = Field(
-        default=None,
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
-            "Null when the preset omits it to inherit it at revision resolution."
-        ),
     )
 
 

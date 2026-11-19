@@ -129,6 +129,7 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
                 agent_selection_policy=(
                     spec.resource_spec.options.scheduling_target.agent_selection_policy
                 ),
+                interpolation=spec.resource_spec.options.interpolation,
             ),
             bootstrap_script=session_bootstrap,
             use_host_network=spec.resource_spec.network.use_host_network,

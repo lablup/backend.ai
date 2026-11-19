@@ -37,6 +37,7 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -169,6 +170,7 @@ class SessionOptionsDraft(_DraftBaseModel):
     scheduling_target: SchedulingTargetDraft = Field(default_factory=SchedulingTargetDraft)
     kernel_groups: tuple[KernelGroupDraft, ...] | None = None
     handler_options: SessionHandlerOptions | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
 
 class SessionIdentityDraft(_DraftBaseModel):

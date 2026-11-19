@@ -84,7 +84,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelMetadataGQL,
     PreStartActionGQL,
-    ServiceArgumentInterpolationGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -138,16 +137,6 @@ class RuntimeVariantModelServiceConfigGQL(
     port: int | None = gql_field(description="Model service port.")
     health_check: RuntimeVariantModelHealthCheckGQL | None = gql_field(
         description="Default model service health-check settings."
-    )
-    interpolation: ServiceArgumentInterpolationGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Default variable syntax of the service arguments. "
-                "Null when the runtime variant leaves it unset."
-            ),
-        ),
-        default=None,
     )
 
 

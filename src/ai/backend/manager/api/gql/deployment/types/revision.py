@@ -25,6 +25,10 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.common import (
+    ServiceArgumentInterpolationDelimiterInfoDTO,
+    ServiceArgumentInterpolationInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.common import (
     ServiceArgumentInterpolationDelimiterInput as ServiceArgumentInterpolationDelimiterInputDTO,
 )
 from ai.backend.common.dto.manager.v2.common import (
@@ -117,8 +121,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
     RuntimeVariantPresetValueInfoDTO,
-    ServiceArgumentInterpolationDelimiterInfoDTO,
-    ServiceArgumentInterpolationInfoDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
@@ -494,12 +496,6 @@ class ModelServiceConfigGQL:
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
         default=None,
-    )
-    interpolation: ServiceArgumentInterpolationGQL = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Variable syntax of the service arguments.",
-        ),
     )
 
 
@@ -1144,16 +1140,6 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
     port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
-    )
-    interpolation: ServiceArgumentInterpolationInputGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Variable syntax of the service arguments. "
-                "Omit to inherit it; the default is `${{ }}` and `{ }`."
-            ),
-        ),
-        default=None,
     )
 
 
