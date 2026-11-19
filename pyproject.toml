@@ -3,6 +3,9 @@ requires-python = "~=3.13.18"
 name = "backend.ai"
 dynamic = ["version"]
 
+[dependency-groups]
+lint = ["ruff==0.14.0"]
+
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
 # Releases go to the per-version-branch file instead: scripts/run-towncrier.py
@@ -83,7 +86,6 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
-required-version = "==0.14.0"
 line-length = 100
 src = ["src"]
 # BUILD files are formatted as Python and not linted (`lint.exclude`).

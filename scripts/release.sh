@@ -66,8 +66,11 @@ else
         FROZEN+=("$f")
     done < <(git diff --name-only -z -- 'src/*.py')
     if [ ${#FROZEN[@]} -gt 0 ]; then
-        uvx ruff@0.14.0 check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
-        uvx ruff@0.14.0 format --quiet --force-exclude "${FROZEN[@]}"
+        # ruff from the `lint` group of pyproject.toml, in the venv scripts/pre-commit.sh uses
+        uv venv --quiet --allow-existing dist/lint-venv
+        uv pip install --quiet --python dist/lint-venv --group pyproject.toml:lint
+        dist/lint-venv/bin/ruff check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
+        dist/lint-venv/bin/ruff format --quiet --force-exclude "${FROZEN[@]}"
     fi
 fi
 

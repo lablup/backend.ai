@@ -31,11 +31,17 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-RUFF=(uvx ruff@0.14.0)
+# ruff from the `lint` group of pyproject.toml, in a gitignored venv
+install_lint_venv() {
+  uv venv --quiet --allow-existing dist/lint-venv
+  uv pip install --quiet --python dist/lint-venv --group pyproject.toml:lint
+}
+install_lint_venv
+RUFF=(dist/lint-venv/bin/ruff)
 
 EXIT_CODE=0
 
-echo "Running pre-commit checks (ruff 0.14.0)..."
+echo "Running pre-commit checks ($("${RUFF[@]}" --version))..."
 
 # 1. Auto-format
 echo "✓ Formatting..."

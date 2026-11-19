@@ -301,7 +301,7 @@ pants export --resolve=python-default
 pants generate-lockfiles --resolve=python-default
 
 # Run linting
-uvx ruff@<version> check
+dist/lint-venv/bin/ruff check
 
 # Run type checking
 pants check ::

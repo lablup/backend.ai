@@ -245,9 +245,9 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 
-Ruff runs outside Pants. Install the version that ``[tool.ruff] required-version`` in ``pyproject.toml`` pins,
-e.g., ``uv tool install 'ruff==0.14.0'``, and point the editor at that ``ruff`` executable,
-or run it as ``uvx ruff@<version>``.
+Ruff runs outside Pants. Install the version the ``lint`` group of ``pyproject.toml`` pins with
+``uv venv --allow-existing dist/lint-venv`` and ``uv pip install --python dist/lint-venv --group pyproject.toml:lint``,
+and point the editor at ``dist/lint-venv/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -346,7 +346,7 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 
    let s:cwd = getcwd()
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy'
-   let g:ale_python_ruff_executable = 'ruff'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/lint-venv/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
@@ -367,9 +367,9 @@ as basedpyright shares most configurations with pyright).
      "python.linting.mypyEnabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy",
      "python.linting.ruffEnabled": true,
-     "python.linting.ruffPath": "ruff",
+     "python.linting.ruffPath": "dist/lint-venv/bin/ruff",
      "python.formatting.provider": "ruff",
-     "python.formatting.ruffPath": "ruff",
+     "python.formatting.ruffPath": "dist/lint-venv/bin/ruff",
    }
 
 .. code-block:: json5
@@ -388,7 +388,7 @@ as basedpyright shares most configurations with pyright).
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.path": "/abs/path/to/ruff",  // absolute path
+     "ruff.path": "/abs/path/to/dist/lint-venv/bin/ruff",  // absolute path
      "ruff.nativeServer": true,
    }
 

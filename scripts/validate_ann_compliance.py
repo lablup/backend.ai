@@ -3,7 +3,7 @@
 Validate ANN (flake8-annotations) linter rule compliance.
 
 This script checks if files comply with ANN linter rules by running ruff
-(`uvx ruff@0.14.0`) and parsing the output for ANN violations. It's useful for validating batches
+(the `lint` group of pyproject.toml, in `dist/lint-venv`) and parsing the output for ANN violations. It's useful for validating batches
 of files during incremental linter rule enablement.
 
 Note: This script uses the ANN rules configured in pyproject.toml. To check
@@ -27,9 +27,13 @@ from pathlib import Path
 
 def run_ruff_check(project_root: Path, path: Path) -> tuple[int, str]:
     """Run ruff check and return (return_code, output)."""
+    venv = project_root / "dist" / "lint-venv"
+    install_cmds = [
+        ["uv", "venv", "--quiet", "--allow-existing", str(venv)],
+        ["uv", "pip", "install", "--quiet", "--python", str(venv), "--group", "pyproject.toml:lint"],
+    ]
     cmd = [
-        "uvx",
-        "ruff@0.14.0",
+        str(venv / "bin" / "ruff"),
         "check",
         "--output-format",
         "concise",
@@ -37,6 +41,8 @@ def run_ruff_check(project_root: Path, path: Path) -> tuple[int, str]:
     ]
 
     try:
+        for install_cmd in install_cmds:
+            subprocess.run(install_cmd, check=True, cwd=project_root)
         result = subprocess.run(
             cmd,
             capture_output=True,

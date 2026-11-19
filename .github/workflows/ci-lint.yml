@@ -105,15 +105,15 @@ jobs:
         ANNOTATE: ${{ inputs.annotate }}
       run: |
         pip install uv
+        uv pip install --system --group pyproject.toml:lint
         if [ "$ANNOTATE" == "true" ]; then
           FORMAT=github
         else
           FORMAT=full
         fi
-        # Every file, every run: the paths and rules are in pyproject.toml, whose
-        # required-version fails a ruff of another version.
-        uvx ruff@0.14.0 format --check
-        uvx ruff@0.14.0 check --output-format="$FORMAT"
+        # Every file, every run: the version, paths and rules are in pyproject.toml.
+        ruff format --check
+        ruff check --output-format="$FORMAT"
         # Only the visibility rules are left in pants lint.
         pants lint --changed-since=$BASE_REF
     - name: Decide whether this run saves the caches
