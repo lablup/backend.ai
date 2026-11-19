@@ -1,13 +1,14 @@
 name: ci-test
 
-# A pytest suite under tests/, sharded, called by `ci.yml` once per suite. The
-# scenario suite has its own workflow, `ci-test-scenario.yml`.
+# The integration suite under tests/, run by Pants and sharded, called by `ci.yml`. The
+# unit and component suites run in `ci-pytest.yml`, the scenario suite in
+# `ci-test-scenario.yml`.
 
 on:
   workflow_call:
     inputs:
       suite:
-        description: "The directory under tests/ to run: unit, component or integration"
+        description: "The directory under tests/ to run: integration"
         type: string
         required: true
       shards:

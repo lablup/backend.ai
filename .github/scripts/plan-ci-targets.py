@@ -26,8 +26,8 @@ Spec file                 Changed-only run (against <rev>)                    Fu
                           dependent falls in, plus the setup
 ========================= ================================================== ==========
 
-``typecheck.txt`` lists file paths and the other files list Pants addresses, one per
-line. A test is a file a ``python_tests`` of its ``BUILD`` owns; its address is
+``typecheck.txt``, ``unit.txt`` and ``component.txt`` list file paths, one per line;
+``integration.txt`` and ``scenario.txt`` list Pants addresses. A test is a file a ``python_tests`` of its ``BUILD`` owns; its address is
 ``<file>:<name>``, or ``<file>`` when the target has no name.
 
 The changed files are ``git diff --name-only <rev>``. The dependents come from
@@ -53,8 +53,10 @@ Changed files that are not Python source:
   document (a ``BUILD`` under ``tests/`` included): the ``.py`` files of its directory
   count as changed
 
-A suite gets one shard per ``SHARD_FLOOR`` tests, at most ``SHARD_LIMIT``. Pants
-assigns a test to ``crc32(address) % N``, so a shard no test lands in is left out.
+A suite gets one shard per ``SHARD_FLOOR`` tests, at most ``SHARD_LIMIT``. A test of
+``unit`` or ``component`` goes to the shard ``crc32(path) % N``, which
+``run-pytest-shard.py`` selects; Pants assigns a test of the other suites to
+``crc32(address) % N``. A shard no test lands in is left out.
 
 Run it from the repository root with ``uv`` on the path:
 
@@ -78,10 +80,11 @@ RUFF_GRAPH_VERSION = "0.17.5"
 RUFF_GRAPH_CONFIG = 'src = ["src", "tests/scenario", "stubs", "."]'
 
 SUITES = ("unit", "component", "integration", "scenario")
-SHARD_LIMIT = {"unit": 6, "component": 6, "integration": 2, "scenario": 6}
+SHARD_LIMIT = {"unit": 3, "component": 3, "integration": 2, "scenario": 6}
 # About a minute of tests on a 4-core runner, the setup every shard pays first.
-# component: two batches of the `batch_size` 5 in pants.toml.
-SHARD_FLOOR = {"unit": 20, "component": 10, "integration": 5, "scenario": 10}
+SHARD_FLOOR = {"unit": 40, "component": 20, "integration": 5, "scenario": 10}
+# Suites run by pytest directly, whose spec file lists paths.
+PYTEST_SUITES = ("unit", "component")
 
 SCENARIO_SETUP = "tests/scenario/bai_scenario/setup"
 SCENARIO_COMPONENT = re.compile(r"^tests/scenario/bai_scenario/manager/([^/]+)/")
@@ -435,7 +438,9 @@ def main() -> int:
 
     addresses = {"typecheck": files["typecheck"]}
     for suite in SUITES:
-        addresses[suite] = [owners[f].address(f) for f in files[suite]]
+        addresses[suite] = (
+            files[suite] if suite in PYTEST_SUITES else [owners[f].address(f) for f in files[suite]]
+        )
 
     args.out.mkdir(parents=True, exist_ok=True)
     for name, lines in addresses.items():

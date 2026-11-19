@@ -1,0 +1,80 @@
+name: ci-pytest
+
+# A pytest suite under tests/ run by pytest directly, sharded, called by `ci.yml` once
+# per suite: unit or component. The other suites run in `ci-test.yml` and
+# `ci-test-scenario.yml`.
+
+on:
+  workflow_call:
+    inputs:
+      suite:
+        description: "The directory under tests/ to run: unit (one pytest process per file) or component (batches of files)"
+        type: string
+        required: true
+      shards:
+        description: The `--shard` values to spread the run across, as a JSON list; `ci.yml` passes only those holding a target
+        type: string
+        required: true
+      runner:
+        description: The runner label
+        type: string
+        required: true
+      targets-artifact:
+        description: The artifact holding `<suite>.txt`, the tests to run, one file path per line
+        type: string
+        required: true
+      sentinel-hosts:
+        description: Map the redis sentinel hostnames to 127.0.0.1 first
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+
+  test:
+    name: ${{ inputs.suite }} (${{ matrix.shard }})
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.shards) }}
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+        lfs: false
+    - name: Download the targets
+      uses: actions/download-artifact@v5
+      with:
+        name: ${{ inputs.targets-artifact }}
+        path: dist/ci-targets
+    - name: Set up the Python virtualenv
+      id: venv
+      uses: ./.github/actions/python-venv
+    - name: Configure the redis sentinel hostnames
+      if: inputs.sentinel-hosts
+      run: |
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+    - name: Test
+      timeout-minutes: 60
+      env:
+        SUITE: ${{ inputs.suite }}
+        SHARD: ${{ matrix.shard }}
+        MODE: ${{ inputs.suite == 'unit' && 'per-file' || 'batched' }}
+        PYTHON: ${{ steps.venv.outputs.python }}
+      run: |
+        .github/scripts/run-pytest-shard.py --list "dist/ci-targets/$SUITE.txt" --shard "$SHARD" \
+          --mode "$MODE" --junit-dir dist/junit --python "$PYTHON" --summary "$GITHUB_STEP_SUMMARY"
+    - name: Upload the junit reports
+      if: always()
+      uses: actions/upload-artifact@v5
+      with:
+        name: junit-${{ inputs.suite }}-${{ strategy.job-index }}
+        path: dist/junit
+        if-no-files-found: ignore
