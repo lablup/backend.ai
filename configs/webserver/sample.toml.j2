@@ -708,6 +708,12 @@
   # export overhead but increase memory usage.
   # Added in 26.2.0
   max-export-batch-size = 4096
+  # Whether to record a span for every SQL statement sent through asyncpg,
+  # carrying the statement text without its parameter values. Applies to the
+  # manager only, and only when `enabled` is true. A statement run with no
+  # enclosing span records no span.
+  # Added in 26.10.0
+  trace-db-statements = false
 
 # Pyroscope continuous profiling integration for performance analysis.
 # Added in 25.12.0
