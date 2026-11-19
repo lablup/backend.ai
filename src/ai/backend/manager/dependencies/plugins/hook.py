@@ -37,8 +37,9 @@ class HookPluginDependency(PluginDependency[HookPluginContext]):
             RuntimeError: If ACTIVATE_MANAGER hook dispatch does not pass
         """
         ctx = HookPluginContext(setup_input.etcd, setup_input.local_config)
+        plugin_context = await setup_input.etcd.get_prefix("config/plugins")
         await ctx.init(
-            context=setup_input.init_context,
+            context=plugin_context,
             allowlist=setup_input.allowed_plugins,
             blocklist=setup_input.disabled_plugins,
         )

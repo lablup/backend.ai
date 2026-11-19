@@ -11,7 +11,7 @@ from weakref import WeakSet
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import prepare_wheelhouse, scan_entrypoints
 
@@ -192,6 +192,8 @@ class BasePluginContext[P: AbstractPlugin]:
             try:
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
+            except BackendAISchemaValidationFailed:
+                raise
             except Exception:
                 log.exception("error during initialization of plugin: {}", plugin_name)
                 continue
