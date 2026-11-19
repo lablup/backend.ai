@@ -37,9 +37,9 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user holding READ and HARD_DELETE purges their auto-generated file not set as default, the id of the file comes back and the file and its revisions are gone](#v2_files-a-user-granted-hard-delete-purges-an-auto-generated-file-not-set-as-default) | answered |
+| [when a user holding HARD_DELETE purges their auto-generated file not set as default, the id of the file comes back and the file and its revisions are gone](#v2_files-a-user-granted-hard-delete-purges-an-auto-generated-file-not-set-as-default) | answered |
 | [a user holding no permission who tries to purge their auto-generated file is rejected for lack of permission](#v2_files-a-user-granted-nothing-may-not-purge-an-auto-generated-file) | rejected |
-| [when a user holding READ and HARD_DELETE tries to purge their auto-generated file set as default, it is rejected and the file stays](#v2_files-purging-the-auto-generated-file-set-as-default-is-refused) | rejected |
+| [when a user holding HARD_DELETE tries to purge their auto-generated file set as default, it is rejected and the file stays](#v2_files-purging-the-auto-generated-file-set-as-default-is-refused) | rejected |
 
 **purge_default_auto_generated_file**
 
@@ -323,11 +323,11 @@ Then
 
 #### [a-user-granted-hard-delete-purges-an-auto-generated-file-not-set-as-default](/tests/scenario/bai_scenario/manager/auto_generated_file/test_v2_files.py): pass
 
-when a user holding READ and HARD_DELETE purges their auto-generated file not set as default, the id of the file comes back and the file and its revisions are gone
+when a user holding HARD_DELETE purges their auto-generated file not set as default, the id of the file comes back and the file and its revisions are gone
 
 Given
 
-- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+- one domain and one user, the user holds a .vimrc auto-generated file not set as default (permission 644, revision 1 holding 'set number\n'), the user holds the HARD_DELETE permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -336,9 +336,8 @@ Given
     - regular user user-1: has their own keypair and personal project
   - Auto-generated file .vimrc: permission 644
   - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
-  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+  - a role assignment granting the HARD_DELETE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
-    - Role config-file-role-1: READ allowed on every auto_generated_file
     - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
     - regular user user-1: holds Role config-file-role-1
 
@@ -382,11 +381,11 @@ Then
 
 #### [purging-the-auto-generated-file-set-as-default-is-refused](/tests/scenario/bai_scenario/manager/auto_generated_file/test_v2_files.py): pass
 
-when a user holding READ and HARD_DELETE tries to purge their auto-generated file set as default, it is rejected and the file stays
+when a user holding HARD_DELETE tries to purge their auto-generated file set as default, it is rejected and the file stays
 
 Given
 
-- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the READ, HARD_DELETE permission on their own auto-generated files
+- one domain and one user, the user holds a .vimrc auto-generated file set as default (permission 644, revision 1 holding 'set number\n'), the user holds the HARD_DELETE permission on their own auto-generated files
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -396,9 +395,8 @@ Given
   - Auto-generated file .vimrc: permission 644
   - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
   - Default auto-generated file .vimrc: set as the default of its path
-  - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
+  - a role assignment granting the HARD_DELETE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
-    - Role config-file-role-1: READ allowed on every auto_generated_file
     - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
     - regular user user-1: holds Role config-file-role-1
 
@@ -627,6 +625,7 @@ Then
 
 - the new file, not set as default, comes back
   - id: skipped: the database generates it
+  - entity_id: skipped: the database generates it
   - scope_type = 'user'
   - scope_id: same as the owner's id
   - path = '.vimrc'

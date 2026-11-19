@@ -37,9 +37,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정되지 않은 자기 auto-generated file 을 지우면, 지운 파일의 id 가 오고 파일과 그 revision 이 모두 지워집니다](#v2_files-a-user-granted-hard-delete-purges-an-auto-generated-file-not-set-as-default) | 성공 |
+| [HARD_DELETE 를 받은 사용자가 default 로 지정되지 않은 자기 auto-generated file 을 지우면, 지운 파일의 id 가 오고 파일과 그 revision 이 모두 지워집니다](#v2_files-a-user-granted-hard-delete-purges-an-auto-generated-file-not-set-as-default) | 성공 |
 | [권한을 받지 않은 사용자가 자기 auto-generated file 을 지우려 하면, 권한 부족으로 거부됩니다](#v2_files-a-user-granted-nothing-may-not-purge-an-auto-generated-file) | 거부 |
-| [READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정된 자기 auto-generated file 을 지우려 하면, 거부되고 그 파일은 그대로 남습니다](#v2_files-purging-the-auto-generated-file-set-as-default-is-refused) | 거부 |
+| [HARD_DELETE 를 받은 사용자가 default 로 지정된 자기 auto-generated file 을 지우려 하면, 거부되고 그 파일은 그대로 남습니다](#v2_files-purging-the-auto-generated-file-set-as-default-is-refused) | 거부 |
 
 **purge_default_auto_generated_file**
 
@@ -323,11 +323,11 @@ Then
 
 #### [a-user-granted-hard-delete-purges-an-auto-generated-file-not-set-as-default](/tests/scenario/bai_scenario/manager/auto_generated_file/test_v2_files.py): pass
 
-READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정되지 않은 자기 auto-generated file 을 지우면, 지운 파일의 id 가 오고 파일과 그 revision 이 모두 지워집니다
+HARD_DELETE 를 받은 사용자가 default 로 지정되지 않은 자기 auto-generated file 을 지우면, 지운 파일의 id 가 오고 파일과 그 revision 이 모두 지워집니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 default 로 지정되지 않은 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ, HARD_DELETE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정되지 않은 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 HARD_DELETE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -336,9 +336,8 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - auto-generated file .vimrc: 권한 644
   - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
-  - 자기 auto-generated file READ, HARD_DELETE 권한을 부여한 역할 배정
+  - 자기 auto-generated file HARD_DELETE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
     - 역할 config-file-role-1: auto_generated_file 전체에 HARD_DELETE 허용
     - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
@@ -382,11 +381,11 @@ Then
 
 #### [purging-the-auto-generated-file-set-as-default-is-refused](/tests/scenario/bai_scenario/manager/auto_generated_file/test_v2_files.py): pass
 
-READ 와 HARD_DELETE 를 받은 사용자가 default 로 지정된 자기 auto-generated file 을 지우려 하면, 거부되고 그 파일은 그대로 남습니다
+HARD_DELETE 를 받은 사용자가 default 로 지정된 자기 auto-generated file 을 지우려 하면, 거부되고 그 파일은 그대로 남습니다
 
 Given
 
-- 도메인 하나와 사용자 하나, 사용자는 default 로 지정된 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 READ, HARD_DELETE 권한을 받았습니다
+- 도메인 하나와 사용자 하나, 사용자는 default 로 지정된 .vimrc auto-generated file 을 갖고 있습니다(권한 644, revision 1 의 내용 'set number\n'), 사용자는 자기 auto-generated file 에 대한 HARD_DELETE 권한을 받았습니다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -396,9 +395,8 @@ Given
   - auto-generated file .vimrc: 권한 644
   - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
-  - 자기 auto-generated file READ, HARD_DELETE 권한을 부여한 역할 배정
+  - 자기 auto-generated file HARD_DELETE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
     - 역할 config-file-role-1: auto_generated_file 전체에 HARD_DELETE 허용
     - 일반 사용자 user-1: 역할 config-file-role-1 보유
 
@@ -627,6 +625,7 @@ Then
 
 - default 로 지정되지 않은 새 파일이 응답으로 옵니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 건너뜀: 데이터베이스가 생성합니다
   - scope_type = 'user'
   - scope_id: 파일 주인의 id 와 같다
   - path = '.vimrc'
