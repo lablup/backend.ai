@@ -25,6 +25,7 @@ __all__ = (
     "NotificationProcessingFailure",
     "NotificationRuleNotFound",
     "NotificationTemplateRenderingFailure",
+    "WebhookConnectionFailure",
 )
 
 
@@ -66,6 +67,21 @@ class NotificationProcessingFailure(BackendAIError, web.HTTPInternalServerError)
 class NotificationTemplateRenderingFailure(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/notification-template-rendering-failure"
     error_title = "Failed to render notification template."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
+    """Raised when the webhook URL cannot be reached or does not respond in time."""
+
+    error_type = "https://api.backend.ai/probs/webhook-connection-failure"
+    error_title = "Failed to connect to the webhook URL."
 
     @override
     def error_code(self) -> ErrorCode:

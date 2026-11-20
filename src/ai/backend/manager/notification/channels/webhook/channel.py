@@ -12,7 +12,10 @@ from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.common.data.notification.types import WebhookSpec
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
+from ai.backend.manager.errors.notification import (
+    NotificationProcessingFailure,
+    WebhookConnectionFailure,
+)
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
@@ -53,7 +56,8 @@ class WebhookChannel(AbstractNotificationChannel):
             SendResult indicating success
 
         Raises:
-            Exception: If webhook delivery fails
+            WebhookConnectionFailure: If the webhook URL cannot be reached or times out
+            NotificationProcessingFailure: If the webhook responds with a failure status
         """
         webhook_url = self._webhook_spec.url
 
@@ -74,22 +78,27 @@ class WebhookChannel(AbstractNotificationChannel):
         headers = self._webhook_spec.headers.copy()
         headers["Content-Type"] = self._webhook_spec.content_type
 
-        async with http_session.post(
-            path,
-            data=message.message,
-            headers=headers,
-            timeout=timeout,
-        ) as response:
-            if response.status in self._webhook_spec.success_status_codes:
-                log.trace(
-                    "webhook notification sent",
-                    webhook_url=webhook_url,
-                    status_code=response.status,
+        try:
+            async with http_session.post(
+                path,
+                data=message.message,
+                headers=headers,
+                timeout=timeout,
+            ) as response:
+                if response.status in self._webhook_spec.success_status_codes:
+                    log.trace(
+                        "webhook notification sent",
+                        webhook_url=webhook_url,
+                        status_code=response.status,
+                    )
+                    return SendResult(
+                        message=f"Webhook sent successfully (status: {response.status})",
+                    )
+                response_text = await response.text()
+                raise NotificationProcessingFailure(
+                    f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
                 )
-                return SendResult(
-                    message=f"Webhook sent successfully (status: {response.status})",
-                )
-            response_text = await response.text()
-            raise NotificationProcessingFailure(
-                f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
-            )
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise WebhookConnectionFailure(
+                f"Failed to connect to the webhook URL: {type(e).__name__}"
+            ) from e
