@@ -6,6 +6,7 @@ import uuid
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
+import aiotools
 import pytest
 from callosum.rpc import RPCMessage
 from callosum.rpc.message import RPCMessageTypes
@@ -129,6 +130,40 @@ class TestKernelCreationConcurrency:
         assert len(tracker.semas) == 4
         assert all(sema is agent.kernel_creation_sema for sema in tracker.semas)
         assert not agent.kernel_creation_sema.locked()
+
+
+def _agent_rejecting_with(*errors: Exception) -> MagicMock:
+    agent = _agent(len(errors), _CreationTracker())
+    agent.create_kernel = AsyncMock(side_effect=list(errors))
+    return agent
+
+
+class TestCreateKernelsErrors:
+    async def test_kernels_all_being_created_answer_with_one_creation_in_progress(
+        self,
+    ) -> None:
+        server = _server(
+            _agent_rejecting_with(
+                KernelCreationInProgress("Kernel creation already in progress"),
+                KernelCreationInProgress("Kernel creation already in progress"),
+            )
+        )
+
+        with pytest.raises(KernelCreationInProgress):
+            await _create_kernels(server, 2)
+
+    async def test_a_creation_in_progress_mixed_with_another_failure_is_a_task_group_error(
+        self,
+    ) -> None:
+        server = _server(
+            _agent_rejecting_with(
+                KernelCreationInProgress("Kernel creation already in progress"),
+                ResourceError("Kernel already created"),
+            )
+        )
+
+        with pytest.raises(aiotools.TaskGroupError):
+            await _create_kernels(server, 2)
 
 
 class _CreateWentAhead(Exception):
