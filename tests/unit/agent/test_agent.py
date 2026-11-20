@@ -4,11 +4,14 @@ Tests for agent configuration and RPC server functionality.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
+from uuid import uuid4
 
 import pytest
 import tomlkit
@@ -23,10 +26,11 @@ from ai.backend.agent.config.unified import (
 )
 from ai.backend.agent.dummy.agent import DummyAgent
 from ai.backend.agent.server import AgentRPCServer
-from ai.backend.agent.types import AgentBackend
+from ai.backend.agent.types import AgentBackend, ContainerLifecycleEvent, LifecycleEvent
 from ai.backend.common.configs.etcd import EtcdConfig, EtcdTLSConfig
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 
 
 @pytest.fixture
@@ -258,7 +262,6 @@ id = "agent-2"
 scaling-group = "default"
 """
         )
-<<<<<<< HEAD
 
         # Create server with runtime
         server = object.__new__(AgentRPCServer)
@@ -295,9 +298,6 @@ scaling-group = "default"
         assert updated_config["agents"][0]["agent"]["scaling-group"] == "default"  # type: ignore[index]
         assert mock_agent2.local_config.agent.scaling_group == "gpu"
         assert mock_agent1.local_config.agent.scaling_group == "default"
-=======
-        queued: ContainerLifecycleEvent = agent.container_lifecycle_queue.get_nowait()
-        assert queued.reason is KernelLifecycleEventReason.UNKNOWN
 
 
 class TestCleanEventOfAKernelBeingDestroyed:
@@ -315,6 +315,7 @@ class TestCleanEventOfAKernelBeingDestroyed:
     def agent(self, kernel_id: KernelId, clean_event: asyncio.Future[Any]) -> SimpleNamespace:
         kernel_obj = Mock(runner=None, clean_event=clean_event, close=AsyncMock())
         kernel_obj.pop.return_value = None
+        kernel_obj.get.return_value = None
         return SimpleNamespace(
             _ongoing_destruction_tasks={},
             stat_ctx=SimpleNamespace(remove_kernel_metric=AsyncMock()),
@@ -363,4 +364,3 @@ class TestCleanEventOfAKernelBeingDestroyed:
         await AbstractAgent._handle_clean_event(cast(Any, agent), clean)
 
         assert clean_event.result() is None
->>>>>>> 2dd550539 (fix(BAI-392): do not set the clean event of a kernel twice (#17269))
