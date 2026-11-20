@@ -88,6 +88,24 @@ class TestQueryColumnName:
         assert _ShelfQuerySpec.nested.boxes.columns.label.name == "label"
 
 
+class TestQueryOwnSectionColumns:
+    def test_columns_are_keyed_by_name_in_declaration_order(self) -> None:
+        own = _ShelfQuerySpec.own
+        assert list(own.columns().items()) == [
+            ("id", own.id),
+            ("name", own.name),
+            ("count", own.count),
+            ("tags", own.tags),
+        ]
+
+    def test_base_class_columns_come_first_and_searchable_fields_are_left_out(self) -> None:
+        class _Columns(_BoxOwnColumns):
+            title = QueryColumn(BoxRow.label, None, None)
+            legacy = SearchableField(BoxRow.label, None, None)
+
+        assert list(_Columns().columns()) == ["id", "label", "title"]
+
+
 class TestQueryColumnSQL:
     def test_condition_matches_searchable_field(self, render: Render) -> None:
         spec = StringMatchSpec(value="a", case_insensitive=False, negated=False)
