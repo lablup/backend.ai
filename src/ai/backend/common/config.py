@@ -22,7 +22,6 @@ from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
-from .meta.meta import NEXT_RELEASE_VERSION
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
@@ -317,18 +316,6 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
-    interpolation: ServiceArgumentInterpolation = Field(
-        default_factory=lambda: ServiceArgumentInterpolation(
-            delimiters=[
-                ServiceArgumentInterpolationDelimiter(start="${{", end="}}"),
-                ServiceArgumentInterpolationDelimiter(start="{", end="}"),
-            ]
-        ),
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
-            "Defaults to ``${{ }}`` and ``{ }``."
-        ),
-    )
 
     @model_validator(mode="before")
     @classmethod
@@ -481,7 +468,6 @@ def _merge_service_config(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick(base.port, override.port, "port" in s),
         health_check=health_check,
-        interpolation=_pick(base.interpolation, override.interpolation, "interpolation" in s),
     )
 
 
@@ -625,7 +611,6 @@ class ModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
-    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -714,9 +699,6 @@ def _merge_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
-        interpolation=_pick_non_null_override(
-            base.interpolation, override.interpolation, "interpolation" in s
-        ),
     )
 
 
@@ -824,7 +806,6 @@ class DefaultModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int = Field(gt=1)
     health_check: ModelHealthCheckDraft | None = None
-    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -864,7 +845,6 @@ class PresetModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
-    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -902,7 +882,6 @@ class PresetModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
-    interpolation: ServiceArgumentInterpolation | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -952,9 +931,6 @@ def _merge_preset_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
-        interpolation=_pick_non_null_override(
-            base.interpolation, override.interpolation, "interpolation" in s
-        ),
     )
 
 

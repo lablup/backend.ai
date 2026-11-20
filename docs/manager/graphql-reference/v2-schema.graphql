@@ -4553,6 +4553,11 @@ type DefaultSessionOptionsInfo {
 
   """Default agent selection policy."""
   agentSelectionPolicy: SessionAgentSelectionPolicy!
+
+  """
+  Added in 26.10.0. Default variable syntax of the service arguments, frozen onto new sessions.
+  """
+  interpolation: ServiceArgumentInterpolation!
 }
 
 """Added in 26.4.4. Resource-group default session options input payload."""
@@ -4564,6 +4569,11 @@ input DefaultSessionOptionsInput {
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInput = null
   handlerOptions: DefaultSessionHandlerOptionsPolicyInput = null
   agentSelectionPolicy: SessionAgentSelectionPolicy = null
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments, frozen onto new sessions. Omit to use the default `${{ }}` and `{ }`.
+  """
+  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """Added in 26.4.4. Qualitative resource hints response."""
@@ -6237,6 +6247,11 @@ input EnqueueSessionInput {
   Added in 26.10.0. Session group UUID the session joins. The group must belong to the session's owner and project.
   """
   sessionGroupId: ID = null
+
+  """
+  Added in 26.10.0. Variable syntax of the service arguments, fixed for the session. Omit to use the resource group's `defaultSessionOptions`.
+  """
+  interpolation: ServiceArgumentInterpolationInput = null
 
   """User-defined tag."""
   tag: String = null
@@ -10211,9 +10226,6 @@ type ModelServiceConfig {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
-
-  """Added in 26.10.0. Variable syntax of the service arguments."""
-  interpolation: ServiceArgumentInterpolation!
 }
 
 """
@@ -10243,11 +10255,6 @@ input ModelServiceConfigInput {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheckInput = null
-
-  """
-  Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`.
-  """
-  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """
@@ -14271,11 +14278,6 @@ type PresetModelServiceConfig {
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
-
-  """
-  Added in 26.10.0. Variable syntax of the service arguments. Null when the preset omits it to inherit it at revision resolution.
-  """
-  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.9.0. Service configuration for a preset model entry."""
@@ -14305,11 +14307,6 @@ input PresetModelServiceConfigInput {
 
   """Health check configuration for the model service."""
   healthCheck: PresetModelHealthCheckInput = null
-
-  """
-  Added in 26.10.0. Variable syntax of the service arguments. Omit to inherit it; the default is `${{ }}` and `{ }`.
-  """
-  interpolation: ServiceArgumentInterpolationInput = null
 }
 
 """
@@ -19704,11 +19701,6 @@ type RuntimeVariantModelServiceConfig {
 
   """Default model service health-check settings."""
   healthCheck: RuntimeVariantModelHealthCheck
-
-  """
-  Added in 26.10.0. Default variable syntax of the service arguments. Null when the runtime variant leaves it unset.
-  """
-  interpolation: ServiceArgumentInterpolation
 }
 
 """Added in 26.4.2. Order specification."""
@@ -20324,7 +20316,7 @@ type SecretKeyCount {
 }
 
 """
-Added in 26.10.0. Variable syntax of the service arguments of a model service.
+Added in 26.10.0. Variable syntax of the service arguments, fixed per session.
 """
 type ServiceArgumentInterpolation {
   """Delimiters that mark the variables to fill in the service arguments."""
@@ -20354,7 +20346,7 @@ input ServiceArgumentInterpolationDelimiterInput {
 }
 
 """
-Added in 26.10.0. Variable syntax of the service arguments of a model service.
+Added in 26.10.0. Variable syntax of the service arguments, fixed per session.
 """
 input ServiceArgumentInterpolationInput {
   """Delimiters that mark the variables to fill in the service arguments."""
@@ -23005,11 +22997,6 @@ input UpdatePresetModelServiceConfigInput {
   Health check configuration for the model service. Omit to keep the current value.
   """
   healthCheck: UpdatePresetModelHealthCheckInput
-
-  """
-  Added in 26.10.0. Variable syntax of the service arguments. Omit or null to keep the current value.
-  """
-  interpolation: ServiceArgumentInterpolationInput
 }
 
 """

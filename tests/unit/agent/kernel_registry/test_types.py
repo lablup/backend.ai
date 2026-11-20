@@ -134,3 +134,26 @@ class TestKernelRecoveryDataFromDockerKernel:
 
         with pytest.raises(KeyError, match="repl_out_port"):
             KernelRecoveryData.from_docker_kernel(mock_docker_kernel)
+
+
+class TestServiceInterpolationSurvivesRecovery:
+    """The session's interpolation on a kernel survives an agent restart."""
+
+    def test_rebuilt_kernel_keeps_service_interpolation(self, mock_docker_kernel: Any) -> None:
+        interpolation = {"delimiters": [{"start": "<<", "end": ">>"}]}
+        mock_docker_kernel.data = {
+            "block_service_ports": False,
+            "domain_socket_proxies": [],
+            "repl_in_port": 2000,
+            "repl_out_port": 2001,
+            "service_interpolation": interpolation,
+        }
+
+        rebuilt = KernelRecoveryData.from_docker_kernel(mock_docker_kernel).to_docker_kernel()
+
+        assert rebuilt.data["service_interpolation"] == interpolation
+
+    def test_rebuilt_kernel_without_it_has_none(self, mock_docker_kernel: Any) -> None:
+        rebuilt = KernelRecoveryData.from_docker_kernel(mock_docker_kernel).to_docker_kernel()
+
+        assert rebuilt.data["service_interpolation"] is None

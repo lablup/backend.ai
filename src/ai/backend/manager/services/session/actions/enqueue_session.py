@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import override
 
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
@@ -105,6 +106,7 @@ class EnqueueSessionAction(SessionScopeAction):
     tag: str | None = None
     callback_url: str | None = None
     session_group_id: SessionGroupID | None = None
+    interpolation: ServiceArgumentInterpolation | None = None
 
     user_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
     user_role: UserRole = UserRole.USER

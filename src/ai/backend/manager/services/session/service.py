@@ -1330,8 +1330,6 @@ class SessionService:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
             opts["envs"] = load_json(envs)
-        if action.interpolation is not None:
-            opts["interpolation"] = action.interpolation.model_dump()
 
         if info.agent_id is None:
             raise AgentNotAllocated(f"Session {session_id} main kernel has no agent allocated")
@@ -1652,6 +1650,7 @@ class SessionService:
                         ),
                         kernel_groups=kernel_groups,
                         handler_options=None,
+                        interpolation=action.interpolation,
                     ),
                 ),
                 internal_data_extras=InternalDataExtras(
