@@ -67,6 +67,7 @@ if TYPE_CHECKING:
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
     from .domains_v2.session_lifecycle_handler import V2SessionLifecycleHandlerClient
+    from .domains_v2.ssh_key import V2SSHKeyClient
     from .domains_v2.storage_host import V2StorageHostClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
     from .domains_v2.system_session_environ import V2SystemSessionEnvironClient
@@ -414,6 +415,12 @@ class V2ClientRegistry:
         from .domains_v2.session_lifecycle_handler import V2SessionLifecycleHandlerClient
 
         return V2SessionLifecycleHandlerClient(self._client)
+
+    @cached_property
+    def ssh_key(self) -> V2SSHKeyClient:
+        from .domains_v2.ssh_key import V2SSHKeyClient
+
+        return V2SSHKeyClient(self._client)
 
     @cached_property
     def storage_host(self) -> V2StorageHostClient:

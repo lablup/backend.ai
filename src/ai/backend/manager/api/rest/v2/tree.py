@@ -135,6 +135,8 @@ def build_v2_routes(
     from .session_group.registry import register_v2_session_group_routes
     from .session_lifecycle_handler.handler import V2SessionLifecycleHandlerHandler
     from .session_lifecycle_handler.registry import register_v2_session_lifecycle_handler_routes
+    from .ssh_key.handler import V2SSHKeyHandler
+    from .ssh_key.registry import register_v2_ssh_key_routes
     from .storage_host.handler import V2StorageHostHandler
     from .storage_host.registry import register_v2_storage_host_routes
     from .storage_namespace.handler import V2StorageNamespaceHandler
@@ -227,6 +229,7 @@ def build_v2_routes(
     )
     user_handler = V2UserHandler(adapter=adapters.user)
     vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)
+    ssh_key_handler = V2SSHKeyHandler(adapter=adapters.ssh_key)
     vfolder_auto_mount_handler = V2VFolderAutoMountHandler(adapter=adapters.vfolder_auto_mount)
     vfs_storage_handler = V2VFSStorageHandler(adapter=adapters.vfs_storage)
 
@@ -344,6 +347,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_vfolder_auto_mount_routes(vfolder_auto_mount_handler, route_deps)
     )
+    v2_reg.add_subregistry(register_v2_ssh_key_routes(ssh_key_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfs_storage_routes(vfs_storage_handler, route_deps))
 
     # Export (reuses v1 handler directly, no adapter)

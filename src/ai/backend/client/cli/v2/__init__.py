@@ -248,6 +248,11 @@ def entity_label() -> None:
     """Entity label commands."""
 
 
+@v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.ssh_key:ssh_key", name="ssh-key")
+def ssh_key() -> None:
+    """SSH key commands."""
+
+
 @v2.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.login_client_type.commands:login_client_type",

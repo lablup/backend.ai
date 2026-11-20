@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 
 
 class DomainNamePathParam(BaseRequestModel):
@@ -161,6 +162,10 @@ class SessionGroupIdPathParam(BaseRequestModel):
 
 class VFolderAutoMountIdPathParam(BaseRequestModel):
     vfolder_auto_mount_id: UUID = Field(description="VFolder auto-mount UUID")
+
+
+class SSHKeyIdPathParam(BaseRequestModel):
+    ssh_key_id: SSHKeypairID = Field(description="SSH key UUID")
 
 
 class SlotNamePathParam(BaseRequestModel):
