@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
@@ -144,6 +145,18 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                 for session in sessions
             )
             return result
+
+        # Sessions enqueued after the coordinator's query have no recorder in this
+        # cycle; they are scheduled in the next one.
+        handed_session_ids = {session.session_info.identity.id for session in sessions}
+        scheduling_data = dataclasses.replace(
+            scheduling_data,
+            workloads=[
+                workload
+                for workload in scheduling_data.workloads
+                if workload.meta.session_id in handed_session_ids
+            ],
+        )
 
         # Delegate to Provisioner with pre-fetched data
         schedule_result = await self._provisioner.schedule_resource_group(scheduling_data)
