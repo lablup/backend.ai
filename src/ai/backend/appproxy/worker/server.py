@@ -64,6 +64,7 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
     AppProxyCircuitRemovedEvent,
     AppProxyCircuitRouteUpdatedEvent,
+    AppProxyIngressInvalidatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -138,7 +139,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
-from .config import ServerConfig
+from .config import IngressLayerType, ServerConfig
 from .config import load as load_config
 from .coordinator_client import (
     deregister_worker,
@@ -454,6 +455,17 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
+    ingress_layers = root_ctx.local_config.proxy_worker.ingress.layers
+    # The in-memory layer keeps the Redis hits only when Redis is read after it.
+    if IngressLayerType.IN_MEMORY in ingress_layers and IngressLayerType.REDIS in ingress_layers:
+        handlers.append(
+            root_ctx.event_dispatcher.subscribe(
+                AppProxyIngressInvalidatedEvent,
+                root_ctx,
+                handle_ingress_invalidated_event,
+                name="proxy-worker-ingress-invalidation",
+            )
+        )
     try:
         yield
     finally:
@@ -740,6 +752,16 @@ async def readyz(request: web.Request) -> web.Response:
 async def status(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     return web.json_response({"api_version": "v2"})
+
+
+async def handle_ingress_invalidated_event(
+    context: RootContext,
+    _agent_id: AgentId,
+    event: AppProxyIngressInvalidatedEvent,
+) -> None:
+    invalidating_writer = context.ingress_state.invalidating_writer
+    if invalidating_writer is not None:
+        await invalidating_writer.apply(event.keys)
 
 
 async def handle_proxy_route_event(
