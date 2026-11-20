@@ -80,7 +80,7 @@ class TestGenerateUserData:
         assert result["user"]["domain_name"] == "default"
         assert result["user"]["status"] == UserStatus.ACTIVE
         assert result["user"]["role"] == UserRole.USER
-        assert result["project"] == "default"
+        assert result["project"] == "experiment-expects-a-failure"
         assert result["keypair_resource_policy"] == "default"
         assert result["user"]["password"]  # non-empty random string
 

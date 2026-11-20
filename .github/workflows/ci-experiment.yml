@@ -1,0 +1,475 @@
+name: ci-experiment
+
+# Runs typecheck, unit, component and lint without Pants, beside `ci.yml`, to compare
+# time and job count. Only the experiment branches (`ci-exp/*`) run it.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  EXP: .github/ci-experiment
+  RUFF_GRAPH_VERSION: 0.17.5
+  RUFF_LINT_VERSION: 0.14.0
+  # The paths PR #17230 keeps out of ruff, plus `stubs`, whose N805 hits that PR fixes.
+  RUFF_EXCLUDE: extend-exclude = ["docs", "plugins", "proposals", "scripts", "stubs", "tools/pants-plugins", "wheelhouse"]
+  TIMINGS: ${{ github.workspace }}/../timings.tsv
+
+jobs:
+
+  exp-plan:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    runs-on: ubuntu-latest
+    outputs:
+      typecheck: ${{ steps.plan.outputs.typecheck }}
+      unit: ${{ steps.plan.outputs.unit }}
+      component: ${{ steps.plan.outputs.component }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+        lfs: false
+    - name: Install uv
+      run: pip install uv
+    - name: List the changed files
+      run: $EXP/exp.py time "$TIMINGS" "git diff" -- sh -c 'git diff --name-only --diff-filter=d HEAD^1 HEAD > dist-changed.txt'
+    - name: Build the dependents graph
+      run: >-
+        $EXP/exp.py time "$TIMINGS" "ruff analyze graph" --
+        sh -c 'uvx "ruff@$RUFF_GRAPH_VERSION" analyze graph --direction dependents
+        --config "src = [\"src\", \"tests/scenario\", \".\"]" src tests > graph.json'
+    - name: Plan the targets
+      id: plan
+      run: |
+        mkdir -p dist/exp-targets
+        cp dist-changed.txt dist/exp-targets/changed.txt
+        $EXP/exp.py time "$TIMINGS" "plan.py" -- sh -c "$EXP/plan.py --graph graph.json --changed dist-changed.txt --out dist/exp-targets > plan.out"
+        cat plan.out | tee -a "$GITHUB_OUTPUT"
+        while IFS='=' read -r k v; do $EXP/exp.py note "$TIMINGS" "count $k" "$v"; done < plan.out
+    - uses: actions/upload-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/exp-targets
+    - name: Summary
+      if: always()
+      run: $EXP/exp.py summary "$TIMINGS" exp-plan >> "$GITHUB_STEP_SUMMARY"
+
+  # Downloads `ci.yml`'s `ci-targets` to compare the lists and to run the tests on
+  # the Pants list too when the lists differ.
+  exp-pants-targets:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    needs: exp-plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      unit-differs: ${{ steps.compare.outputs.unit-differs }}
+      component-differs: ${{ steps.compare.outputs.component-differs }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/exp-targets
+    - name: Wait for plan-targets of ci.yml
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        run_id=$($EXP/fetch-pants-targets.sh "$REPO" "$SHA" dist/ci-targets 2400)
+        $EXP/exp.py note "$TIMINGS" "ci.yml run" "$run_id"
+    - name: Compare the lists
+      id: compare
+      run: |
+        mkdir -p dist/pants-targets
+        for name in unit component typecheck; do
+          $EXP/exp.py addresses "dist/ci-targets/$name.txt" > "dist/pants-targets/$name.txt"
+          $EXP/exp.py compare "dist/exp-targets/$name.txt" "dist/pants-targets/$name.txt" > "dist/pants-targets/$name.diff"
+          head -1 "dist/pants-targets/$name.diff"
+          $EXP/exp.py note "$TIMINGS" "$name" "$(head -1 "dist/pants-targets/$name.diff")"
+          {
+            echo "<details><summary>$name: $(head -1 "dist/pants-targets/$name.diff")</summary>"
+            echo
+            echo '```'
+            tail -n +2 "dist/pants-targets/$name.diff" | head -300
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$name" != typecheck ]; then
+            if [ "$(tail -n +2 "dist/pants-targets/$name.diff" | wc -l)" -gt 0 ]; then
+              echo "$name-differs=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name-differs=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+        done
+    - uses: actions/upload-artifact@v5
+      with:
+        name: pants-targets
+        path: dist/pants-targets
+    - name: Summary
+      if: always()
+      run: $EXP/exp.py summary "$TIMINGS" exp-pants-targets >> "$GITHUB_STEP_SUMMARY"
+
+  # Stands in for a periodic job on main: a cold mypy run on the base revision, saved
+  # under the base sha.
+  exp-mypy-seed:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.base.outputs.sha }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+        lfs: false
+    - name: Compute the venv key
+      id: venv-key
+      env:
+        KEY: exp-venv-${{ runner.os }}-${{ hashFiles('python.lock', 'python.lock.metadata') }}-${{ hashFiles('.github/ci-experiment/requirements-extra.txt') }}
+      run: echo "key=$KEY" >> "$GITHUB_OUTPUT"
+    - name: Check out the base revision
+      id: base
+      run: |
+        echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+        # The base does not hold the experiment scripts.
+        cp -r "$EXP" ../ci-experiment
+        git checkout --quiet HEAD^1
+    - name: Look up the mypy cache
+      id: lookup
+      uses: actions/cache/restore@v5
+      with:
+        path: .mypy_cache
+        key: exp-mypy-${{ steps.base.outputs.sha }}
+        lookup-only: true
+    - uses: actions/setup-python@v6
+      if: steps.lookup.outputs.cache-hit != 'true'
+      with:
+        python-version: '3.13.18'
+    - name: Restore the venv
+      if: steps.lookup.outputs.cache-hit != 'true'
+      id: venv
+      uses: actions/cache@v5
+      with:
+        path: .venv
+        key: ${{ steps.venv-key.outputs.key }}
+    - name: Build the venv
+      if: steps.lookup.outputs.cache-hit != 'true' && steps.venv.outputs.cache-hit != 'true'
+      run: |
+        pip install uv
+        ../ci-experiment/exp.py time "$TIMINGS" "venv" -- ../ci-experiment/setup-venv.sh 3.13.18 .venv ../venv-work
+    - name: Typecheck every file, cold
+      if: steps.lookup.outputs.cache-hit != 'true'
+      env:
+        MYPYPATH: tests/scenario
+      run: >-
+        ../ci-experiment/exp.py time "$TIMINGS" "mypy cold (src tests)" --
+        .venv/bin/mypy --python-executable .venv/bin/python src tests
+    - name: Save the mypy cache
+      if: always() && steps.lookup.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: .mypy_cache
+        key: exp-mypy-${{ steps.base.outputs.sha }}
+    - name: Summary
+      if: always()
+      run: |
+        ../ci-experiment/exp.py note "$TIMINGS" "seed cache hit" "${{ steps.lookup.outputs.cache-hit }}"
+        ../ci-experiment/exp.py summary "$TIMINGS" exp-mypy-seed >> "$GITHUB_STEP_SUMMARY"
+
+  exp-typecheck:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    needs: [exp-plan, exp-mypy-seed]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/exp-targets
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.13.18'
+    - name: Restore the venv
+      id: venv
+      uses: actions/cache@v5
+      with:
+        path: .venv
+        key: exp-venv-${{ runner.os }}-${{ hashFiles('python.lock', 'python.lock.metadata') }}-${{ hashFiles('.github/ci-experiment/requirements-extra.txt') }}
+    - name: Build the venv
+      if: steps.venv.outputs.cache-hit != 'true'
+      run: |
+        pip install uv
+        $EXP/exp.py time "$TIMINGS" "venv" -- $EXP/setup-venv.sh 3.13.18 .venv ../venv-work
+    - name: Restore the mypy cache
+      id: mypy-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: .mypy_cache
+        key: exp-mypy-${{ needs.exp-mypy-seed.outputs.base }}
+    - name: Typecheck
+      env:
+        MYPYPATH: tests/scenario
+      run: |
+        echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        $EXP/exp.py note "$TIMINGS" "mypy cache hit" "${{ steps.mypy-cache.outputs.cache-hit }}"
+        $EXP/exp.py note "$TIMINGS" "files" "$(wc -l < dist/exp-targets/typecheck.txt)"
+        if [ ! -s dist/exp-targets/typecheck.txt ]; then
+          echo "No targets to typecheck"
+          exit 0
+        fi
+        $EXP/exp.py time "$TIMINGS" "mypy incremental" -- \
+          .venv/bin/mypy --python-executable .venv/bin/python @dist/exp-targets/typecheck.txt
+    - name: Summary
+      if: always()
+      run: $EXP/exp.py summary "$TIMINGS" exp-typecheck >> "$GITHUB_STEP_SUMMARY"
+
+  exp-lint:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - name: Install uv
+      run: pip install uv
+    - name: Ruff format
+      run: $EXP/exp.py time "$TIMINGS" "ruff format --check" -- uvx "ruff@$RUFF_LINT_VERSION" format --check --config "$RUFF_EXCLUDE"
+    - name: Ruff check
+      if: always()
+      run: $EXP/exp.py time "$TIMINGS" "ruff check" -- uvx "ruff@$RUFF_LINT_VERSION" check --config "$RUFF_EXCLUDE" --output-format=github
+    - name: Summary
+      if: always()
+      run: $EXP/exp.py summary "$TIMINGS" exp-lint >> "$GITHUB_STEP_SUMMARY"
+
+  # `list`: `exp` runs `exp-plan`'s list; `pants` runs `ci.yml`'s list, only when they differ.
+  exp-unit:
+    if: startsWith(github.head_ref, 'ci-exp/') && needs.exp-plan.outputs.unit != '0'
+    needs: exp-plan
+    name: exp-unit (exp ${{ matrix.shard }}/${{ matrix.count }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        # The 2-, 3- and 4-shard rows ran up to 178790f142; one shard is testmon's baseline.
+        - {count: 1, shard: 0}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/targets
+    - uses: ./.github/ci-experiment/pytest
+      with:
+        suite: unit
+        list: dist/targets/unit.txt
+        shard: ${{ matrix.shard }}
+        count: ${{ matrix.count }}
+        workers: '4'
+
+  exp-unit-pants-list:
+    if: startsWith(github.head_ref, 'ci-exp/') && needs.exp-pants-targets.outputs.unit-differs == 'true'
+    needs: exp-pants-targets
+    name: exp-unit (pants list ${{ matrix.shard }}/${{ matrix.count }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - {count: 1, shard: 0}
+        - {count: 2, shard: 0}
+        - {count: 2, shard: 1}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: pants-targets
+        path: dist/targets
+    - uses: ./.github/ci-experiment/pytest
+      with:
+        suite: unit
+        list: dist/targets/unit.txt
+        shard: ${{ matrix.shard }}
+        count: ${{ matrix.count }}
+        workers: '4'
+
+  exp-component:
+    if: startsWith(github.head_ref, 'ci-exp/') && needs.exp-plan.outputs.component != '0'
+    needs: exp-plan
+    name: exp-component (exp ${{ matrix.shard }}/${{ matrix.count }}, ${{ matrix.workers }} proc)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        # The 2-, 3- and 4-shard rows ran up to 178790f142; one shard is testmon's baseline.
+        - {count: 1, shard: 0, workers: 4}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/targets
+    - uses: ./.github/ci-experiment/pytest
+      with:
+        suite: component
+        list: dist/targets/component.txt
+        shard: ${{ matrix.shard }}
+        count: ${{ matrix.count }}
+        workers: ${{ matrix.workers }}
+        batch-size: auto
+
+  exp-component-pants-list:
+    if: startsWith(github.head_ref, 'ci-exp/') && needs.exp-pants-targets.outputs.component-differs == 'true'
+    needs: exp-pants-targets
+    name: exp-component (pants list ${{ matrix.shard }}/${{ matrix.count }}, ${{ matrix.workers }} proc)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - {count: 1, shard: 0, workers: 0}
+        - {count: 2, shard: 0, workers: 0}
+        - {count: 2, shard: 1, workers: 0}
+        - {count: 1, shard: 0, workers: 4}
+        - {count: 2, shard: 0, workers: 4}
+        - {count: 2, shard: 1, workers: 4}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: pants-targets
+        path: dist/targets
+    - uses: ./.github/ci-experiment/pytest
+      with:
+        suite: component
+        list: dist/targets/component.txt
+        shard: ${{ matrix.shard }}
+        count: ${{ matrix.count }}
+        workers: ${{ matrix.workers }}
+        batch-size: auto
+
+  # Stands in for a job on main: runs `exp-plan`'s lists on the base revision with testmon
+  # and saves its data under the base sha.
+  exp-testmon-seed:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    needs: exp-plan
+    name: exp-testmon-seed (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    env:
+      EXP: .exp
+    outputs:
+      base: ${{ steps.base.outputs.sha }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - {suite: unit, size: '1'}
+        - {suite: component, size: auto}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+        lfs: false
+    - name: Compute the venv key
+      id: venv-key
+      env:
+        KEY: exp-venv-${{ runner.os }}-${{ hashFiles('python.lock', 'python.lock.metadata') }}-${{ hashFiles('.github/ci-experiment/requirements-extra.txt') }}
+      run: echo "key=$KEY" >> "$GITHUB_OUTPUT"
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/targets
+    - name: Check out the base revision
+      id: base
+      env:
+        SUITE: ${{ matrix.suite }}
+      run: |
+        echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+        # The base does not hold the experiment scripts.
+        cp -r .github/ci-experiment ../ci-experiment
+        git checkout --quiet HEAD^1
+        cp -r ../ci-experiment "$EXP"
+        $EXP/exp.py existing "dist/targets/$SUITE.txt" > ../base-list.txt
+        $EXP/exp.py note "$TIMINGS" "files on the base" "$(wc -l < ../base-list.txt)"
+    - name: Look up the testmon data
+      id: lookup
+      uses: actions/cache/restore@v5
+      with:
+        path: .testmon
+        key: exp-testmon-v2-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
+        lookup-only: true
+    - uses: ./.exp/pytest
+      if: steps.lookup.outputs.cache-hit != 'true'
+      with:
+        suite: ${{ matrix.suite }}
+        list: ../base-list.txt
+        shard: '0'
+        count: '1'
+        workers: '4'
+        batch-size: ${{ matrix.size }}
+        testmon: seed
+        venv-key: ${{ steps.venv-key.outputs.key }}
+    - name: Save the testmon data
+      if: always() && steps.lookup.outputs.cache-hit != 'true' && hashFiles('.testmon/data.db') != ''
+      uses: actions/cache/save@v5
+      with:
+        path: .testmon
+        key: exp-testmon-v2-${{ matrix.suite }}-${{ steps.base.outputs.sha }}
+
+  exp-testmon-select:
+    if: startsWith(github.head_ref, 'ci-exp/')
+    needs: [exp-plan, exp-testmon-seed]
+    name: exp-testmon-select (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - {suite: unit, size: '1'}
+        - {suite: component, size: auto}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: actions/download-artifact@v5
+      with:
+        name: exp-targets
+        path: dist/targets
+    - name: Restore the testmon data
+      uses: actions/cache/restore@v5
+      with:
+        path: .testmon
+        key: exp-testmon-v2-${{ matrix.suite }}-${{ needs.exp-testmon-seed.outputs.base }}
+    - uses: ./.github/ci-experiment/pytest
+      with:
+        suite: ${{ matrix.suite }}
+        list: dist/targets/${{ matrix.suite }}.txt
+        shard: '0'
+        count: '1'
+        workers: '4'
+        batch-size: ${{ matrix.size }}
+        testmon: select
+        changed: dist/targets/changed.txt
