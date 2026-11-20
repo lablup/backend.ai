@@ -5,6 +5,7 @@ from ai.backend.agent.kernel import KernelOwnershipData
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.proxy import DomainSocketPathPair
 from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServicePort, SessionTypes
 
@@ -28,6 +29,8 @@ class KernelRecoveryScratchData(BackendAISchema):
 
     block_service_ports: bool
     domain_socket_proxies: list[DomainSocketPathPair]
+    # None on records written before it was kept.
+    service_interpolation: ServiceArgumentInterpolation | None = None
     service_ports: list[ServicePort]
     repl_in_port: int
     repl_out_port: int
@@ -48,6 +51,7 @@ class KernelRecoveryScratchData(BackendAISchema):
             session_type=data.session_type,
             block_service_ports=data.block_service_ports,
             domain_socket_proxies=data.domain_socket_proxies,
+            service_interpolation=data.service_interpolation,
             service_ports=data.service_ports,
             repl_in_port=data.repl_in_port,
             repl_out_port=data.repl_out_port,
@@ -69,6 +73,7 @@ class KernelRecoveryScratchData(BackendAISchema):
             session_type=self.session_type,
             block_service_ports=self.block_service_ports,
             domain_socket_proxies=self.domain_socket_proxies,
+            service_interpolation=self.service_interpolation,
             service_ports=self.service_ports,
             repl_in_port=self.repl_in_port,
             repl_out_port=self.repl_out_port,
