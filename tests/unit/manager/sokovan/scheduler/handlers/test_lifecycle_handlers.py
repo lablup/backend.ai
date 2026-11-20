@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -31,7 +32,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions impo
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult, SchedulingSkip
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import StartFailure
+from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
+    ScheduleResult,
+    SchedulingSkip,
+)
 from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
 from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForPullWithImages,
@@ -626,6 +632,33 @@ class TestStartSessionsLifecycleHandler:
         # Verify success reason
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
+
+    @pytest.mark.parametrize("disposition", list(FailureDisposition))
+    async def test_session_launcher_could_not_start_is_a_failure(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+        disposition: FailureDisposition,
+    ) -> None:
+        mock_repository.search_sessions_with_kernels_and_user.return_value = (
+            sessions_for_start_factory([prepared_session])
+        )
+        failing = prepared_session.session_info.identity.id
+        mock_launcher.start_sessions_for_handler = AsyncMock(
+            return_value={failing: StartFailure("RuntimeError: refused", disposition)}
+        )
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+
+        assert not result.successes
+        (failure,) = result.failures
+        assert failure.session_id == failing
+        assert failure.disposition is disposition
+        assert failure.reason == KernelLifecycleEventReason.FAILED_TO_START
+        assert failure.message == "RuntimeError: refused"
 
     async def test_empty_session_list_returns_empty(
         self,
