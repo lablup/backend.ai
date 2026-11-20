@@ -5,6 +5,8 @@ from typing import override
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.ssh_keypair import DefaultSSHKeyConflict
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
@@ -24,7 +26,13 @@ class SSHKeypairCreator(FieldCreator[UserID, SSHKeypairRow, SSHKeypairData]):
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                constraint_name="uq_ssh_keypairs_is_default",
+                error=DefaultSSHKeyConflict(),
+            ),
+        )
 
     @override
     def build_row(self, owner_id: UserID) -> SSHKeypairRow:

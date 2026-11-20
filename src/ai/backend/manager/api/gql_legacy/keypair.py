@@ -22,9 +22,10 @@ from ai.backend.manager.models.keypair.row import (
     keypairs,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
 from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
-from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.actions.search import ScopedSearchSSHKeypairsAction
 
 from .session import ComputeSession
 
@@ -561,9 +562,9 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
         result = await graph_ctx.processors.user.admin_create_keypair.run(
             AdminCreateKeypairAction(user_id=UserID(owner.entity_id()), creator=props.to_creator())
         )
-        ssh_keypairs = await graph_ctx.processors.user.search_ssh_keypairs.run(
-            SearchSSHKeypairsAction(
-                user_ids=[UserID(owner.entity_id())],
+        ssh_keypairs = await graph_ctx.processors.ssh_key.scoped_search.run(
+            ScopedSearchSSHKeypairsAction(
+                targets=[UserSSHKeypairTarget(user_id=UserID(owner.entity_id()))],
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=1),
                     conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
