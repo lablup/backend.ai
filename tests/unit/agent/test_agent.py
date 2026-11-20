@@ -258,6 +258,7 @@ id = "agent-2"
 scaling-group = "default"
 """
         )
+<<<<<<< HEAD
 
         # Create server with runtime
         server = object.__new__(AgentRPCServer)
@@ -294,3 +295,72 @@ scaling-group = "default"
         assert updated_config["agents"][0]["agent"]["scaling-group"] == "default"  # type: ignore[index]
         assert mock_agent2.local_config.agent.scaling_group == "gpu"
         assert mock_agent1.local_config.agent.scaling_group == "default"
+=======
+        queued: ContainerLifecycleEvent = agent.container_lifecycle_queue.get_nowait()
+        assert queued.reason is KernelLifecycleEventReason.UNKNOWN
+
+
+class TestCleanEventOfAKernelBeingDestroyed:
+    """DESTROY hands its done future to the kernel as `clean_event`, and CLEAN gets the same one."""
+
+    @pytest.fixture
+    def kernel_id(self) -> KernelId:
+        return KernelId(uuid4())
+
+    @pytest.fixture
+    async def clean_event(self) -> asyncio.Future[Any]:
+        return asyncio.get_running_loop().create_future()
+
+    @pytest.fixture
+    def agent(self, kernel_id: KernelId, clean_event: asyncio.Future[Any]) -> SimpleNamespace:
+        kernel_obj = Mock(runner=None, clean_event=clean_event, close=AsyncMock())
+        kernel_obj.pop.return_value = None
+        return SimpleNamespace(
+            _ongoing_destruction_tasks={},
+            stat_ctx=SimpleNamespace(remove_kernel_metric=AsyncMock()),
+            registry_lock=asyncio.Lock(),
+            kernel_registry={kernel_id: kernel_obj},
+            restarting_kernels={},
+            clean_kernel=AsyncMock(),
+            reconstruct_resource_usage=AsyncMock(),
+            anycast_and_broadcast_event=AsyncMock(),
+            produce_error_event=AsyncMock(),
+        )
+
+    @pytest.fixture
+    def clean(
+        self, kernel_id: KernelId, clean_event: asyncio.Future[Any]
+    ) -> ContainerLifecycleEvent:
+        return ContainerLifecycleEvent(
+            kernel_id,
+            SessionId(uuid4()),
+            None,
+            LifecycleEvent.CLEAN,
+            KernelLifecycleEventReason.USER_REQUESTED,
+            done_future=clean_event,
+        )
+
+    async def test_a_failed_clean_leaves_its_exception_to_the_waiter(
+        self,
+        agent: SimpleNamespace,
+        clean: ContainerLifecycleEvent,
+        clean_event: asyncio.Future[Any],
+    ) -> None:
+        error = RuntimeError("scratch removal failed")
+        agent.clean_kernel.side_effect = error
+
+        await AbstractAgent._handle_clean_event(cast(Any, agent), clean)
+
+        assert clean_event.exception() is error
+        agent.anycast_and_broadcast_event.assert_awaited_once()
+
+    async def test_a_clean_that_succeeds_ends_the_waiter_with_none(
+        self,
+        agent: SimpleNamespace,
+        clean: ContainerLifecycleEvent,
+        clean_event: asyncio.Future[Any],
+    ) -> None:
+        await AbstractAgent._handle_clean_event(cast(Any, agent), clean)
+
+        assert clean_event.result() is None
+>>>>>>> 2dd550539 (fix(BAI-392): do not set the clean event of a kernel twice (#17269))
