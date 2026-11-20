@@ -118,6 +118,12 @@ class TestMaxLength:
     @pytest.mark.parametrize(
         "make",
         [
+            lambda path: CreateGroupDotfileRequest(
+                group="g", path=path, data="x", permission="644"
+            ),
+            lambda path: CreateDomainDotfileRequest(
+                domain="d", path=path, data="x", permission="644"
+            ),
             lambda path: UpdateUserDotfileRequest(path=path, data="x", permission="644"),
             lambda path: UpdateGroupDotfileRequest(
                 group="g", path=path, data="x", permission="644"
@@ -126,10 +132,10 @@ class TestMaxLength:
                 domain="d", path=path, data="x", permission="644"
             ),
         ],
-        ids=["user", "group", "domain"],
+        ids=["create-group", "create-domain", "update-user", "update-group", "update-domain"],
     )
     @pytest.mark.parametrize("path", [".ssh/authorized_keys", "../x"])
-    def test_update_rejects_path_by_path_rule(
+    def test_rejects_path_by_path_rule_on_other_requests(
         self, make: Callable[[str], object], path: str
     ) -> None:
         with pytest.raises(InvalidDotfilePath):
