@@ -11,7 +11,7 @@ from callosum.rpc import RPCMessage
 from callosum.rpc.message import RPCMessageTypes
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.errors.resources import ResourceError
+from ai.backend.agent.errors.resources import KernelCreationInProgress, ResourceError
 from ai.backend.agent.server import AgentRPCServer
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
@@ -171,6 +171,15 @@ class TestCreateForARegisteredKernel:
             await self._create(agent, kernel_id, restarting=False)
 
         assert agent.kernel_registry[kernel_id] is live_kernel
+        agent.init_kernel_context.assert_not_called()
+
+    async def test_a_create_for_a_kernel_being_created_raises_creation_in_progress(
+        self, agent: MagicMock, kernel_id: KernelId
+    ) -> None:
+        with agent.track_create(kernel_id, SessionId(uuid.uuid4())):
+            with pytest.raises(KernelCreationInProgress):
+                await self._create(agent, kernel_id, restarting=False)
+
         agent.init_kernel_context.assert_not_called()
 
     async def test_a_restart_goes_ahead_over_the_kernel_it_restarts(
