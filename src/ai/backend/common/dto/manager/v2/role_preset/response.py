@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID, RolePresetScopeID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
@@ -43,6 +43,14 @@ class RolePresetNode(BaseResponseModel):
             "Scope type this preset targets. A preset of the `global` type reads as the "
             "global entity its role is created in: `global` or `public`."
         )
+    )
+    scope_id: RolePresetScopeID | None = Field(
+        default=None,
+        description=(
+            "ID of the one scope of `scope_type` the preset's role is created in: a domain, a "
+            "project or a global entity. Null when the role is created in every scope of the "
+            f"type. Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     role_name_template: str | None = Field(
         default=None,

@@ -116,6 +116,7 @@ Scenario: incomplete 9 / 21
 
 | scenario | verdict |
 |---|---|
+| [when the superadmin searches presets with the scope type global, only the preset creating its role in public alone comes back](#searching-a-global-scope-type-finds-the-preset-for-public) | answered |
 | [when the superadmin searches with the project-scope filter, name order and a page size of one, only the first matching preset in the order comes back and the rest do not. The global role gates this call](#searching-the-superadmin-finds-one-page-of-matching-presets) | answered |
 | [when a user without the global role tries to search presets, it is rejected for lack of permission](#searching-a-user-who-is-not-the-superadmin-may-not-search-presets) | rejected |
 
@@ -217,6 +218,7 @@ Then
   - [0].entity_id: same as the id of the preset seeded in advance
   - [0].name = 'preset-1'
   - [0].scope_type = 'project'
+  - [0].scope_id = None
   - [0].role_name_template = None
   - [0].auto_assign = False
   - [0].auto_assign_to_owner = False
@@ -228,6 +230,7 @@ Then
   - [1].entity_id: same as the id of the preset seeded in advance
   - [1].name = 'preset-2'
   - [1].scope_type = 'project'
+  - [1].scope_id = None
   - [1].role_name_template = None
   - [1].auto_assign = False
   - [1].auto_assign_to_owner = False
@@ -409,6 +412,7 @@ Then
   - items[0].entity_id: same as the id of the preset seeded in advance
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].auto_assign = False
   - items[0].role_name_template = None
   - items[0].auto_assign_to_owner = False
@@ -420,6 +424,7 @@ Then
   - items[1].entity_id: same as the id of the preset seeded in advance
   - items[1].name = 'preset-2'
   - items[1].scope_type = 'project'
+  - items[1].scope_id = None
   - items[1].auto_assign = False
   - items[1].role_name_template = None
   - items[1].auto_assign_to_owner = False
@@ -465,6 +470,7 @@ Then
   - items[0].entity_id: same as the id of the preset seeded in advance
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].auto_assign = False
   - items[0].role_name_template = None
   - items[0].auto_assign_to_owner = False
@@ -476,6 +482,7 @@ Then
   - items[1].entity_id: same as the id of the preset seeded in advance
   - items[1].name = 'preset-2'
   - items[1].scope_type = 'project'
+  - items[1].scope_id = None
   - items[1].auto_assign = False
   - items[1].role_name_template = None
   - items[1].auto_assign_to_owner = False
@@ -585,6 +592,7 @@ Then
   - items[0].entity_id: same as the id of the preset seeded in advance
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].auto_assign = False
   - items[0].role_name_template = None
   - items[0].auto_assign_to_owner = False
@@ -596,6 +604,7 @@ Then
   - items[1].entity_id: same as the id of the preset seeded in advance
   - items[1].name = 'preset-2'
   - items[1].scope_type = 'project'
+  - items[1].scope_id = None
   - items[1].auto_assign = False
   - items[1].role_name_template = None
   - items[1].auto_assign_to_owner = False
@@ -635,6 +644,7 @@ Then
   - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
@@ -703,6 +713,7 @@ Then
   - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - role_name_template = 'team-member'
   - auto_assign = True
   - auto_assign_to_owner = True
@@ -801,6 +812,7 @@ Then
   - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -812,6 +824,7 @@ Then
   - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -887,6 +900,7 @@ Then
   - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -898,6 +912,7 @@ Then
   - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -973,6 +988,7 @@ Then
   - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -984,6 +1000,7 @@ Then
   - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -1023,6 +1040,7 @@ Then
   - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
@@ -1087,6 +1105,7 @@ Then
   - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
@@ -1123,6 +1142,48 @@ Then
 
 ### search
 
+<a id="searching-a-global-scope-type-finds-the-preset-for-public"></a>
+
+#### [a-global-scope-type-finds-the-preset-for-public](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
+
+when the superadmin searches presets with the scope type global, only the preset creating its role in public alone comes back
+
+Given
+
+- one preset creating its role in public alone, one preset creating its role in every project, and one superadmin
+  - Role preset for-public-1: for one global scope, with automatic grant disabled
+  - Role preset for-every-project-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.search: user-1 searches presets whose scope type is global
+
+Then
+
+- only the preset creating its role in public alone comes back
+  - items count = 1
+  - items[0].id: same as the id of the preset seeded in advance
+  - items[0].entity_id: same as the id of the preset seeded in advance
+  - items[0].name = 'for-public-1'
+  - items[0].scope_type = 'public'
+  - items[0].scope_id: same as the id of the scope the preset seeded in advance names
+  - items[0].auto_assign = False
+  - items[0].role_name_template = None
+  - items[0].auto_assign_to_owner = False
+  - items[0].deleted = False
+  - items[0].deleted_at = None
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="searching-the-superadmin-finds-one-page-of-matching-presets"></a>
 
 #### [the-superadmin-finds-one-page-of-matching-presets](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
@@ -1154,6 +1215,7 @@ Then
   - items[0].entity_id: same as the id of the preset seeded in advance
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].role_name_template = None
   - items[0].auto_assign = False
   - items[0].auto_assign_to_owner = False
@@ -1783,6 +1845,7 @@ Then
   - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = True
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -1794,6 +1857,7 @@ Then
   - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = True
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -1874,6 +1938,7 @@ Then
   - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = True
@@ -1914,6 +1979,7 @@ Then
   - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = True
@@ -1950,6 +2016,7 @@ Then
   - entity_id: same as the id of the preset seeded in advance
   - name = 'renamed-preset'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False

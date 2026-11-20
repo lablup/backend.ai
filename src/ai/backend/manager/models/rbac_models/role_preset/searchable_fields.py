@@ -59,8 +59,8 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
     """The preset's own columns.
 
     ``role_name_template`` is ``sa.Text`` with no index serving a partial match, so it
-    carries equality and membership only. ``scope_type`` filters and orders on the value
-    the API shows: a ``global`` preset's global entity name.
+    carries equality and membership only. ``scope_type`` filters on the stored column and
+    orders on the value the API shows: a ``global`` preset's global entity name.
     """
 
     id = SearchableField(
@@ -78,7 +78,7 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
     )
     scope_type = SearchableField(
         RolePresetRow.scope_type,
-        StringConditions(_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME),
+        StringConditions(RolePresetRow.scope_type),
         ColumnOrder(_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME),
     )
     scope_id = SearchableField(

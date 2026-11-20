@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID, RolePresetScopeID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData, RolePresetData
@@ -24,10 +24,12 @@ from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRow
 
 @dataclass(frozen=True)
 class TestSeedRolePreset(TestSeedRow[RolePresetData]):
-    """A role preset in the global catalog, carrying no permission entry."""
+    """A role preset in the global catalog, carrying no permission entry. Without
+    ``scope_id`` it is for every scope of ``scope_type``; with one, for that scope alone."""
 
     name_hint: str = "preset"
     scope_type: EntityType = ProjectEntityType()
+    scope_id: RolePresetScopeID | None = None
     auto_assign: bool = False
     auto_assign_to_owner: bool = False
     role_name_template: str | None = None
@@ -38,7 +40,10 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def detail(self) -> str:
-        if self.scope_type == ProjectEntityType():
+        if self.scope_id is not None:
+            scope_ko = f"{self.scope_type} 스코프 하나용"
+            scope_en = f"for one {self.scope_type} scope"
+        elif self.scope_type == ProjectEntityType():
             scope_ko, scope_en = "프로젝트 스코프용", "for the project scope"
         else:
             scope_ko = f"{self.scope_type} 스코프용"
@@ -67,6 +72,7 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
         return RolePresetCreator(
             name=name,
             scope_type=self.scope_type,
+            scope_id=self.scope_id,
             auto_assign=self.auto_assign,
             auto_assign_to_owner=self.auto_assign_to_owner,
             role_name_template=self.role_name_template,

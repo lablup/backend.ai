@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from datetime import UTC, datetime
+from typing import Any, override
 
 import pytest
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -24,6 +27,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.role_preset import (
+    OnlyThePresetForPublicComesBack,
+    PresetsForPublicAndEveryProjectAndACaller,
+    PresetsForPublicAndEveryProjectAndSomeone,
     PresetsToFind,
     ProjectPresetsAndADomainOne,
     TheMatchingPresetPage,
@@ -32,9 +38,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SearchStep = Scenario[
-    TestSeedingSession, PresetsToFind, RolePresetAdapter, SearchRolePresetsPayload
-]
+type SearchStep = Scenario[TestSeedingSession, Any, RolePresetAdapter, SearchRolePresetsPayload]
 
 
 @dataclass(frozen=True)
@@ -73,6 +77,39 @@ class Searching(When[PresetsToFind, RolePresetAdapter, SearchRolePresetsPayload]
                         )
                     ],
                     limit=1,
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingByScopeType(
+    When[PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload]
+):
+    """스코프 타입 필터에 값 하나를 지정해 검색한다."""
+
+    scope_type: str
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: PresetsForPublicAndEveryProjectAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 스코프 타입이 {self.scope_type}인 프리셋을 검색합니다",
+            english=(
+                f"{laid.caller.username} searches presets whose scope type is {self.scope_type}"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: RolePresetAdapter, laid: PresetsForPublicAndEveryProjectAndACaller
+    ) -> SearchRolePresetsPayload:
+        with ActingAs(laid.caller):
+            return await adapter.search(
+                SearchRolePresetsInput(
+                    filter=RolePresetFilter(scope_type=StringFilter(equals=self.scope_type))
                 )
             )
 
@@ -142,8 +179,54 @@ class ARegularUserMayNotSearch(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
+@dataclass(frozen=True)
+class AGlobalScopeTypeFindsThePresetForPublic(
+    Scenario[
+        TestSeedingSession,
+        PresetsForPublicAndEveryProjectAndACaller,
+        RolePresetAdapter,
+        SearchRolePresetsPayload,
+    ]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-global-scope-type-finds-the-preset-for-public"
+
+    @override
+    def describe(self) -> str:
+        scope_type = GlobalEntityType()
+        public = GlobalEntityName.PUBLIC
+        return Says(
+            f"superadmin 이 스코프 타입 {scope_type}로 프리셋을 검색하면, {public} 하나에만 "
+            "역할을 만드는 프리셋만 반환됩니다",
+            english=(
+                f"when the superadmin searches presets with the scope type {scope_type}, only "
+                f"the preset creating its role in {public} alone comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, PresetsForPublicAndEveryProjectAndACaller]:
+        return PresetsForPublicAndEveryProjectAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(
+        self,
+    ) -> When[
+        PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload
+    ]:
+        return SearchingByScopeType(str(GlobalEntityType()))
+
+    @override
+    def then(self) -> Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]:
+        return OnlyThePresetForPublicComesBack(self.started)
+
+
 SCENARIOS: list[SearchStep] = [
     TheSuperadminFindsOnePage(),
+    AGlobalScopeTypeFindsThePresetForPublic(started=datetime.now(UTC)),
     ARegularUserMayNotSearch(),
 ]
 

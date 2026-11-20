@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from ai.backend.common.data.entity.global_entity import GlobalEntityID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID, RolePresetScopeID
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.dto.manager.v2.common import (
     OrderDirection,
@@ -664,6 +664,7 @@ class RolePresetAdapter(BaseAdapter):
             entity_id=data.entity_id(),
             name=data.name,
             scope_type=RolePresetAdapter._scope_type_or_global_entity_name(data),
+            scope_id=RolePresetScopeID(data.scope_id) if data.scope_id is not None else None,
             role_name_template=data.role_name_template,
             auto_assign=data.auto_assign,
             auto_assign_to_owner=data.auto_assign_to_owner,
