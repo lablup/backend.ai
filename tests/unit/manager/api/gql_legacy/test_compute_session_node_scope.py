@@ -18,7 +18,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.rbac.base import DomainScope, ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac import DomainScope, ProjectScope, ScopeType, SystemScope
 from ai.backend.manager.models.session.scopes import (
     DomainSessionTarget,
     ProjectSessionTarget,
