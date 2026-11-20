@@ -26444,7 +26444,7 @@ type SecretKeyCount
 }
 
 """
-Added in 26.10.0. Variable syntax of the service arguments of a model service.
+Added in 26.10.0. Variable syntax of the service arguments, fixed per session.
 """
 type ServiceArgumentInterpolation
   @join__type(graph: STRAWBERRY)
@@ -26480,7 +26480,7 @@ input ServiceArgumentInterpolationDelimiterInput
 }
 
 """
-Added in 26.10.0. Variable syntax of the service arguments of a model service.
+Added in 26.10.0. Variable syntax of the service arguments, fixed per session.
 """
 input ServiceArgumentInterpolationInput
   @join__type(graph: STRAWBERRY)

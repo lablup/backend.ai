@@ -20060,7 +20060,7 @@ type SecretKeyCount {
 }
 
 """
-Added in 26.10.0. Variable syntax of the service arguments of a model service.
+Added in 26.10.0. Variable syntax of the service arguments, fixed per session.
 """
 type ServiceArgumentInterpolation {
   """Delimiters that mark the variables to fill in the service arguments."""
@@ -20090,7 +20090,7 @@ input ServiceArgumentInterpolationDelimiterInput {
 }
 
 """
-Added in 26.10.0. Variable syntax of the service arguments of a model service.
+Added in 26.10.0. Variable syntax of the service arguments, fixed per session.
 """
 input ServiceArgumentInterpolationInput {
   """Delimiters that mark the variables to fill in the service arguments."""

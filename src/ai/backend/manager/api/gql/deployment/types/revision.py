@@ -450,7 +450,7 @@ class ServiceArgumentInterpolationDelimiterGQL:
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Variable syntax of the service arguments of a model service.",
+        description="Variable syntax of the service arguments, fixed per session.",
     ),
     model=ServiceArgumentInterpolationInfoDTO,
     name="ServiceArgumentInterpolation",
@@ -1089,7 +1089,7 @@ class ServiceArgumentInterpolationDelimiterInputGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Variable syntax of the service arguments of a model service.",
+        description="Variable syntax of the service arguments, fixed per session.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="ServiceArgumentInterpolationInput",
