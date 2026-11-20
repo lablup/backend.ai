@@ -338,15 +338,16 @@ class OIDCWebAppPlugin(WebappPlugin):
         valkey_client: ValkeyOpenIDClient = request.app["valkey_client"]
         await valkey_client.set_openid_key(session_key, code_verifier)
 
+        return_uri = self._return_uri(redirect_to)
         uri, _ = client.create_authorization_url(
             authorization_endpoint,
             state=urllib.parse.urlencode({
-                "redirect": str(self._return_uri(redirect_to)),
+                "redirect": str(return_uri),
                 "session": session_key,
                 "force": force,
             }),
             code_verifier=code_verifier,
-            redirect_uri=self._callback_uri(),
+            redirect_uri=self._callback_uri(return_uri),
         )
 
         response = web.Response(
@@ -373,7 +374,7 @@ class OIDCWebAppPlugin(WebappPlugin):
         try:
             if "session" in state:
                 cookie_name = _session_cookie_name(state["session"][0])
-            stoken = await self._authorize(request, state)
+            stoken = await self._authorize(request, state, redirect_uri)
         except OpenIDRedirectError as e:
             self._log_authorization_failure(e)
             response = self._redirect_to(redirect_uri, {"bai_error": e.error_slug()})
@@ -386,8 +387,15 @@ class OIDCWebAppPlugin(WebappPlugin):
             response.del_cookie(cookie_name, path=_SESSION_COOKIE_PATH)
         return response
 
-    def _callback_uri(self) -> str:
-        return str(yarl.URL(self._config.login_uri).with_path(_CALLBACK_PATH))
+    def _callback_uri(self, return_uri: yarl.URL) -> str:
+        """Call back on the host the sign-in returns to, so the browser sends its session cookie.
+
+        Only a host ``allowed_redirect_hosts`` accepted qualifies; otherwise ``login_uri`` is used.
+        """
+        base = yarl.URL(self._config.login_uri)
+        if self._config.allowed_redirect_hosts is not None:
+            base = return_uri
+        return str(base.with_path(_CALLBACK_PATH))
 
     def _return_uri(self, candidate: object) -> yarl.URL:
         """Return ``candidate`` unless ``allowed_redirect_hosts`` rejects its host."""
@@ -463,7 +471,9 @@ class OIDCWebAppPlugin(WebappPlugin):
             return issuer.replace("{tenantid}", str(claims.get("tid", "")))
         return issuer
 
-    async def _authorize(self, request: web.Request, state: Mapping[str, list[str]]) -> str:
+    async def _authorize(
+        self, request: web.Request, state: Mapping[str, list[str]], return_uri: yarl.URL
+    ) -> str:
         if "error" in request.query:
             callback_error = OAuthError(
                 error=request.query["error"],
@@ -492,7 +502,7 @@ class OIDCWebAppPlugin(WebappPlugin):
                 token_endpoint,
                 authorization_response=str(request.url),
                 code_verifier=code_verifier,
-                redirect_uri=self._callback_uri(),
+                redirect_uri=self._callback_uri(return_uri),
             )
         except OAuthError as e:
             raise self._provider_error(e) from e
