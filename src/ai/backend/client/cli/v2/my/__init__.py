@@ -34,6 +34,15 @@ def app_config_fragment() -> None:
     """My app config fragment commands."""
 
 
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.auto_generated_file:auto_generated_file",
+    name="auto-generated-file",
+)
+def auto_generated_file() -> None:
+    """My auto-generated file commands."""
+
+
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.keypair:keypair")
 def keypair() -> None:
     """My keypair commands."""
