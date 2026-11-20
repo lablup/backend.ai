@@ -39,7 +39,10 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
+from ai.backend.manager.errors.notification import (
+    NotificationProcessingFailure,
+    WebhookConnectionFailure,
+)
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import SendResult
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
@@ -272,6 +275,11 @@ class TestRuleFailureLogLevel:
         [
             (NotificationChannelType.WEBHOOK, aiohttp.ClientConnectionError(), _TRACE_LEVEL),
             (NotificationChannelType.WEBHOOK, TimeoutError(), _TRACE_LEVEL),
+            (
+                NotificationChannelType.WEBHOOK,
+                WebhookConnectionFailure("Failed to connect to the webhook URL"),
+                _TRACE_LEVEL,
+            ),
             (
                 NotificationChannelType.WEBHOOK,
                 NotificationProcessingFailure("Webhook delivery failed with status 500"),

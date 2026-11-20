@@ -16,6 +16,7 @@ from ai.backend.manager.data.notification.types import MatchingNotificationRuleD
 from ai.backend.manager.errors.notification import (
     NotificationProcessingFailure,
     NotificationTemplateRenderingFailure,
+    WebhookConnectionFailure,
 )
 from ai.backend.manager.notification.types import ProcessRuleParams
 from ai.backend.manager.services.notification.actions.process_notification import (
@@ -105,6 +106,7 @@ class NotificationService:
 
         Raises:
             NotificationChannelNotFound: If the channel does not exist
+            WebhookConnectionFailure: If the webhook URL cannot be reached or times out
             NotificationProcessingFailure: If sending the test message fails
         """
         channel_data = await self._repository.get_channel_by_id(action.channel_id)
@@ -205,7 +207,13 @@ class NotificationService:
             return True
         if channel_type == NotificationChannelType.WEBHOOK:
             return isinstance(
-                error, (NotificationProcessingFailure, aiohttp.ClientError, TimeoutError)
+                error,
+                (
+                    NotificationProcessingFailure,
+                    WebhookConnectionFailure,
+                    aiohttp.ClientError,
+                    TimeoutError,
+                ),
             )
         return False
 
