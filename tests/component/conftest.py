@@ -356,8 +356,8 @@ def bootstrap_config(
     postgres_container: tuple[str, HostPortPairModel],  # noqa: F811
     test_db: str,
 ) -> Iterator[BootstrapConfig]:
-    etcd_addr = etcd_container[1]
-    postgres_addr = postgres_container[1]
+    _, etcd_addr = etcd_container
+    _, postgres_addr = postgres_container
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 

@@ -1,0 +1,168 @@
+name: exp-pytest
+description: Run one shard of a test list with pytest directly, retrying a failed test once.
+inputs:
+  suite:
+    description: unit or component
+    required: true
+  list:
+    description: The test files, one path per line
+    required: true
+  shard:
+    description: This shard's index
+    required: true
+  count:
+    description: The number of shards
+    required: true
+  workers:
+    description: Processes to spread batches of files across; 0 runs the shard in one process
+    required: true
+  batch-size:
+    description: Files per process when `workers` is not 0; `auto` makes two batches per process
+    required: false
+    default: '1'
+  testmon:
+    description: >-
+      `seed` records testmon data in `.testmon/data.db`; `select` runs only the tests that
+      data selects, or the whole list when `exp.py forced` names a changed file
+    required: false
+    default: ''
+  changed:
+    description: 'The changed files, one path per line, for `testmon: select`'
+    required: false
+    default: ''
+  venv-key:
+    description: The venv cache key, for a job that checks out another revision
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.13.18'
+    - name: Restore the venv
+      id: venv
+      uses: actions/cache@v5
+      with:
+        path: .venv
+        key: ${{ inputs.venv-key || format('exp-venv-{0}-{1}-{2}', runner.os, hashFiles('python.lock', 'python.lock.metadata'), hashFiles('.github/ci-experiment/requirements-extra.txt')) }}
+    - name: Build the venv
+      if: steps.venv.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        pip install uv
+        $EXP/exp.py time "$TIMINGS" "venv" -- $EXP/setup-venv.sh 3.13.18 .venv ../venv-work
+    - name: Configure the redis sentinel hostnames
+      if: inputs.suite == 'component'
+      shell: bash
+      run: |
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+    - name: Test
+      shell: bash
+      env:
+        LIST: ${{ inputs.list }}
+        SHARD: ${{ inputs.shard }}
+        COUNT: ${{ inputs.count }}
+        WORKERS: ${{ inputs.workers }}
+        SIZE: ${{ inputs.batch-size }}
+        SUITE: ${{ inputs.suite }}
+        VENV_HIT: ${{ steps.venv.outputs.cache-hit }}
+        TESTMON: ${{ inputs.testmon }}
+        CHANGED: ${{ inputs.changed }}
+      run: |
+        $EXP/exp.py note "$TIMINGS" "venv cache hit" "$VENV_HIT"
+        $EXP/exp.py shard "$LIST" "$SHARD" "$COUNT" > ../shard.txt
+        $EXP/exp.py note "$TIMINGS" "files" "$(wc -l < ../shard.txt)"
+        if [ ! -s ../shard.txt ]; then echo "No tests in this shard"; exit 0; fi
+        # Outside the rootdir, where testmon does not record the plugin as a dependency
+        # of every test (it sits in `.exp` on the base and `$EXP` on the head).
+        mkdir -p "$RUNNER_TEMP/exp-plugins"
+        cp "$EXP/exp_fixture_timer.py" "$RUNNER_TEMP/exp-plugins/"
+        export PYTHONPATH="$PWD/src:$PWD/tests/scenario:$PWD:$RUNNER_TEMP/exp-plugins"
+        export EXP_FIXTURE_LOG="$PWD/../fixtures.tsv"
+        export BACKEND_BUILD_ROOT="$PWD"
+        mkdir -p dist
+        # `[test]` in pants.toml: 180s per test, a failed test runs once more.
+        pytest=(.venv/bin/python -m pytest --import-mode=importlib
+          --timeout=180 --reruns=1 -vv --no-header --suppress-no-test-exit-code -o junit_family=xunit2 -p no:cacheprovider
+          -p exp_fixture_timer)
+        export TESTMON_DATAFILE="$PWD/.testmon/data.db"
+        case "$TESTMON" in
+          seed)
+            pytest+=(--testmon)
+            mkdir -p .testmon
+            # Processes that create the sqlite file at once fail on `PRAGMA journal_mode = WAL`
+            # with "database is locked"; once it exists, they write it at once.
+            "${pytest[@]}" --co -q "$(head -1 ../shard.txt)" > /dev/null
+            ;;
+          select)
+            if [ ! -f "$TESTMON_DATAFILE" ]; then echo "::error::No testmon data"; exit 1; fi
+            # `tests/conftest.py` adds `-m 'not integration'`, which turns testmon's own
+            # selection off; `--testmon-forceselect` keeps both. A copy, as `--co` writes the data.
+            cp "$TESTMON_DATAFILE" ../select.db
+            TESTMON_DATAFILE="$PWD/../select.db" $EXP/exp.py time "$TIMINGS" "testmon select" -- \
+              .venv/bin/python -m pytest --import-mode=importlib -p no:cacheprovider -W ignore \
+              --suppress-no-test-exit-code --testmon-forceselect --co -q $(cat ../shard.txt) \
+              > dist/testmon-collected.txt
+            $EXP/exp.py note "$TIMINGS" "testmon selected" "$($EXP/exp.py selected dist/testmon-collected.txt dist/testmon-selected.txt)"
+            forced=$($EXP/exp.py forced "$CHANGED" "$SUITE" | tr '\n' ' ')
+            if [ -n "$forced" ]; then
+              $EXP/exp.py note "$TIMINGS" "whole list" "$forced"
+            else
+              # Whole files: testmon runs the selected tests ordered by duration, and
+              # `test_vfolder_repository.py` fails in that order.
+              cp dist/testmon-selected.txt ../shard.txt
+              $EXP/exp.py note "$TIMINGS" "files to run" "$(wc -l < ../shard.txt)"
+              if [ ! -s ../shard.txt ]; then echo "testmon selected no tests"; exit 0; fi
+            fi
+            ;;
+        esac
+        if [ "$WORKERS" = 0 ]; then
+          $EXP/exp.py time "$TIMINGS" "pytest $SUITE (1 process)" -- \
+            "${pytest[@]}" --junitxml=dist/junit-0.xml $(cat ../shard.txt)
+        else
+          # pytest-xdist refuses a run whose workers collect different test ids (some
+          # tests draw a parametrize id at random), and unit files sharing a process
+          # see each other's DB changes; Pants runs one unit file per process.
+          if [ "$SIZE" = auto ]; then
+            files=$(wc -l < ../shard.txt)
+            SIZE=$(( (files + WORKERS * 2 - 1) / (WORKERS * 2) ))
+          fi
+          $EXP/exp.py note "$TIMINGS" "batch size" "$SIZE"
+          $EXP/exp.py time "$TIMINGS" "pytest $SUITE ($WORKERS processes)" -- \
+            $EXP/exp.py batches ../shard.txt "$WORKERS" "$SIZE" dist/junit -- "${pytest[@]}"
+        fi
+    - name: Summarize the failures
+      if: always()
+      shell: bash
+      run: |
+        if ls dist/junit-*.xml > /dev/null 2>&1; then
+          python3 - dist/junit-*.xml <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+        import sys, xml.etree.ElementTree as ET
+        total = dict.fromkeys(("tests", "failures", "errors", "skipped"), 0)
+        failed = []
+        for path in sys.argv[1:]:
+            root = ET.parse(path).getroot()
+            for s in [root] if root.tag == "testsuite" else list(root):
+                for k in total:
+                    total[k] += int(s.get(k, 0))
+            for case in root.iter("testcase"):
+                if case.find("failure") is not None or case.find("error") is not None:
+                    failed.append(f"{case.get('classname')}::{case.get('name')}")
+        print(f"### Tests: {total}\n")
+        for name in sorted(failed):
+            print(f"- FAILED `{name}`")
+        EOF
+        fi
+        $EXP/exp.py fixtures ../fixtures.tsv | tee -a "$TIMINGS"
+        $EXP/exp.py summary "$TIMINGS" "exp-${{ inputs.suite }}" >> "$GITHUB_STEP_SUMMARY"
+    - uses: actions/upload-artifact@v5
+      if: always()
+      with:
+        name: junit-${{ inputs.suite }}-${{ github.job }}-${{ inputs.shard }}-of-${{ inputs.count }}
+        path: |
+          dist/junit-*.xml
+          dist/testmon-*.txt
+        if-no-files-found: ignore
