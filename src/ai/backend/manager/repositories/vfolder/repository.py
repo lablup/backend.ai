@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -31,6 +32,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.deployment.types import (
+    RevisionServingState,
+    RevisionVFolderReference,
+    ServingRevisionRef,
+)
 from ai.backend.manager.data.entity_share.types import EntityShareData, EntityShareStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
@@ -69,7 +75,14 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent.row import agents
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.deployment_revision.searchers import (
+    ServingRevisionsReferencingVFolderSearcher,
+)
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.lookups import HeldShareLookup
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -83,6 +96,7 @@ from ai.backend.manager.models.entity_share.updaters import (
     EntityShareRevokeUpdater,
 )
 from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.kernel.searchers import LiveKernelsMountingVFolderSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -94,6 +108,7 @@ from ai.backend.manager.models.resource_policy.row import (
     keypair_resource_policies,
 )
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user.lookups import UserEmailLookup
@@ -129,7 +144,10 @@ from ai.backend.manager.models.vfolder.row import (
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
-from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
+from ai.backend.manager.models.vfolder.searchers import (
+    VFolderSearcher,
+    VFolderUserMountPolicySearcher,
+)
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
     VFolderReadyUpdater,
@@ -144,6 +162,7 @@ from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
 )
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.vfolder.host_permission import (
@@ -152,7 +171,6 @@ from ai.backend.manager.repositories.vfolder.host_permission import (
     get_allowed_vfolder_hosts_by_user,
 )
 from ai.backend.manager.repositories.vfolder.purge_guards import (
-    find_active_vfolder_references,
     get_sessions_by_mounted_folder,
     vfolder_reference_conflict_checks,
 )
@@ -186,6 +204,43 @@ class _VFolderWithLinkedModelCards:
 
     vfolder_row: VFolderRow
     model_card_rows: list[ModelCardRow]
+
+
+@dataclass(frozen=True)
+class _VFolderReferenceHit:
+    """The referrers of one kind: those the viewer may see, and a count of the rest."""
+
+    describe: str
+    shown: list[str]
+    hidden_count: int = 0
+
+
+def _deployment_visible_to(viewer: UserData) -> QueryCondition:
+    user_id = UserID(viewer.user_id)
+
+    def inner() -> sa.ColumnElement[bool]:
+        return sa.or_(
+            EndpointRow.session_owner == user_id,
+            EndpointRow.created_user == user_id,
+            EndpointRow.project.in_(joined_project_ids_query(user_id)),
+        )
+
+    return inner
+
+
+def _vfolder_in_use_error(
+    vfolder_id: uuid.UUID, hits: Sequence[_VFolderReferenceHit]
+) -> VFolderDeletionNotAllowed:
+    details: list[str] = []
+    for hit in hits:
+        referrers = list(hit.shown)
+        if hit.hidden_count:
+            referrers.append(f"{hit.hidden_count} more you cannot see")
+        details.append(f"{hit.describe}: {', '.join(referrers)}")
+    return VFolderDeletionNotAllowed(
+        f"Cannot purge the vfolder(id: {vfolder_id}); it is still in use: "
+        f"{'; '.join(details)}. Remove the reference(s) first or set force=True."
+    )
 
 
 class VfolderRepository:
@@ -592,36 +647,99 @@ class VfolderRepository:
                 record.model_card_rows.append(card_row)
         return list(grouped.values())
 
-    async def _ensure_vfolder_purgeable(
-        self, session: SASession, vfolder_row: VFolderRow, *, force: bool
+    def _ensure_purgable_status(
+        self, vfolder_id: uuid.UUID, status: VFolderOperationStatus
     ) -> None:
-        """Raise when the vfolder must not be purged; return normally otherwise.
-
-        Enforces a purgable-status precondition and rejects the purge while the
-        vfolder is actively referenced anywhere in
-        :data:`VFOLDER_REFERENCE_CHECKS` (live session/kernel mounts, active
-        model-service endpoints via ``model`` or ``extra_mounts``). All checks
-        are skipped when ``force`` is True.
-
-        Raises:
-            VFolderFilterStatusFailed: The vfolder status is not purgable.
-            VFolderDeletionNotAllowed: The vfolder is still actively referenced.
-        """
-        if force:
-            return
-        if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
+        if status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
             raise VFolderFilterStatusFailed(
-                f"Cannot purge the vfolder(id: {vfolder_row.id}). Its status "
-                f"({vfolder_row.status.value}) is not purgable. Soft-delete it "
-                "first or set force=True."
+                f"Cannot purge the vfolder(id: {vfolder_id}). Its status "
+                f"({status.value}) is not purgable. Soft-delete it first or set force=True."
             )
-        hits = await find_active_vfolder_references(session, vfolder_row)
-        if hits:
-            details = "; ".join(f"{hit.describe} {hit.referrer_ids}" for hit in hits)
-            raise VFolderDeletionNotAllowed(
-                f"Cannot purge the vfolder(id: {vfolder_row.id}); it is still in use: "
-                f"{details}. Remove the reference(s) first or set force=True."
+
+    async def _vfolder_references(
+        self, r: V2ReadOps, vfolder_id: VFolderID
+    ) -> list[_VFolderReferenceHit]:
+        """Every active reference to the vfolder, in the order of
+        :data:`VFOLDER_REFERENCE_CHECKS`. Deployments the current user cannot see are
+        counted, not named."""
+        hits: list[_VFolderReferenceHit] = []
+        live_sessions = await r.search_in_global(
+            LiveSessionsMountingVFolderSearcher(pagination=NoPagination(), vfolder_id=vfolder_id)
+        )
+        if live_sessions.items:
+            hits.append(
+                _VFolderReferenceHit(
+                    describe="mounted on live session(s)",
+                    shown=[str(session_id) for session_id in live_sessions.items],
+                )
             )
+        folder_uuid = VFolderUUID(vfolder_id.folder_id)
+        live_kernels = await r.search_in_global(
+            LiveKernelsMountingVFolderSearcher(pagination=NoPagination(), vfolder_id=folder_uuid)
+        )
+        if live_kernels.items:
+            hits.append(
+                _VFolderReferenceHit(
+                    describe="mounted on live kernel(s)",
+                    shown=[str(kernel_id) for kernel_id in live_kernels.items],
+                )
+            )
+        for reference, describe in (
+            (
+                RevisionVFolderReference.MODEL,
+                "referenced as the model by serving or deploying revision(s)",
+            ),
+            (
+                RevisionVFolderReference.EXTRA_MOUNT,
+                "mounted as an extra mount by serving or deploying revision(s)",
+            ),
+        ):
+            revisions: list[ServingRevisionRef] = []
+            for state in RevisionServingState:
+                found = await r.search_in_global(
+                    ServingRevisionsReferencingVFolderSearcher(
+                        pagination=NoPagination(),
+                        vfolder_id=folder_uuid,
+                        reference=reference,
+                        state=state,
+                    )
+                )
+                revisions.extend(found.items)
+            if revisions:
+                hits.append(await self._revision_reference_hit(r, describe, revisions))
+        return hits
+
+    async def _revision_reference_hit(
+        self, r: V2ReadOps, describe: str, revisions: Sequence[ServingRevisionRef]
+    ) -> _VFolderReferenceHit:
+        conditions = [
+            DeploymentSearchableFields.own.entity_id.filter.in_(
+                UUIDInMatchSpec(
+                    values=list({revision.deployment_id for revision in revisions}),
+                    negated=False,
+                )
+            ),
+        ]
+        viewer = current_user()
+        if viewer is not None and not viewer.is_superadmin:
+            conditions.append(_deployment_visible_to(viewer))
+        deployments = await r.search_in_global(
+            DeploymentSearcher(pagination=NoPagination(), conditions=conditions)
+        )
+        visible = {deployment.id: deployment for deployment in deployments.items}
+        shown = [
+            f"deployment '{deployment.metadata.name}' (id: {deployment.id}, project: "
+            f"{deployment.metadata.project_id}) revision #{revision.revision_number} "
+            f"(id: {revision.revision_id}, {revision.state})"
+            for revision in sorted(
+                revisions,
+                key=lambda revision: (str(revision.deployment_id), revision.revision_number),
+            )
+            if (deployment := visible.get(revision.deployment_id)) is not None
+        ]
+        return _VFolderReferenceHit(
+            describe=describe, shown=shown, hidden_count=len(revisions) - len(shown)
+        )
 
     @vfolder_repository_resilience.apply()
     async def delete_vfolders_forever(
@@ -641,12 +759,31 @@ class VfolderRepository:
         ``DELETE_ONGOING`` like any other success.
 
         Unless ``force`` is True, a vfolder that is mounted by a live session,
-        referenced by an active model-service endpoint, or not in a purgable
+        referenced by a serving or deploying revision, or not in a purgable
         status also becomes a failure (carrying the blocking error) and is
         skipped — its storage is left intact.
         """
 
         result = BulkVFolderPurgeResult()
+        in_use: dict[uuid.UUID, VFolderDeletionNotAllowed] = {}
+        if not force and vfolder_ids:
+            async with self._v2_ops.read_ops() as r:
+                targets = await r.search_in_global(
+                    VFolderSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            VFolderSearchableFields.own.id.filter.in_(
+                                UUIDInMatchSpec(values=list(vfolder_ids), negated=False)
+                            )
+                        ],
+                    )
+                )
+                for target in targets.items:
+                    hits = await self._vfolder_references(
+                        r, VFolderID(target.quota_scope_id, target.id)
+                    )
+                    if hits:
+                        in_use[target.id] = _vfolder_in_use_error(target.id, hits)
         async with self._db.connect() as db_conn:
             async with self._db.begin_session(db_conn) as db_session:
                 records = await self._fetch_vfolders_with_linked_model_cards(
@@ -659,9 +796,10 @@ class VfolderRepository:
                     # Partial-success semantics: a per-vfolder blocker becomes a
                     # failure entry rather than aborting the whole batch.
                     try:
-                        await self._ensure_vfolder_purgeable(
-                            db_session, rec.vfolder_row, force=force
-                        )
+                        if not force:
+                            self._ensure_purgable_status(rec.vfolder_row.id, rec.vfolder_row.status)
+                            if (in_use_error := in_use.get(rec.vfolder_row.id)) is not None:
+                                raise in_use_error
                     except BackendAIError as e:
                         result.failures.append(
                             VFolderPurgeFailure(vfolder_id=rec.vfolder_row.id, exception=e)
@@ -719,10 +857,10 @@ class VfolderRepository:
         Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
 
         Unless ``force`` is True, the purge is rejected when the vfolder is
-        mounted by a live session, referenced by an active model-service
-        endpoint, or not in a purgable status. The in-use guard is carried by the
-        purger spec as conflict checks, so the guard and the delete run in one
-        transaction.
+        mounted by a live session, referenced by a serving or deploying revision,
+        or not in a purgable status. The in-use guard is carried by the purger spec
+        as conflict checks, so the guard and the delete run in one transaction; a
+        read before it names the blocking references in the error.
 
         Raises:
             VFolderNotFound: If the vfolder doesn't exist.
@@ -730,6 +868,18 @@ class VfolderRepository:
             VFolderDeletionNotAllowed: If the vfolder is mounted or endpoint-referenced.
             VFolderHasLinkedModelCard: If a model card still references the vfolder.
         """
+        if not force:
+            async with self._v2_ops.read_ops() as r:
+                target = await r.query_data(VFolderQuerier(vfolder_id=vfolder_id))
+                if (
+                    target is not None
+                    and target.status in vfolder_status_map[VFolderStatusSet.PURGABLE]
+                ):
+                    hits = await self._vfolder_references(
+                        r, VFolderID(target.quota_scope_id, target.id)
+                    )
+                    if hits:
+                        raise _vfolder_in_use_error(vfolder_id, hits)
         async with self._v2_ops.write_ops() as w:
             vfolder = await w.query_data(VFolderQuerier(vfolder_id=vfolder_id))
             if vfolder is None:
