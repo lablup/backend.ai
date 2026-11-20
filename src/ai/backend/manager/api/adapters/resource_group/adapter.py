@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
+    UpdateResourceGroupSchedulerOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload,
@@ -561,6 +562,10 @@ class ResourceGroupAdapter(BaseAdapter):
     def _to_updater(
         self, resource_group_id: ResourceGroupID, input: UpdateResourceGroupInput
     ) -> ResourceGroupUpdater:
+        scheduler_options = OptionalState[UpdateResourceGroupSchedulerOptionsInput].from_unset(
+            input.scheduler_options
+        )
+        scheduler_options_config = scheduler_options.and_optional(lambda options: options.config)
         scheduler: OptionalState[str] = OptionalState.nop()
         if not isinstance(input.scheduler_type, Unset) and input.scheduler_type is not None:
             scheduler = OptionalState.update(SchedulerType(input.scheduler_type).value)
@@ -589,6 +594,24 @@ class ResourceGroupAdapter(BaseAdapter):
             use_host_network=OptionalState.from_unset(input.use_host_network),
             scheduler=scheduler,
             preemption_config=preemption_config,
+            allowed_session_types=scheduler_options.and_optional(
+                lambda options: options.allowed_session_types
+            ),
+            pending_timeout=scheduler_options.and_optional(
+                lambda options: options.pending_timeout
+            ).map(lambda seconds: timedelta(seconds=seconds)),
+            num_retries_to_skip=scheduler_options_config.and_tri(
+                lambda config: config.num_retries_to_skip
+            ),
+            agent_selection_strategy=scheduler_options.and_optional(
+                lambda options: options.agent_selection_strategy
+            ),
+            allow_fractional_resource_fragmentation=scheduler_options.and_optional(
+                lambda options: options.allow_fractional_resource_fragmentation
+            ),
+            route_cleanup_target_statuses=scheduler_options.and_optional(
+                lambda options: options.route_cleanup_target_statuses
+            ),
         )
 
     def _to_partial_bulk_payload(
@@ -738,6 +761,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 use_host_network=input.use_host_network,
                 scheduler_type=input.scheduler_type,
                 preemption=input.preemption,
+                scheduler_options=input.scheduler_options,
             ),
         )
         return UpdateResourceGroupConfigPayloadNode(resource_group=payload.resource_group)

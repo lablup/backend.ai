@@ -5,13 +5,14 @@ Request DTOs for resource group DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
@@ -26,7 +27,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import PreemptionVictimScope
+from ai.backend.common.types import AgentSelectionStrategy, PreemptionVictimScope, SessionTypes
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
@@ -51,6 +52,8 @@ __all__ = (
     "UpdateResourceGroupConfigInput",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
+    "UpdateResourceGroupSchedulerOptionsConfigInput",
+    "UpdateResourceGroupSchedulerOptionsInput",
 )
 
 
@@ -150,6 +153,69 @@ class PreemptionConfigInputDTO(BaseRequestModel):
     )
 
 
+class UpdateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
+    """Input for updating the ``config`` section of a resource group's scheduler options."""
+
+    num_retries_to_skip: Annotated[int, Field(ge=0)] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Number of scheduling retries before a pending session is skipped."
+            " Omit to leave unchanged; null clears."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+
+
+class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
+    """Input for updating a resource group's scheduler options. Omitted keys are kept."""
+
+    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "The ``config`` section of the scheduler options. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    agent_selection_strategy: AgentSelectionStrategy | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "How agents are chosen for a session's kernels. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    allow_fractional_resource_fragmentation: bool | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+            " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    route_cleanup_target_statuses: list[RouteHealthStatus] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Route health statuses whose routes are cleaned up automatically."
+            " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+
+
 class UpdateResourceGroupInput(BaseRequestModel):
     """Input for updating a resource group. All fields optional for partial update."""
 
@@ -214,6 +280,13 @@ class UpdateResourceGroupInput(BaseRequestModel):
     preemption: PreemptionConfigInputDTO | None | Unset = Field(
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
+    )
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Scheduler options. Omit to leave unchanged; omitted keys are kept."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
@@ -404,6 +477,13 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     preemption: PreemptionConfigInputDTO | None | Unset = Field(
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
+    )
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Scheduler options. Omit to leave unchanged; omitted keys are kept."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
