@@ -10,7 +10,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    override,
 )
 from uuid import UUID
 
@@ -18,14 +17,12 @@ import aiotools
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
     foreign,
     joinedload,
-    load_only,
     mapped_column,
     noload,
     relationship,
@@ -52,8 +49,12 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
+=======
+from ai.backend.logging.structured import StructuredLogger
+>>>>>>> 0748394e (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
@@ -92,6 +93,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+<<<<<<< HEAD
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
@@ -106,6 +108,10 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
+=======
+from ai.backend.manager.models.network.row import NetworkRow, NetworkType
+from ai.backend.manager.models.project.row import ProjectRow
+>>>>>>> 0748394e (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -1258,6 +1264,7 @@ DEFAULT_SESSION_ORDERING = [
         )
     ),
 ]
+<<<<<<< HEAD
 
 
 ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
@@ -1536,3 +1543,5 @@ async def get_permission_ctx(
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
         return await builder.build(ctx, target_scope, requested_permission)
+=======
+>>>>>>> 0748394e (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
