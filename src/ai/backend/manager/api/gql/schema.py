@@ -654,6 +654,10 @@ from ai.backend.manager.api.gql.session_group.resolver import (
 from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
     admin_session_lifecycle_handlers,
 )
+from ai.backend.manager.api.gql.ssh_key.resolver import (
+    my_upload_ssh_key,
+    switch_default_ssh_key,
+)
 from ai.backend.manager.api.gql.storage_volume.resolver import (
     admin_storage_volumes,
     delete_storage_volume,
@@ -1561,6 +1565,8 @@ class Mutation:
     create_vfolder_auto_mount = create_vfolder_auto_mount
     update_vfolder_auto_mount = update_vfolder_auto_mount
     delete_vfolder_auto_mount = delete_vfolder_auto_mount
+    my_upload_ssh_key = my_upload_ssh_key
+    switch_default_ssh_key = switch_default_ssh_key
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
     partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels

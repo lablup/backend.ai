@@ -41957,6 +41957,23 @@
         "title": "UpdateVFolderAutoMountInput",
         "type": "object"
       },
+      "MyUploadSSHKeyInput": {
+        "description": "A public key the caller uploads to their own SSH keys.",
+        "properties": {
+          "public_key": {
+            "description": "The SSH public key in the OpenSSH single-line format. It becomes the default only when the caller has no default yet.",
+            "maxLength": 3000,
+            "minLength": 1,
+            "title": "Public Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "title": "MyUploadSSHKeyInput",
+        "type": "object"
+      },
       "CreateVFSStorageInput": {
         "description": "Input for creating a VFS storage.",
         "properties": {
@@ -68841,6 +68858,64 @@
           }
         ],
         "description": "Mark an auto-mount deleted.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/ssh-keys/my/upload": {
+      "post": {
+        "operationId": "v2/ssh-keys.my_upload",
+        "tags": [
+          "v2/ssh-keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyUploadSSHKeyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upload a public key to the current user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/ssh-keys/{ssh_key_id}/switch-default": {
+      "post": {
+        "operationId": "v2/ssh-keys.switch_default",
+        "tags": [
+          "v2/ssh-keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ssh_key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Make an SSH key the default of its owner.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfs-storages": {
