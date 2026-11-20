@@ -11,9 +11,12 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
+<<<<<<< HEAD
     Self,
     cast,
     override,
+=======
+>>>>>>> 0748394e4 (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 )
 from uuid import UUID
 
@@ -22,14 +25,12 @@ import sqlalchemy as sa
 import yarl
 from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
     foreign,
     joinedload,
-    load_only,
     mapped_column,
     noload,
     relationship,
@@ -49,7 +50,11 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
+=======
+from ai.backend.logging.structured import StructuredLogger
+>>>>>>> 0748394e4 (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
@@ -90,6 +95,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+<<<<<<< HEAD
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -106,6 +112,11 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.routing import RoutingRow
+=======
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.network.row import NetworkRow, NetworkType
+from ai.backend.manager.models.project.row import ProjectRow
+>>>>>>> 0748394e4 (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -1409,6 +1420,7 @@ DEFAULT_SESSION_ORDERING = [
         )
     ),
 ]
+<<<<<<< HEAD
 
 
 ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
@@ -1731,3 +1743,5 @@ async def batch_populate_session_occupied_slots(
             "occupying_slots",
             slots_map.get(SessionId(session_row.id), ResourceSlot()),
         )
+=======
+>>>>>>> 0748394e4 (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
