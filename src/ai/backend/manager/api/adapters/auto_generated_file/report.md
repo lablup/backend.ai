@@ -570,6 +570,8 @@ Then
   - items[0].path = '.bashrc'
   - items[0].permission = '644'
   - items[0].is_default = True
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
   - items[1].id: same as the .vimrc file seeded as default
   - items[1].entity_id: same as the .vimrc file seeded as default
   - items[1].scope_type = 'user'
@@ -577,6 +579,8 @@ Then
   - items[1].path = '.vimrc'
   - items[1].permission = '644'
   - items[1].is_default = True
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
 
 <a id="v2_search-a-user-granted-nothing-may-not-list-auto-generated-files"></a>
 
@@ -736,6 +740,8 @@ Then
   - path = '.vimrc'
   - permission = '644'
   - is_default = False
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="v2_files-a-user-granted-nothing-may-not-create-an-auto-generated-file"></a>
 
@@ -862,6 +868,8 @@ Then
   - path = '.vimrc'
   - permission = '644'
   - is_default = True
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="v2_default-a-user-granted-nothing-may-not-switch-the-default-auto-generated-file"></a>
 
