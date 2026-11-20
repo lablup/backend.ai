@@ -23,15 +23,10 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
-<<<<<<< HEAD
-from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
-=======
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
->>>>>>> 0748394e (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -61,12 +56,8 @@ from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, OR
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow
-<<<<<<< HEAD
-from ai.backend.manager.models.rbac import ScopeType, SystemScope
-=======
-from ai.backend.manager.models.rbac.base import DomainScope, ProjectScope, ScopeType, SystemScope
-from ai.backend.manager.models.rbac.base import UserScope as UserRBACScope
->>>>>>> 0748394e (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
+from ai.backend.manager.models.rbac import DomainScope, ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac import UserScope as UserRBACScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_session_allocations,
@@ -96,16 +87,11 @@ from ai.backend.manager.models.types import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import agg_to_array
-<<<<<<< HEAD
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
-=======
-from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.models.vfolder.row import get_permission_ctx as get_vfolder_permission_ctx
 from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
     ScopedGetHeldPermissionsAction,
 )
->>>>>>> 0748394e (fix(BA-9054): check the legacy session queries through the new RBAC (#17195))
 from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
