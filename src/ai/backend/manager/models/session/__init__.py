@@ -24,9 +24,6 @@ from .row import (
 from .row import (
     _build_session_fetch_query as _build_session_fetch_query,
 )
-from .row import (
-    get_permission_ctx as get_permission_ctx,
-)
 
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
