@@ -527,9 +527,8 @@ def sql_json_increment(
 
 
 def _populate_column(column: sa.Column[Any]) -> sa.Column[Any]:
-    column_attrs = dict(column.__dict__)
-    name = column_attrs.pop("name")
-    return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})
+    column_attrs = column.__dict__
+    return sa.Column(column.name, column.type, **{k: column_attrs[k] for k in column_constraints})
 
 
 def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
@@ -559,5 +558,5 @@ def agg_to_array(
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 
 
-def is_db_retry_error(e: Exception) -> bool:
+def is_db_retry_error(e: Exception) -> str:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
