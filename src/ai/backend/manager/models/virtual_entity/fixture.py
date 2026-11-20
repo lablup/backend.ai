@@ -171,3 +171,32 @@ async def _provision_table(conn: AsyncConnection, table_name: str, spec: Fixture
         )
         .on_conflict_do_nothing()
     )
+    public_nodes = (
+        sa.select(VirtualEntityRow.id)
+        .join(GlobalEntityRow, VirtualEntityRow.entity_id == GlobalEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == GlobalEntityType(),
+            GlobalEntityRow.name == GlobalEntityName.PUBLIC,
+        )
+        .subquery()
+    )
+    await conn.execute(
+        pg_insert(EntityMembershipRow)
+        .from_select(
+            ["virtual_entity_id", "member_entity_id", "capped"],
+            sa.select(public_nodes.c.id, members.c.id, sa.literal(False)).select_from(
+                public_nodes.join(members, sa.true())
+            ),
+        )
+        .on_conflict_do_nothing(index_elements=["virtual_entity_id", "member_entity_id"])
+    )
+    await conn.execute(
+        pg_insert(ScopeBindingRow)
+        .from_select(
+            ["virtual_entity_id", "scope_entity_id"],
+            sa.select(members.c.id, public_nodes.c.id).select_from(
+                public_nodes.join(members, sa.true())
+            ),
+        )
+        .on_conflict_do_nothing()
+    )
