@@ -4,7 +4,20 @@ __all__ = ("ROCmDevice",)
 
 
 class ROCmXCD(AbstractComputeDevice):
-    pass
+    render_minor: int
+
+    def __init__(
+        self,
+        render_minor: int,
+        *args,
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.render_minor = render_minor
+
+    @property
+    def render_node_path(self) -> str:
+        return f"/dev/dri/renderD{self.render_minor}"
 
 
 class ROCmDevice(AbstractComputeDevice):
