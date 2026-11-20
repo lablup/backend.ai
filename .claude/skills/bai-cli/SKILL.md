@@ -90,6 +90,7 @@ Check options with `--help`.
 - **login-history**: admin(search) | my(search)
 - **login-session**: admin(search, revoke) | my(search, revoke)
 - **login-client-type**: user(get) | admin(search, create, update, delete)
+- **ssh-key**: user(switch-default) | my(upload)
 
 ### Resource Management
 

@@ -152,7 +152,7 @@ class TheSSHKeyNode(Then[SSHKeyholder, SSHKeyNode]):
                 node.field_id,
                 SameAs(node.id, Says("응답의 id", english="the id in the response")),
             ),
-            Held(
+            Held[UUID](
                 "user_id",
                 node.user_id,
                 SameAs(laid.caller.id, Says("호출한 사용자", english="the calling user")),

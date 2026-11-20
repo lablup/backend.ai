@@ -60,6 +60,11 @@ def login_session() -> None:
     """My login session commands."""
 
 
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.ssh_key:ssh_key", name="ssh-key")
+def ssh_key() -> None:
+    """My SSH key commands."""
+
+
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.export:export")
 def export() -> None:
     """My export commands."""
