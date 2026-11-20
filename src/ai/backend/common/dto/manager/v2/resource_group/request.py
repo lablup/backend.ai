@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
@@ -26,11 +27,13 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import PreemptionVictimScope
+from ai.backend.common.types import AgentSelectionStrategy, PreemptionVictimScope, SessionTypes
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
+    "CreateResourceGroupSchedulerOptionsConfigInput",
+    "CreateResourceGroupSchedulerOptionsInput",
     "DeleteResourceGroupInput",
     "PartialBulkPurgeResourceGroupsInput",
     "PartialBulkUpdateResourceGroupItemInput",
@@ -52,6 +55,69 @@ __all__ = (
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
 )
+
+
+class CreateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
+    """Input for the ``config`` section of a new resource group's scheduler options."""
+
+    num_retries_to_skip: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Number of scheduling retries before a pending session is skipped. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+
+
+class CreateResourceGroupSchedulerOptionsInput(BaseRequestModel):
+    """Input for a new resource group's scheduler options."""
+
+    allowed_session_types: list[SessionTypes] = Field(
+        default_factory=lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
+        description=(
+            "Session types that may be created in the resource group. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    pending_timeout: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout). "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    config: CreateResourceGroupSchedulerOptionsConfigInput | None = Field(
+        default=None,
+        description=(
+            f"The ``config`` section of the scheduler options. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    agent_selection_strategy: AgentSelectionStrategy = Field(
+        default=AgentSelectionStrategy.DISPERSED,
+        description=(
+            f"How agents are chosen for a session's kernels. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    allow_fractional_resource_fragmentation: bool = Field(
+        default=True,
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
+        default_factory=lambda: [RouteHealthStatus.UNHEALTHY],
+        description=(
+            "Route health statuses whose routes are cleaned up automatically. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
 
 
 class CreateResourceGroupInput(BaseRequestModel):
@@ -103,6 +169,12 @@ class CreateResourceGroupInput(BaseRequestModel):
     scheduler_type: SchedulerTypeDTO = Field(
         default=SchedulerTypeDTO.FIFO,
         description="Scheduler type value (fifo/lifo/drf/fair-share).",
+    )
+    scheduler_options: CreateResourceGroupSchedulerOptionsInput | None = Field(
+        default=None,
+        description=(
+            f"Scheduler options. Omit to use the defaults. Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
     @field_validator("name", mode="before")

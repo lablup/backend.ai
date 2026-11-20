@@ -5258,6 +5258,9 @@ input CreateResourceGroupInput
 
   """Added in 26.10.0. Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE)."""
   schedulerType: SchedulerType! = FIFO
+
+  """Added in 26.10.0. Scheduler options. Omit to use the defaults."""
+  schedulerOptions: CreateResourceGroupSchedulerOptionsInput = null
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
@@ -5266,6 +5269,47 @@ type CreateResourceGroupPayload
 {
   """The created resource group."""
   resourceGroup: ResourceGroup!
+}
+
+"""
+Added in 26.10.0. Input for the config section of a new resource group's scheduler options.
+"""
+input CreateResourceGroupSchedulerOptionsConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int = null
+}
+
+"""Added in 26.10.0. Input for a new resource group's scheduler options."""
+input CreateResourceGroupSchedulerOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Added in 26.10.0. Session types that may be created in the resource group.
+  """
+  allowedSessionTypes: [SessionTypes!]! = [INTERACTIVE, BATCH, INFERENCE]
+
+  """
+  Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float! = 0
+
+  """The config section of the scheduler options."""
+  config: CreateResourceGroupSchedulerOptionsConfigInput = null
+
+  """How agents are chosen for a session's kernels."""
+  agentSelectionStrategy: AgentSelectionStrategy! = DISPERSED
+
+  """
+  Whether an agent may start a kernel that fragments a fractional resource request.
+  """
+  allowFractionalResourceFragmentation: Boolean! = true
+
+  """
+  Added in 26.10.0. Route health statuses whose routes are cleaned up automatically.
+  """
+  routeCleanupTargetStatuses: [RouteHealthStatus!]! = [UNHEALTHY]
 }
 
 type CreateResourcePreset
