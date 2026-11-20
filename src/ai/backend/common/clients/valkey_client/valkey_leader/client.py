@@ -27,7 +27,7 @@ from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
-# Resilience instance for valkey_leader layer
+# No reconnect retry: waiting past the leader TTL would keep this process acting as leader.
 valkey_leader_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_STREAM)),

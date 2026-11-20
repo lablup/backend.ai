@@ -12,6 +12,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.reconnect import ValkeyReconnectErrorClassifier
 from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaHealthResult,
@@ -19,16 +20,16 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaProbeTarget,
 )
 from ai.backend.common.data.entity.replica import ReplicaID
-from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
-    BackoffStrategy,
     MetricArgs,
     MetricPolicy,
     Resilience,
-    RetryArgs,
-    RetryPolicy,
+)
+from ai.backend.common.resilience.policies.retry import (
+    ReconnectRetryArgs,
+    ReconnectRetryPolicy,
 )
 from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 
@@ -57,14 +58,7 @@ class HealthCheckStatus(enum.StrEnum):
 valkey_schedule_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_SCHEDULE)),
-        RetryPolicy(
-            RetryArgs(
-                max_retries=3,
-                retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.FIXED,
-                non_retryable_exceptions=(BackendAIError,),
-            )
-        ),
+        ReconnectRetryPolicy(ReconnectRetryArgs(classifier=ValkeyReconnectErrorClassifier())),
     ]
 )
 
