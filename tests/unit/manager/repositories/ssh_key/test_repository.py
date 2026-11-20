@@ -6,6 +6,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.types import SSHPublicKey
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
@@ -33,7 +34,7 @@ class TestSSHKeyRepository:
         user_id: UserID,
         default_id: SSHKeypairID,
     ) -> None:
-        added = await repository.upload(user_id, "pub-2")
+        added = await repository.upload(user_id, SSHPublicKey("pub-2"))
 
         assert not added.is_default
         assert await self._defaults(db, user_id) == [default_id]

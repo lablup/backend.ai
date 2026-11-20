@@ -54,6 +54,7 @@ Then
 
 - the whole SSH key comes back
   - id: skipped: the database generates it
+  - field_id: same as the id in the response
   - user_id: same as the calling user
   - public_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII3oEkCHOFCltBkvsATl1upB3yfnsmzsvEhpbiVrYOQv'
   - is_default = True
@@ -88,6 +89,7 @@ Then
 
 - the whole SSH key comes back
   - id: skipped: the database generates it
+  - field_id: same as the id in the response
   - user_id: same as the calling user
   - public_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICuqqTj6Ee2CFRyYHeq1INgqKdEoYvyazZPR69RTWOJI'
   - is_default = False
@@ -183,6 +185,7 @@ Then
 
 - the whole SSH key comes back
   - id: same as the seeded SSH key
+  - field_id: same as the id in the response
   - user_id: same as the calling user
   - public_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFYD/Yrss1np0I+R9f51bEJ0Jjs+d0s4JUussQhs0WBG'
   - is_default = True

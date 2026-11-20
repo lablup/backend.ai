@@ -3,7 +3,7 @@ name: ssh-key-service-shapes
 type: decision-table
 description: SSH key knowledge: why it is its own package, how upload and switch_default keep one default per user, why switch_default needs READ and UPDATE, the legacy SSH APIs still on the user service
 scope: src/ai/backend/manager/services/ssh_key
-keywords: [SSHKeyProcessors, SSHKeyService, SSHKeyRepository, UploadSSHKeyAction, SwitchDefaultSSHKeyAction, SSHKeyDefaultSetUpdater, uq_ssh_keypairs_is_default]
+keywords: [SSHKeyProcessors, SSHKeyService, SSHKeyRepository, UploadSSHPublicKeyAction, SwitchDefaultSSHKeyAction, SSHKeyDefaultSetUpdater, uq_ssh_keypairs_is_default]
 sources:
   - src/ai/backend/manager/services/ssh_key
   - src/ai/backend/manager/repositories/ssh_key
@@ -32,7 +32,7 @@ It is its own package so the SSH key operations stop living in the user and auth
 |---|---|---|
 | `upload` | `SSHKeyService.upload` | the user named in the action |
 | `switch_default` | `SSHKeyService.switch_default` | the owning user, read by `LookupSSHKeypairOwnerAction` |
-| `search` | ops (`atomic_bulk_scoped_search_ops`) | every user named |
+| `scoped_search` | ops (`atomic_bulk_scoped_search_ops`) | every user named |
 
 ## A user has at most one default
 

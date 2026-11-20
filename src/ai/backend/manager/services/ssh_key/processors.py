@@ -20,8 +20,8 @@ from ai.backend.manager.services.ssh_key.actions.switch_default import (
     SwitchDefaultSSHKeyActionResult,
 )
 from ai.backend.manager.services.ssh_key.actions.upload import (
-    UploadSSHKeyAction,
-    UploadSSHKeyActionResult,
+    UploadSSHPublicKeyAction,
+    UploadSSHPublicKeyActionResult,
 )
 from ai.backend.manager.services.ssh_key.service import SSHKeyService
 
@@ -35,7 +35,7 @@ class SSHKeyProcessors:
     scoped_search: BulkActionProcessor[
         ScopedSearchSSHKeypairsAction, ScopedFieldsOpsResult[SSHKeypairData]
     ]
-    upload: SingleEntityActionProcessor[UploadSSHKeyAction, UploadSSHKeyActionResult]
+    upload: SingleEntityActionProcessor[UploadSSHPublicKeyAction, UploadSSHPublicKeyActionResult]
     switch_default: SingleFieldActionProcessor[
         SwitchDefaultSSHKeyAction, SwitchDefaultSSHKeyActionResult
     ]
@@ -50,7 +50,7 @@ class SSHKeyProcessors:
         self.scoped_search = self.fields.atomic_bulk_scoped_search_ops(
             ScopedSearchSSHKeypairsAction
         )
-        self.upload = group.single_entity(UploadSSHKeyAction, service.upload)
+        self.upload = group.single_entity(UploadSSHPublicKeyAction, service.upload)
         self.switch_default = self.fields.single_field(
             SwitchDefaultSSHKeyAction, service.switch_default
         )

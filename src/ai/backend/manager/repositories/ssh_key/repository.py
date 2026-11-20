@@ -7,6 +7,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import SSHPublicKey
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.errors.ssh_keypair import SSHKeyNotFound
 from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
@@ -45,7 +46,7 @@ class SSHKeyRepository:
         self._ops = ops_provider
 
     @ssh_key_repository_resilience.apply()
-    async def upload(self, user_id: UserID, public_key: str) -> SSHKeypairData:
+    async def upload(self, user_id: UserID, public_key: SSHPublicKey) -> SSHKeypairData:
         """Add a public key to the user. It becomes the default only when the user has none."""
         async with self._ops.write_ops() as w:
             designated = await w.query_owned_fields(DefaultSSHKeypairQuerier(), [user_id])

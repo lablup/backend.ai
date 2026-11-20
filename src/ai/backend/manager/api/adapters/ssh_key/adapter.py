@@ -14,7 +14,7 @@ from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.services.ssh_key.actions.switch_default import (
     SwitchDefaultSSHKeyAction,
 )
-from ai.backend.manager.services.ssh_key.actions.upload import UploadSSHKeyAction
+from ai.backend.manager.services.ssh_key.actions.upload import UploadSSHPublicKeyAction
 from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
 
 
@@ -30,7 +30,7 @@ class SSHKeyAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         result = await self._ssh_key.upload.run(
-            UploadSSHKeyAction(
+            UploadSSHPublicKeyAction(
                 user_id=UserID(me.user_id), public_key=SSHPublicKey(input.public_key)
             )
         )

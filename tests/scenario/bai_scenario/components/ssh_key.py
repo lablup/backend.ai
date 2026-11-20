@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.ssh_key.response import SSHKeyNode
 from ai.backend.manager.data.permission.types import Permission
@@ -146,6 +147,11 @@ class TheSSHKeyNode(Then[SSHKeyholder, SSHKeyNode]):
             )
         return [
             id_verdict,
+            Held[UUID](
+                "field_id",
+                node.field_id,
+                SameAs(node.id, Says("응답의 id", english="the id in the response")),
+            ),
             Held(
                 "user_id",
                 node.user_id,

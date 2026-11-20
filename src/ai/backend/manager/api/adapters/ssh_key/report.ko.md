@@ -54,6 +54,7 @@ Then
 
 - SSH 키 전체가 응답으로 옵니다
   - id: 건너뜀: 데이터베이스가 만듭니다
+  - field_id: 응답의 id 와 같다
   - user_id: 호출한 사용자와 같다
   - public_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII3oEkCHOFCltBkvsATl1upB3yfnsmzsvEhpbiVrYOQv'
   - is_default = True
@@ -88,6 +89,7 @@ Then
 
 - SSH 키 전체가 응답으로 옵니다
   - id: 건너뜀: 데이터베이스가 만듭니다
+  - field_id: 응답의 id 와 같다
   - user_id: 호출한 사용자와 같다
   - public_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICuqqTj6Ee2CFRyYHeq1INgqKdEoYvyazZPR69RTWOJI'
   - is_default = False
@@ -183,6 +185,7 @@ Then
 
 - SSH 키 전체가 응답으로 옵니다
   - id: 심어 둔 그 SSH 키와 같다
+  - field_id: 응답의 id 와 같다
   - user_id: 호출한 사용자와 같다
   - public_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFYD/Yrss1np0I+R9f51bEJ0Jjs+d0s4JUussQhs0WBG'
   - is_default = True

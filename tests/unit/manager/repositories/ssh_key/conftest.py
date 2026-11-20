@@ -10,7 +10,7 @@ import pytest
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SSHPublicKey
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
@@ -92,11 +92,11 @@ async def user_id(db: ExtendedAsyncSAEngine) -> UserID:
 
 @pytest.fixture
 async def default_id(repository: SSHKeyRepository, user_id: UserID) -> SSHKeypairID:
-    return (await repository.upload(user_id, "pub-default")).id
+    return (await repository.upload(user_id, SSHPublicKey("pub-default"))).id
 
 
 @pytest.fixture
 async def other_id(
     repository: SSHKeyRepository, user_id: UserID, default_id: SSHKeypairID
 ) -> SSHKeypairID:
-    return (await repository.upload(user_id, "pub-other")).id
+    return (await repository.upload(user_id, SSHPublicKey("pub-other"))).id

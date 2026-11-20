@@ -7,8 +7,8 @@ from ai.backend.manager.services.ssh_key.actions.switch_default import (
     SwitchDefaultSSHKeyActionResult,
 )
 from ai.backend.manager.services.ssh_key.actions.upload import (
-    UploadSSHKeyAction,
-    UploadSSHKeyActionResult,
+    UploadSSHPublicKeyAction,
+    UploadSSHPublicKeyActionResult,
 )
 
 
@@ -20,10 +20,10 @@ class SSHKeyService:
         self._repository = repository
         self._ssh_key_validator = ssh_key_validator
 
-    async def upload(self, action: UploadSSHKeyAction) -> UploadSSHKeyActionResult:
+    async def upload(self, action: UploadSSHPublicKeyAction) -> UploadSSHPublicKeyActionResult:
         self._ssh_key_validator.validate(action.public_key)
         ssh_key = await self._repository.upload(action.user_id, action.public_key)
-        return UploadSSHKeyActionResult(ssh_key=ssh_key)
+        return UploadSSHPublicKeyActionResult(ssh_key=ssh_key)
 
     async def switch_default(
         self, action: SwitchDefaultSSHKeyAction

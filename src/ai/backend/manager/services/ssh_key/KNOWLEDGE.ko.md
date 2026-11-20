@@ -13,7 +13,7 @@ SSH 키 동작을 user service 와 auth service 에서 떼어 내려고 별도 �
 |---|---|---|
 | `upload` | `SSHKeyService.upload` | action 이 지정한 사용자 |
 | `switch_default` | `SSHKeyService.switch_default` | `LookupSSHKeypairOwnerAction` 이 읽은 소유 사용자 |
-| `search` | ops (`atomic_bulk_scoped_search_ops`) | 지정한 사용자 모두 |
+| `scoped_search` | ops (`atomic_bulk_scoped_search_ops`) | 지정한 사용자 모두 |
 
 ## 사용자의 default 는 많아야 하나다
 
