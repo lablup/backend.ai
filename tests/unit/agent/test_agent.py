@@ -125,7 +125,7 @@ class TestCleanEventOfAKernelBeingDestroyed:
     @pytest.fixture
     def agent(self, kernel_id: KernelId, clean_event: asyncio.Future[Any]) -> SimpleNamespace:
         kernel_obj = Mock(runner=None, clean_event=clean_event, close=AsyncMock())
-        kernel_obj.pop.return_value = None
+        kernel_obj.get.return_value = None
         return SimpleNamespace(
             _ongoing_destruction_tasks={},
             stat_ctx=SimpleNamespace(remove_kernel_metric=AsyncMock()),
