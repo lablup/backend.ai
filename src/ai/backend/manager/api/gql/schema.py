@@ -76,6 +76,13 @@ from ai.backend.manager.api.gql.audit_log.resolver.query import (
     admin_audit_logs_v2,
     scoped_audit_logs_v2,
 )
+from ai.backend.manager.api.gql.auto_generated_file.resolver import (
+    create_auto_generated_file,
+    my_auto_generated_files,
+    purge_auto_generated_file,
+    scoped_auto_generated_files,
+    switch_default_auto_generated_file,
+)
 from ai.backend.manager.api.gql.client_ip_masking.resolver import (
     admin_client_ip_masking_policies,
     admin_purge_client_ip_masking_policy,
@@ -933,6 +940,8 @@ class Query:
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
     scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
+    scoped_auto_generated_files = scoped_auto_generated_files
+    my_auto_generated_files = my_auto_generated_files
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments
@@ -1565,6 +1574,10 @@ class Mutation:
     create_vfolder_auto_mount = create_vfolder_auto_mount
     update_vfolder_auto_mount = update_vfolder_auto_mount
     delete_vfolder_auto_mount = delete_vfolder_auto_mount
+    # Auto-generated file mutations
+    create_auto_generated_file = create_auto_generated_file
+    switch_default_auto_generated_file = switch_default_auto_generated_file
+    purge_auto_generated_file = purge_auto_generated_file
     my_upload_ssh_key = my_upload_ssh_key
     switch_default_ssh_key = switch_default_ssh_key
     # Entity Label mutations
