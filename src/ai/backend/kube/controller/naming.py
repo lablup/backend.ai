@@ -14,6 +14,8 @@ LABEL_USER_ID: Final = "backend.ai/user-id"
 LABEL_RESOURCE_GROUP: Final = "backend.ai/resource-group"
 LABEL_NETWORK_ID: Final = "backend.ai/network-id"
 LABEL_QUEUE: Final = "scheduling.backend.ai/queue"
+# On kernel Pods of a session in a SessionGroup: sokovan counts the group's members per node.
+LABEL_SESSION_GROUP: Final = "sokovan.backend.ai/session-group"
 ANNOTATION_DEVICES: Final = "scheduling.backend.ai/devices"  # {"<DRA driver>/<slot>": <count>}
 # {"<DRA driver>": <count>} of devices the Pod takes a share of; the node must have them.
 ANNOTATION_SHARED_DEVICES: Final = "scheduling.backend.ai/shared-devices"
@@ -67,9 +69,12 @@ def session_queue(workload: SessionWorkload) -> str:
 
 
 def kernel_labels(workload: SessionWorkload, kernel: KernelSpec) -> dict[str, str]:
-    return {
+    labels = {
         **session_labels(workload),
         LABEL_KERNEL_ID: kernel.kernel_id,
         LABEL_CLUSTER_ROLE: kernel.cluster_role,
         LABEL_QUEUE: session_queue(workload),
     }
+    if workload.spec.session_group is not None:
+        labels[LABEL_SESSION_GROUP] = workload.spec.session_group.id
+    return labels

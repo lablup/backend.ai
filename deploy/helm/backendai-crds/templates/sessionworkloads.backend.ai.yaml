@@ -229,6 +229,44 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              sessionGroup:
+                description: The SessionGroup a session belongs to and its placement
+                  policy (BEP-1083).
+                properties:
+                  id:
+                    maxLength: 36
+                    pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+                    type: string
+                  direction:
+                    description: How the members of a SessionGroup sit relative to
+                      each other, per node (BEP-1064).
+                    enum:
+                    - spread
+                    - pack
+                    - none
+                    type: string
+                    default: none
+                  enforcement:
+                    enum:
+                    - preferred
+                    - strict
+                    type: string
+                    default: preferred
+                  admission:
+                    enum:
+                    - independent
+                    - all_or_none
+                    type: string
+                    default: independent
+                  memberCount:
+                    minimum: 1
+                    type: integer
+                    description: Members placed together under all_or_none admission
+                    nullable: true
+                required:
+                - id
+                type: object
+                nullable: true
             required:
             - sessionId
             - sessionName

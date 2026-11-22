@@ -9,7 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from kubernetes_asyncio.client.exceptions import ApiException
 
+from ai.backend.kube.crd.session import SessionGroupAdmission, SessionGroupDirection
 from ai.backend.kube.scheduler.cycle import (
+    GroupPolicy,
     PendingGroup,
     PendingPod,
     Placement,
@@ -19,6 +21,7 @@ from ai.backend.kube.scheduler.cycle import (
 )
 from ai.backend.kube.scheduler.runner import (
     SokovanScheduler,
+    batches,
     bind_request_name,
     rolled_back,
     unplaceable_since,
@@ -405,3 +408,65 @@ class TestCycle:
         scheduler._core.patch_namespaced_pod.assert_not_awaited()
         [(*_, placement)] = _placement_writes(scheduler)
         assert (placement["phase"], placement["reason"]) == ("Pending", "WaitingForPods")
+
+
+GROUP = GroupPolicy(
+    id="33333333-0000-0000-0000-000000000001",
+    direction=SessionGroupDirection.SPREAD,
+    admission=SessionGroupAdmission.ALL_OR_NONE,
+    member_count=2,
+)
+
+
+def _member_placement(name: str, pod: str) -> Placement:
+    group = PendingGroup(
+        "ns",
+        name,
+        0,
+        "1",
+        1,
+        [PendingPod("ns", pod, Resources(1000, 1, 1))],
+        session_id=name,
+        session_group=GROUP,
+        group_ready=2,
+    )
+    return Placement(group, {pod: "n1"})
+
+
+class TestAllOrNoneStart:
+    @pytest.fixture
+    def members(self) -> list[Placement | Skip]:
+        return [_member_placement("s-1", "a"), _member_placement("s-2", "b")]
+
+    def test_the_members_of_a_group_form_one_batch(self, members: list[Placement | Skip]) -> None:
+        single = _placement()
+        assert batches([members[0], single, members[1]]) == [
+            [members[0], members[1]],
+            [single],
+        ]
+
+    async def test_no_member_is_released_unless_every_pod_still_waits(
+        self, scheduler: SokovanScheduler, members: list[Placement | Skip]
+    ) -> None:
+        scheduler._core.read_namespaced_pod = _read({"a": True, "b": False})
+        results = await scheduler._release_all(members)
+        assert [r.reason for r in results if isinstance(r, Skip)] == [
+            SkipReason.WAITING_FOR_PODS
+        ] * 2
+        scheduler._core.patch_namespaced_pod.assert_not_awaited()
+
+    async def test_every_member_is_released_together(
+        self, scheduler: SokovanScheduler, members: list[Placement | Skip]
+    ) -> None:
+        scheduler._core.read_namespaced_pod = _read({"a": True, "b": True})
+        results = await scheduler._release_all(members)
+        assert all(isinstance(r, Placement) for r in results)
+        assert scheduler._core.patch_namespaced_pod.await_count == 2
+
+    async def test_a_group_that_does_not_fit_is_reported_unschedulable(
+        self, scheduler: SokovanScheduler, members: list[Placement | Skip]
+    ) -> None:
+        skip = Skip(members[0].group, SkipReason.GROUP_DOES_NOT_FIT, "no fit")
+        await scheduler._report(skip, _workload())
+        [(*_, placement)] = _placement_writes(scheduler)
+        assert (placement["phase"], placement["reason"]) == ("Unschedulable", "GroupDoesNotFit")

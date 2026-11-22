@@ -446,3 +446,69 @@ class TestGroupOrderKey:
         workload["metadata"]["creationTimestamp"] = "2026-11-22T09:00:00Z"
         [pending] = build_pending_groups([workload], [_pod("a", gated=True)])
         assert pending.created_at == "2026-11-22T09:00:00Z"
+
+
+GROUP_ID = "33333333-0000-0000-0000-000000000001"
+
+
+def _group_session_id(index: int) -> str:
+    return f"00000000-0000-0000-0000-00000000010{index}"
+
+
+def _group_workload(index: int, group: dict[str, Any] | None) -> dict[str, Any]:
+    return {
+        "metadata": {"name": f"s-{index}", "namespace": "ns", "creationTimestamp": "t"},
+        "spec": {
+            "sessionId": _group_session_id(index),
+            "kernels": [{"kernelId": "k0"}],
+            **({"sessionGroup": group} if group is not None else {}),
+        },
+    }
+
+
+def _member_pod(
+    index: int, *, node: str | None = None, gated: bool = False, name: str = "main1"
+) -> dict[str, Any]:
+    pod = _pod(f"s-{index}-{name}", node=node, gated=gated)
+    pod["metadata"]["labels"] = {
+        **SESSION_LABELS,
+        "backend.ai/session-id": _group_session_id(index),
+        "sokovan.backend.ai/session-group": GROUP_ID,
+    }
+    return pod
+
+
+class TestSessionGroup:
+    def test_nodes_count_each_member_session_once(self) -> None:
+        pods = [
+            _member_pod(1, node="n1"),
+            _member_pod(1, node="n1", name="sub1"),
+            _member_pod(2, node="n1"),
+            _member_pod(3, gated=True),
+        ]
+        [node] = build_nodes([_node("n1")], pods)
+        assert node.group_members == {
+            GROUP_ID: frozenset({_group_session_id(1), _group_session_id(2)})
+        }
+
+    def test_pending_sessions_carry_the_group_and_its_ready_members(self) -> None:
+        group = {
+            "id": GROUP_ID,
+            "direction": "spread",
+            "enforcement": "strict",
+            "admission": "all_or_none",
+            "memberCount": 3,
+        }
+        workloads = [_group_workload(i, group) for i in (1, 2, 3)]
+        # s-3 has no kernel Pod yet: two of the three members are ready.
+        first, second = build_pending_groups(
+            workloads, [_member_pod(1, gated=True), _member_pod(2, gated=True)]
+        )
+        assert first.session_group is not None and first.session_group.member_count == 3
+        assert (first.group_ready, second.group_ready) == (2, 2)
+        assert first.unit == GROUP_ID
+
+    def test_an_invalid_group_is_ignored(self) -> None:
+        workloads = [_group_workload(1, {"id": GROUP_ID, "direction": "sideways"})]
+        [pending] = build_pending_groups(workloads, [_member_pod(1, gated=True)])
+        assert pending.session_group is None
