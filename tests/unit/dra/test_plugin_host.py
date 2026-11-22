@@ -12,8 +12,9 @@ import pytest
 
 from ai.backend.accelerator.mock.plugin import MockPlugin
 from ai.backend.accelerator.mock.types import MockDevice
-from ai.backend.agent.resources import AbstractAllocMap
+from ai.backend.agent.resources import AbstractAllocMap, AbstractComputePlugin
 from ai.backend.common.types import DeviceId, SlotName
+from ai.backend.dra.bridge import ContainerEdits
 from ai.backend.dra.errors import (
     InvalidClaimUIDError,
     IsolationRequiredError,
@@ -22,7 +23,7 @@ from ai.backend.dra.errors import (
     UnknownDeviceError,
     UnsupportedContainerArgsError,
 )
-from ai.backend.dra.host.isolation import BaiHook, HamiCore
+from ai.backend.dra.host.isolation import BaiHook, HamiCore, SharedAllocation
 from ai.backend.dra.host.plugin_host import (
     PluginHost,
     device_name,
@@ -51,6 +52,29 @@ number_format = { binary = false, round_length = 0 }
 GIB = 1024**3
 CLAIM = "0b5e6a2c-1d1f-4a8e-9a43-3f1d2b8f0c11"
 HAMI = HamiCore(Path("/var/lib/bai-dra/hami-core"))
+
+
+MIG_CONFIG = MOCK_CONFIG.replace(
+    "]\n[attributes]",
+    """  { mother_uuid = "aaaaaaaa-0000-0000-0000-000000000003", model_name = "CUDA GPU-1g.10gb", numa_node = 1, subproc_count = 14, memory_size = "10G", is_mig_device = true },
+  { mother_uuid = "aaaaaaaa-0000-0000-0000-000000000003", model_name = "CUDA GPU", numa_node = 1, subproc_count = 98, memory_size = "80G", is_mig_device = false },
+]
+[attributes]""",
+)
+MIG_ID = "MIG-aaaaaaaa-0000-0000-0000-000000000003/2/0"
+
+
+class FailingHami(HamiCore):
+    """A provider that refuses every allocation: a claim that reaches it fails."""
+
+    def __init__(self) -> None:
+        super().__init__(Path("/nonexistent"))
+
+    @override
+    async def edits(
+        self, allocation: SharedAllocation, plugin: AbstractComputePlugin
+    ) -> ContainerEdits:
+        raise IsolationUnavailableError("the provider is not reachable")
 
 
 class CDIMockPlugin(MockPlugin):
@@ -124,6 +148,22 @@ async def shared_host(mock_config_dir: Path) -> AsyncIterator[PluginHost]:
         mount_root=mock_config_dir / "mounts",
         shared=True,
         isolation=HAMI,
+    )
+    yield host
+    await host.close()
+
+
+@pytest.fixture
+async def mig_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[PluginHost]:
+    (tmp_path / "mock-accelerator.toml").write_text(MIG_CONFIG)
+    monkeypatch.chdir(tmp_path)
+    host = await PluginHost.start(
+        "ai.backend.accelerator.mock.plugin:MockPlugin",
+        {"allocation_mode": "fractional"},
+        {},
+        mount_root=tmp_path / "mounts",
+        shared=True,
+        isolation=FailingHami(),
     )
     yield host
     await host.close()
@@ -346,11 +386,43 @@ class TestSharedDevices:
         assert all("=" in line for line in lines)
         assert not override.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
 
-    async def test_the_whole_capacity_is_still_isolated(self, shared_host: PluginHost) -> None:
+    async def test_a_whole_device_runs_without_isolation(
+        self, shared_host: PluginHost, mock_config_dir: Path
+    ) -> None:
         name = (await shared_host.list_devices()).devices[0].name
         edits, _ = await shared_host.prepare(CLAIM, [name], {name: {"shares": "1350"}})
-        assert f"CUDA_DEVICE_MEMORY_LIMIT_0={27 * GIB}" in edits.env
+        assert not any(e.startswith("CUDA_DEVICE_") for e in edits.env)
+        assert not {m.container_path for m in edits.mounts} & {
+            "/usr/local/vgpu/libvgpu.so",
+            "/etc/ld.so.preload",
+            "/overrideEnv",
+        }
+        assert not (mock_config_dir / "mounts" / CLAIM / "hami-core.env").exists()
+        assert "BACKENDAI_MOCK_CUDA_DEVICE_COUNT=1" in edits.env
+
+    async def test_whole_devices_need_no_provider(self, mock_config_dir: Path) -> None:
+        plugin = MockPlugin({"allocation_mode": "discrete"}, {})
+        await plugin.init()
+        host = PluginHost(plugin, mock_config_dir / "mounts", shared=True, isolation=FailingHami())
+        [first, second] = (await host.list_devices()).devices
+        consumed = {first.name: {"shares": "1350"}, second.name: {"shares": "1350"}}
+        edits, _ = await host.prepare(CLAIM, [first.name, second.name], consumed)
+        await host.close()
+        assert "BACKENDAI_MOCK_CUDA_DEVICE_COUNT=2" in edits.env
+
+    async def test_a_whole_device_beside_a_partial_one_gets_full_limits(
+        self, shared_host: PluginHost
+    ) -> None:
+        [first, second] = (await shared_host.list_devices()).devices
+        edits, _ = await shared_host.prepare(
+            CLAIM,
+            [first.name, second.name],
+            {first.name: {"shares": "1350"}, second.name: {"shares": "50"}},
+        )
+        assert f"CUDA_DEVICE_MEMORY_LIMIT_0={40 * GIB}" in edits.env
         assert "CUDA_DEVICE_SM_LIMIT_0=100" in edits.env
+        assert f"CUDA_DEVICE_MEMORY_LIMIT_1={GIB}" in edits.env
+        assert "CUDA_DEVICE_SM_LIMIT_1=4" in edits.env
 
     async def test_the_qualified_capacity_name_and_suffixes_are_accepted(
         self, shared_host: PluginHost
@@ -380,6 +452,37 @@ class TestSharedDevices:
         name = (await shared_host.list_devices()).devices[0].name
         with pytest.raises(MissingConsumedSharesError):
             await shared_host.prepare(CLAIM, [name], {name: {"shares": "1351"}})
+
+
+class TestStaticMIG:
+    async def test_mig_instances_are_exclusive_devices_of_their_slot(
+        self, mig_host: PluginHost
+    ) -> None:
+        devices = {d.attributes["deviceId"]: d for d in (await mig_host.list_devices()).devices}
+        mig = devices[MIG_ID]
+        assert mig.attributes["slotName"] == "cuda.device:1g.10gb-mig"
+        assert not mig.allow_multiple_allocations
+        assert mig.request_policies == {}
+        assert "shares" not in mig.capacity
+
+    async def test_a_gpu_in_mig_mode_is_not_shared(self, mig_host: PluginHost) -> None:
+        devices = (await mig_host.list_devices()).devices
+        shared = {d.attributes["deviceId"] for d in devices if d.allow_multiple_allocations}
+        assert shared == {
+            "aaaaaaaa-0000-0000-0000-000000000001",
+            "aaaaaaaa-0000-0000-0000-000000000002",
+        }
+        assert {d.attributes["slotName"] for d in devices} == {
+            "cuda.shares",
+            "cuda.device:1g.10gb-mig",
+        }
+
+    async def test_a_mig_instance_is_prepared_without_shares_or_isolation(
+        self, mig_host: PluginHost
+    ) -> None:
+        devices = {d.attributes["deviceId"]: d for d in (await mig_host.list_devices()).devices}
+        edits, _ = await mig_host.prepare(CLAIM, [devices[MIG_ID].name], {})
+        assert f"BACKENDAI_MOCK_CUDA_DEVICES={MIG_ID}" in edits.env
 
 
 class TestBaiHook:
