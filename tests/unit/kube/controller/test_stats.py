@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import msgpack
+import pytest
 from prometheus_client import generate_latest
 
 from ai.backend.kube.controller.stats import (
     ContainerMetrics,
     ContainerSample,
     KernelStats,
+    StatBridge,
     kubelet_endpoint,
     parse_stats_summary,
 )
@@ -101,3 +106,19 @@ class TestContainerMetrics:
         assert 'value_type="current"' in text and 'value_type="pct"' not in text
         metrics.forget(["k1"])
         assert "k1" not in generate_latest(metrics.registry).decode()
+
+
+class TestStatBridgeRun:
+    async def test_any_collection_failure_is_retried(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        bridge = StatBridge(MagicMock(), AsyncMock(), ContainerMetrics("a"), interval=0.001)
+        failures: list[BaseException] = [
+            aiohttp.ClientError("reset"),
+            RuntimeError("valkey"),
+            ValueError("parse"),
+            asyncio.CancelledError(),
+        ]
+        collect = AsyncMock(side_effect=failures)
+        monkeypatch.setattr(bridge, "collect", collect)
+        with pytest.raises(asyncio.CancelledError):
+            await bridge.run()
+        assert collect.await_count == 4

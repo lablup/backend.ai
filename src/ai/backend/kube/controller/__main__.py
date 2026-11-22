@@ -15,6 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.defs import REDIS_CONTAINER_LOG, REDIS_STATISTICS_DB
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import ValkeyTarget
+from ai.backend.kube.controller.cache import ClusterObjectCache
 from ai.backend.kube.controller.logs import KernelLogSync
 from ai.backend.kube.controller.manifests import ControllerSettings
 from ai.backend.kube.controller.reconciler import SessionReconciler
@@ -69,8 +70,9 @@ async def _serve(
     async with client.ApiClient() as api:
         if producer is not None and log_client is not None:
             reporter = StatusReporter(producer, KernelLogSync(api, log_client, producer))
+        cache = ClusterObjectCache(api)
         controller = SessionController(
-            api, SessionReconciler(api, settings, reporter), workers=workers
+            api, SessionReconciler(api, settings, reporter, cache), workers=workers, cache=cache
         )
         # Every replica serves /metrics; a standby's is empty, as it collects nothing.
         metrics_runner = None
@@ -86,12 +88,11 @@ async def _serve(
             )
 
         async def work() -> None:
-            stats_task = asyncio.create_task(bridge.run()) if bridge is not None else None
-            try:
-                await controller.run()
-            finally:
-                if stats_task is not None:
-                    stats_task.cancel()
+            # A crash of either ends the work, hence the process, instead of going unnoticed.
+            async with asyncio.TaskGroup() as tg:
+                tg.create_task(controller.run())
+                if bridge is not None:
+                    tg.create_task(bridge.run())
 
         log.info("session controller started", krunner_image=settings.krunner_image)
         run_task = asyncio.current_task()

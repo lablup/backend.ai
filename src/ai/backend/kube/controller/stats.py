@@ -22,7 +22,6 @@ import aiohttp
 import msgpack
 from aiohttp import web
 from kubernetes_asyncio import client
-from kubernetes_asyncio.client.exceptions import ApiException
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Gauge, generate_latest
 
 from ai.backend.agent.stats import Measurement, Metric, MetricTypes, MovingStatistics
@@ -47,6 +46,7 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 STAT_INTERVAL: Final = 5.0
+STAT_MAX_BACKOFF: Final = 60.0
 KUBELET_PORT: Final = 10250
 KUBELET_TIMEOUT: Final = 10.0
 _Q: Final = Decimal("0.000")
@@ -327,16 +327,21 @@ class StatBridge:
         self._interval = interval
 
     async def run(self) -> None:
+        """Collect every interval; a failed round is logged and retried with a backoff."""
+        delay = self._interval
         while True:
             try:
                 await self.collect()
-            except (ApiException, OSError) as e:
-                log.warning("kernel stat collection failed", exc_info=e)
-            await asyncio.sleep(self._interval)
+                delay = self._interval
+            except Exception:
+                log.exception("kernel stat collection failed")
+                delay = min(delay * 2, STAT_MAX_BACKOFF)
+            await asyncio.sleep(delay)
 
     async def collect(self) -> None:
         listed = await self._core.list_pod_for_all_namespaces(
-            label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY},{LABEL_KERNEL_ID}"
+            label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY},{LABEL_KERNEL_ID}",
+            _request_timeout=KUBELET_TIMEOUT,
         )
         pods = [self._api.sanitize_for_serialization(p) for p in listed.items]
         by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)

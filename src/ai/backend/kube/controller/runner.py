@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Final
 
 from kubernetes_asyncio import client
-from kubernetes_asyncio.client.exceptions import ApiException
 
+from ai.backend.kube.controller.cache import ClusterObjectCache
 from ai.backend.kube.controller.naming import LABEL_MANAGED_BY, MANAGED_BY
 from ai.backend.kube.controller.reconciler import SessionReconciler
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.scheduling import PodGroup
-from ai.backend.kube.crd.session import SessionWorkload
+from ai.backend.kube.crd.session import SessionPhase, SessionWorkload
 from ai.backend.kube.watch import watch_forever
 from ai.backend.logging.structured import StructuredLogger
 
@@ -23,6 +24,8 @@ _SW = SessionWorkload.crd
 _PG = PodGroup.crd
 
 Key = tuple[str, str]  # (namespace, name)
+_ENDED: Final = frozenset({SessionPhase.ERROR.value, SessionPhase.TERMINATED.value})
+_RESYNC_TIMEOUT: Final = 60.0
 
 
 class WorkQueue:
@@ -66,6 +69,7 @@ class SessionController:
     _queue: WorkQueue
     _workers: int
     _resync_seconds: float
+    _cache: ClusterObjectCache | None
 
     def __init__(
         self,
@@ -74,9 +78,11 @@ class SessionController:
         *,
         workers: int = 4,
         resync_seconds: float = 30.0,
+        cache: ClusterObjectCache | None = None,
     ) -> None:
         self._api = api
         self._reconciler = reconciler
+        self._cache = cache
         self._queue = WorkQueue()
         self._workers = workers
         self._resync_seconds = resync_seconds
@@ -109,6 +115,8 @@ class SessionController:
                     self._on_owned_object,
                 )
             )
+            if self._cache is not None:
+                tg.create_task(self._cache.run())
             tg.create_task(self._resync_forever(custom))
             for _ in range(self._workers):
                 tg.create_task(self._work_forever())
@@ -124,12 +132,16 @@ class SessionController:
                 self._queue.add((meta["namespace"], ref["name"]))
 
     async def _resync_forever(self, custom: client.CustomObjectsApi) -> None:
+        """Requeue live sessions; an ended one waits for the Manager to delete it."""
         while True:
             try:
-                listed = await custom.list_cluster_custom_object(_SW.group, CRD_VERSION, _SW.plural)
+                listed = await custom.list_cluster_custom_object(
+                    _SW.group, CRD_VERSION, _SW.plural, _request_timeout=_RESYNC_TIMEOUT
+                )
                 for item in listed["items"]:
-                    self._on_workload("RESYNC", item)
-            except ApiException as e:
+                    if needs_resync(item):
+                        self._on_workload("RESYNC", item)
+            except Exception as e:
                 log.warning("resync list failed", exc_info=e)
             await asyncio.sleep(self._resync_seconds)
 
@@ -142,3 +154,10 @@ class SessionController:
                 log.exception("reconcile failed", k8s_namespace=key[0], name=key[1])
             finally:
                 self._queue.done(key)
+
+
+def needs_resync(workload: Mapping[str, Any]) -> bool:
+    """A session being deleted, or not ended yet."""
+    if workload["metadata"].get("deletionTimestamp"):
+        return True
+    return (workload.get("status") or {}).get("phase") not in _ENDED

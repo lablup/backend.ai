@@ -36,6 +36,8 @@ spec:
           spec:
             properties:
               sessionId:
+                maxLength: 36
+                pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
                 type: string
               sessionName:
                 type: string
@@ -43,9 +45,13 @@ spec:
                 default: interactive
                 type: string
               ownerUserId:
+                maxLength: 63
+                pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
                 type: string
               ownerProjectId:
                 type: string
+                maxLength: 63
+                pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
                 nullable: true
               accessKey:
                 type: string
@@ -54,9 +60,13 @@ spec:
                 type: string
                 nullable: true
               resourceGroup:
+                maxLength: 63
+                pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
                 type: string
               queue:
                 type: string
+                maxLength: 63
+                pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
                 nullable: true
               priority:
                 default: 0
@@ -70,6 +80,8 @@ spec:
                 type: integer
               networkId:
                 type: string
+                maxLength: 63
+                pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
                 nullable: true
               idleTimeout:
                 default: 0
@@ -87,15 +99,21 @@ spec:
                 items:
                   properties:
                     kernelId:
+                      maxLength: 36
+                      pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
                       type: string
                     clusterRole:
                       default: main
+                      maxLength: 63
+                      pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
                       type: string
                     clusterIdx:
                       default: 1
                       type: integer
                     clusterHostname:
                       default: main1
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
                     localRank:
                       default: 0

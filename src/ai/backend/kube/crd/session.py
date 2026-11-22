@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Final
 
 from pydantic import Field
+from pydantic.config import JsonDict
 
 from ai.backend.kube.crd.base import (
     BACKEND_AI_GROUP,
@@ -13,6 +14,17 @@ from ai.backend.kube.crd.base import (
     CustomResource,
     PrinterColumn,
 )
+
+# Checked by the API server only (the CRD schema): object names and labels take these values.
+_UUID: Final[JsonDict] = {
+    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+    "maxLength": 36,
+}
+_LABEL_VALUE: Final[JsonDict] = {
+    "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+    "maxLength": 63,
+}
+_DNS_LABEL: Final[JsonDict] = {"pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 63}
 
 
 class SessionPhase(enum.StrEnum):
@@ -69,10 +81,10 @@ class ServicePortSpec(CRDModel):
 
 
 class KernelSpec(CRDModel):
-    kernel_id: str
-    cluster_role: str = "main"
+    kernel_id: str = Field(json_schema_extra=_UUID)
+    cluster_role: str = Field(default="main", json_schema_extra=_LABEL_VALUE)
     cluster_idx: int = 1
-    cluster_hostname: str = "main1"
+    cluster_hostname: str = Field(default="main1", json_schema_extra=_DNS_LABEL)
     local_rank: int = 0
     image: KernelImage
     resource_slots: dict[str, str] = Field(default_factory=dict)
@@ -88,19 +100,19 @@ class KernelSpec(CRDModel):
 
 
 class SessionWorkloadSpec(CRDModel):
-    session_id: str
+    session_id: str = Field(json_schema_extra=_UUID)
     session_name: str
     session_type: str = "interactive"
-    owner_user_id: str
-    owner_project_id: str | None = None
+    owner_user_id: str = Field(json_schema_extra=_LABEL_VALUE)
+    owner_project_id: str | None = Field(default=None, json_schema_extra=_LABEL_VALUE)
     access_key: str | None = None
     domain_name: str | None = None
-    resource_group: str
-    queue: str | None = None
+    resource_group: str = Field(json_schema_extra=_LABEL_VALUE)
+    queue: str | None = Field(default=None, json_schema_extra=_LABEL_VALUE)
     priority: int = 0
     cluster_mode: str = "single-node"
     cluster_size: int = Field(default=1, ge=1)
-    network_id: str | None = None
+    network_id: str | None = Field(default=None, json_schema_extra=_LABEL_VALUE)
     idle_timeout: int = 0
     scheduler_name: str = "sokovan"
     secret_name: str | None = Field(
