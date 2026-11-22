@@ -18,10 +18,6 @@ __all__ = (
 )
 
 
-KUBERNETES_RESOURCE_GROUP_DRIVER: Final = "kubernetes"
-"""`scaling_groups.driver` of a resource group whose sessions run in a compute cluster."""
-
-
 DEFAULT_CLUSTER_SCHEDULER: Final = "sokovan"
 """`driver_opts.scheduler` when unset: the cluster's sokovan places the Pods."""
 

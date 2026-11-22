@@ -10,6 +10,8 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if "compute_clusters" in sa.inspect(op.get_bind()).get_table_names():
+        return
     op.create_table(
         "compute_clusters",
         sa.Column("id", sa.Uuid(), nullable=False, server_default=sa.text("uuid_generate_v7()")),
@@ -34,4 +36,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("compute_clusters")
+    op.execute("DROP TABLE IF EXISTS compute_clusters")

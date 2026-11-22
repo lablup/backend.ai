@@ -4745,16 +4745,22 @@ input CreateComputeClusterInput
   """Unique compute cluster name."""
   name: String!
 
-  """URL of the cluster's Kubernetes API server."""
-  apiServer: String!
+  """
+  URL of the cluster's Kubernetes API server. Read from the kubeconfig's current context; a different value is rejected.
+  """
+  apiServer: String = null
 
-  """Kubeconfig the manager uses to reach the cluster. Stored encrypted."""
+  """
+  Kubeconfig the manager uses to reach the cluster. Stored encrypted. Only inline credentials are accepted; `exec`, `auth-provider` and file paths are rejected.
+  """
   kubeconfig: String!
 
   """Optional description."""
   description: String = null
 
-  """Prefix of the namespaces created in the cluster."""
+  """
+  Prefix of the namespaces created in the cluster: lowercase alphanumerics and '-', at most 26 characters.
+  """
   namespacePrefix: String! = "bai-"
 
   """Address of the cluster's network gateway."""
@@ -29432,7 +29438,9 @@ input UpdateComputeClusterInput
   """Updated description. Null clears it."""
   description: String
 
-  """Updated API server URL."""
+  """
+  API server URL. Read from the kubeconfig; only accepted together with `kubeconfig` and must match it.
+  """
   apiServer: String
 
   """Replacement kubeconfig. Stored encrypted."""
@@ -30446,12 +30454,12 @@ input UpdateResourceGroupV2Input
   preemption: PreemptionConfigInput
 
   """
-  Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driverOpts.compute_cluster`. Omit to leave unchanged; `kubernetes` requires `driverOpts` in the same update.
+  Added in 26.10.0. Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driverOpts.compute_cluster`. Omit to leave unchanged; `kubernetes` requires `driverOpts` in the same update.
   """
   driver: String
 
   """
-  Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster. Replaces the stored options. Omit to leave unchanged.
+  Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster, and accepts `system_namespace` and `scheduler`. Replaces the stored options. Omit to leave unchanged.
   """
   driverOpts: JSON
 }

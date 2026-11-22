@@ -43,6 +43,7 @@ from ai.backend.common.data.filter_specs import StringInMatchSpec, UUIDInMatchSp
 from ai.backend.common.dotfile import DotfilePath, InvalidDotfilePath
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     DEFAULT_KUBERNETES_SYSTEM_NAMESPACE,
+    KUBERNETES_RESOURCE_GROUP_DRIVER,
 )
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
@@ -68,7 +69,6 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.compute_cluster.types import (
     DEFAULT_CLUSTER_SCHEDULER,
-    KUBERNETES_RESOURCE_GROUP_DRIVER,
     ProjectQueueData,
     ResourceGroupComputeCluster,
 )

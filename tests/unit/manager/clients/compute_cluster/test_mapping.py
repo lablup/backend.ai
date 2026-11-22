@@ -12,6 +12,7 @@ from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.manager.clients.compute_cluster.mapping import (
     SessionPlacement,
     build_session_objects,
+    queue_name,
 )
 
 SESSION_ID = SessionId(UUID("22222222-0000-0000-0000-000000000001"))
@@ -157,3 +158,20 @@ class TestBuildSessionObjects:
             "/home/work/data",
             "ro",
         )
+
+
+class TestQueueName:
+    def test_a_valid_name_is_kept(self) -> None:
+        assert queue_name("default") == "default"
+
+    def test_project_queue_sits_under_the_group_queue(self) -> None:
+        project = UUID("33333333-0000-0000-0000-000000000001")
+        assert queue_name("default", project) == f"default.{project}"
+
+    def test_names_that_normalize_alike_stay_distinct(self) -> None:
+        names = {queue_name(name) for name in ("rg-a", "rg_a", "RG-A", "rg.a")}
+        assert len(names) == 4
+
+    def test_a_normalized_name_is_stable(self) -> None:
+        assert queue_name("rg_a") == queue_name("rg_a")
+        assert queue_name("rg_a").startswith("rg-a-")

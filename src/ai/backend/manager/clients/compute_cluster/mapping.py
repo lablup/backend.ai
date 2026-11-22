@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -54,8 +55,13 @@ class SessionObjects:
 
 
 def queue_name(resource_group: str, project_id: UUID | None = None) -> str:
-    """A resource group's queue, or a project's queue under it, as a Kubernetes object name."""
+    """A resource group's queue, or a project's queue under it, as a Kubernetes object name.
+
+    A name the normalization changed gets a hash of the original, so `rg_a` and `rg-a` differ.
+    """
     base = re.sub(r"[^a-z0-9-]+", "-", resource_group.lower()).strip("-") or "rg"
+    if base != resource_group:
+        base = f"{base}-{hashlib.sha256(resource_group.encode()).hexdigest()[:8]}"
     return base if project_id is None else f"{base}.{project_id}"
 
 
