@@ -82,3 +82,61 @@ class TestParseKubeconfig:
     def test_rejects_documents_that_are_not_kubeconfigs(self, text: str) -> None:
         with pytest.raises(InvalidKubeconfigError):
             parse_kubeconfig(text)
+
+
+_SERVER = "https://10.0.0.1:6443"
+
+
+class TestKubeconfigValueTypes:
+    """Each accepted key carries the type the Kubernetes client expects, so a value it
+    would read differently (a string "false" read as true) never reaches it."""
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_accepts_a_boolean_skip_verify(self, value: bool) -> None:
+        cluster = {"server": _SERVER, "insecure-skip-tls-verify": value}
+        parsed = parse_kubeconfig(yaml.safe_dump(_config(cluster=cluster)))
+        assert parsed.config["clusters"][0]["cluster"]["insecure-skip-tls-verify"] is value
+
+    @pytest.mark.parametrize("value", ["false", "true", "", 0, 1], ids=repr)
+    def test_rejects_a_skip_verify_that_is_not_a_boolean(self, value: Any) -> None:
+        cluster = {"server": _SERVER, "insecure-skip-tls-verify": value}
+        with pytest.raises(InvalidKubeconfigError):
+            parse_kubeconfig(yaml.safe_dump(_config(cluster=cluster)))
+
+    @pytest.mark.parametrize("key", ["certificate-authority-data", "tls-server-name"])
+    @pytest.mark.parametrize("value", ["", 1, None, ["x"], {"a": "b"}], ids=repr)
+    def test_rejects_cluster_strings_that_are_empty_or_not_strings(
+        self, key: str, value: Any
+    ) -> None:
+        cluster = {"server": _SERVER, key: value}
+        with pytest.raises(InvalidKubeconfigError):
+            parse_kubeconfig(yaml.safe_dump(_config(cluster=cluster)))
+
+    @pytest.mark.parametrize("server", ["", 6443, None], ids=repr)
+    def test_rejects_a_server_that_is_not_a_string(self, server: Any) -> None:
+        with pytest.raises(InvalidKubeconfigError):
+            parse_kubeconfig(yaml.safe_dump(_config(cluster={"server": server})))
+
+    @pytest.mark.parametrize(
+        "user",
+        [
+            {"token": ""},
+            {"token": 123},
+            {"client-certificate-data": "", "client-key-data": "a2V5"},
+            {"client-certificate-data": "Y2VydA==", "client-key-data": None},
+            {"client-certificate-data": "Y2VydA=="},
+            {"client-key-data": "a2V5"},
+        ],
+        ids=["empty-token", "int-token", "empty-cert", "null-key", "cert-only", "key-only"],
+    )
+    def test_rejects_user_credentials_that_are_empty_or_incomplete(
+        self, user: dict[str, Any]
+    ) -> None:
+        with pytest.raises(InvalidKubeconfigError):
+            parse_kubeconfig(yaml.safe_dump(_config(user=user)))
+
+    def test_rejects_a_context_namespace_that_is_not_a_string(self) -> None:
+        config = _config()
+        config["contexts"][0]["context"]["namespace"] = 7
+        with pytest.raises(InvalidKubeconfigError):
+            parse_kubeconfig(yaml.safe_dump(config))
