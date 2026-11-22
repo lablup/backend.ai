@@ -233,14 +233,19 @@ logCollector:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {cpu: 500m, memory: 256Mi}
 
-# appproxy worker (suggestion-1122 9.2), port mode on the host network of one node.
+# appproxy worker (suggestion-1122 9.2), port mode behind a Service.
 appproxyWorker:
   enabled: false
   coordinatorEndpoint: ""    # e.g. http://appproxy-coordinator.backendai-control.svc:10200
   authority: ""              # defaults to cluster.agentId
-  advertisedHost: ""         # the node address users reach
+  advertisedHost: ""         # the Service address users reach (load balancer or node)
   apiPort: 10211
   portRange: [12000, 12100]
+  # LoadBalancer: the same port numbers on the load balancer. NodePort: node ports equal to the
+  # ports, so apiPort and portRange must lie in the cluster's node port range (30000-32767).
+  service:
+    type: LoadBalancer
+    annotations: {}
   nodeSelector: {}
   logLevel: INFO
   # An existing Secret with the coordinator's secrets (the keys below). The Valkey password comes
