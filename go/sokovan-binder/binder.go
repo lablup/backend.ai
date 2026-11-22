@@ -1,24 +1,34 @@
 package main
 
 // The binder: for each pending BindRequest, record the claim allocations, release the
-// scheduling gate and bind the Pod. A request that keeps failing rolls its claims back.
+// scheduling gate and bind the Pod. A request that keeps failing, or that the scheduler marks
+// failed, rolls its claims back; the scheduler deletes it once the rollback shows. A request
+// that succeeded is deleted after a grace period, when the allocator's informer shows its claims.
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
+	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 )
 
@@ -28,6 +38,12 @@ const (
 	phasePending          = "Pending"
 	phaseSucceeded        = "Succeeded"
 	phaseFailed           = "Failed"
+	// How long a Succeeded request stays: the scheduler sends its allocations to the allocator
+	// until the allocator's informer shows them on the claims.
+	succeededRetention = 30 * time.Second
+	// How long a claim allocation this binder wrote counts in the conflict check while the
+	// claim informer may not show it yet.
+	writtenRetention = time.Minute
 )
 
 var bindRequestGVR = schema.GroupVersionResource{Group: "scheduling.backend.ai", Version: "v1alpha1", Resource: "bindrequests"}
@@ -52,13 +68,51 @@ type bindRequest struct {
 	Status            *bindRequestStatus `json:"status,omitempty"`
 }
 
+type writtenAllocation struct {
+	allocation resourceapi.AllocationResult
+	at         time.Time
+}
+
 type binder struct {
-	client  kubernetes.Interface
-	dynamic dynamic.Interface
+	client   kubernetes.Interface
+	dynamic  dynamic.Interface
+	requests cache.GenericLister
+	claims   resourcelisters.ResourceClaimLister
+	// claim key → allocation this binder wrote, until the claim informer surely shows it
+	written map[string]writtenAllocation
+	// bind request key → when it was first seen Succeeded
+	succeededAt map[string]time.Time
+	now         func() time.Time
+}
+
+func newBinder(client kubernetes.Interface, dyn dynamic.Interface) *binder {
+	return &binder{
+		client:      client,
+		dynamic:     dyn,
+		written:     map[string]writtenAllocation{},
+		succeededAt: map[string]time.Time{},
+		now:         time.Now,
+	}
 }
 
 func runBinder(ctx context.Context, client kubernetes.Interface, dyn dynamic.Interface, interval time.Duration) error {
-	b := &binder{client: client, dynamic: dyn}
+	b := newBinder(client, dyn)
+	requestInformers := dynamicinformer.NewDynamicSharedInformerFactory(dyn, 10*time.Minute)
+	b.requests = requestInformers.ForResource(bindRequestGVR).Lister()
+	claimInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	b.claims = claimInformers.Resource().V1().ResourceClaims().Lister()
+	requestInformers.Start(ctx.Done())
+	claimInformers.Start(ctx.Done())
+	for typ, ok := range requestInformers.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return fmt.Errorf("informer for %v did not sync", typ)
+		}
+	}
+	for typ, ok := range claimInformers.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			return fmt.Errorf("informer for %v did not sync", typ)
+		}
+	}
 	klog.FromContext(ctx).Info("binder started")
 	for {
 		if err := b.cycle(ctx); err != nil {
@@ -73,40 +127,87 @@ func runBinder(ctx context.Context, client kubernetes.Interface, dyn dynamic.Int
 }
 
 func (b *binder) cycle(ctx context.Context) error {
-	list, err := b.dynamic.Resource(bindRequestGVR).List(ctx, metav1.ListOptions{})
+	objects, err := b.requests.List(labels.Everything())
 	if err != nil {
 		return err
 	}
-	for _, item := range list.Items {
+	b.expireWritten()
+	seen := map[string]bool{}
+	for _, obj := range objects {
+		item, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			continue
+		}
 		var br bindRequest
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &br); err != nil {
 			klog.FromContext(ctx).Error(err, "malformed bind request", "name", item.GetName())
 			continue
 		}
-		if br.Status != nil && br.Status.Phase != "" && br.Status.Phase != phasePending {
-			continue
+		key := br.Namespace + "/" + br.Name
+		seen[key] = true
+		phase := phasePending
+		if br.Status != nil && br.Status.Phase != "" {
+			phase = br.Status.Phase
 		}
-		status := bindRequestStatus{Phase: phasePending}
-		if br.Status != nil {
-			status = *br.Status
+		switch phase {
+		case phasePending:
+			b.process(ctx, &br)
+		case phaseFailed:
+			// Marked failed by the scheduler (bind timeout, gang cancelled) or left by a
+			// rollback that did not finish: the scheduler deletes it once the claims are free.
+			b.rollback(ctx, &br)
+		case phaseSucceeded:
+			b.deleteSucceeded(ctx, &br, key)
 		}
-		if err := b.bind(ctx, &br); err != nil {
-			status.FailedAttempts++
-			status.Reason = err.Error()
-			if status.FailedAttempts > br.Spec.BackoffLimit {
-				status.Phase = phaseFailed
-				b.rollback(ctx, &br)
-			}
-			klog.FromContext(ctx).Error(err, "bind failed", "pod", klog.KRef(br.Namespace, br.Spec.PodName), "attempts", status.FailedAttempts)
-		} else {
-			status = bindRequestStatus{Phase: phaseSucceeded, FailedAttempts: status.FailedAttempts}
-			klog.FromContext(ctx).Info("pod bound", "pod", klog.KRef(br.Namespace, br.Spec.PodName), "node", br.Spec.SelectedNode)
-		}
-		if err := b.writeStatus(ctx, &br, status); err != nil {
-			klog.FromContext(ctx).Error(err, "bind request status not written", "name", br.Name)
+	}
+	for key := range b.succeededAt {
+		if !seen[key] {
+			delete(b.succeededAt, key)
 		}
 	}
 	return nil
+}
+
+func (b *binder) process(ctx context.Context, br *bindRequest) {
+	status := bindRequestStatus{Phase: phasePending}
+	if br.Status != nil {
+		status = *br.Status
+		status.Phase = phasePending
+	}
+	if err := b.bind(ctx, br); err != nil {
+		status.FailedAttempts++
+		status.Reason = err.Error()
+		if status.FailedAttempts > br.Spec.BackoffLimit {
+			b.rollback(ctx, br)
+			status.Phase = phaseFailed
+		}
+		klog.FromContext(ctx).Error(err, "bind failed", "pod", klog.KRef(br.Namespace, br.Spec.PodName), "attempts", status.FailedAttempts)
+	} else {
+		status = bindRequestStatus{Phase: phaseSucceeded, FailedAttempts: status.FailedAttempts}
+		klog.FromContext(ctx).Info("pod bound", "pod", klog.KRef(br.Namespace, br.Spec.PodName), "node", br.Spec.SelectedNode)
+	}
+	if err := b.writeStatus(ctx, br, status); err != nil {
+		klog.FromContext(ctx).Error(err, "bind request status not written", "name", br.Name)
+	}
+}
+
+func (b *binder) deleteSucceeded(ctx context.Context, br *bindRequest, key string) {
+	first, ok := b.succeededAt[key]
+	if !ok {
+		b.succeededAt[key] = b.now()
+		return
+	}
+	if b.now().Sub(first) < succeededRetention {
+		return
+	}
+	uid := br.UID
+	err := b.dynamic.Resource(bindRequestGVR).Namespace(br.Namespace).Delete(
+		ctx, br.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
+	if err != nil && !apierrors.IsNotFound(err) {
+		klog.FromContext(ctx).Error(err, "succeeded bind request not deleted", "name", br.Name)
+		return
+	}
+	delete(b.succeededAt, key)
 }
 
 func (b *binder) bind(ctx context.Context, br *bindRequest) error {
@@ -130,7 +231,10 @@ func (b *binder) bind(ctx context.Context, br *bindRequest) error {
 		}
 	}
 	if gates := withoutGate(pod.Spec.SchedulingGates); len(gates) != len(pod.Spec.SchedulingGates) {
-		patch, _ := json.Marshal([]map[string]any{{"op": "replace", "path": "/spec/schedulingGates", "value": gates}})
+		patch, err := json.Marshal([]map[string]any{{"op": "replace", "path": "/spec/schedulingGates", "value": gates}})
+		if err != nil {
+			return err
+		}
 		if _, err := pods.Patch(ctx, pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{}); err != nil {
 			return err
 		}
@@ -153,59 +257,155 @@ func withoutGate(gates []corev1.PodSchedulingGate) []corev1.PodSchedulingGate {
 
 func (b *binder) allocateClaim(ctx context.Context, ns string, pod *corev1.Pod, ca ClaimAllocation) error {
 	claims := b.client.ResourceV1().ResourceClaims(ns)
-	claim, err := claims.Get(ctx, ca.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if claim.Status.Allocation == nil {
-		allocation := ca.Allocation
-		claim.Status.Allocation = &allocation
-	} else if !sameDevices(claim.Status.Allocation, &ca.Allocation) {
-		return fmt.Errorf("claim %s is allocated to other devices", claim.Name)
-	}
-	reserved := slices.ContainsFunc(claim.Status.ReservedFor, func(r resourceapi.ResourceClaimConsumerReference) bool {
-		return r.UID == pod.UID
-	})
-	if !reserved {
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{
-			Resource: "pods", Name: pod.Name, UID: pod.UID,
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		claim, err := claims.Get(ctx, ca.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		changed := false
+		if claim.Status.Allocation == nil {
+			if err := b.checkConflicts(ns, ca); err != nil {
+				return err
+			}
+			allocation := *ca.Allocation.DeepCopy()
+			claim.Status.Allocation = &allocation
+			changed = true
+		} else if !sameDevices(claim.Status.Allocation, &ca.Allocation) {
+			return fmt.Errorf("claim %s is allocated to other devices", claim.Name)
+		}
+		reserved := slices.ContainsFunc(claim.Status.ReservedFor, func(r resourceapi.ResourceClaimConsumerReference) bool {
+			return r.UID == pod.UID
 		})
-	}
-	_, err = claims.UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-	return err
+		if !reserved {
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{
+				Resource: "pods", Name: pod.Name, UID: pod.UID,
+			})
+			changed = true
+		}
+		if !changed {
+			return nil
+		}
+		if _, err := claims.UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+		if b.written != nil {
+			b.written[ns+"/"+ca.Name] = writtenAllocation{allocation: *claim.Status.Allocation, at: b.now()}
+		}
+		return nil
+	})
 }
 
-func sameDevices(a, b *resourceapi.AllocationResult) bool {
-	key := func(r resourceapi.DeviceRequestAllocationResult) string {
-		return r.Driver + "/" + r.Pool + "/" + r.Device
-	}
-	if len(a.Devices.Results) != len(b.Devices.Results) {
-		return false
-	}
-	for i := range a.Devices.Results {
-		if key(a.Devices.Results[i]) != key(b.Devices.Results[i]) {
-			return false
+// checkConflicts refuses an allocation whose devices another claim already holds: a whole
+// device held by anyone, or a share of a device held whole.
+func (b *binder) checkConflicts(ns string, ca ClaimAllocation) error {
+	self := ns + "/" + ca.Name
+	held := map[string]*resourceapi.AllocationResult{}
+	if b.claims != nil {
+		all, err := b.claims.List(labels.Everything())
+		if err != nil {
+			return err
+		}
+		for _, c := range all {
+			if c.Status.Allocation != nil {
+				held[c.Namespace+"/"+c.Name] = c.Status.Allocation
+			}
 		}
 	}
-	return true
+	for key, w := range b.written {
+		if held[key] == nil {
+			held[key] = &w.allocation
+		}
+	}
+	for key, alloc := range held {
+		if key == self {
+			continue
+		}
+		for _, mine := range ca.Allocation.Devices.Results {
+			for _, theirs := range alloc.Devices.Results {
+				if deviceKey(mine) != deviceKey(theirs) {
+					continue
+				}
+				if mine.ShareID == nil || theirs.ShareID == nil || *mine.ShareID == *theirs.ShareID {
+					return fmt.Errorf("device %s of claim %s is held by claim %s", deviceKey(mine), ca.Name, key)
+				}
+			}
+		}
+	}
+	return nil
 }
 
-// rollback frees the claims this request allocated, so the next placement starts clean.
+func (b *binder) expireWritten() {
+	for key, w := range b.written {
+		if b.now().Sub(w.at) > writtenRetention {
+			delete(b.written, key)
+		}
+	}
+}
+
+func deviceKey(r resourceapi.DeviceRequestAllocationResult) string {
+	return r.Driver + "/" + r.Pool + "/" + r.Device
+}
+
+// sameDevices compares the devices (and shares) of two allocations in any order.
+func sameDevices(a, b *resourceapi.AllocationResult) bool {
+	keys := func(alloc *resourceapi.AllocationResult) []string {
+		out := make([]string, 0, len(alloc.Devices.Results))
+		for _, r := range alloc.Devices.Results {
+			share := ""
+			if r.ShareID != nil {
+				share = string(*r.ShareID)
+			}
+			out = append(out, deviceKey(r)+"#"+share)
+		}
+		sort.Strings(out)
+		return out
+	}
+	return slices.Equal(keys(a), keys(b))
+}
+
+// rollback frees what this request wrote to its claims, unless its Pod is bound as asked: the
+// Pod leaves the claims' reservations, and a claim nobody else reserves loses its allocation.
 func (b *binder) rollback(ctx context.Context, br *bindRequest) {
+	pod, err := b.client.CoreV1().Pods(br.Namespace).Get(ctx, br.Spec.PodName, metav1.GetOptions{})
+	if err == nil && string(pod.UID) == br.Spec.PodUID && pod.Spec.NodeName == br.Spec.SelectedNode {
+		return
+	}
+	if err != nil && !apierrors.IsNotFound(err) {
+		klog.FromContext(ctx).Error(err, "pod of a failed bind request not read", "pod", klog.KRef(br.Namespace, br.Spec.PodName))
+		return
+	}
 	claims := b.client.ResourceV1().ResourceClaims(br.Namespace)
+	uid := types.UID(br.Spec.PodUID)
 	for _, ca := range br.Spec.ResourceClaimAllocations {
-		claim, err := claims.Get(ctx, ca.Name, metav1.GetOptions{})
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			claim, err := claims.Get(ctx, ca.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if claim.Status.Allocation == nil || !sameDevices(claim.Status.Allocation, &ca.Allocation) {
+				return nil
+			}
+			reservedFor := slices.DeleteFunc(slices.Clone(claim.Status.ReservedFor), func(r resourceapi.ResourceClaimConsumerReference) bool {
+				return r.UID == uid
+			})
+			if len(reservedFor) == len(claim.Status.ReservedFor) && len(reservedFor) > 0 {
+				return nil
+			}
+			claim.Status.ReservedFor = reservedFor
+			if len(reservedFor) == 0 {
+				claim.Status.Allocation = nil
+			}
+			_, err = claims.UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+			return err
+		})
 		if apierrors.IsNotFound(err) {
 			continue
 		}
-		if err != nil || claim.Status.Allocation == nil || !sameDevices(claim.Status.Allocation, &ca.Allocation) {
+		if err != nil {
+			klog.FromContext(ctx).Error(err, "claim rollback failed", "claim", klog.KRef(br.Namespace, ca.Name))
 			continue
 		}
-		claim.Status.Allocation = nil
-		claim.Status.ReservedFor = nil
-		if _, err := claims.UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
-			klog.FromContext(ctx).Error(err, "claim rollback failed", "claim", klog.KObj(claim))
-		}
+		delete(b.written, br.Namespace+"/"+ca.Name)
 	}
 }
 

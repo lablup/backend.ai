@@ -2,7 +2,7 @@ package main
 
 // The DRA allocator: the structured allocator of k8s.io/dynamic-resource-allocation over an
 // informer snapshot, for the Pods of one gang in order. The caller's in-flight allocations
-// (BindRequests not yet written to claims) arrive as `reserved`.
+// (BindRequests whose claims the informer may not show yet) arrive as `reserved`, by claim.
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -34,9 +36,16 @@ type PodPlacement struct {
 	Claims []ClaimRef `json:"claims"`
 }
 
+// ReservedClaim is the allocation of a claim that a BindRequest carries.
+type ReservedClaim struct {
+	Namespace  string                       `json:"namespace"`
+	Name       string                       `json:"name"`
+	Allocation resourceapi.AllocationResult `json:"allocation"`
+}
+
 type AllocateRequest struct {
-	Reserved []resourceapi.DeviceRequestAllocationResult `json:"reserved"`
-	Pods     []PodPlacement                              `json:"pods"`
+	Reserved []ReservedClaim `json:"reserved"`
+	Pods     []PodPlacement  `json:"pods"`
 }
 
 type ClaimAllocation struct {
@@ -75,6 +84,19 @@ type allocator struct {
 	cel     *cel.Cache
 }
 
+// The allocator features of Kubernetes 1.36 with its default feature gates.
+var allocatorFeatures = structured.Features{
+	AdminAccess:            true,
+	ConsumableCapacity:     true,
+	DeviceBindingAndStatus: false,
+	DeviceTaints:           false,
+	ListTypeAttributes:     false,
+	PartitionableDevices:   true,
+	PrioritizedList:        true,
+}
+
+var celFeatures = cel.Features{EnableConsumableCapacity: true}
+
 func runAllocator(ctx context.Context, client kubernetes.Interface, listen string) error {
 	factory := informers.NewSharedInformerFactory(client, 10*time.Minute)
 	a := &allocator{
@@ -82,7 +104,7 @@ func runAllocator(ctx context.Context, client kubernetes.Interface, listen strin
 		slices:  factory.Resource().V1().ResourceSlices().Lister(),
 		claims:  factory.Resource().V1().ResourceClaims().Lister(),
 		classes: classLister{factory.Resource().V1().DeviceClasses().Lister()},
-		cel:     cel.NewCache(100, cel.Features{EnableConsumableCapacity: true}),
+		cel:     cel.NewCache(100, celFeatures),
 	}
 	factory.Start(ctx.Done())
 	for typ, ok := range factory.WaitForCacheSync(ctx.Done()) {
@@ -93,7 +115,7 @@ func runAllocator(ctx context.Context, client kubernetes.Interface, listen strin
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/allocate", a.handle)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	server := &http.Server{Addr: listen, Handler: mux}
+	server := &http.Server{Addr: listen, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		_ = server.Close()
@@ -119,28 +141,30 @@ func (a *allocator) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *allocator) allocate(ctx context.Context, req *AllocateRequest) (*AllocateResponse, error) {
-	requested := sets.New[string]()
-	for _, p := range req.Pods {
-		for _, c := range p.Claims {
-			requested.Insert(c.Namespace + "/" + c.Name)
-		}
-	}
 	state := structured.AllocatedState{
 		AllocatedDevices:         sets.New[structured.DeviceID](),
 		AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
 		AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
 	}
+	// Every allocation counts once: the informer's, else the one a BindRequest carries.
+	held := map[string]*resourceapi.AllocationResult{}
 	all, err := a.claims.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	for _, c := range all {
-		if c.Status.Allocation != nil && !requested.Has(c.Namespace+"/"+c.Name) {
-			addAllocated(&state, c.Status.Allocation)
+		if c.Status.Allocation != nil {
+			held[c.Namespace+"/"+c.Name] = c.Status.Allocation
 		}
 	}
-	for _, r := range req.Reserved {
-		addResult(&state, r)
+	for i := range req.Reserved {
+		r := &req.Reserved[i]
+		if key := r.Namespace + "/" + r.Name; held[key] == nil {
+			held[key] = &r.Allocation
+		}
+	}
+	for _, alloc := range held {
+		addAllocated(&state, alloc)
 	}
 	slices, err := a.slices.List(labels.Everything())
 	if err != nil {
@@ -154,13 +178,22 @@ func (a *allocator) allocate(ctx context.Context, req *AllocateRequest) (*Alloca
 		}
 		var claims []*resourceapi.ResourceClaim
 		for _, ref := range p.Claims {
+			if alloc := held[ref.Namespace+"/"+ref.Name]; alloc != nil {
+				// Already allocated or in flight: its devices tie the Pod to their node.
+				ok, err := allocationFitsNode(alloc, node)
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
+					return &AllocateResponse{Fits: false, Reason: fmt.Sprintf("claim %s is allocated for a node other than %s", ref.Name, p.Node)}, nil
+				}
+				continue
+			}
 			c, err := a.claims.ResourceClaims(ref.Namespace).Get(ref.Name)
 			if err != nil {
 				return nil, err
 			}
-			if c.Status.Allocation == nil {
-				claims = append(claims, c.DeepCopy())
-			}
+			claims = append(claims, c.DeepCopy())
 		}
 		out := PodAllocations{Name: p.Name}
 		if len(claims) > 0 {
@@ -177,6 +210,7 @@ func (a *allocator) allocate(ctx context.Context, req *AllocateRequest) (*Alloca
 			}
 			for i := range results {
 				addAllocated(&state, &results[i])
+				held[claims[i].Namespace+"/"+claims[i].Name] = &results[i]
 				out.Allocations = append(out.Allocations, ClaimAllocation{Name: claims[i].Name, Allocation: results[i]})
 			}
 		}
@@ -185,8 +219,16 @@ func (a *allocator) allocate(ctx context.Context, req *AllocateRequest) (*Alloca
 	return resp, nil
 }
 
-// The cluster runs with DRAConsumableCapacity: devices may be shared by capacity.
-var allocatorFeatures = structured.Features{ConsumableCapacity: true}
+func allocationFitsNode(alloc *resourceapi.AllocationResult, node *corev1.Node) (bool, error) {
+	if alloc.NodeSelector == nil {
+		return true, nil
+	}
+	selector, err := nodeaffinity.NewNodeSelector(alloc.NodeSelector)
+	if err != nil {
+		return false, err
+	}
+	return selector.Match(node), nil
+}
 
 func addAllocated(state *structured.AllocatedState, alloc *resourceapi.AllocationResult) {
 	for _, r := range alloc.Devices.Results {
