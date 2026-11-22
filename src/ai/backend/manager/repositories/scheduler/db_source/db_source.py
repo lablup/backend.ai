@@ -41,6 +41,9 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import StringInMatchSpec, UUIDInMatchSpec
 from ai.backend.common.dotfile import DotfilePath, InvalidDotfilePath
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    DEFAULT_KUBERNETES_SYSTEM_NAMESPACE,
+)
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
     KernelLifecycleEventReason,
@@ -1829,6 +1832,9 @@ class ScheduleDBSource:
             return ResourceGroupComputeCluster(
                 cluster=ComputeClusterSearchableFields.own.to_data(row),
                 scheduler=str(opts.get("scheduler") or DEFAULT_CLUSTER_SCHEDULER),
+                system_namespace=str(
+                    opts.get("system_namespace") or DEFAULT_KUBERNETES_SYSTEM_NAMESPACE
+                ),
             )
 
     async def get_project_queue_data(

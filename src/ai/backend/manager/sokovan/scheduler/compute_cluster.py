@@ -10,6 +10,9 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    DEFAULT_KUBERNETES_SYSTEM_NAMESPACE,
+)
 from ai.backend.common.types import AgentId
 from ai.backend.manager.clients.compute_cluster.client import ComputeClusterClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -29,6 +32,7 @@ class ComputeClusterTarget:
     namespace_prefix: str
     client: ComputeClusterClient
     scheduler: str = DEFAULT_CLUSTER_SCHEDULER
+    system_namespace: str = DEFAULT_KUBERNETES_SYSTEM_NAMESPACE
 
 
 class ComputeClusterResolver:
@@ -64,6 +68,7 @@ class ComputeClusterResolver:
             namespace_prefix=cluster.namespace_prefix,
             client=await self._client(cluster),
             scheduler=found.scheduler,
+            system_namespace=found.system_namespace,
         )
 
     async def for_agent(self, agent_id: AgentId) -> ComputeClusterTarget | None:

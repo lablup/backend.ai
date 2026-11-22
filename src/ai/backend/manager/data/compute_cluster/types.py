@@ -63,8 +63,10 @@ class ProjectQueueData:
 
 @dataclass(frozen=True)
 class ResourceGroupComputeCluster:
-    """The compute cluster of a `kubernetes` resource group, and the scheduler adapter it uses
-    there (`driver_opts.scheduler`: sokovan, kueue or kube)."""
+    """The compute cluster of a `kubernetes` resource group, the scheduler adapter it uses
+    there (`driver_opts.scheduler`: sokovan, kueue or kube), and the namespace of the
+    cluster's Backend.AI components (`driver_opts.system_namespace`)."""
 
     cluster: ComputeClusterData
     scheduler: str
+    system_namespace: str

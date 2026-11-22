@@ -4,8 +4,9 @@ Request DTOs for resource group DTO v2.
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
-from typing import Any, Self
+from typing import Any, Final, Self
 from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
@@ -63,11 +64,31 @@ _DRIVER_DESCRIPTION = (
 )
 _DRIVER_OPTS_DESCRIPTION = (
     "Options of the resource group driver. Empty for `static`; `kubernetes` requires"
-    " `compute_cluster`, the name of a registered compute cluster."
+    " `compute_cluster`, the name of a registered compute cluster, and accepts"
+    " `system_namespace` (default `backendai-system`), the namespace of the cluster's"
+    " Backend.AI components, and `scheduler`."
 )
+DEFAULT_KUBERNETES_SYSTEM_NAMESPACE: Final = "backendai-system"
+_DNS_1123_LABEL: Final = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+
+
+def _validate_driver_opts(driver_opts: dict[str, Any] | Unset) -> None:
+    if isinstance(driver_opts, Unset):
+        return
+    system_namespace = driver_opts.get("system_namespace")
+    if system_namespace is not None and (
+        not isinstance(system_namespace, str)
+        or len(system_namespace) > 63
+        or not _DNS_1123_LABEL.match(system_namespace)
+    ):
+        raise ValueError(
+            "driver_opts.system_namespace must be a DNS-1123 label"
+            f" (lowercase alphanumerics and '-', at most 63 characters), got {system_namespace!r}"
+        )
 
 
 def _validate_driver(driver: str | Unset, driver_opts: dict[str, Any] | Unset) -> None:
+    _validate_driver_opts(driver_opts)
     if isinstance(driver, Unset):
         return
     if driver not in RESOURCE_GROUP_DRIVERS:

@@ -610,7 +610,9 @@ class SessionLauncher:
         """Write the session's SessionWorkload; the cluster's sokovan places its Pods."""
         namespace = f"{target.namespace_prefix}{session.project_id}"
         await target.client.ensure_namespace(
-            namespace, {"backend.ai/project-id": str(session.project_id)}
+            namespace,
+            {"backend.ai/project-id": str(session.project_id)},
+            system_namespace=target.system_namespace,
         )
         resource_group = session.kernels[0].resource_group
         queue = await target.client.sync_project_queue(
