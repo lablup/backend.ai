@@ -42,7 +42,12 @@ from ai.backend.dra.errors import (
     UnknownDeviceError,
     UnsupportedContainerArgsError,
 )
-from ai.backend.dra.host.isolation import DeviceLimit, HamiCore, limit_from_shares
+from ai.backend.dra.host.isolation import (
+    DeviceLimit,
+    IsolationProvider,
+    SharedAllocation,
+    limit_from_shares,
+)
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -157,7 +162,7 @@ class PluginHost:
     _mount_root: Path
     _sysfs_root: Path
     _shared: bool
-    _isolation: HamiCore | None
+    _isolation: IsolationProvider | None
     _host_id: str
     _generation: int
     _published: list[DeviceInfo] | None
@@ -168,7 +173,7 @@ class PluginHost:
         mount_root: Path | None = None,
         *,
         shared: bool = False,
-        isolation: HamiCore | None = None,
+        isolation: IsolationProvider | None = None,
         sysfs_root: Path = Path("/sys"),
     ) -> None:
         if shared and isolation is None:
@@ -195,7 +200,7 @@ class PluginHost:
         mount_root: Path | None = None,
         *,
         shared: bool = False,
-        isolation: HamiCore | None = None,
+        isolation: IsolationProvider | None = None,
         sysfs_root: Path = Path("/sys"),
     ) -> PluginHost:
         """`shared` publishes devices that several claims split by `shares` capacity."""
@@ -218,20 +223,29 @@ class PluginHost:
         preferred = SlotName(f"{self._plugin.key}.device")
         return preferred if preferred in names else names[0]
 
-    def _pcie_roots(self) -> dict[str, str]:
+    @property
+    def shares_slot(self) -> SlotName:
+        """The slot every shared device is allocated by."""
+        return SlotName(f"{self._plugin.key}.shares")
+
+    def _pcie_roots(self, devices: Mapping[str, AbstractComputeDevice]) -> dict[str, str]:
         """Device name → PCIe root, read from sysfs."""
         roots = {}
-        for name, device in self._devices.items():
+        for name, device in devices.items():
             if (bus_id := pci_bus_id(device.hw_location)) is not None:
                 if (root := pcie_root(bus_id, self._sysfs_root)) is not None:
                     roots[name] = root
         return roots
 
     def _attributes(
-        self, name: str, device: AbstractComputeDevice, pcie_roots: Mapping[str, str]
+        self,
+        name: str,
+        slot: SlotName,
+        device: AbstractComputeDevice,
+        pcie_roots: Mapping[str, str],
     ) -> dict[str, str | int | bool]:
         attributes: dict[str, str | int | bool] = {
-            "slotName": str(self._slots[name]),
+            "slotName": str(slot),
             "deviceId": str(device.device_id),
             "hwLocation": device.hw_location,
         }
@@ -253,23 +267,29 @@ class PluginHost:
         )
 
     async def list_devices(self) -> DevicesResponse:
-        devices = await self._plugin.list_devices()
-        self._devices = {device_name(d.device_id): d for d in devices}
-        # The alloc map tells a whole GPU (`cuda.device`) from a MIG instance
-        # (`cuda.device:10g-mig`) and the like.
-        slot_infos = (await self._plugin.create_alloc_map()).device_slots
-        self._slots = {
-            name: (
-                slot_infos[d.device_id].slot_name if d.device_id in slot_infos else self.device_slot
-            )
-            for name, d in self._devices.items()
-        }
-        pcie_roots = await asyncio.to_thread(self._pcie_roots)
+        devices = {device_name(d.device_id): d for d in await self._plugin.list_devices()}
+        if self._shared:
+            slots = dict.fromkeys(devices, self.shares_slot)
+        else:
+            # The alloc map tells a whole GPU (`cuda.device`) from a MIG instance
+            # (`cuda.device:10g-mig`) and the like.
+            slot_infos = (await self._plugin.create_alloc_map()).device_slots
+            slots = {
+                name: (
+                    slot_infos[d.device_id].slot_name
+                    if d.device_id in slot_infos
+                    else self.device_slot
+                )
+                for name, d in devices.items()
+            }
+        # Both maps change together: a prepare between two awaits sees one generation.
+        self._devices, self._slots = devices, slots
+        pcie_roots = await asyncio.to_thread(self._pcie_roots, devices)
         infos = []
-        for name, device in sorted(self._devices.items()):
+        for name, device in sorted(devices.items()):
             info = DeviceInfo(
                 name=name,
-                attributes=self._attributes(name, device, pcie_roots),
+                attributes=self._attributes(name, slots[name], device, pcie_roots),
                 capacity={
                     "memory": str(int(device.memory_size)),
                     "processingUnits": str(device.processing_units),
@@ -352,13 +372,17 @@ class PluginHost:
         unknown = [n for n in names if n not in self._devices]
         if unknown:
             raise UnknownDeviceError(f"devices not on this node: {unknown}")
+        # Everything that reads the device maps runs before the first await: list_devices
+        # replaces them meanwhile.
         shares = self._shares(names, consumed or {}) if self._shared else {}
         alloc = self._alloc(names, shares)
+        singles = {n: self._alloc([n], shares) for n in names}
+        limits = self._limits(names, shares) if shares else []
         edits = await self._edits(alloc)
         per_device: dict[str, list[str]] = {}
         if edits.cdi_devices:
             for n in names:
-                single = await self._edits(self._alloc([n], shares))
+                single = await self._edits(singles[n])
                 per_device[n] = [i for i in single.cdi_devices if i in edits.cdi_devices]
             attributed = {i for ids in per_device.values() for i in ids}
             edits.cdi_devices = [i for i in edits.cdi_devices if i not in attributed]
@@ -372,9 +396,17 @@ class PluginHost:
                     options=["bind", "ro"],
                 )
             )
-        if self._isolation is not None and shares:
+        if shares:
+            if self._isolation is None:
+                raise IsolationRequiredError("shared devices need an isolation provider")
             # Fail closed: every shared allocation runs under the provider, a whole one too.
-            isolation = self._isolation.edits(claim_uid, self._limits(names, shares))
+            allocation = SharedAllocation(
+                claim_uid=claim_uid,
+                claim_dir=source,
+                limits=limits,
+                alloc=alloc,
+            )
+            isolation = await self._isolation.edits(allocation, self._plugin)
             edits.env.extend(isolation.env)
             edits.mounts.extend(isolation.mounts)
         log.debug("claim prepared", claim_uid=claim_uid, devices=",".join(names))

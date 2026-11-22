@@ -98,6 +98,10 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "create", "delete"]
+  # A multi-node session on NVIDIA DeviceProfiles with computeDomain gets a ComputeDomain (IMEX).
+  - apiGroups: ["resource.nvidia.com"]
+    resources: ["computedomains"]
+    verbs: ["get", "list", "watch", "create", "delete"]
 ---
 # The controller creates the PVs of StorageBindings: CSI volumes of the listed drivers only, and
 # CSI secrets only from this namespace. No hostPath, local or other in-tree volume.
@@ -189,7 +193,7 @@ spec:
             - {name: BACKENDAI_SYSTEM_NAMESPACE, value: {{ .Release.Namespace | quote }}}
             - {name: BACKENDAI_KERNEL_UID, value: {{ .Values.sessionController.kernelUid | quote }}}
             - {name: BACKENDAI_KUBELET_INSECURE_TLS, value: {{ .Values.sessionController.kubeletInsecureTls | default false | quote }}}
-            {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
+            - {name: BACKENDAI_PLACEMENT_TIMEOUT, value: {{ .Values.sessionController.placementTimeoutSeconds | default 600 | quote }}}
             - {name: BACKENDAI_KERNEL_GID, value: {{ .Values.sessionController.kernelGid | quote }}}
             - {name: BACKENDAI_CONTROLLER_WORKERS, value: {{ .Values.sessionController.workers | quote }}}
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sessionController.logLevel | quote }}}

@@ -81,6 +81,17 @@ spec:
 {{- end }}
 {{- end -}}
 
+{{/* The isolation provider of a bai-dra driver entry: `isolation`, or hami-core when only hamiCore is set. */}}
+{{- define "backendai-cluster.baiDraIsolation" -}}
+{{- if .isolation -}}
+{{- .isolation -}}
+{{- else if .hamiCore -}}
+hami-core
+{{- else -}}
+none
+{{- end -}}
+{{- end -}}
+
 {{/*
 Node affinity of a bai-dra DaemonSet: the entry's affinity or nodeSelector, plus NotIn on the
 labels of nodes whose GPUs another allocator owns. (dict "root" $ "driver" <baiDra.drivers entry>)

@@ -99,8 +99,15 @@ spec:
 {{- if not (or .nodeSelector .affinity) }}
 {{- fail (printf "baiDra.drivers %s: set nodeSelector or affinity to the nodes bai-dra owns (dra.backend.ai/driver-mode=bai)" $name) }}
 {{- end }}
-{{- if and .shared (not .hamiCore) }}
-{{- fail (printf "baiDra.drivers %s: shared devices need an isolation provider (hamiCore)" $name) }}
+{{- $isolation := include "backendai-cluster.baiDraIsolation" . }}
+{{- if not (has $isolation (list "hami-core" "bai-hook" "none")) }}
+{{- fail (printf "baiDra.drivers %s: isolation must be hami-core, bai-hook or none, not %q" $name $isolation) }}
+{{- end }}
+{{- if and .shared (eq $isolation "none") }}
+{{- fail (printf "baiDra.drivers %s: shared devices need an isolation provider (isolation: hami-core or bai-hook)" $name) }}
+{{- end }}
+{{- if and (eq $isolation "hami-core") (not .hamiCore) }}
+{{- fail (printf "baiDra.drivers %s: isolation hami-core needs hamiCore (image, libDir)" $name) }}
 {{- end }}
 {{- if and .shared (eq $policy "device-plugin") }}
 {{- fail (printf "baiDra.drivers %s: gpuAllocationPolicy device-plugin has no fraction (shared) pool" $name) }}
@@ -166,11 +173,11 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .hamiCore }}
+      {{- if eq $isolation "hami-core" }}
       initContainers:
         # HAMi-core's preload library goes to the node: CDI mounts it read-only into shared containers.
         - name: hami-core
-          image: {{ required "hamiCore.image is required" .image }}
+          image: {{ required "hamiCore.image is required" .hamiCore.image }}
           command: [sh, -c]
           args:
             - cp /k8s-vgpu/lib/nvidia/libvgpu.so.* /host/libvgpu.so && echo /usr/local/vgpu/libvgpu.so > /host/ld.so.preload
@@ -204,7 +211,8 @@ spec:
             - {name: plugins, mountPath: /var/lib/kubelet/plugins}
             - {name: cdi, mountPath: /var/run/cdi}
         - name: plugin-host
-          image: {{ include "backendai-cluster.image" $.Values.image }}
+          # An image with the entry's plugin (pluginHostImage), e.g. the enterprise CUDA plugin for bai-hook.
+          image: {{ include "backendai-cluster.image" (.pluginHostImage | default $.Values.image) }}
           args: ["ai.backend.dra.host"]
           workingDir: /etc/backend.ai
           env:
@@ -214,8 +222,13 @@ spec:
             - {name: BAI_DRA_MOUNT_ROOT, value: {{ $mountRoot | quote }}}
             - {name: HOME, value: /tmp}
             - {name: BAI_DRA_SHARED, value: {{ .shared | default false | quote }}}
-            {{- with .hamiCore }}
-            - {name: BAI_DRA_HAMI_LIB_DIR, value: {{ .libDir | quote }}}
+            - {name: BAI_DRA_ISOLATION, value: {{ $isolation | quote }}}
+            {{- if eq $isolation "hami-core" }}
+            - {name: BAI_DRA_HAMI_LIB_DIR, value: {{ .hamiCore.libDir | quote }}}
+            {{- end }}
+            {{- if eq $isolation "bai-hook" }}
+            - {name: BAI_DRA_HOOK_DISTRO, value: {{ (.baiHook | default dict).distro | default "ubuntu22.04" | quote }}}
+            - {name: BAI_DRA_VAR_BASE_PATH, value: {{ $.Values.baiDra.varBasePath | quote }}}
             {{- end }}
             {{- range $k, $v := .pluginHostEnv }}
             - {name: {{ $k }}, value: {{ $v | quote }}}
@@ -250,6 +263,10 @@ spec:
             # Plugins that name devices of other CDI specs check that the spec exists.
             - {name: cdi, mountPath: /var/run/cdi, readOnly: true}
             - {name: cdi-static, mountPath: /etc/cdi, readOnly: true}
+            {{- if eq $isolation "bai-hook" }}
+            # The plugin's hook cache (agent.var-base-path): CDI mounts the hook from the node path.
+            - {name: var-base, mountPath: {{ $.Values.baiDra.varBasePath }}}
+            {{- end }}
       volumes:
         - {name: bridge, emptyDir: {}}
         - {name: tmp, emptyDir: {}}
@@ -265,9 +282,13 @@ spec:
           hostPath: {path: /var/run/cdi, type: DirectoryOrCreate}
         - name: cdi-static
           hostPath: {path: /etc/cdi, type: DirectoryOrCreate}
-        {{- with .hamiCore }}
+        {{- if eq $isolation "hami-core" }}
         - name: hami-core
-          hostPath: {path: {{ required "hamiCore.libDir is required" .libDir }}, type: DirectoryOrCreate}
+          hostPath: {path: {{ required "hamiCore.libDir is required" .hamiCore.libDir }}, type: DirectoryOrCreate}
+        {{- end }}
+        {{- if eq $isolation "bai-hook" }}
+        - name: var-base
+          hostPath: {path: {{ $.Values.baiDra.varBasePath }}, type: DirectoryOrCreate}
         {{- end }}
 {{- end }}
 {{- end }}

@@ -65,6 +65,19 @@ class IsolationRequiredError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class IsolationUnavailableError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/dra/isolation-unavailable"
+    error_title = "The isolation provider cannot limit this allocation."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class MissingConsumedSharesError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/dra/missing-consumed-shares"
     error_title = "A shared device was allocated without consumed shares."
