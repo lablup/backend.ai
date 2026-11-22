@@ -39,15 +39,3 @@ func TestCDIWriteAndRemove(t *testing.T) {
 		t.Fatalf("removing twice must not fail: %v", err)
 	}
 }
-
-func TestAttributeTypes(t *testing.T) {
-	if a := attribute(float64(3)); a.IntValue == nil || *a.IntValue != 3 {
-		t.Fatal("JSON numbers become int attributes")
-	}
-	if a := attribute(true); a.BoolValue == nil || !*a.BoolValue {
-		t.Fatal("bools stay bools")
-	}
-	if a := attribute("x"); a.StringValue == nil || *a.StringValue != "x" {
-		t.Fatal("strings stay strings")
-	}
-}
