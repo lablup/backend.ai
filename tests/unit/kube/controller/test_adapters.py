@@ -25,6 +25,25 @@ def two_kernels(workload: SessionWorkload, main_kernel: KernelSpec) -> SessionWo
     return workload
 
 
+class TestSokovan:
+    def test_kernel_pods_join_the_gang_by_the_session_label(
+        self, two_kernels: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        pod = build_kernel_pod(two_kernels, main_kernel, settings)
+        labels = pod["metadata"]["labels"]
+        assert labels["backend.ai/session-id"] == two_kernels.spec.session_id
+        assert labels["app.kubernetes.io/managed-by"] == "backendai-session-controller"
+        assert not any(
+            k.startswith("scheduling.backend.ai/pod") for k in pod["metadata"]["annotations"]
+        )
+        assert pod["spec"]["schedulingGates"] == [{"name": "scheduling.backend.ai/sokovan"}]
+
+    def test_no_object_is_created_beside_the_pods(
+        self, workload: SessionWorkload, settings: ControllerSettings
+    ) -> None:
+        assert scheduler_adapter(workload, settings).group_objects(workload) == []
+
+
 class TestKueue:
     def test_pods_carry_the_queue_and_the_pod_group(
         self, two_kernels: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
@@ -37,7 +56,6 @@ class TestKueue:
         assert annotations["kueue.x-k8s.io/pod-group-total-count"] == "2"
         assert pod["spec"]["schedulerName"] == "default-scheduler"
         assert "schedulingGates" not in pod["spec"]
-        assert "scheduling.backend.ai/pod-group" not in annotations
 
     def test_the_namespace_gets_a_local_queue(
         self, workload: SessionWorkload, settings: ControllerSettings

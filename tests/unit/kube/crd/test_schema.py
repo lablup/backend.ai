@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic.alias_generators import to_camel
 
 from ai.backend.kube.crd.base import CustomResource
 from ai.backend.kube.crd.generate import render_all
@@ -13,9 +14,12 @@ from ai.backend.kube.crd.session import (
     KernelSpec,
     SessionWorkload,
     SessionWorkloadSpec,
+    SessionWorkloadStatus,
 )
 
-CHART_TEMPLATES = Path(__file__).resolve().parents[4] / "deploy/helm/backendai-crds/templates"
+HELM = Path(__file__).resolve().parents[4] / "deploy/helm"
+CHART_TEMPLATES = HELM / "backendai-crds/templates"
+ADMISSION = HELM / "backendai-cluster/templates/admission.yaml"
 
 
 def _walk(node: Any, path: str = "") -> list[tuple[str, dict[str, Any]]]:
@@ -55,6 +59,20 @@ class TestGeneratedManifests:
     def test_chart_templates_match_models(self) -> None:
         for name, body in render_all().items():
             assert (CHART_TEMPLATES / name).read_text() == body, f"{name} is stale"
+
+    def test_chart_has_no_crd_without_a_model(self) -> None:
+        on_disk = {p.name for p in CHART_TEMPLATES.glob("*.yaml")}
+        assert on_disk == set(render_all())
+
+
+class TestAdmission:
+    def test_the_scheduler_status_rule_covers_every_controller_field(self) -> None:
+        """sokovan-scheduler may change only `status.placement`: the policy compares every
+        other status field, so a new field must be added there too."""
+        policy = ADMISSION.read_text()
+        fields = {to_camel(name) for name in SessionWorkloadStatus.model_fields} - {"placement"}
+        for field in sorted(fields):
+            assert f"object.?status.?{field} == oldObject.?status.?{field}" in policy, field
 
 
 class TestStructuralSchema:

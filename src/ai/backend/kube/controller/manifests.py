@@ -22,7 +22,6 @@ from ai.backend.kube.controller.krunner import select_krunner
 from ai.backend.kube.controller.naming import (
     ANNOTATION_KERNEL_GID,
     ANNOTATION_KERNEL_UID,
-    HOSTNAME_LABEL,
     KERNEL_CONTAINER,
     KRUNNER_CONTAINER,
     LABEL_NETWORK_ID,
@@ -31,16 +30,10 @@ from ai.backend.kube.controller.naming import (
     kernel_pod_name,
     kernel_secret_name,
     session_labels,
-    session_queue,
 )
 from ai.backend.kube.controller.volumes import ResolvedMount, pod_volumes, volume_mounts
 from ai.backend.kube.crd.device import GPUAllocationPolicy
-from ai.backend.kube.crd.scheduling import (
-    PodGroup,
-    PodGroupSpec,
-    SokovanBindMode,
-    TopologyConstraint,
-)
+from ai.backend.kube.crd.scheduling import SokovanBindMode
 from ai.backend.kube.crd.session import KernelSpec, ServicePortSpec, SessionWorkload
 from ai.backend.kube.errors import InvalidSessionWorkloadError
 
@@ -506,28 +499,6 @@ def build_session_network_policy(
             ],
         },
     }
-
-
-def build_pod_group(workload: SessionWorkload) -> dict[str, Any]:
-    spec = workload.spec
-    group = PodGroup(
-        metadata=_metadata(workload, workload.metadata["name"], session_labels(workload)),
-        spec=PodGroupSpec(
-            min_member=len(spec.kernels),
-            queue=session_queue(workload),
-            priority=spec.priority,
-            session_id=spec.session_id,
-            topology=_topology(workload),
-        ),
-    )
-    return group.to_manifest()
-
-
-def _topology(workload: SessionWorkload) -> TopologyConstraint | None:
-    """A single-node session keeps all its kernels on one node, as on one Agent."""
-    if workload.spec.cluster_mode == "single-node" and len(workload.spec.kernels) > 1:
-        return TopologyConstraint(required_levels=[HOSTNAME_LABEL])
-    return None
 
 
 def peer_hosts(workload: SessionWorkload, kernel: KernelSpec) -> list[str]:

@@ -21,7 +21,7 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list", "watch", "patch"]
   - apiGroups: ["scheduling.backend.ai"]
-    resources: ["podgroups", "queues"]
+    resources: ["queues"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceslices", "resourceclaims", "deviceclasses"]
@@ -30,15 +30,19 @@ rules:
     resources: ["bindrequests"]
     verbs: ["get", "list", "watch", "create", "delete"]
   - apiGroups: ["scheduling.backend.ai"]
-    resources: ["podgroups/status", "bindrequests/status"]
+    resources: ["bindrequests/status"]
     verbs: ["get", "patch"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["deviceprofiles"]
     verbs: ["get", "list", "watch"]
-  # A gang that cannot be placed is requeued through the session controller (annotation only).
+  # The SessionWorkload is the gang. One that cannot be placed is requeued through the session
+  # controller (annotation only); admission keeps status writes to status.placement.
   - apiGroups: ["backend.ai"]
     resources: ["sessionworkloads"]
     verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads/status"]
+    verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

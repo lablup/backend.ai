@@ -36,3 +36,7 @@ session gateway share. To rotate it, update the Secret and restart both:
   carries the annotation helm.sh/resource-policy=keep (nodeHelper.tokenSecret in values.yaml).
 {{- end }}
 {{- end }}
+
+sokovan schedules SessionWorkloads and writes their status.placement: upgrade the backendai-crds
+chart first (an older CRD drops the field). PodGroups of earlier versions are not read; delete
+them with: kubectl delete crd podgroups.scheduling.backend.ai

@@ -149,6 +149,25 @@ class Condition(CRDModel):
     last_transition_time: str | None = None
 
 
+class PlacementPhase(enum.StrEnum):
+    """Where sokovan is with the placement of the session's kernels."""
+
+    PENDING = "Pending"
+    PLACED = "Placed"
+    BOUND = "Bound"
+    UNSCHEDULABLE = "Unschedulable"
+
+
+class PlacementStatus(CRDModel):
+    """Written only by the sokovan scheduler (admission keeps the session controller out)."""
+
+    phase: PlacementPhase = PlacementPhase.PENDING
+    scheduled: int = Field(default=0, description="Kernels bound or with a node chosen")
+    last_attempt: str | None = Field(default=None, description="RFC 3339 time of the last try")
+    reason: str | None = None
+    message: str | None = None
+
+
 class SessionWorkloadStatus(CRDModel):
     phase: SessionPhase = SessionPhase.PENDING
     reason: str | None = None
@@ -179,6 +198,7 @@ class SessionWorkloadStatus(CRDModel):
             "RFC 3339 time the controller reported the current placement attempt as timed out"
         ),
     )
+    placement: PlacementStatus | None = None
 
 
 class SessionWorkload(CustomResource):
@@ -192,6 +212,7 @@ class SessionWorkload(CustomResource):
             PrinterColumn("Session", ".spec.sessionName"),
             PrinterColumn("Phase", ".status.phase"),
             PrinterColumn("Size", ".spec.clusterSize", "integer"),
+            PrinterColumn("Placement", ".status.placement.phase"),
             PrinterColumn("Age", ".metadata.creationTimestamp", "date"),
         ),
     )

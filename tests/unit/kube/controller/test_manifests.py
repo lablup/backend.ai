@@ -10,7 +10,6 @@ from ai.backend.kube.controller.manifests import (
     SessionSecrets,
     build_kernel_pod,
     build_kernel_secret,
-    build_pod_group,
     build_session_network_policy,
     build_session_service,
 )
@@ -130,11 +129,6 @@ class TestSessionObjects:
         assert spec["clusterIP"] == "None"
         assert spec["publishNotReadyAddresses"] is True
 
-    def test_pod_group_waits_for_every_kernel(self, workload: SessionWorkload) -> None:
-        spec = build_pod_group(workload)["spec"]
-        assert spec["minMember"] == 1
-        assert spec["queue"] == "k8s"
-
 
 class TestNetworkPolicy:
     def test_session_alone_without_a_persistent_network(
@@ -220,14 +214,6 @@ class TestMultiKernelSessions:
         workload.spec.kernels = [main_kernel, sub]
         workload.spec.cluster_size = 2
         return workload
-
-    def test_single_node_session_requires_one_node(self, two_kernels: SessionWorkload) -> None:
-        spec = build_pod_group(two_kernels)["spec"]
-        assert spec["topology"]["requiredLevels"] == ["kubernetes.io/hostname"]
-
-    def test_multi_node_session_places_kernels_freely(self, two_kernels: SessionWorkload) -> None:
-        two_kernels.spec.cluster_mode = "multi-node"
-        assert build_pod_group(two_kernels)["spec"].get("topology") is None
 
     def test_krunner_waits_for_the_peers(
         self, two_kernels: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings

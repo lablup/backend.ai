@@ -41,8 +41,9 @@ spec:
                 type: string
               selectedNode:
                 type: string
-              podGroup:
+              session:
                 type: string
+                description: The SessionWorkload of the Pod
                 nullable: true
               resourceClaimAllocations:
                 items:

@@ -37,7 +37,7 @@ class TestCRDs:
         checks = check_crds({"sessionworkloads.backend.ai": ["v1alpha1"]})
         outcomes = {c.name: c.outcome for c in checks}
         assert outcomes["crd sessionworkloads.backend.ai"] == Outcome.PASS
-        assert outcomes["crd podgroups.scheduling.backend.ai"] == Outcome.FAIL
+        assert outcomes["crd bindrequests.scheduling.backend.ai"] == Outcome.FAIL
 
 
 class TestDRADrivers:

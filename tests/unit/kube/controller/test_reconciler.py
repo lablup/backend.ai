@@ -617,3 +617,58 @@ class TestComputeDomain:
         domain["gone"] = True
         await reconciler.reconcile("bai-p", "s-1")
         assert apis.core.create_namespaced_pod.await_count == 2
+
+
+class TestPlacementStatus:
+    """`status.placement` is sokovan's: the controller reads it and never writes it."""
+
+    @pytest.fixture
+    def unschedulable(self, persisted_status: dict[str, Any], apis: Apis) -> dict[str, Any]:
+        _started(persisted_status, "Pending")
+        persisted_status["status"]["placement"] = {
+            "phase": "Unschedulable",
+            "reason": "Unschedulable",
+            "message": "not every pod of the group fits now",
+        }
+        apis.core.list_namespaced_pod.return_value = SimpleNamespace(
+            items=[_unplaced_pod(datetime.now(UTC))]
+        )
+        return persisted_status
+
+    async def test_a_pending_session_reports_why_sokovan_has_not_placed_it(
+        self, reconciler: SessionReconciler, unschedulable: dict[str, Any]
+    ) -> None:
+        await reconciler.reconcile("bai-p", "s-1")
+        status = unschedulable["status"]
+        assert (status["phase"], status["reason"], status["message"]) == (
+            "Pending",
+            "Unschedulable",
+            "not every pod of the group fits now",
+        )
+
+    async def test_a_placed_session_has_no_pending_reason(
+        self, reconciler: SessionReconciler, unschedulable: dict[str, Any]
+    ) -> None:
+        unschedulable["status"]["placement"] = {"phase": "Placed", "reason": None}
+        unschedulable["status"]["reason"] = "Unschedulable"
+        await reconciler.reconcile("bai-p", "s-1")
+        assert unschedulable["status"]["reason"] is None
+
+    async def test_the_controller_never_writes_the_placement(
+        self, reconciler: SessionReconciler, unschedulable: dict[str, Any], apis: Apis
+    ) -> None:
+        await reconciler.reconcile("bai-p", "s-1")
+        patches = _status_patches(apis)
+        assert patches
+        assert all("placement" not in patch for patch in patches)
+        assert unschedulable["status"]["placement"]["phase"] == "Unschedulable"
+
+    async def test_no_pod_group_is_created(
+        self, reconciler: SessionReconciler, raw: dict[str, Any], apis: Apis
+    ) -> None:
+        await reconciler.reconcile("bai-p", "s-1")
+        apis.core.create_namespaced_pod.assert_awaited()
+        kinds = [
+            c.args[4]["kind"] for c in apis.custom.create_namespaced_custom_object.call_args_list
+        ]
+        assert "PodGroup" not in kinds

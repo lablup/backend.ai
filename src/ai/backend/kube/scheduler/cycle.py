@@ -209,10 +209,12 @@ class PendingPod:
 
 @dataclass(frozen=True)
 class PendingGroup:
+    """The kernels of one sokovan SessionWorkload, placed all or none."""
+
     namespace: str
-    name: str
+    name: str  # of the SessionWorkload
     priority: int
-    created_at: str  # of the SessionWorkload (of the PodGroup when it is not known)
+    created_at: str  # of the SessionWorkload
     min_member: int
     pods: Sequence[PendingPod]  # the members still to place
     required_levels: Sequence[str] = ()  # node labels every pod of the group shares a value of

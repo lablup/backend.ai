@@ -13,7 +13,6 @@ from ai.backend.kube.controller.cache import ClusterObjectCache
 from ai.backend.kube.controller.naming import LABEL_MANAGED_BY, MANAGED_BY
 from ai.backend.kube.controller.reconciler import SessionReconciler
 from ai.backend.kube.crd.base import CRD_VERSION
-from ai.backend.kube.crd.scheduling import PodGroup
 from ai.backend.kube.crd.session import SessionPhase, SessionWorkload
 from ai.backend.kube.watch import watch_forever
 from ai.backend.logging.structured import StructuredLogger
@@ -21,7 +20,6 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _SW = SessionWorkload.crd
-_PG = PodGroup.crd
 
 Key = tuple[str, str]  # (namespace, name)
 _ENDED: Final = frozenset({SessionPhase.ERROR.value, SessionPhase.TERMINATED.value})
@@ -108,14 +106,6 @@ class SessionController:
                 watch_forever(
                     lambda **kw: core.list_pod_for_all_namespaces(
                         label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY}", **kw
-                    ),
-                    self._on_owned_object,
-                )
-            )
-            tg.create_task(
-                watch_forever(
-                    lambda **kw: custom.list_cluster_custom_object(
-                        _PG.group, CRD_VERSION, _PG.plural, **kw
                     ),
                     self._on_owned_object,
                 )

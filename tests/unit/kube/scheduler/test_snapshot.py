@@ -9,12 +9,19 @@ from ai.backend.kube.scheduler.snapshot import (
     build_pending_groups,
     in_flight_binds,
     live_pod_uids,
+    newly_bound,
     pod_requests,
+    required_levels,
     reserved_claims,
     slot_profiles,
 )
 
 GATE = [{"name": "scheduling.backend.ai/sokovan"}]
+SESSION_ID = "00000000-0000-0000-0000-000000000001"
+SESSION_LABELS = {
+    "app.kubernetes.io/managed-by": "backendai-session-controller",
+    "backend.ai/session-id": SESSION_ID,
+}
 
 
 def _pod(
@@ -42,8 +49,8 @@ def _pod(
             "name": name,
             "namespace": "ns",
             "uid": uid or f"uid-{name}",
-            "labels": {},
-            "annotations": {"scheduling.backend.ai/pod-group": "g"},
+            "labels": dict(SESSION_LABELS),
+            "annotations": {},
         },
         "spec": spec,
         "status": {"phase": phase},
@@ -106,14 +113,99 @@ class TestBuildNodes:
         assert node.devices_used == {"gpu.x/g": 3}
 
 
+def _workload(
+    kernels: int = 2,
+    *,
+    scheduler: str = "sokovan",
+    status: dict[str, Any] | None = None,
+    **spec: Any,
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "metadata": {"name": "g", "namespace": "ns", "creationTimestamp": "t"},
+        "spec": {
+            "sessionId": SESSION_ID,
+            "schedulerName": scheduler,
+            "kernels": [{"kernelId": f"k{i}"} for i in range(kernels)],
+            **spec,
+        },
+    }
+    if status is not None:
+        body["status"] = status
+    return body
+
+
 class TestBuildPendingGroups:
     def test_only_gated_pods_of_pending_groups(self) -> None:
-        group = {
-            "metadata": {"name": "g", "namespace": "ns", "creationTimestamp": "t"},
-            "spec": {"minMember": 2},
-        }
-        [pending] = build_pending_groups([group], [_pod("a", gated=True), _pod("b", node="n1")])
+        pods = [_pod("a", gated=True), _pod("b", node="n1")]
+        [pending] = build_pending_groups([_workload(2)], pods)
         assert [p.name for p in pending.pods] == ["a"]
+
+    def test_the_gang_is_the_session_and_its_kernels(self) -> None:
+        workload = _workload(3, priority=5)
+        [pending] = build_pending_groups([workload], [_pod("a", gated=True)])
+        assert (pending.namespace, pending.name) == ("ns", "g")
+        assert pending.min_member == 3
+        assert pending.priority == 5
+        assert pending.session_id == SESSION_ID
+        assert pending.created_at == "t"
+
+    def test_pods_of_another_session_are_not_members(self) -> None:
+        other = _pod("x", gated=True)
+        other["metadata"]["labels"]["backend.ai/session-id"] = "other"
+        unmanaged = _pod("y", gated=True)
+        del unmanaged["metadata"]["labels"]["app.kubernetes.io/managed-by"]
+        [pending] = build_pending_groups([_workload(1)], [_pod("a", gated=True), other, unmanaged])
+        assert [p.name for p in pending.pods] == ["a"]
+
+    def test_a_session_of_another_scheduler_is_not_placed(self) -> None:
+        assert (
+            build_pending_groups([_workload(1, scheduler="kueue")], [_pod("a", gated=True)]) == []
+        )
+
+    def test_a_session_being_deleted_or_terminating_is_not_placed(self) -> None:
+        deleting = _workload(1)
+        deleting["metadata"]["deletionTimestamp"] = "now"
+        terminating = _workload(1, status={"phase": "Terminating"})
+        pods = [_pod("a", gated=True)]
+        assert build_pending_groups([deleting], pods) == []
+        assert build_pending_groups([terminating], pods) == []
+
+    def test_the_same_session_id_in_another_namespace_is_not_a_member(self) -> None:
+        pod = _pod("a", gated=True)
+        pod["metadata"]["namespace"] = "other"
+        assert build_pending_groups([_workload(1)], [pod]) == []
+
+
+class TestRequiredLevels:
+    def test_a_single_node_session_requires_one_node(self) -> None:
+        spec = _workload(2, clusterMode="single-node")["spec"]
+        assert required_levels(spec) == ["kubernetes.io/hostname"]
+
+    def test_a_multi_node_session_places_kernels_freely(self) -> None:
+        assert required_levels(_workload(2, clusterMode="multi-node")["spec"]) == []
+
+    def test_a_single_kernel_has_no_constraint(self) -> None:
+        assert required_levels(_workload(1)["spec"]) == []
+
+    def test_the_pending_group_carries_the_topology(self) -> None:
+        workload = _workload(2, clusterMode="single-node")
+        [pending] = build_pending_groups([workload], [_pod("a", gated=True)])
+        assert pending.required_levels == ["kubernetes.io/hostname"]
+
+
+class TestNewlyBound:
+    def test_a_placed_session_with_every_kernel_bound(self) -> None:
+        workload = _workload(2, status={"placement": {"phase": "Placed"}})
+        pods = [_pod("a", node="n1"), _pod("b", node="n2")]
+        assert newly_bound([workload], pods) == [(workload, 2)]
+
+    def test_not_while_a_kernel_waits(self) -> None:
+        workload = _workload(2, status={"placement": {"phase": "Placed"}})
+        assert newly_bound([workload], [_pod("a", node="n1"), _pod("b", gated=True)]) == []
+
+    def test_not_twice(self) -> None:
+        workload = _workload(1, status={"placement": {"phase": "Bound"}})
+        assert newly_bound([workload], [_pod("a", node="n1")]) == []
 
 
 def _bind(
@@ -143,38 +235,19 @@ class TestBindRequests:
         in_flight = {"uid-waiting": "n1"}
         [node] = build_nodes([_node("n1")], [pod], in_flight=in_flight)
         assert node.used.cpu_milli == 1000
-        group = {
-            "metadata": {"namespace": "ns", "name": "g"},
-            "spec": {"minMember": 1},
-        }
-        assert build_pending_groups([group], [pod], in_flight) == []
+        assert build_pending_groups([_workload(1)], [pod], in_flight) == []
 
     def test_an_ungated_pod_for_sokovan_is_still_pending(self) -> None:
         pod = _pod("released")
         pod["spec"]["schedulerName"] = "sokovan"
-        group = {
-            "metadata": {"namespace": "ns", "name": "g"},
-            "spec": {"minMember": 1},
-        }
-        [pending] = build_pending_groups([group], [pod])
+        [pending] = build_pending_groups([_workload(1)], [pod])
         assert [p.name for p in pending.pods] == ["released"]
 
-    def test_a_scheduled_group_that_lost_its_bind_requests_is_placed_again(self) -> None:
+    def test_a_placed_session_that_lost_its_bind_requests_is_placed_again(self) -> None:
         pod = _pod("waiting", gated=True)
-        group = {
-            "metadata": {"namespace": "ns", "name": "g"},
-            "spec": {"minMember": 1},
-            "status": {"phase": "Scheduled"},
-        }
-        [pending] = build_pending_groups([group], [pod], {})
+        workload = _workload(1, status={"phase": "Pending", "placement": {"phase": "Placed"}})
+        [pending] = build_pending_groups([workload], [pod], {})
         assert [p.name for p in pending.pods] == ["waiting"]
-
-
-def _group_obj(min_member: int = 2) -> dict[str, Any]:
-    return {
-        "metadata": {"name": "g", "namespace": "ns", "creationTimestamp": "t"},
-        "spec": {"minMember": min_member},
-    }
 
 
 def _gpu_slice(node: str, pool: str, devices: list[dict[str, Any]]) -> dict[str, Any]:
@@ -193,14 +266,14 @@ def _foreign_claim(result: dict[str, Any]) -> dict[str, Any]:
 class TestGangMembers:
     def test_bound_and_in_flight_members_count_toward_min_member(self) -> None:
         pods = [_pod("a", node="n1"), _pod("b", gated=True), _pod("c", gated=True)]
-        [pending] = build_pending_groups([_group_obj(3)], pods, {"uid-b": "n1"})
+        [pending] = build_pending_groups([_workload(3)], pods, {"uid-b": "n1"})
         assert [p.name for p in pending.pods] == ["c"]
         assert pending.placed_members == 2
         assert pending.placed_nodes == ["n1"]
 
     def test_a_pod_with_a_failed_bind_request_waits_for_its_removal(self) -> None:
         pods = [_pod("a", gated=True), _pod("b", gated=True)]
-        [pending] = build_pending_groups([_group_obj()], pods, {}, has_bind_request={"uid-a"})
+        [pending] = build_pending_groups([_workload()], pods, {}, has_bind_request={"uid-a"})
         assert [p.name for p in pending.pods] == ["b"]
 
 
@@ -260,7 +333,7 @@ class TestDeviceAccounting:
         pod = _pod("p", gated=True)
         pod["spec"]["resourceClaims"] = [{"name": "c", "resourceClaimName": "p-cuda-shares"}]
         [pending] = build_pending_groups(
-            [_group_obj(1)], [pod], {}, (), [claim], slot_profiles([profile])
+            [_workload(1)], [pod], {}, (), [claim], slot_profiles([profile])
         )
         [share_request] = pending.pods[0].share_claims[0]
         assert share_request.driver == "gpu.x" and share_request.options[0].shares == 150
@@ -285,7 +358,7 @@ class TestDeviceAccounting:
         pod = _pod("p", gated=True)
         pod["spec"]["resourceClaims"] = [{"name": "c", "resourceClaimName": "p-cuda-device"}]
         [pending] = build_pending_groups(
-            [_group_obj(1)], [pod], {}, (), [claim], slot_profiles(profiles)
+            [_workload(1)], [pod], {}, (), [claim], slot_profiles(profiles)
         )
         [share_request] = pending.pods[0].share_claims[0]
         assert share_request.options == (ShareOption(None, 2),)
@@ -340,7 +413,7 @@ class TestRecreatedPod:
     def test_the_new_pod_is_placed_again(self) -> None:
         pods, binds = self._timeline()
         in_flight = in_flight_binds(binds, live_pod_uids(pods))
-        [pending] = build_pending_groups([_group_obj(1)], pods, in_flight, bind_requested(binds))
+        [pending] = build_pending_groups([_workload(1)], pods, in_flight, bind_requested(binds))
         assert [p.name for p in pending.pods] == ["a"]
 
     def test_a_request_of_the_new_pod_holds_it(self) -> None:
@@ -348,7 +421,7 @@ class TestRecreatedPod:
         binds.append(_bind("a", uid="new"))
         in_flight = in_flight_binds(binds, live_pod_uids(pods))
         assert in_flight == {"new": "n1"}
-        assert build_pending_groups([_group_obj(1)], pods, in_flight, bind_requested(binds)) == []
+        assert build_pending_groups([_workload(1)], pods, in_flight, bind_requested(binds)) == []
 
 
 class TestNodeLifecycle:
@@ -369,12 +442,7 @@ class TestNodeLifecycle:
 
 class TestGroupOrderKey:
     def test_the_session_workload_creation_time_orders_a_group(self) -> None:
-        group = _group_obj(1)
-        group["metadata"]["creationTimestamp"] = "2026-11-22T10:00:00Z"
-        group["metadata"]["ownerReferences"] = [{"kind": "SessionWorkload", "uid": "sw"}]
-        workload = {"metadata": {"uid": "sw", "creationTimestamp": "2026-11-22T09:00:00Z"}}
-        pods = [_pod("a", gated=True)]
-        [pending] = build_pending_groups([group], pods, workloads=[workload])
+        workload = _workload(1)
+        workload["metadata"]["creationTimestamp"] = "2026-11-22T09:00:00Z"
+        [pending] = build_pending_groups([workload], [_pod("a", gated=True)])
         assert pending.created_at == "2026-11-22T09:00:00Z"
-        [fallback] = build_pending_groups([group], pods)
-        assert fallback.created_at == "2026-11-22T10:00:00Z"

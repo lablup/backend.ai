@@ -1,0 +1,6 @@
+Backend.AI CRDs are installed. Helm keeps them on uninstall (helm.sh/resource-policy: keep).
+
+Upgrade from a chart with PodGroups (podgroups.scheduling.backend.ai): sokovan now schedules
+SessionWorkloads and reports in their status.placement. Helm keeps the old CRD, and the
+PodGroups left in session namespaces are not read any more. Deleting the CRD removes them:
+  kubectl delete crd podgroups.scheduling.backend.ai
