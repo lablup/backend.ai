@@ -125,6 +125,8 @@ async def _serve(
         except asyncio.CancelledError:
             log.info("session gateway stopped")
         finally:
+            if images is not None:
+                await images.close()
             await kernels.close()
             await event_producer.close()
 

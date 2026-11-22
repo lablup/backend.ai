@@ -39,6 +39,9 @@ CRI_POD_NAMESPACE: Final = "io.kubernetes.pod.namespace"
 CRI_POD_NAME: Final = "io.kubernetes.pod.name"
 CRI_CONTAINER_NAME: Final = "io.kubernetes.container.name"
 MAX_CONCURRENT_COMMANDS: Final = 2
+# Seconds a command may run; the gateway gives up on a request after 1800.
+COMMAND_TIMEOUT: Final = 1500.0
+INSPECT_TIMEOUT: Final = 30.0
 _RX_CONTAINER_ID: Final = re.compile(r"^[0-9a-f]{12,64}$")
 _RX_IMAGE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@-]*$")
 
@@ -155,20 +158,44 @@ def _write_config(config_dir: Path, config: Mapping[str, object]) -> None:
     path.write_text(json.dumps(config))
 
 
-async def _run(args: Sequence[str], env: dict[str, str] | None = None) -> str:
+def _command(args: Sequence[str]) -> str:
+    return args[3] if len(args) > 3 else args[0]
+
+
+async def run_command(
+    args: Sequence[str],
+    env: dict[str, str] | None = None,
+    time_limit: float = COMMAND_TIMEOUT,
+) -> str:
+    """The command's output; on a timeout or a cancellation the process is killed."""
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
         env=env,
     )
-    out, _ = await proc.communicate()
+    try:
+        async with asyncio.timeout(time_limit):
+            out, _ = await proc.communicate()
+    except TimeoutError as e:
+        await _kill(proc)
+        raise NodeHelperCommandError(f"{_command(args)} timed out after {time_limit:g}s") from e
+    except asyncio.CancelledError:
+        await _kill(proc)
+        raise
     text = out.decode(errors="replace")
     if proc.returncode != 0:
-        raise NodeHelperCommandError(
-            f"{args[3] if len(args) > 3 else args[0]} failed: {text[-2000:]}"
-        )
+        raise NodeHelperCommandError(f"{_command(args)} failed: {text[-2000:]}")
     return text
+
+
+async def _kill(proc: asyncio.subprocess.Process) -> None:
+    if proc.returncode is None:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            return
+    await proc.wait()
 
 
 def kube_verifier(nerdctl: str, api: client.ApiClient, node_name: str | None) -> ContainerVerifier:
@@ -177,7 +204,9 @@ def kube_verifier(nerdctl: str, api: client.ApiClient, node_name: str | None) ->
 
     async def verify(container_id: str) -> None:
         try:
-            inspected = json.loads(await _run(inspect_args(nerdctl, container_id)))
+            inspected = json.loads(
+                await run_command(inspect_args(nerdctl, container_id), time_limit=INSPECT_TIMEOUT)
+            )
         except ValueError as e:
             raise NodeHelperCommandError("the container is not inspectable") from e
         labels = cri_labels(inspected)
@@ -198,6 +227,7 @@ def build_app(
     token: str,
     verify: ContainerVerifier,
     crane: str = "/usr/local/bin/crane",
+    command_timeout: float = COMMAND_TIMEOUT,
 ) -> web.Application:
     # Commands are heavy (a commit copies the container's layer): run a few at a time.
     slots = asyncio.Semaphore(MAX_CONCURRENT_COMMANDS)
@@ -221,7 +251,7 @@ def build_app(
             return web.json_response({"error": str(e.extra_msg)}, status=403)
         async with slots:
             try:
-                await _run(commit_args(nerdctl, req))
+                await run_command(commit_args(nerdctl, req), time_limit=command_timeout)
             except NodeHelperCommandError as e:
                 log.warning("session commit failed", image=req.image, exc_info=e)
                 return web.json_response({"error": str(e.extra_msg)}, status=500)
@@ -238,9 +268,13 @@ def build_app(
                 await asyncio.to_thread(_write_config, Path(config_dir), docker_config(req))
                 env = {"DOCKER_CONFIG": config_dir, "HOME": config_dir}
                 try:
-                    await _run(push_args(nerdctl, req), env=env)
+                    await run_command(push_args(nerdctl, req), env=env, time_limit=command_timeout)
                     if req.labels:
-                        await _run(label_args(crane, req.image, req.labels, req.insecure), env=env)
+                        await run_command(
+                            label_args(crane, req.image, req.labels, req.insecure),
+                            env=env,
+                            time_limit=command_timeout,
+                        )
                 except NodeHelperCommandError as e:
                     log.warning("image push failed", image=req.image, exc_info=e)
                     return web.json_response({"error": str(e.extra_msg)}, status=500)

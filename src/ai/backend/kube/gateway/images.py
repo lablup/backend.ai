@@ -9,7 +9,8 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import Awaitable, Mapping
+from collections.abc import Awaitable, Mapping, Sequence
+from datetime import UTC, datetime
 from typing import Any, Final
 
 import aiohttp
@@ -18,6 +19,7 @@ from kubernetes_asyncio import client
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.bgtask.broadcast import (
+    BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
 )
@@ -36,10 +38,43 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 NODE_HELPER_SELECTOR: Final = "app.kubernetes.io/name=node-helper"
-# On the kernel Pod: {"image": <canonical>, "labels": {...}} of its last commit. The push
-# finds the node holding the commit through it, after a gateway restart too.
+# On the kernel Pod: {"image": <canonical>, "labels": {...}, "committedAt": <ISO 8601>} of its
+# last commit. The push finds the node holding the newest commit through it, after a gateway
+# restart too.
 ANNOTATION_COMMITTED_IMAGE: Final = "backend.ai/committed-image"
 _TIMEOUT: Final = aiohttp.ClientTimeout(total=1800)
+# Seconds the end event of a cancelled task may take at shutdown.
+_CANCEL_REPORT_TIMEOUT: Final = 5.0
+
+
+def _committed_at(record: Mapping[str, Any]) -> datetime:
+    """When a commit record was written; a record without a valid time is the oldest."""
+    try:
+        moment = datetime.fromisoformat(str(record["committedAt"]))
+    except (KeyError, ValueError):
+        return datetime.min.replace(tzinfo=UTC)
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+def newest_commit(
+    pods: Sequence[Mapping[str, Any]], canonical: str
+) -> tuple[str, dict[str, str]] | None:
+    """The node and labels of the newest commit record of `canonical` among the Pods."""
+    best: tuple[datetime, str, dict[str, str]] | None = None
+    for pod in pods:
+        meta = pod["metadata"]
+        try:
+            record = json.loads((meta.get("annotations") or {})[ANNOTATION_COMMITTED_IMAGE])
+        except (KeyError, ValueError):
+            continue
+        node = pod.get("spec", {}).get("nodeName")
+        if not isinstance(record, dict) or record.get("image") != canonical or not node:
+            continue
+        moment = _committed_at(record)
+        if best is None or moment > best[0]:
+            labels = record.get("labels") or {}
+            best = (moment, str(node), {str(k): str(v) for k, v in labels.items()})
+    return None if best is None else (best[1], best[2])
 
 
 class GatewayImages:
@@ -91,7 +126,14 @@ class GatewayImages:
             "commit",
             {"container_id": container.container_id.split("://", 1)[-1], "image": canonical},
         )
-        record = json.dumps({"image": canonical, "labels": dict(labels)}, sort_keys=True)
+        record = json.dumps(
+            {
+                "image": canonical,
+                "labels": dict(labels),
+                "committedAt": datetime.now(UTC).isoformat(),
+            },
+            sort_keys=True,
+        )
         await self._core.patch_namespaced_pod(
             endpoint.pod_name,
             endpoint.namespace,
@@ -99,25 +141,21 @@ class GatewayImages:
         )
 
     async def _committed_on(self, canonical: str) -> tuple[str, dict[str, str]]:
-        """The node and labels of the kernel Pod whose last commit is `canonical`."""
+        """The node and labels of the newest commit of `canonical` on a kernel Pod."""
         pods = await self._core.list_pod_for_all_namespaces(
             label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY}"
         )
+        trusted = []
         for raw in pods.items:
             pod = self._api.sanitize_for_serialization(raw)
             meta = pod["metadata"]
             endpoint = self._index.get((meta.get("labels") or {}).get(LABEL_KERNEL_ID, ""))
-            if endpoint is None or endpoint.pod_uid != meta.get("uid"):
-                continue  # not a kernel Pod the index trusts
-            try:
-                record = json.loads((meta.get("annotations") or {})[ANNOTATION_COMMITTED_IMAGE])
-            except (KeyError, ValueError):
-                continue
-            node = pod.get("spec", {}).get("nodeName")
-            if isinstance(record, dict) and record.get("image") == canonical and node:
-                labels = record.get("labels") or {}
-                return str(node), {str(k): str(v) for k, v in labels.items()}
-        raise NodeHelperCommandError(f"{canonical} was not committed here")
+            if endpoint is not None and endpoint.pod_uid == meta.get("uid"):
+                trusted.append(pod)  # a kernel Pod the index trusts
+        found = newest_commit(trusted, canonical)
+        if found is None:
+            raise NodeHelperCommandError(f"{canonical} was not committed here")
+        return found
 
     async def _push(self, image_ref: ImageRef, registry: Mapping[str, Any]) -> None:
         node, labels = await self._committed_on(image_ref.canonical)
@@ -151,6 +189,13 @@ class GatewayImages:
                     error = answer.get("error") if isinstance(answer, dict) else None
                     raise NodeHelperCommandError(str(error or f"HTTP {resp.status}"))
 
+    async def close(self) -> None:
+        """Cancel the running tasks; each reports its cancellation to the Manager."""
+        tasks = list(self._tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
     def _start(self, work: Awaitable[None]) -> str:
         task_id = uuid.uuid4()
 
@@ -158,6 +203,18 @@ class GatewayImages:
             cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
             try:
                 await work
+            except asyncio.CancelledError:
+                # The Manager waits for an end event of the task: a cancelled one, then.
+                log.trace("image task cancelled", task_id=str(task_id))
+                try:
+                    async with asyncio.timeout(_CANCEL_REPORT_TIMEOUT):
+                        await self._producer.broadcast_event_with_cache(
+                            cache_id,
+                            BgtaskCancelledEvent(task_id=task_id, message="gateway stopped"),
+                        )
+                except Exception as e:
+                    log.warning("image task cancel not reported", task_id=str(task_id), exc_info=e)
+                raise
             except (
                 NodeHelperCommandError,
                 aiohttp.ClientError,
