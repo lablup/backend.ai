@@ -47,7 +47,7 @@ rules:
     resources: ["sessionworkloads"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["scheduling.backend.ai"]
-    resources: ["queues", "deviceprofiles"]
+    resources: ["queues"]
     verbs: ["get", "list", "create", "patch", "delete"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["queues/status"]

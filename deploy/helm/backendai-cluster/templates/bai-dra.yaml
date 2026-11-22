@@ -40,6 +40,59 @@ subjects:
   - kind: ServiceAccount
     name: bai-dra
     namespace: {{ .Release.Namespace }}
+---
+# bai-dra writes only its own node's ResourceSlices of its drivers: the node comes from the
+# node-bound ServiceAccount token of the DaemonSet Pod.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-bai-dra-slices
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["resource.k8s.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["resourceslices"]
+  matchConditions:
+    - name: bai-dra
+      expression: request.userInfo.username == "system:serviceaccount:{{ .Release.Namespace }}:bai-dra"
+  variables:
+    - name: node
+      expression: >-
+        "authentication.kubernetes.io/node-name" in request.userInfo.extra &&
+        size(request.userInfo.extra["authentication.kubernetes.io/node-name"]) == 1 ?
+        request.userInfo.extra["authentication.kubernetes.io/node-name"][0] : ""
+    - name: slice
+      expression: 'request.operation == "DELETE" ? oldObject : object'
+    - name: drivers
+      {{- $driverNames := list }}
+      {{- range .Values.baiDra.drivers }}
+      {{- $driverNames = append $driverNames .driverName }}
+      {{- end }}
+      expression: {{ toJson (uniq $driverNames) | squote }}
+  validations:
+    - expression: variables.node != ""
+      message: bai-dra needs a node-bound ServiceAccount token.
+    - expression: >-
+        variables.slice.spec.?nodeName.orValue("") == variables.node &&
+        (request.operation != "UPDATE" || oldObject.spec.?nodeName.orValue("") == variables.node)
+      messageExpression: '"bai-dra on " + variables.node + " may write only the ResourceSlices of its node"'
+    - expression: variables.slice.spec.driver in variables.drivers
+      messageExpression: '"bai-dra may write only the ResourceSlices of its drivers: " + variables.drivers.join(", ")'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-bai-dra-slices
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-bai-dra-slices
+  validationActions: [Deny]
 {{- $classes := dict }}
 {{- range .Values.baiDra.drivers }}
 {{- $name := required "baiDra.drivers[].name is required" .name }}
