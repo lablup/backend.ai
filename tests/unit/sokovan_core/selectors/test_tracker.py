@@ -108,6 +108,21 @@ class TestAgentStateTracker:
         assert tracker.committed_slots[CPU] == Decimal("2")
         assert tracker.pending_slots == {}
 
+    def test_restore_drops_what_was_committed_after_the_checkpoint(self) -> None:
+        tracker = AgentStateTracker(original_agent=_agent_info({"cpu": "8"}))
+        tracker.apply_diff(_request({"cpu": "2"}), containers=1, session_group_id=GROUP_ID)
+        tracker.commit()
+        checkpoint = tracker.checkpoint()
+        tracker.apply_diff(_request({"cpu": "3"}), containers=1, session_group_id=GROUP_ID)
+        tracker.commit()
+        tracker.apply_diff(_request({"cpu": "1"}), containers=1, session_group_id=None)
+
+        tracker.restore(checkpoint)
+
+        assert tracker.remaining_slots()[CPU] == Decimal("6")
+        assert tracker.current_container_count() == 1
+        assert tracker.current_group_member_count(GROUP_ID) == 1
+
     def test_container_count_includes_base_count(self) -> None:
         tracker = AgentStateTracker(original_agent=_agent_info({"cpu": "8"}, container_count=3))
         tracker.apply_diff(_request({"cpu": "1"}), containers=1, session_group_id=None)

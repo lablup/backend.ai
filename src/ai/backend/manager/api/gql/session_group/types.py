@@ -46,6 +46,9 @@ from ai.backend.common.dto.manager.v2.session_group.response import (
     UpdateSessionGroupPayload as UpdateSessionGroupPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
+    SessionGroupAdmissionEnum as SessionGroupAdmissionDTO,
+)
+from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupOrderField as SessionGroupOrderFieldDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
@@ -67,6 +70,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -115,6 +119,15 @@ SessionGroupPlacementEnforcementGQL: type[SessionGroupPlacementEnforcementDTO] =
     name="SessionGroupPlacementEnforcement",
 )
 
+SessionGroupAdmissionGQL: type[SessionGroupAdmissionDTO] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Whether the member sessions of a group are admitted one by one or all at once.",
+    ),
+    SessionGroupAdmissionDTO,
+    name="SessionGroupAdmission",
+)
+
 SessionGroupOrderFieldGQL: type[SessionGroupOrderFieldDTO] = gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -148,6 +161,20 @@ class SessionGroupGQL(PydanticNodeMixin[SessionGroupNodeDTO]):
     )
     placement_enforcement: SessionGroupPlacementEnforcementGQL = gql_field(
         description="Whether the direction is a preference or a hard constraint."
+    )
+    admission: SessionGroupAdmissionGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the members are admitted one by one or all at once.",
+        )
+    )
+    member_count: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Members an `all_or_none` group admits together. Null for an `independent` group."
+            ),
+        )
     )
     created_at: datetime = gql_field(description="Creation timestamp.")
     deleted_at: datetime | None = gql_field(
@@ -315,8 +342,9 @@ class SessionGroupScopeGQL(PydanticInputMixin[SessionGroupScopeDTO]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Input for changing a session group's placement policy. At least one of the two "
-            "fields must be given; members placed afterwards follow the new policy."
+            "Input for changing a session group's placement policy and admission. At least one "
+            "field must be given; members placed afterwards follow the new policy. The admission "
+            "and the member count do not change while a member is pending."
         ),
     ),
     name="UpdateSessionGroupInput",
@@ -328,6 +356,26 @@ class UpdateSessionGroupInputGQL(PydanticInputMixin[UpdateSessionGroupInputDTO])
     )
     placement_enforcement: SessionGroupPlacementEnforcementGQL | None = gql_field(
         description="New placement enforcement. Omit to leave unchanged.", default=UNSET
+    )
+    admission: SessionGroupAdmissionGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "New admission. Omit to leave unchanged; `INDEPENDENT` without `memberCount` "
+                "clears the member count."
+            ),
+        ),
+        default=UNSET,
+    )
+    member_count: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "New member count of an `all_or_none` group, at least 2. Null clears it. "
+                "Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
     )
 
 
@@ -345,6 +393,26 @@ class CreateSessionGroupInputGQL(PydanticInputMixin[CreateSessionGroupInputDTO])
     )
     placement_enforcement: SessionGroupPlacementEnforcementGQL = gql_field(
         description="How hard the placement direction is enforced."
+    )
+    admission: SessionGroupAdmissionGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether the members are admitted one by one (`INDEPENDENT`) or all at once "
+                "(`ALL_OR_NONE`)."
+            ),
+        ),
+        default=SessionGroupAdmissionDTO.INDEPENDENT,
+    )
+    member_count: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Members an `all_or_none` group admits together; required for `ALL_OR_NONE`, "
+                "empty for `INDEPENDENT`."
+            ),
+        ),
+        default=None,
     )
 
 

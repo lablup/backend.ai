@@ -22,6 +22,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 
@@ -88,6 +89,8 @@ class SessionDataForStart:
     environ: dict[str, str]
     network_type: NetworkType | None = None
     network_id: str | None = None
+    # Policy of the session's live group; None without one
+    session_group: SessionGroupData | None = None
 
 
 @dataclass

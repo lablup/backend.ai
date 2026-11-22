@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any, cast
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import ClusterInfo, ClusterMode, SessionId
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.manager.clients.compute_cluster.mapping import (
+    SessionGroupSpec,
     SessionPlacement,
     build_session_objects,
     queue_name,
@@ -135,6 +137,48 @@ class TestBuildSessionObjects:
     ) -> None:
         objects = build_session_objects(placement, [_config("k1")], cluster_info)
         assert objects.pull_secret is None
+
+    def test_a_session_without_a_group_has_no_session_group(
+        self, placement: SessionPlacement, cluster_info: ClusterInfo
+    ) -> None:
+        objects = build_session_objects(placement, [_config("k1")], cluster_info)
+        assert "sessionGroup" not in objects.workload["spec"]
+
+    def test_an_all_or_none_group_carries_its_member_count(
+        self, placement: SessionPlacement, cluster_info: ClusterInfo
+    ) -> None:
+        group = SessionGroupSpec(
+            id="33333333-0000-0000-0000-000000000001",
+            direction="spread",
+            enforcement="strict",
+            admission="all_or_none",
+            member_count=3,
+        )
+        objects = build_session_objects(
+            replace(placement, session_group=group), [_config("k1")], cluster_info
+        )
+        assert objects.workload["spec"]["sessionGroup"] == {
+            "id": "33333333-0000-0000-0000-000000000001",
+            "direction": "spread",
+            "enforcement": "strict",
+            "admission": "all_or_none",
+            "memberCount": 3,
+        }
+
+    def test_an_independent_group_has_no_member_count(
+        self, placement: SessionPlacement, cluster_info: ClusterInfo
+    ) -> None:
+        group = SessionGroupSpec(
+            id="33333333-0000-0000-0000-000000000002",
+            direction="pack",
+            enforcement="preferred",
+            admission="independent",
+            member_count=None,
+        )
+        objects = build_session_objects(
+            replace(placement, session_group=group), [_config("k1")], cluster_info
+        )
+        assert "memberCount" not in objects.workload["spec"]["sessionGroup"]
 
     def test_vfolder_mounts_carry_the_storage_proxy_path(
         self, placement: SessionPlacement, cluster_info: ClusterInfo

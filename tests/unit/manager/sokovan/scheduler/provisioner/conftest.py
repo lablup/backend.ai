@@ -41,6 +41,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
     SystemSnapshot,
 )
 from ai.backend.manager.views.sokovan.workload import (
+    GroupAdmission,
     SessionDependencyInfo,
     SessionWorkload,
     WorkloadMeta,
@@ -78,6 +79,7 @@ def _make_workload(
     architecture: str = "x86_64",
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     requested_starts_at: datetime | None = None,
+    group_admission: GroupAdmission | None = None,
 ) -> SessionWorkload:
     if kernel_slots is None:
         kernel_slots = [{"cpu": "1", "mem": "1024"}]
@@ -116,6 +118,7 @@ def _make_workload(
         session_type=session_type,
         requested_starts_at=requested_starts_at,
         is_preemptible=False,
+        group_admission=group_admission,
     )
 
 

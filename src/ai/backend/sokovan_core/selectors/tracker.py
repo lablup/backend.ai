@@ -17,6 +17,15 @@ from ai.backend.sokovan_core.types.agent import AgentInfo, ResourceGroupResource
 from ai.backend.sokovan_core.types.workload import ResourceRequest
 
 
+@dataclass(frozen=True)
+class TrackerCheckpoint:
+    """The committed in-batch state of one tracker at a point of the pass."""
+
+    committed_slots: Mapping[ResourceSlotName, Decimal]
+    committed_containers: int
+    committed_group_members: Mapping[SessionGroupID, int]
+
+
 @dataclass
 class AgentStateTracker:
     """Tracks in-batch allocations for one agent during a scheduling pass.
@@ -107,6 +116,22 @@ class AgentStateTracker:
         self.pending_slots = {}
         self.pending_containers = 0
         self.pending_group_id = None
+
+    def checkpoint(self) -> TrackerCheckpoint:
+        """Capture the committed state, so several sessions can be placed as one unit."""
+        return TrackerCheckpoint(
+            committed_slots=dict(self.committed_slots),
+            committed_containers=self.committed_containers,
+            committed_group_members=dict(self.committed_group_members),
+        )
+
+    def restore(self, checkpoint: TrackerCheckpoint) -> None:
+        """Return to a checkpoint, dropping every placement committed after it."""
+        self.committed_slots = dict(checkpoint.committed_slots)
+        self.committed_containers = checkpoint.committed_containers
+        self.committed_group_members = dict(checkpoint.committed_group_members)
+        self.rollback()
+        self.clear_reclaim()
 
     def apply_reclaim(self, slots: Mapping[ResourceSlotName, Decimal]) -> None:
         """Provisionally reclaim a preemption victim's allocation back onto

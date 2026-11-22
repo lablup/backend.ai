@@ -12,9 +12,11 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.session_group.types import (
+    SessionGroupAdmissionEnum,
     SessionGroupPlacementDirectionEnum,
     SessionGroupPlacementEnforcementEnum,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchSessionGroupsPayload",
@@ -40,6 +42,19 @@ class SessionGroupNode(BaseResponseModel):
     )
     placement_enforcement: SessionGroupPlacementEnforcementEnum = Field(
         description="Whether the direction is a preference or a hard constraint."
+    )
+    admission: SessionGroupAdmissionEnum = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Whether the members are admitted one by one"
+            " or all at once."
+        )
+    )
+    member_count: int | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Members an `all_or_none` group admits together."
+            " Null for an `independent` group."
+        ),
     )
     created_at: datetime = Field(description="Creation timestamp.")
     deleted_at: datetime | None = Field(

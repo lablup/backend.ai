@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import InvalidAPIParameters
 
 __all__ = (
+    "SessionGroupAdmissionEnum",
     "SessionGroupOrderField",
     "SessionGroupPlacementDirectionEnum",
     "SessionGroupPlacementEnforcementEnum",
@@ -33,6 +34,13 @@ class SessionGroupPlacementEnforcementEnum(StrEnum):
 
     PREFERRED = "preferred"
     STRICT = "strict"
+
+
+class SessionGroupAdmissionEnum(StrEnum):
+    """Whether the member sessions of a group are admitted one by one or all at once."""
+
+    INDEPENDENT = "independent"
+    ALL_OR_NONE = "all_or_none"
 
 
 class SessionGroupOrderField(StrEnum):

@@ -116,7 +116,15 @@ class PlacementTimeoutRecord:
     """A placement timeout recorded on a session that a compute cluster could not place.
 
     `attempts` counts the placement timeouts of the session so far, this one included.
+    `group_member_ids` are the other admitted members of its `all_or_none` group,
+    rescheduled with it under the same count.
     """
 
     session_id: SessionId
     attempts: int
+    group_member_ids: tuple[SessionId, ...] = ()
+
+    @property
+    def session_ids(self) -> tuple[SessionId, ...]:
+        """Every session the timeout rescheduled."""
+        return (self.session_id, *self.group_member_ids)

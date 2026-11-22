@@ -15,6 +15,7 @@ from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -53,6 +54,12 @@ class _SessionGroupOwnFields(RowDataConverter[SessionGroupRow, SessionGroupData]
         EnumConditions(SessionGroupRow.placement_enforcement, SessionGroupPlacementEnforcement),
         ColumnOrder(SessionGroupRow.placement_enforcement),
     )
+    admission = SearchableField(
+        SessionGroupRow.admission,
+        EnumConditions(SessionGroupRow.admission, SessionGroupAdmission),
+        ColumnOrder(SessionGroupRow.admission),
+    )
+    member_count = SearchableField(SessionGroupRow.member_count, None, None)
     created_at = SearchableField(
         SessionGroupRow.created_at,
         DateTimeConditions(SessionGroupRow.created_at),
@@ -73,6 +80,8 @@ class _SessionGroupOwnFields(RowDataConverter[SessionGroupRow, SessionGroupData]
             owner_user_id=self.owner_user_id.read(row),
             placement_direction=self.placement_direction.read(row),
             placement_enforcement=self.placement_enforcement.read(row),
+            admission=self.admission.read(row),
+            member_count=self.member_count.read(row),
             created_at=self.created_at.read(row),
             deleted_at=self.deleted_at.read(row),
         )

@@ -29,6 +29,7 @@ from ai.backend.manager.services.session.actions.enqueue_session import (
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -46,6 +47,8 @@ def _session_group() -> SessionGroupData:
         owner_user_id=_USER_ID,
         placement_direction=SessionGroupPlacementDirection.SPREAD,
         placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+        admission=SessionGroupAdmission.INDEPENDENT,
+        member_count=None,
         created_at=datetime.now(UTC),
         deleted_at=None,
     )

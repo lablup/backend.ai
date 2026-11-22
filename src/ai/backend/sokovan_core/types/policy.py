@@ -30,3 +30,10 @@ class SessionGroupPlacementEnforcement(enum.StrEnum):
 
     PREFERRED = "preferred"
     STRICT = "strict"
+
+
+class SessionGroupAdmission(enum.StrEnum):
+    """Whether the member sessions of a group are admitted one by one or all at once."""
+
+    INDEPENDENT = "independent"
+    ALL_OR_NONE = "all_or_none"

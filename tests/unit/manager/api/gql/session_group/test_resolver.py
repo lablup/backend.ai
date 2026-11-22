@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.session_group.response import (
     SessionGroupNode,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
+    SessionGroupAdmissionEnum,
     SessionGroupPlacementDirectionEnum,
     SessionGroupPlacementEnforcementEnum,
     SessionGroupScope,
@@ -40,6 +41,7 @@ def _node() -> SessionGroupNode:
         owner_user_id=uuid.uuid4(),
         placement_direction=SessionGroupPlacementDirectionEnum.SPREAD,
         placement_enforcement=SessionGroupPlacementEnforcementEnum.PREFERRED,
+        admission=SessionGroupAdmissionEnum.INDEPENDENT,
         created_at=datetime(2026, 10, 16, tzinfo=UTC),
     )
 

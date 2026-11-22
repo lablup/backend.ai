@@ -25,17 +25,26 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     KUBERNETES_RESOURCE_GROUP_DRIVER,
+)
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.session_group import (
+    SessionGroupFull,
+    SessionGroupResourceGroupMismatch,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldCreator, FieldToCreate
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.sokovan_core.types.policy import SessionGroupAdmission
 
 
 @dataclass
@@ -94,6 +103,40 @@ class ReconcileWriteOps(V2WriteOps):
             )
             .with_for_update(read=True)
         )
+
+    async def admit_session_group_member(
+        self, session_group_id: SessionGroupID, resource_group_id: ResourceGroupID
+    ) -> None:
+        """Check that one more session may join the group, holding its row until commit.
+
+        An `all_or_none` group takes at most `member_count` live members, all in one
+        resource group; an `independent` group takes any session.
+        """
+        group = (
+            await self._sess.execute(
+                sa.select(SessionGroupRow.admission, SessionGroupRow.member_count)
+                .where(SessionGroupRow.id == session_group_id)
+                .with_for_update()
+            )
+        ).one_or_none()
+        if group is None or group.admission != SessionGroupAdmission.ALL_OR_NONE:
+            return
+        members = (
+            await self._sess.execute(
+                sa.select(SessionRow.resource_group_id).where(
+                    SessionRow.session_group_id == session_group_id,
+                    SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+                )
+            )
+        ).all()
+        if any(member.resource_group_id != resource_group_id for member in members):
+            raise SessionGroupResourceGroupMismatch(
+                f"The members of session group {session_group_id} run in another resource group"
+            )
+        if len(members) >= (group.member_count or 0):
+            raise SessionGroupFull(
+                f"Session group {session_group_id} already holds {group.member_count} members"
+            )
 
     async def apply_transitions(
         self, transitions: Sequence[ReconcileTransition[Any, Any, Any, Any, Any]]

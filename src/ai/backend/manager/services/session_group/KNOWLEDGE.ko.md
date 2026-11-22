@@ -35,9 +35,10 @@
 
 ## update 는 ops 로 실행한다
 
-- `placement_direction` 과 `placement_enforcement` 만 변경할 수 있다. scheduler 가 배치마다 이 값을 읽으므로 이후에 배치되는 멤버는 새 정책을 따른다.
+- `placement_direction`, `placement_enforcement`, `admission`, `member_count` 를 변경할 수 있다. scheduler 가 배치마다 이 값을 읽으므로 이후에 배치되는 멤버는 새 정책을 따른다.
+- 멤버가 PENDING 인 동안 `admission` 과 `member_count` 는 변경되지 않는다. 두 번째 `GuardCheck` 가 이를 거부한다. 상태 코드는 409 다. admission 과 맞지 않는 member count 는 `ck_session_groups_member_count` check 가 거부한다. 상태 코드는 400 이다.
 - guard 가 UPDATE 에 함께 적용되므로 generic update 에 service method 가 필요 없다.
-- 설정할 것이 없으면 ops 는 guard 없이 row 를 읽는다. 그래서 update 입력은 두 field 어느 쪽도 지정하지 않는 호출을 거부한다.
+- 설정할 것이 없으면 ops 는 guard 없이 row 를 읽는다. 그래서 update 입력은 어느 field 도 지정하지 않는 호출을 거부한다.
 
 ## search 는 ops 로 실행한다
 

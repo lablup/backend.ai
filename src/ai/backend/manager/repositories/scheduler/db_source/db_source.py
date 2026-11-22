@@ -181,6 +181,7 @@ from ai.backend.manager.models.session_designated_agent.creators import (
 )
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -250,6 +251,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
     UserResourceLimit,
 )
 from ai.backend.manager.views.sokovan.workload import (
+    GroupAdmission,
     PreemptionScopeKey,
     SessionDependencyInfo,
     SessionWorkload,
@@ -261,6 +263,7 @@ from ai.backend.sokovan_core.types.agent import (
     AgentResource,
     SlotResource,
 )
+from ai.backend.sokovan_core.types.policy import SessionGroupAdmission
 from ai.backend.sokovan_core.types.preemption import (
     PreemptionCandidate,
     ScopeVictimCandidates,
@@ -331,6 +334,14 @@ class _PreemptionScopeMatch:
     group_wide_key: PreemptionScopeKey | None
 
 
+@dataclass(frozen=True)
+class _PendingGroupPolicy:
+    """The placement policy and the admission of a pending session's group."""
+
+    policy: SessionGroupPolicy
+    admission: GroupAdmission | None
+
+
 def _parse_node_shapes(
     stored: list[dict[str, str]] | None,
 ) -> tuple[Mapping[ResourceSlotName, Decimal], ...] | None:
@@ -381,7 +392,11 @@ class ScheduleDBSource:
             resource_group = await self._fetch_resource_group(db_sess, resource_group_id)
 
             # 2. Get pending sessions
-            pending_sessions = await self._fetch_pending_sessions(db_sess, resource_group.meta.id)
+            pending_sessions = await self._fetch_pending_sessions(
+                db_sess,
+                resource_group.meta.id,
+                per_agent_group_policy=not resource_group.is_kubernetes,
+            )
             if not pending_sessions.sessions:
                 return None
 
@@ -488,6 +503,7 @@ class ScheduleDBSource:
                 ResourceGroupRow.name,
                 ResourceGroupRow.scheduler,
                 ResourceGroupRow.scheduler_opts,
+                ResourceGroupRow.driver,
                 ComputeClusterRow.node_shapes,
             )
             .select_from(ResourceGroupRow)
@@ -516,14 +532,22 @@ class ScheduleDBSource:
                 preemption_order=rg_row.scheduler_opts.preemption.order,
             ),
             preemption=rg_row.scheduler_opts.preemption,
+            is_kubernetes=rg_row.driver == KUBERNETES_RESOURCE_GROUP_DRIVER,
             node_shapes=_parse_node_shapes(rg_row.node_shapes),
         )
 
     async def _fetch_pending_sessions(
-        self, db_sess: SASession, resource_group_id: ResourceGroupID
+        self,
+        db_sess: SASession,
+        resource_group_id: ResourceGroupID,
+        per_agent_group_policy: bool = True,
     ) -> PendingSessions:
         """
         Fetch pending sessions with kernels using a single JOIN query.
+
+        Without ``per_agent_group_policy`` (a `kubernetes` group, one agent for the whole
+        cluster) the group placement policy is left to the cluster scheduler; the
+        all-or-none admission still applies.
 
         Requested amounts come from the normalized ``resource_allocations``
         rows (written at enqueue), not from the denormalized JSON columns;
@@ -650,8 +674,8 @@ class ScheduleDBSource:
                         kernels=kernels,
                         agent_selection_policy=row.options.agent_selection_policy,
                         designated_agent_ids=designated_agents.get(session_id),
-                        session_group=group_policies.get(row.session_group_id)
-                        if row.session_group_id is not None
+                        session_group=group_policies[row.session_group_id].policy
+                        if per_agent_group_policy and row.session_group_id in group_policies
                         else None,
                     ),
                     priority=row.priority,
@@ -659,6 +683,9 @@ class ScheduleDBSource:
                     session_type=row.session_type,
                     requested_starts_at=row.requested_starts_at,
                     is_preemptible=row.is_preemptible,
+                    group_admission=group_policies[row.session_group_id].admission
+                    if row.session_group_id in group_policies
+                    else None,
                 )
             )
 
@@ -668,8 +695,9 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         session_group_ids: set[SessionGroupID],
-    ) -> dict[SessionGroupID, SessionGroupPolicy]:
-        """Load the placement policy of the groups the pending sessions belong to.
+    ) -> dict[SessionGroupID, _PendingGroupPolicy]:
+        """Load the placement policy and the admission of the groups the pending sessions
+        belong to.
 
         A group already soft-deleted is left out: its members place
         unconstrained, matching the NULL-group default.
@@ -682,6 +710,8 @@ class ScheduleDBSource:
                     SessionGroupRow.id,
                     SessionGroupRow.placement_direction,
                     SessionGroupRow.placement_enforcement,
+                    SessionGroupRow.admission,
+                    SessionGroupRow.member_count,
                 ).where(
                     SessionGroupRow.id.in_(session_group_ids),
                     SessionGroupRow.deleted_at.is_(None),
@@ -689,10 +719,16 @@ class ScheduleDBSource:
             )
         ).all()
         return {
-            row.id: SessionGroupPolicy(
-                group_id=row.id,
-                direction=row.placement_direction,
-                enforcement=row.placement_enforcement,
+            row.id: _PendingGroupPolicy(
+                policy=SessionGroupPolicy(
+                    group_id=row.id,
+                    direction=row.placement_direction,
+                    enforcement=row.placement_enforcement,
+                ),
+                admission=GroupAdmission(group_id=row.id, member_count=row.member_count)
+                if row.admission == SessionGroupAdmission.ALL_OR_NONE
+                and row.member_count is not None
+                else None,
             )
             for row in rows
         }
@@ -1416,6 +1452,23 @@ class ScheduleDBSource:
             )
             return marked_sessions
 
+    async def mark_pending_sessions_status_info(
+        self, session_ids: list[SessionId], status_info: str
+    ) -> None:
+        """Record why PENDING sessions wait, leaving their status unchanged."""
+        if not session_ids:
+            return
+        async with self._db.begin_session_read_committed() as db_sess:
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .where(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status == SessionStatus.PENDING,
+                    SessionRow.status_info.is_distinct_from(status_info),
+                )
+                .values(status_info=status_info)
+            )
+
     async def record_placement_timeout(
         self, session_id: SessionId, reason: str, message: str | None
     ) -> PlacementTimeoutRecord | None:
@@ -1423,13 +1476,27 @@ class ScheduleDBSource:
 
         Only a session of a `kubernetes` resource group that has left the queue but is not
         RUNNING yet is affected; for any other session (or a repeated event) None is returned.
-        The count lives in `status_data.placement_timeout.attempts`.
+        The admitted members of its `all_or_none` group are rescheduled with it, all under
+        the highest count among them. The count lives in `status_data.placement_timeout.attempts`.
         """
         async with self._db.begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
+            # The group row is locked first, so timeouts of two members queue on it.
+            await db_sess.execute(
+                sa.select(SessionGroupRow.id)
+                .where(
+                    SessionGroupRow.id
+                    == sa.select(SessionRow.session_group_id)
+                    .where(SessionRow.id == session_id)
+                    .scalar_subquery()
+                )
+                .with_for_update()
+            )
             row = (
                 await db_sess.execute(
-                    sa.select(SessionRow.status, SessionRow.status_data)
+                    sa.select(
+                        SessionRow.status, SessionRow.status_data, SessionRow.session_group_id
+                    )
                     .select_from(SessionRow)
                     .join(ResourceGroupRow, ResourceGroupRow.name == SessionRow.scaling_group_name)
                     .where(
@@ -1441,11 +1508,22 @@ class ScheduleDBSource:
             ).one_or_none()
             if row is None or SessionStatus(row.status) not in PLACEMENT_PENDING_STATUSES:
                 return None
-            previous = (row.status_data or {}).get("placement_timeout") or {}
-            attempts = int(previous.get("attempts") or 0) + 1
+            statuses: dict[SessionId, tuple[SessionStatus, Mapping[str, Any] | None]] = {
+                session_id: (SessionStatus(row.status), row.status_data)
+            }
+            if row.session_group_id is not None:
+                statuses.update(
+                    await self._lock_admitted_group_members(
+                        db_sess, SessionGroupID(row.session_group_id), session_id
+                    )
+                )
+            attempts = 1 + max(
+                int(((status_data or {}).get("placement_timeout") or {}).get("attempts") or 0)
+                for _, status_data in statuses.values()
+            )
             await db_sess.execute(
                 sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
+                .where(SessionRow.id.in_(list(statuses)))
                 .values(
                     status=SessionStatus.RESCHEDULING,
                     status_info=KernelLifecycleEventReason.PLACEMENT_TIMEOUT,
@@ -1465,18 +1543,50 @@ class ScheduleDBSource:
                 db_sess,
                 [
                     SessionHistoryToCreate(
-                        session_id=SessionID(session_id),
+                        session_id=SessionID(member_id),
                         creator=SessionSchedulingHistoryCreator(
                             phase="placement_timeout",
                             result=SchedulingResult.NEED_RETRY,
                             message=message or reason,
-                            from_status=SessionStatus(row.status),
+                            from_status=from_status,
                             to_status=SessionStatus.RESCHEDULING,
                         ),
                     )
+                    for member_id, (from_status, _) in statuses.items()
                 ],
             )
-        return PlacementTimeoutRecord(session_id=session_id, attempts=attempts)
+        return PlacementTimeoutRecord(
+            session_id=session_id,
+            attempts=attempts,
+            group_member_ids=tuple(member_id for member_id in statuses if member_id != session_id),
+        )
+
+    async def _lock_admitted_group_members(
+        self, db_sess: SASession, session_group_id: SessionGroupID, session_id: SessionId
+    ) -> dict[SessionId, tuple[SessionStatus, Mapping[str, Any] | None]]:
+        """The other admitted members of an `all_or_none` group, locked for the reschedule;
+        empty for an `independent` group."""
+        admission = await db_sess.scalar(
+            sa.select(SessionGroupRow.admission).where(SessionGroupRow.id == session_group_id)
+        )
+        if admission != SessionGroupAdmission.ALL_OR_NONE:
+            return {}
+        rows = (
+            await db_sess.execute(
+                sa.select(SessionRow.id, SessionRow.status, SessionRow.status_data)
+                .where(
+                    SessionRow.session_group_id == session_group_id,
+                    SessionRow.id != session_id,
+                    SessionRow.status.in_(PLACEMENT_PENDING_STATUSES),
+                )
+                .order_by(SessionRow.id)
+                .with_for_update()
+            )
+        ).all()
+        return {
+            SessionId(member.id): (SessionStatus(member.status), member.status_data)
+            for member in rows
+        }
 
     async def cancel_rescheduling_sessions(
         self, session_ids: list[SessionId], reason: str
@@ -2288,6 +2398,10 @@ class ScheduleDBSource:
 
         async with self._reconcile_ops.write_ops() as w:
             await w.share_lock_kubernetes_resource_group(spec.scope.resource_group_id)
+            if spec.scope.session_group_id is not None:
+                await w.admit_session_group_member(
+                    spec.scope.session_group_id, spec.scope.resource_group_id
+                )
             await w.create_entity(
                 SessionCreator(
                     spec=spec,
@@ -4966,6 +5080,7 @@ class ScheduleDBSource:
                     "project_id": session.group_id,
                     "network_type": session.network_type,
                     "network_id": session.network_id,
+                    "session_group_id": session.session_group_id,
                     "kernels": [],
                 }
                 if session.user_uuid is not None:
@@ -5056,6 +5171,24 @@ class ScheduleDBSource:
             # 4. Resolve image configs
             image_configs = await self._resolve_image_configs(db_sess, unique_images)
 
+            # 5. Live groups of the sessions
+            group_ids = {
+                session.session_group_id
+                for session in session_result.items
+                if session.session_group_id is not None
+            }
+            group_map: dict[SessionGroupID, SessionGroupData] = {}
+            if group_ids:
+                group_rows = await db_sess.scalars(
+                    sa.select(SessionGroupRow).where(
+                        SessionGroupRow.id.in_(group_ids),
+                        SessionGroupRow.deleted_at.is_(None),
+                    )
+                )
+                group_map = {
+                    row.id: SessionGroupSearchableFields.own.to_data(row) for row in group_rows
+                }
+
             # Build SessionDataForStart objects
             sessions_for_start: list[SessionDataForStart] = []
             for session_id in session_ids:
@@ -5082,6 +5215,9 @@ class ScheduleDBSource:
                         user_name=user_info.username,
                         network_type=session_info["network_type"],
                         network_id=session_info["network_id"],
+                        session_group=group_map.get(session_info["session_group_id"])
+                        if session_info["session_group_id"] is not None
+                        else None,
                     )
                 )
 

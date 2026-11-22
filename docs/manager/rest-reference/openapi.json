@@ -38555,6 +38555,15 @@
         "title": "TerminateSessionsInput",
         "type": "object"
       },
+      "SessionGroupAdmissionEnum": {
+        "description": "Whether the member sessions of a group are admitted one by one or all at once.",
+        "enum": [
+          "independent",
+          "all_or_none"
+        ],
+        "title": "SessionGroupAdmissionEnum",
+        "type": "string"
+      },
       "SessionGroupPlacementDirectionEnum": {
         "description": "How the member sessions of a group sit relative to each other, per agent.",
         "enum": [
@@ -38590,6 +38599,25 @@
           "placement_enforcement": {
             "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum",
             "description": "How hard the placement direction is enforced."
+          },
+          "admission": {
+            "$ref": "#/components/schemas/SessionGroupAdmissionEnum",
+            "default": "independent",
+            "description": "Added in 26.10.0. Whether the members are admitted one by one (`independent`) or all at once (`all_or_none`)."
+          },
+          "member_count": {
+            "anyOf": [
+              {
+                "minimum": 2,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Members an `all_or_none` group admits together; required for `all_or_none`, empty for `independent`.",
+            "title": "Member Count"
           }
         },
         "required": [
@@ -38601,7 +38629,7 @@
         "type": "object"
       },
       "UpdateSessionGroupInput": {
-        "description": "Input for changing a session group's placement policy.\n\nAt least one of the two fields must be given.",
+        "description": "Input for changing a session group's placement policy and admission.\n\nAt least one field must be given. The admission and the member count do not change\nwhile a member is pending.",
         "properties": {
           "id": {
             "description": "ID of the session group to update.",
@@ -38632,6 +38660,30 @@
             ],
             "description": "New placement enforcement. Omit to leave unchanged.",
             "title": "Placement Enforcement"
+          },
+          "admission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupAdmissionEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. New admission. Omit to leave unchanged; `independent` without `member_count` clears the member count.",
+            "title": "Admission"
+          },
+          "member_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. New member count of an `all_or_none` group, at least 2. Null clears it. Omit to leave unchanged.",
+            "title": "Member Count"
           }
         },
         "required": [

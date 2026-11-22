@@ -689,6 +689,13 @@ class SchedulerRepository:
         return await self._db_source.get_agent_ids_for_sessions(session_ids)
 
     @scheduler_repository_resilience.apply()
+    async def mark_pending_sessions_status_info(
+        self, session_ids: list[SessionId], status_info: str
+    ) -> None:
+        """Record why PENDING sessions wait, leaving their status unchanged."""
+        await self._db_source.mark_pending_sessions_status_info(session_ids, status_info)
+
+    @scheduler_repository_resilience.apply()
     async def record_placement_timeout(
         self, session_id: SessionId, reason: str, message: str | None
     ) -> PlacementTimeoutRecord | None:

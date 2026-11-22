@@ -12,11 +12,14 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
 
-__all__ = ("SessionGroupRow",)
+__all__ = ("MEMBER_COUNT_CHECK", "SessionGroupRow")
+
+MEMBER_COUNT_CHECK = "ck_session_groups_member_count"
 
 
 class SessionGroupRow(CreatedAtMixin, Base):
@@ -29,6 +32,15 @@ class SessionGroupRow(CreatedAtMixin, Base):
     """
 
     __tablename__ = "session_groups"
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "(admission = 'independent' AND member_count IS NULL)"
+            " OR (admission = 'all_or_none' AND member_count IS NOT NULL AND member_count >= 2)",
+            # The naming convention prefixes it into MEMBER_COUNT_CHECK.
+            name="member_count",
+        ),
+    )
 
     id: Mapped[SessionGroupID] = mapped_column(
         "id",
@@ -69,6 +81,19 @@ class SessionGroupRow(CreatedAtMixin, Base):
         "placement_enforcement",
         StrEnumType(SessionGroupPlacementEnforcement),
         nullable=False,
+    )
+    admission: Mapped[SessionGroupAdmission] = mapped_column(
+        "admission",
+        StrEnumType(SessionGroupAdmission),
+        nullable=False,
+        default=SessionGroupAdmission.INDEPENDENT,
+        server_default=SessionGroupAdmission.INDEPENDENT.value,
+    )
+    # Members an `all_or_none` group admits together; NULL for an `independent` group.
+    member_count: Mapped[int | None] = mapped_column(
+        "member_count",
+        sa.Integer,
+        nullable=True,
     )
     # The retention boundary; the sweep collects groups deleted long enough ago.
     deleted_at: Mapped[datetime | None] = mapped_column(

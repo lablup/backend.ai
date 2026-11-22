@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -25,6 +26,9 @@ class SessionGroupData(EntityData):
     owner_user_id: UserID
     placement_direction: SessionGroupPlacementDirection
     placement_enforcement: SessionGroupPlacementEnforcement
+    admission: SessionGroupAdmission
+    # Members an `all_or_none` group admits together; None for an `independent` group
+    member_count: int | None
     created_at: datetime
     deleted_at: datetime | None
 

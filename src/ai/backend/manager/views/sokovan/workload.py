@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
@@ -88,6 +89,15 @@ class WorkloadMeta:
                 return PreemptionScopeKey(self.resource_group_id)
 
 
+@dataclass(frozen=True)
+class GroupAdmission:
+    """The `all_or_none` admission of the session's group: its pending members are held
+    until `member_count` of them are PENDING, then admitted together or not at all."""
+
+    group_id: SessionGroupID
+    member_count: int
+
+
 @dataclass
 class SessionWorkload:
     """Represents a session workload for scheduling."""
@@ -106,6 +116,8 @@ class SessionWorkload:
     requested_starts_at: datetime | None
     # Whether this session can be preempted
     is_preemptible: bool
+    # Set when the session's group admits its members all or none
+    group_admission: GroupAdmission | None = None
 
     @property
     def is_private(self) -> bool:

@@ -191,6 +191,14 @@ class ResourceOccupancySnapshot:
     by_project: MutableMapping[ProjectID, ResourceAllocation]
     by_domain: MutableMapping[DomainID, ResourceAllocation]
 
+    def copy(self) -> ResourceOccupancySnapshot:
+        """A copy whose additions leave this one untouched (the allocations are immutable)."""
+        return ResourceOccupancySnapshot(
+            by_user=dict(self.by_user),
+            by_project=dict(self.by_project),
+            by_domain=dict(self.by_domain),
+        )
+
     def add_occupancy(
         self,
         user_id: UserID,
