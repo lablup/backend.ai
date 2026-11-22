@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import posixpath
 import textwrap
 import time
 from collections.abc import Mapping, Sequence
+from pathlib import PurePosixPath
 from typing import Any, Final, Literal, override
 from uuid import UUID
 
@@ -36,6 +38,12 @@ from ai.backend.kube.controller.manifests import kernel_service_ports
 from ai.backend.kube.controller.naming import KERNEL_CONTAINER
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.session import ServicePortSpec, SessionWorkload
+from ai.backend.kube.gateway.errors import (
+    KernelExecFailedError,
+    KernelFileNotFoundError,
+    KernelFileTooLargeError,
+    KernelPathNotAllowedError,
+)
 from ai.backend.kube.gateway.kernel_index import KernelEndpoint, KernelIndex
 from ai.backend.kube.gateway.pod_exec import exec_in_pod
 from ai.backend.logging.structured import StructuredLogger
@@ -47,45 +55,50 @@ KERNEL_PYTHON: Final = "/opt/backend.ai/bin/python"
 SU_EXEC: Final = "/opt/kernel/su-exec"
 MAX_DOWNLOAD_BYTES: Final = 1024 * 1024
 
-# Each script confines the path to the kernel home and prints a JSON result or the payload.
-_UPLOAD_SCRIPT: Final = textwrap.dedent("""
+# Exit codes of the scripts: the path is outside the home, it does not exist, it is too large.
+_EXIT_NOT_ALLOWED: Final = 3
+_EXIT_NOT_FOUND: Final = 4
+_EXIT_TOO_LARGE: Final = 5
+# Each script confines the path to the kernel home (symlinks resolved) and prints a JSON
+# result or the payload. They run with `python -I`: the kernel home is not on `sys.path`.
+_CONFINE: Final = textwrap.dedent("""
     import os, sys
     home = os.path.realpath(sys.argv[1])
     target = os.path.realpath(os.path.join(home, sys.argv[2]))
     if os.path.commonpath([home, target]) != home:
-        sys.exit("not allowed to upload files outside " + home)
+        sys.stderr.write("not allowed to access files outside " + home)
+        sys.exit(3)
+""")
+_UPLOAD_SCRIPT: Final = _CONFINE + textwrap.dedent("""
     data = sys.stdin.buffer.read(int(sys.argv[3]))
     os.makedirs(os.path.dirname(target), exist_ok=True)
     with open(target, "wb") as f:
         f.write(data)
 """)
-_DOWNLOAD_SCRIPT: Final = textwrap.dedent("""
-    import io, os, sys, tarfile
-    home = os.path.realpath(sys.argv[1])
-    target = os.path.realpath(os.path.join(home, sys.argv[2]))
-    if os.path.commonpath([home, target]) != home:
-        sys.exit("not allowed to download files outside " + home)
+_DOWNLOAD_SCRIPT: Final = _CONFINE + textwrap.dedent("""
+    import io, tarfile
+    if not os.path.exists(target):
+        sys.stderr.write("no such file: " + sys.argv[2])
+        sys.exit(4)
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w") as tar:
         tar.add(target, arcname=os.path.basename(target))
     if buf.tell() > int(sys.argv[3]):
-        sys.exit("too large archive file exceeding the limit")
+        sys.stderr.write("too large archive file exceeding the limit")
+        sys.exit(5)
     if sys.argv[4] == "single":
         buf.seek(0)
         with tarfile.open(fileobj=buf) as tar:
             names = tar.getnames()
             if len(names) != 1:
-                sys.exit("expected a single file")
+                sys.stderr.write("expected a single file")
+                sys.exit(1)
             sys.stdout.buffer.write(tar.extractfile(names[0]).read())
     else:
         sys.stdout.buffer.write(buf.getvalue())
 """)
-_LIST_SCRIPT: Final = textwrap.dedent("""
-    import json, os, stat, sys
-    home = os.path.realpath(sys.argv[1])
-    target = os.path.realpath(os.path.join(home, sys.argv[2]))
-    if os.path.commonpath([home, target]) != home:
-        sys.exit("not allowed to list files outside " + home)
+_LIST_SCRIPT: Final = _CONFINE + textwrap.dedent("""
+    import json, stat
     files = []
     for f in os.scandir(target):
         st = f.stat(follow_symlinks=False)
@@ -96,6 +109,19 @@ _LIST_SCRIPT: Final = textwrap.dedent("""
         })
     print(json.dumps(files))
 """)
+MAX_LIST_BYTES: Final = 16 * 1024 * 1024
+MAX_LOG_BYTES: Final = 8 * 1024 * 1024
+MAX_LOG_LINES: Final = 100_000
+_ARCHIVE_OVERHEAD: Final = 64 * 1024
+
+
+def _confined(path: str) -> str:
+    """The path inside the kernel home, as the Agent checks it before running anything."""
+    home = PurePosixPath(KERNEL_HOME)
+    target = PurePosixPath(posixpath.normpath(home / path))
+    if not target.is_relative_to(home):
+        raise KernelPathNotAllowedError(f"not allowed to access files outside {KERNEL_HOME}")
+    return str(target)
 
 
 class PodCodeRunner(AbstractCodeRunner):
@@ -135,6 +161,7 @@ class GatewayKernels:
     _runners: dict[str, tuple[str, PodCodeRunner]]  # kernel id → (pod uid, runner)
     _runner_lock: asyncio.Lock
     _batch_tasks: set[asyncio.Task[None]]
+    _forget_tasks: set[asyncio.Task[None]]
 
     def __init__(
         self,
@@ -151,6 +178,7 @@ class GatewayKernels:
         self._runners = {}
         self._runner_lock = asyncio.Lock()
         self._batch_tasks = set()
+        self._forget_tasks = set()
 
     async def close(self) -> None:
         for task in self._batch_tasks:
@@ -182,6 +210,14 @@ class GatewayKernels:
             )
             self._runners[kernel_id] = (endpoint.pod_uid, runner)
             return runner
+
+    def schedule_forget(self, kernel_id: str) -> None:
+        """KernelIndex removal hook: close the runner of a kernel whose Pod is gone."""
+        if kernel_id not in self._runners:
+            return
+        task = asyncio.create_task(self.forget(kernel_id))
+        self._forget_tasks.add(task)
+        task.add_done_callback(self._forget_tasks.discard)
 
     async def forget(self, kernel_id: str) -> None:
         async with self._runner_lock:
@@ -270,6 +306,9 @@ class GatewayKernels:
                     mode, opts = "continue", {"exec": ""}
         except TimeoutError:
             await self._batch_ended(session_id, -2, timed_out=True)
+        except Exception:
+            log.exception("batch execution failed")
+            await self._batch_ended(session_id, -1)
 
     async def _batch_ended(
         self, session_id: SessionId, exit_code: int, *, timed_out: bool = False
@@ -349,13 +388,20 @@ class GatewayKernels:
     def _as_kernel_user(self, endpoint: KernelEndpoint, command: list[str]) -> list[str]:
         if endpoint.uid is None:
             return command
-        return [SU_EXEC, f"{endpoint.uid}:{endpoint.gid or endpoint.uid}", *command]
+        gid = endpoint.gid if endpoint.gid is not None else endpoint.uid
+        return [SU_EXEC, f"{endpoint.uid}:{gid}", *command]
 
     async def _run_script(
-        self, endpoint: KernelEndpoint, script: str, args: list[str], stdin: bytes | None = None
-    ) -> bytes:
+        self,
+        endpoint: KernelEndpoint,
+        script: str,
+        args: list[str],
+        stdin: bytes | None = None,
+        *,
+        stdout_limit: int,
+    ) -> tuple[int, bytes, str]:
         command = self._as_kernel_user(
-            endpoint, [KERNEL_PYTHON, "-s", "-c", script, KERNEL_HOME, *args]
+            endpoint, [KERNEL_PYTHON, "-I", "-c", script, KERNEL_HOME, *args]
         )
         result = await exec_in_pod(
             self._exec_core,
@@ -364,31 +410,71 @@ class GatewayKernels:
             KERNEL_CONTAINER,
             command,
             stdin,
+            stdout_limit=stdout_limit,
         )
-        if result.exit_code != 0:
-            raise PermissionError(result.stderr.decode("utf-8", "replace").strip())
-        return result.stdout
+        return result.exit_code, result.stdout, result.stderr.decode("utf-8", "replace").strip()
+
+    async def _run_file_script(
+        self,
+        endpoint: KernelEndpoint,
+        script: str,
+        args: list[str],
+        stdin: bytes | None = None,
+        *,
+        stdout_limit: int,
+    ) -> bytes:
+        code, out, err = await self._run_script(
+            endpoint, script, args, stdin, stdout_limit=stdout_limit
+        )
+        if code == 0:
+            return out
+        if code == _EXIT_NOT_ALLOWED:
+            raise KernelPathNotAllowedError(err)
+        if code == _EXIT_NOT_FOUND:
+            raise KernelFileNotFoundError(err)
+        if code == _EXIT_TOO_LARGE:
+            raise KernelFileTooLargeError(err)
+        raise KernelExecFailedError(err or f"exit code {code}")
 
     async def upload_file(self, kernel_id: str, filename: str, payload: bytes) -> None:
         endpoint = self._endpoint(kernel_id)
-        await self._run_script(endpoint, _UPLOAD_SCRIPT, [filename, str(len(payload))], payload)
+        _confined(filename)
+        await self._run_file_script(
+            endpoint,
+            _UPLOAD_SCRIPT,
+            [filename, str(len(payload))],
+            payload,
+            stdout_limit=_ARCHIVE_OVERHEAD,
+        )
 
     async def download_file(self, kernel_id: str, filepath: str) -> bytes:
         endpoint = self._endpoint(kernel_id)
-        return await self._run_script(
-            endpoint, _DOWNLOAD_SCRIPT, [filepath, str(MAX_DOWNLOAD_BYTES), "archive"]
+        _confined(filepath)
+        return await self._run_file_script(
+            endpoint,
+            _DOWNLOAD_SCRIPT,
+            [filepath, str(MAX_DOWNLOAD_BYTES), "archive"],
+            stdout_limit=MAX_DOWNLOAD_BYTES + _ARCHIVE_OVERHEAD,
         )
 
     async def download_single(self, kernel_id: str, filepath: str) -> bytes:
         endpoint = self._endpoint(kernel_id)
-        return await self._run_script(
-            endpoint, _DOWNLOAD_SCRIPT, [filepath, str(MAX_DOWNLOAD_BYTES), "single"]
+        _confined(filepath)
+        return await self._run_file_script(
+            endpoint,
+            _DOWNLOAD_SCRIPT,
+            [filepath, str(MAX_DOWNLOAD_BYTES), "single"],
+            stdout_limit=MAX_DOWNLOAD_BYTES + _ARCHIVE_OVERHEAD,
         )
 
     async def list_files(self, kernel_id: str, path: str) -> dict[str, Any]:
+        """As the Agent: the listing and the errors as text, `abspath` as given."""
         endpoint = self._endpoint(kernel_id)
-        out = await self._run_script(endpoint, _LIST_SCRIPT, [path])
-        return {"files": out.decode("utf-8"), "errors": "", "abspath": path}
+        _confined(path)
+        _, out, err = await self._run_script(
+            endpoint, _LIST_SCRIPT, [path], stdout_limit=MAX_LIST_BYTES
+        )
+        return {"files": out.decode("utf-8", "replace"), "errors": err, "abspath": path}
 
     async def images_ready(self, gateway_id: str, canonicals: Sequence[str]) -> None:
         """The kubelet pulls a session's image when its Pod starts, so each one is ready now.
@@ -412,6 +498,10 @@ class GatewayKernels:
     async def get_logs(self, kernel_id: str) -> dict[str, Any]:
         endpoint = self._endpoint(kernel_id)
         logs = await self._core.read_namespaced_pod_log(
-            endpoint.pod_name, endpoint.namespace, container=KERNEL_CONTAINER
+            endpoint.pod_name,
+            endpoint.namespace,
+            container=KERNEL_CONTAINER,
+            tail_lines=MAX_LOG_LINES,
+            limit_bytes=MAX_LOG_BYTES,
         )
         return {"logs": logs}
