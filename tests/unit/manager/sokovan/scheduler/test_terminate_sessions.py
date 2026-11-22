@@ -28,6 +28,7 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterLookup
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
@@ -388,4 +389,6 @@ def _no_compute_cluster() -> AsyncMock:
     resolver = AsyncMock()
     resolver.of_resource_groups.return_value = {}
     resolver.of_agents.return_value = {}
+    resolver.lookup_resource_groups.return_value = ComputeClusterLookup(found={})
+    resolver.lookup_agents.return_value = ComputeClusterLookup(found={})
     return resolver

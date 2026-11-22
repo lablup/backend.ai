@@ -13,9 +13,13 @@ from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 from ai.backend.manager.models.compute_cluster.creators import ComputeClusterCreator
 from ai.backend.manager.models.compute_cluster.row import COMPUTE_CLUSTER_KUBECONFIG_CONTEXT
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.compute_cluster.actions.create import (
     CreateComputeClusterAction,
+)
+from ai.backend.manager.services.compute_cluster.actions.purge import (
+    PurgeComputeClusterAction,
 )
 from ai.backend.manager.services.compute_cluster.actions.update import (
     UpdateComputeClusterAction,
@@ -42,18 +46,22 @@ class ComputeClusterService:
     """The writes that carry a kubeconfig, which is validated and encrypted before it reaches
     the spec. The API server is always the kubeconfig's.
 
-    Get, search and purge run straight against ops.
+    The purge is ordered against a resource group write naming the cluster. Get and search
+    run straight against ops.
     """
 
     _ops_repository: OpsRepository[ComputeClusterData]
+    _resource_group_repository: ResourceGroupRepository
     _key_provider_pool: KeyProviderPool
 
     def __init__(
         self,
         ops_repository: OpsRepository[ComputeClusterData],
+        resource_group_repository: ResourceGroupRepository,
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._ops_repository = ops_repository
+        self._resource_group_repository = resource_group_repository
         self._key_provider_pool = key_provider_pool
 
     async def create(
@@ -96,3 +104,8 @@ class ComputeClusterService:
                 api_server=OptionalState.update(parsed.server),
             )
         return EntityOpsResult(data=await self._ops_repository.update(updater))
+
+    async def purge(self, action: PurgeComputeClusterAction) -> EntityOpsResult[ComputeClusterData]:
+        return EntityOpsResult(
+            data=await self._resource_group_repository.purge_compute_cluster(action.to_purger())
+        )

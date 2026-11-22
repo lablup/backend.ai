@@ -53,7 +53,10 @@ from ai.backend.manager.data.kernel.types import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
+from ai.backend.manager.sokovan.scheduler.compute_cluster import (
+    ComputeClusterLookup,
+    ComputeClusterResolver,
+)
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
@@ -354,6 +357,8 @@ def _no_compute_cluster() -> AsyncMock:
     resolver = AsyncMock()
     resolver.of_resource_groups.return_value = {}
     resolver.of_agents.return_value = {}
+    resolver.lookup_resource_groups.return_value = ComputeClusterLookup(found={})
+    resolver.lookup_agents.return_value = ComputeClusterLookup(found={})
     return resolver
 
 
@@ -405,11 +410,17 @@ def cluster_repository(
 
 
 @pytest.fixture
+def cluster_client_factory(cluster_client: AsyncMock) -> AsyncMock:
+    """Builds `cluster_client` from a kubeconfig; a test may make it refuse one."""
+    return AsyncMock(return_value=cluster_client)
+
+
+@pytest.fixture
 def terminator_on_cluster(
     cluster_repository: AsyncMock,
     mock_agent_client_pool: MagicMock,
     mock_valkey_schedule: AsyncMock,
-    cluster_client: AsyncMock,
+    cluster_client_factory: AsyncMock,
 ) -> SessionTerminator:
     """A terminator whose resolver lends `cluster_client`. Kubernetes is disabled in the
     config: termination does not depend on it."""
@@ -421,7 +432,7 @@ def terminator_on_cluster(
         cluster_repository,
         key_provider_pool,
         config_provider,
-        client_factory=AsyncMock(return_value=cluster_client),
+        client_factory=cluster_client_factory,
     )
     return SessionTerminator(
         SessionTerminatorArgs(
@@ -431,3 +442,31 @@ def terminator_on_cluster(
             compute_clusters=resolver,
         )
     )
+
+
+@pytest.fixture
+def docker_and_unresolvable_sessions() -> list[TerminatingSessionData]:
+    """A session on a Docker agent and one on an agent whose lookup keeps failing."""
+    return [
+        _create_terminating_session_data(
+            kernels=[_create_terminating_kernel_data(agent_id=AgentId("agent-docker"))]
+        ),
+        _create_terminating_session_data(
+            kernels=[_create_terminating_kernel_data(agent_id=AgentId("agent-broken"))]
+        ),
+    ]
+
+
+@pytest.fixture
+def failing_batch_lookup(cluster_repository: AsyncMock) -> AsyncMock:
+    """The batch lookup fails; alone, `agent-docker` is not a gateway and `agent-broken` fails."""
+
+    async def of_agents(
+        agent_ids: Collection[AgentId],
+    ) -> dict[AgentId, ResourceGroupComputeCluster]:
+        if len(agent_ids) > 1 or AgentId("agent-broken") in agent_ids:
+            raise ConnectionError("database unavailable")
+        return {}
+
+    cluster_repository.get_compute_clusters_of_agents.side_effect = of_agents
+    return cluster_repository

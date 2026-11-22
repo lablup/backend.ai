@@ -24,6 +24,7 @@ from sqlalchemy.orm import aliased, load_only, selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
@@ -69,6 +70,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.compute_cluster.types import (
     DEFAULT_CLUSTER_SCHEDULER,
+    ComputeClusterStatus,
     ProjectQueueData,
     ResourceGroupComputeCluster,
 )
@@ -1983,6 +1985,28 @@ class ScheduleDBSource:
             ),
         )
 
+    async def update_compute_cluster_status(
+        self, cluster_id: ComputeClusterID, status: ComputeClusterStatus
+    ) -> bool:
+        """Set a compute cluster's status when it differs; returns whether it changed.
+
+        The registration the cached client is built from (`updated_at`) is left alone.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            result = await session.execute(
+                sa.update(ComputeClusterRow)
+                .where(
+                    ComputeClusterRow.id == cluster_id,
+                    ComputeClusterRow.status != status,
+                )
+                .values(
+                    status=status,
+                    status_changed_at=sa.func.now(),
+                    updated_at=ComputeClusterRow.updated_at,
+                )
+            )
+            return cast(CursorResult[Any], result).rowcount > 0
+
     async def get_project_queue_data(
         self, project_id: UUID, resource_group: str
     ) -> ProjectQueueData:
@@ -2263,6 +2287,7 @@ class ScheduleDBSource:
                 )
 
         async with self._reconcile_ops.write_ops() as w:
+            await w.share_lock_kubernetes_resource_group(spec.scope.resource_group_id)
             await w.create_entity(
                 SessionCreator(
                     spec=spec,

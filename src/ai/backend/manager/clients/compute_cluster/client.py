@@ -123,6 +123,10 @@ class ComputeClusterClient:
     async def close(self) -> None:
         await self._api.close()
 
+    async def probe(self) -> None:
+        """Reach the API server once (its version endpoint); raises when it cannot."""
+        await client.VersionApi(self._api).get_code()
+
     async def ensure_namespace(
         self,
         name: str,
