@@ -1,0 +1,19 @@
+bai-dra dynamic MIG (package nvmig)
+
+Portions of this package are derived from the following projects, licensed under the
+Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0):
+
+- NVIDIA DRA Driver for GPUs (kubernetes-sigs/dra-driver-nvidia-gpu), v0.5.0 development line:
+  cmd/gpu-kubelet-plugin/{partitions.go, mig.go, nvlib.go, device_state.go, cleanup.go, cdi.go}
+  and internal/common/nvcaps.go.
+  Copyright The Kubernetes Authors.
+
+- go-nvlib (github.com/NVIDIA/go-nvlib), pkg/nvlib/device/mig_profile.go (MIG profile names).
+  Copyright (c) NVIDIA CORPORATION. All rights reserved.
+
+Changes by Lablup Inc.: the code is reduced to dynamic MIG for bai-dra (no static MIG, MPS,
+time-slicing, VFIO or health handling), uses go-nvml directly instead of go-nvlib, keeps its
+own per-claim checkpoint and writes the MIG capability devices into bai-dra's CDI specs.
+
+The test doubles come from go-nvml (github.com/NVIDIA/go-nvml/pkg/nvml/mock), Apache 2.0,
+Copyright (c) NVIDIA CORPORATION.

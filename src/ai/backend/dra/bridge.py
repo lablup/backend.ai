@@ -73,6 +73,9 @@ class DeviceInfo(BaseModel):
     capacity: dict[str, str] = Field(default_factory=dict, description="Kubernetes quantities")
     allow_multiple_allocations: bool = False
     request_policies: dict[str, CapacityPolicy] = Field(default_factory=dict)
+    uuid: str | None = Field(
+        default=None, description="NVML UUID of a GPU (`GPU-...`); dynamic MIG attaches by it"
+    )
 
 
 class DevicesResponse(BaseModel):

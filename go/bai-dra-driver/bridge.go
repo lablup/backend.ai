@@ -30,6 +30,8 @@ type DeviceInfo struct {
 	Capacity                 map[string]string         `json:"capacity"`
 	AllowMultipleAllocations bool                      `json:"allow_multiple_allocations"`
 	RequestPolicies          map[string]CapacityPolicy `json:"request_policies"`
+	// The NVML UUID of a GPU (GPU-...); dynamic MIG attaches the GPU's MIG devices by it.
+	UUID string `json:"uuid,omitempty"`
 }
 
 type DevicesResponse struct {

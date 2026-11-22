@@ -86,6 +86,9 @@ func startFakeHost(t *testing.T, h *fakeHost) *bridge {
 			"device_cdi_devices": perDevice,
 		})
 	})
+	mux.HandleFunc("/v1/unprepare", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("{}"))
+	})
 	server := &http.Server{Handler: mux}
 	go func() { _ = server.Serve(ln) }()
 	t.Cleanup(func() { _ = server.Close() })

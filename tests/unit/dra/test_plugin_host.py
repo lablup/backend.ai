@@ -5,14 +5,18 @@ import stat
 from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, override
+from typing import Any, cast, override
 
 import aiodocker
 import pytest
 
 from ai.backend.accelerator.mock.plugin import MockPlugin
 from ai.backend.accelerator.mock.types import MockDevice
-from ai.backend.agent.resources import AbstractAllocMap, AbstractComputePlugin
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+)
 from ai.backend.common.types import DeviceId, SlotName
 from ai.backend.dra.bridge import ContainerEdits
 from ai.backend.dra.errors import (
@@ -28,6 +32,7 @@ from ai.backend.dra.host.plugin_host import (
     PluginHost,
     device_name,
     docker_args_to_edits,
+    gpu_uuid,
     pcie_root,
     share_capacity,
 )
@@ -165,6 +170,30 @@ async def mig_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIter
         shared=True,
         isolation=FailingHami(),
     )
+    yield host
+    await host.close()
+
+
+class UUIDMockPlugin(MockPlugin):
+    """Knows each GPU's bare UUID, as the CUDA plugin does."""
+
+    @override
+    async def list_devices(self) -> Collection[MockDevice]:
+        devices = await super().list_devices()
+        for d in devices:
+            setattr(d, "uuid", str(d.mother_uuid))
+        return devices
+
+
+@pytest.fixture
+async def dynamic_mig_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[PluginHost]:
+    (tmp_path / "mock-accelerator.toml").write_text(MIG_CONFIG)
+    monkeypatch.chdir(tmp_path)
+    plugin = UUIDMockPlugin({"allocation_mode": "fractional"}, {})
+    await plugin.init()
+    host = PluginHost(plugin, tmp_path / "mounts", shared=True, isolation=HAMI, dynamic_mig=True)
     yield host
     await host.close()
 
@@ -483,6 +512,42 @@ class TestStaticMIG:
         devices = {d.attributes["deviceId"]: d for d in (await mig_host.list_devices()).devices}
         edits, _ = await mig_host.prepare(CLAIM, [devices[MIG_ID].name], {})
         assert f"BACKENDAI_MOCK_CUDA_DEVICES={MIG_ID}" in edits.env
+
+
+class TestDynamicMIG:
+    async def test_whole_gpus_only_and_their_uuids(self, dynamic_mig_host: PluginHost) -> None:
+        devices = (await dynamic_mig_host.list_devices()).devices
+        assert {d.attributes["slotName"] for d in devices} == {"cuda.shares"}
+        # The GPU in MIG mode stays a shared device; the Go driver publishes its MIG devices.
+        assert {d.uuid for d in devices} == {
+            f"GPU-aaaaaaaa-0000-0000-0000-00000000000{i}" for i in (1, 2, 3)
+        }
+        assert all(d.allow_multiple_allocations for d in devices)
+
+    async def test_a_device_missing_from_the_last_list_is_listed_again(
+        self, dynamic_mig_host: PluginHost
+    ) -> None:
+        name = (await dynamic_mig_host.list_devices()).devices[0].name
+        # As if the GPU was in MIG mode at the last list and has just left it.
+        await dynamic_mig_host.list_devices()
+        del dynamic_mig_host._devices[name]
+        edits, _ = await dynamic_mig_host.prepare(CLAIM, [name], {name: {"shares": "1000"}})
+        assert any(e.startswith("BACKENDAI_MOCK_CUDA_DEVICES=") for e in edits.env)
+
+    def test_gpu_uuid_takes_the_nvml_form(self) -> None:
+        class Device:
+            uuid: str | None
+
+            def __init__(self, uuid: str | None) -> None:
+                self.uuid = uuid
+
+        def of(uuid: str | None) -> str | None:
+            return gpu_uuid(cast(AbstractComputeDevice, Device(uuid)))
+
+        assert of("1234") == "GPU-1234"
+        assert of("GPU-1234") == "GPU-1234"
+        assert of("MIG-1234") == "MIG-1234"
+        assert of(None) is None
 
 
 class TestBaiHook:

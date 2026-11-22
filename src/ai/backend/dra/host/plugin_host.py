@@ -100,6 +100,15 @@ def pcie_root(bus_id: str, sysfs_root: Path) -> str | None:
     return next((part for part in resolved.parts if _RX_PCIE_ROOT.match(part)), None)
 
 
+def gpu_uuid(device: AbstractComputeDevice) -> str | None:
+    """The NVML UUID (`GPU-...`) of a device whose plugin knows it; the CUDA plugin keeps it bare."""
+    raw = getattr(device, "uuid", None)
+    if not raw:
+        return None
+    text = str(raw)
+    return text if text.startswith(("GPU-", "MIG-")) else f"GPU-{text}"
+
+
 def share_capacity(memory_size: int, processing_units: int, unit_mem: int, unit_proc: int) -> int:
     """A device's share capacity in 0.01-share units: min(memory, SMs) in shares, rounded down."""
     return min(
@@ -163,6 +172,7 @@ class PluginHost:
     _mount_root: Path
     _sysfs_root: Path
     _shared: bool
+    _dynamic_mig: bool
     _isolation: IsolationProvider | None
     _host_id: str
     _generation: int
@@ -176,6 +186,7 @@ class PluginHost:
         shared: bool = False,
         isolation: IsolationProvider | None = None,
         sysfs_root: Path = Path("/sys"),
+        dynamic_mig: bool = False,
     ) -> None:
         if shared and isolation is None:
             # Shared devices without a provider would let every claim use the whole device.
@@ -187,6 +198,7 @@ class PluginHost:
         self._mount_root = mount_root or DEFAULT_MOUNT_ROOT
         self._sysfs_root = sysfs_root
         self._shared = shared
+        self._dynamic_mig = dynamic_mig
         self._isolation = isolation
         self._host_id = uuid.uuid4().hex
         self._generation = 0
@@ -203,14 +215,23 @@ class PluginHost:
         shared: bool = False,
         isolation: IsolationProvider | None = None,
         sysfs_root: Path = Path("/sys"),
+        dynamic_mig: bool = False,
     ) -> PluginHost:
-        """`shared` publishes devices that several claims split by `shares` capacity."""
+        """`shared` publishes devices that several claims split by `shares` capacity.
+        `dynamic_mig`: the Go driver publishes the MIG devices; the host lists whole GPUs only."""
         if shared and isolation is None:
             raise IsolationRequiredError("shared devices need an isolation provider")
         plugin = load_plugin_class(spec)(plugin_config, local_config)
         await plugin.init()
         log.info("accelerator plugin loaded", plugin=spec, slot_name=str(plugin.key))
-        return cls(plugin, mount_root, shared=shared, isolation=isolation, sysfs_root=sysfs_root)
+        return cls(
+            plugin,
+            mount_root,
+            shared=shared,
+            isolation=isolation,
+            sysfs_root=sysfs_root,
+            dynamic_mig=dynamic_mig,
+        )
 
     async def close(self) -> None:
         await self._plugin.cleanup()
@@ -284,16 +305,19 @@ class PluginHost:
         # (`cuda.device:10g-mig`) and the like.
         slot_infos = (await self._plugin.create_alloc_map()).device_slots
         slots: dict[str, SlotName] = {}
-        for name, d in devices.items():
+        for name, d in list(devices.items()):
             slot_info = slot_infos.get(d.device_id)
             exclusive = self._exclusive_slot(slot_info)
-            if exclusive is not None:
+            if exclusive is not None and self._dynamic_mig:
+                # The instances the Go driver created: it publishes them itself.
+                del devices[name]
+            elif exclusive is not None:
                 slots[name] = exclusive
             elif self._shared:
                 slots[name] = self.shares_slot
             else:
                 slots[name] = slot_info.slot_name if slot_info is not None else self.device_slot
-        if self._shared:
+        if self._shared and not self._dynamic_mig:
             # A GPU in MIG mode is served by its instances alone, never as a shared device.
             mig_parents = {
                 str(mother)
@@ -319,6 +343,7 @@ class PluginHost:
                     "memory": str(int(device.memory_size)),
                     "processingUnits": str(device.processing_units),
                 },
+                uuid=gpu_uuid(device),
             )
             if slots[name] == self.shares_slot:
                 capacity = self._share_capacity(device)
@@ -392,7 +417,8 @@ class PluginHost:
     ) -> tuple[ContainerEdits, dict[str, list[str]]]:
         """The claim's edits and, per device, the CDI devices of other specs for it alone."""
         source = self._claim_dir(claim_uid)
-        if not self._devices:
+        if not self._devices or any(n not in self._devices for n in names):
+            # Also a GPU that just left MIG mode (dynamic MIG): it is listed again.
             await self.list_devices()
         unknown = [n for n in names if n not in self._devices]
         if unknown:
