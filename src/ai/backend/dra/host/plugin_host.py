@@ -19,8 +19,9 @@ from typing import Any, Final
 
 import aiodocker
 
+from ai.backend.agent.alloc_map import DeviceSlotInfo
 from ai.backend.agent.resources import AbstractComputeDevice, AbstractComputePlugin
-from ai.backend.common.types import DeviceId, SlotName
+from ai.backend.common.types import DeviceId, SlotName, SlotTypes
 from ai.backend.dra.bridge import (
     SHARE_SCALE,
     SHARES_CAPACITY,
@@ -266,22 +267,46 @@ class PluginHost:
             int(device.memory_size), int(device.processing_units), unit_mem, unit_proc
         )
 
+    def _exclusive_slot(self, slot_info: DeviceSlotInfo | None) -> SlotName | None:
+        """The slot of a device the plugin never splits (a MIG instance: `cuda.device:1g.10gb-mig`)."""
+        if slot_info is None:
+            return None
+        if slot_info.slot_type == SlotTypes.UNIQUE or slot_info.slot_name not in (
+            self.device_slot,
+            self.shares_slot,
+        ):
+            return slot_info.slot_name
+        return None
+
     async def list_devices(self) -> DevicesResponse:
         devices = {device_name(d.device_id): d for d in await self._plugin.list_devices()}
+        # The alloc map tells a whole GPU (`cuda.device`) from a MIG instance
+        # (`cuda.device:10g-mig`) and the like.
+        slot_infos = (await self._plugin.create_alloc_map()).device_slots
+        slots: dict[str, SlotName] = {}
+        for name, d in devices.items():
+            slot_info = slot_infos.get(d.device_id)
+            exclusive = self._exclusive_slot(slot_info)
+            if exclusive is not None:
+                slots[name] = exclusive
+            elif self._shared:
+                slots[name] = self.shares_slot
+            else:
+                slots[name] = slot_info.slot_name if slot_info is not None else self.device_slot
         if self._shared:
-            slots = dict.fromkeys(devices, self.shares_slot)
-        else:
-            # The alloc map tells a whole GPU (`cuda.device`) from a MIG instance
-            # (`cuda.device:10g-mig`) and the like.
-            slot_infos = (await self._plugin.create_alloc_map()).device_slots
-            slots = {
-                name: (
-                    slot_infos[d.device_id].slot_name
-                    if d.device_id in slot_infos
-                    else self.device_slot
-                )
+            # A GPU in MIG mode is served by its instances alone, never as a shared device.
+            mig_parents = {
+                str(mother)
                 for name, d in devices.items()
+                if slots[name] != self.shares_slot
+                and (mother := getattr(d, "mother_uuid", None)) is not None
             }
+            for name in [
+                n
+                for n, d in devices.items()
+                if slots[n] == self.shares_slot and str(d.device_id) in mig_parents
+            ]:
+                del devices[name], slots[name]
         # Both maps change together: a prepare between two awaits sees one generation.
         self._devices, self._slots = devices, slots
         pcie_roots = await asyncio.to_thread(self._pcie_roots, devices)
@@ -295,7 +320,7 @@ class PluginHost:
                     "processingUnits": str(device.processing_units),
                 },
             )
-            if self._shared:
+            if slots[name] == self.shares_slot:
                 capacity = self._share_capacity(device)
                 if capacity < 1:
                     log.warning("device too small for one share unit", device=name)
@@ -374,10 +399,12 @@ class PluginHost:
             raise UnknownDeviceError(f"devices not on this node: {unknown}")
         # Everything that reads the device maps runs before the first await: list_devices
         # replaces them meanwhile.
-        shares = self._shares(names, consumed or {}) if self._shared else {}
+        shared_names = [n for n in names if self._slots[n] == self.shares_slot]
+        shares = self._shares(shared_names, consumed or {}) if self._shared else {}
+        partial = [n for n in shares if shares[n] < self._share_capacity(self._devices[n])]
         alloc = self._alloc(names, shares)
         singles = {n: self._alloc([n], shares) for n in names}
-        limits = self._limits(names, shares) if shares else []
+        limits = self._limits(names, shares) if partial else []
         edits = await self._edits(alloc)
         per_device: dict[str, list[str]] = {}
         if edits.cdi_devices:
@@ -396,10 +423,11 @@ class PluginHost:
                     options=["bind", "ro"],
                 )
             )
-        if shares:
+        # A device taken in full needs no isolation; one partial device puts the claim under
+        # the provider (fail closed).
+        if partial:
             if self._isolation is None:
                 raise IsolationRequiredError("shared devices need an isolation provider")
-            # Fail closed: every shared allocation runs under the provider, a whole one too.
             allocation = SharedAllocation(
                 claim_uid=claim_uid,
                 claim_dir=source,
@@ -413,19 +441,24 @@ class PluginHost:
         return edits, per_device
 
     def _limits(self, names: list[str], shares: Mapping[str, int]) -> list[DeviceLimit]:
-        """In the container's device order (PCI location), as the CUDA runtime numbers them."""
+        """In the container's device order (PCI location), as the CUDA runtime numbers them.
+        A device taken in full gets its whole memory and every SM."""
         unit_mem, unit_proc = self._plugin.share_units()
         ordered = sorted(names, key=lambda n: self._devices[n].hw_location)
-        return [
-            limit_from_shares(
-                index,
-                shares[name],
-                unit_mem,
-                unit_proc,
-                int(self._devices[name].processing_units),
+        limits = []
+        for index, name in enumerate(ordered):
+            if name not in shares:
+                continue
+            device = self._devices[name]
+            if shares[name] >= self._share_capacity(device):
+                limits.append(DeviceLimit(index, int(device.memory_size), 100))
+                continue
+            limits.append(
+                limit_from_shares(
+                    index, shares[name], unit_mem, unit_proc, int(device.processing_units)
+                )
             )
-            for index, name in enumerate(ordered)
-        ]
+        return limits
 
     async def unprepare(self, claim_uid: str) -> None:
         source = self._claim_dir(claim_uid)
