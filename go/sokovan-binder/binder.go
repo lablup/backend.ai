@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -69,8 +70,10 @@ type bindRequest struct {
 }
 
 type writtenAllocation struct {
-	allocation resourceapi.AllocationResult
-	at         time.Time
+	allocation      resourceapi.AllocationResult
+	uid             types.UID
+	resourceVersion string
+	at              time.Time
 }
 
 type binder struct {
@@ -285,11 +288,17 @@ func (b *binder) allocateClaim(ctx context.Context, ns string, pod *corev1.Pod, 
 		if !changed {
 			return nil
 		}
-		if _, err := claims.UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+		updated, err := claims.UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		if err != nil {
 			return err
 		}
 		if b.written != nil {
-			b.written[ns+"/"+ca.Name] = writtenAllocation{allocation: *claim.Status.Allocation, at: b.now()}
+			b.written[ns+"/"+ca.Name] = writtenAllocation{
+				allocation:      *updated.Status.Allocation,
+				uid:             updated.UID,
+				resourceVersion: updated.ResourceVersion,
+				at:              b.now(),
+			}
 		}
 		return nil
 	})
@@ -300,19 +309,21 @@ func (b *binder) allocateClaim(ctx context.Context, ns string, pod *corev1.Pod, 
 func (b *binder) checkConflicts(ns string, ca ClaimAllocation) error {
 	self := ns + "/" + ca.Name
 	held := map[string]*resourceapi.AllocationResult{}
+	seen := map[string]*resourceapi.ResourceClaim{}
 	if b.claims != nil {
 		all, err := b.claims.List(labels.Everything())
 		if err != nil {
 			return err
 		}
 		for _, c := range all {
+			seen[c.Namespace+"/"+c.Name] = c
 			if c.Status.Allocation != nil {
 				held[c.Namespace+"/"+c.Name] = c.Status.Allocation
 			}
 		}
 	}
 	for key, w := range b.written {
-		if held[key] == nil {
+		if held[key] == nil && !b.informerCaughtUp(seen, key, w) {
 			held[key] = &w.allocation
 		}
 	}
@@ -332,6 +343,22 @@ func (b *binder) checkConflicts(ns string, ca ClaimAllocation) error {
 		}
 	}
 	return nil
+}
+
+// informerCaughtUp tells whether the claim informer already shows the claim at or past the
+// write, so a missing allocation there means it was freed. A claim gone from the informer
+// (deleted or recreated) no longer holds the write either.
+func (b *binder) informerCaughtUp(seen map[string]*resourceapi.ResourceClaim, key string, w writtenAllocation) bool {
+	if b.claims == nil {
+		return false
+	}
+	c, ok := seen[key]
+	if !ok || c.UID != w.uid {
+		return true
+	}
+	current, err1 := strconv.ParseUint(c.ResourceVersion, 10, 64)
+	written, err2 := strconv.ParseUint(w.resourceVersion, 10, 64)
+	return err1 == nil && err2 == nil && current >= written
 }
 
 func (b *binder) expireWritten() {

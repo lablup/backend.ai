@@ -170,6 +170,13 @@ class GatewayImages:
                     cache_id, BgtaskFailedEvent(task_id=task_id, message=message)
                 )
                 return
+            except Exception as e:
+                # A timeout or an unexpected fault still ends the task, or the Manager waits forever.
+                log.exception("image task crashed", task_id=str(task_id))
+                await self._producer.broadcast_event_with_cache(
+                    cache_id, BgtaskFailedEvent(task_id=task_id, message=repr(e))
+                )
+                return
             await self._producer.broadcast_event_with_cache(
                 cache_id, BgtaskDoneEvent(task_id=task_id, message=None)
             )

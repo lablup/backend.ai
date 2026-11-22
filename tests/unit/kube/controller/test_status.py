@@ -110,6 +110,10 @@ class TestSessionPhase:
         kernels = self._kernels(SessionPhase.RUNNING, SessionPhase.TERMINATED)
         assert session_phase(kernels, deleting=False) == SessionPhase.TERMINATED
 
+    def test_a_pod_deleted_outside_a_session_deletion_does_not_end_the_session(self) -> None:
+        kernels = self._kernels(SessionPhase.RUNNING, SessionPhase.TERMINATING)
+        assert session_phase(kernels, deleting=False) == SessionPhase.TERMINATING
+
     def test_deletion_is_terminating(self) -> None:
         kernels = self._kernels(SessionPhase.RUNNING)
         assert session_phase(kernels, deleting=True) == SessionPhase.TERMINATING

@@ -234,6 +234,32 @@ class TestReportedPhase:
         assert recorded[:3] == ["Pulling", "Creating", "Running"]
 
 
+class TestPodDeletedOutside:
+    async def test_the_kernel_is_reported_terminated_once_its_pod_is_gone(
+        self,
+        apis: Apis,
+        api: MagicMock,
+        settings: ControllerSettings,
+        raw: dict[str, Any],
+    ) -> None:
+        producer = AsyncMock()
+        reconciler = SessionReconciler(api, settings, StatusReporter(producer))
+        _started(raw)
+        raw["status"]["kernels"][0]["reportedPhase"] = "Running"
+        apis.core.list_namespaced_pod.return_value = SimpleNamespace(
+            items=[_pod(deletionTimestamp="2026-01-01T00:00:00Z")]
+        )
+        await reconciler.reconcile("bai-p", "s-1")
+        assert _status_patches(apis)[-1]["phase"] == "Terminating"
+        producer.anycast_and_broadcast_event.assert_not_called()
+
+        raw["status"] = _status_patches(apis)[-1]
+        apis.core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
+        await reconciler.reconcile("bai-p", "s-1")
+        assert _status_patches(apis)[-1]["phase"] == "Error"
+        producer.anycast_and_broadcast_event.assert_called_once()
+
+
 def _requeue(raw: dict[str, Any], when: str = "2026-01-01T00:00:00Z") -> None:
     raw["metadata"]["annotations"] = {"sokovan.backend.ai/requeue": when}
 

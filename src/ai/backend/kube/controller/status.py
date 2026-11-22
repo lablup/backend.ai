@@ -126,6 +126,9 @@ def session_phase(kernels: Sequence[KernelStatus], deleting: bool) -> SessionPha
     if any(p == SessionPhase.ERROR for p in phases):
         return SessionPhase.ERROR
     # One kernel leaving ends the session: the Agent path does the same.
-    if any(p in (SessionPhase.TERMINATED, SessionPhase.TERMINATING) for p in phases):
+    if any(p == SessionPhase.TERMINATED for p in phases):
         return SessionPhase.TERMINATED
+    # A Pod deleted outside a session deletion: not ended until its kernel is reported ended.
+    if any(p == SessionPhase.TERMINATING for p in phases):
+        return SessionPhase.TERMINATING
     return min(phases, key=_ORDER.index, default=SessionPhase.PENDING)

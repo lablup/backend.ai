@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 func allocationOf(devices ...string) resourceapi.AllocationResult {
@@ -139,5 +142,48 @@ func TestSameDevicesIgnoresOrderButNotShares(t *testing.T) {
 	shared.Devices.Results[0].ShareID = &share
 	if sameDevices(&ab, &shared) {
 		t.Fatal("a share differs from the whole device")
+	}
+}
+
+func claimLister(t *testing.T, claims ...*resourceapi.ResourceClaim) resourcelisters.ResourceClaimLister {
+	t.Helper()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for _, c := range claims {
+		if err := indexer.Add(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return resourcelisters.NewResourceClaimLister(indexer)
+}
+
+func TestAWrittenAllocationHoldsItsDeviceOnlyUntilTheInformerCatchesUp(t *testing.T) {
+	written := writtenAllocation{allocation: allocationOf("dev-0"), uid: "uid-a", resourceVersion: "10", at: time.Now()}
+	at := func(rv string) *resourceapi.ResourceClaim {
+		c := claim("a")
+		c.UID, c.ResourceVersion = "uid-a", rv
+		return c
+	}
+	recreated := at("12")
+	recreated.UID = "uid-a2"
+	cases := []struct {
+		name     string
+		informer []*resourceapi.ResourceClaim
+		conflict bool
+	}{
+		{"informer behind the write", []*resourceapi.ResourceClaim{at("9")}, true},
+		{"informer shows the claim freed", []*resourceapi.ResourceClaim{at("11")}, false},
+		{"claim deleted", nil, false},
+		{"claim recreated", []*resourceapi.ResourceClaim{recreated}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b := newBinder(fake.NewClientset(claim("b")), nil)
+			b.claims = claimLister(t, tc.informer...)
+			b.written["ns/a"] = written
+			err := b.allocateClaim(context.Background(), "ns", testPod(), ClaimAllocation{Name: "b", Allocation: allocationOf("dev-0")})
+			if (err != nil) != tc.conflict {
+				t.Fatalf("conflict = %v, want %v", err, tc.conflict)
+			}
+		})
 	}
 }
