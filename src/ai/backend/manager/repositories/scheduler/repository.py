@@ -85,6 +85,7 @@ from ai.backend.manager.views.sokovan.search import (
 )
 from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
+    PlacementTimeoutRecord,
     SweptSessionInfo,
     TerminatingSessionData,
 )
@@ -177,6 +178,7 @@ class SchedulerRepository:
                 session_dependencies=fetch.session_dependencies,
                 policy=fetch.policy,
                 preemption_candidates=fetch.preemption_candidates,
+                node_shapes=fetch.node_shapes,
             ),
             global_scope=GlobalScopeSnapshot(
                 occupancy=fetch.occupancy,
@@ -676,6 +678,20 @@ class SchedulerRepository:
     ) -> dict[SessionId, list[AgentId]]:
         """Get agent IDs assigned to kernels for the given sessions."""
         return await self._db_source.get_agent_ids_for_sessions(session_ids)
+
+    @scheduler_repository_resilience.apply()
+    async def record_placement_timeout(
+        self, session_id: SessionId, reason: str, message: str | None
+    ) -> PlacementTimeoutRecord | None:
+        """Send an unplaced session of a compute cluster to RESCHEDULING and count the timeout."""
+        return await self._db_source.record_placement_timeout(session_id, reason, message)
+
+    @scheduler_repository_resilience.apply()
+    async def cancel_rescheduling_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> list[SessionId]:
+        """Cancel RESCHEDULING sessions whose kernels are gone instead of requeueing them."""
+        return await self._db_source.cancel_rescheduling_sessions(session_ids, reason)
 
     @scheduler_repository_resilience.apply()
     async def reset_kernels_to_pending_for_sessions(

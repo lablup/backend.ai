@@ -121,6 +121,32 @@ class DependenciesNotSatisfied(SchedulingValidationError):
         )
 
 
+class NoNodeShapeFits(SchedulingValidationError):
+    """Raised when a kernel requests more than any node of the compute cluster can hold."""
+
+    error_type = "https://api.backend.ai/probs/no-node-shape-fits"
+    error_title = "No node of the compute cluster can hold the kernel."
+
+    _kernel_requests: list[str]
+
+    def __init__(self, *, kernel_requests: Sequence[str]) -> None:
+        self._kernel_requests = list(kernel_requests)
+        super().__init__(self.summary())
+
+    @override
+    def summary(self) -> str:
+        kernels = "; ".join(self._kernel_requests)
+        return f"No node of the compute cluster is large enough for the kernel ({kernels})."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class UserResourceQuotaExceeded(SchedulingValidationError):
     """Raised when user resource quota is exceeded."""
 

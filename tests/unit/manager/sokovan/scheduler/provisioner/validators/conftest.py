@@ -131,6 +131,7 @@ def _make_snapshot(
     domain_limit: ResourceLimit | None = None,
     occupancy: ResourceOccupancySnapshot | None = None,
     observed_at: datetime | None = None,
+    node_shapes: list[Mapping[str, str]] | None = None,
 ) -> SystemSnapshot:
     if occupancy is None:
         occupancy = ResourceOccupancySnapshot(by_user={}, by_project={}, by_domain={})
@@ -142,6 +143,9 @@ def _make_snapshot(
                 scheduler="fifo",
                 agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
                 preemption_order=PreemptionOrder.OLDEST,
+            ),
+            node_shapes=(
+                tuple(slot_map(shape) for shape in node_shapes) if node_shapes is not None else None
             ),
         ),
         global_scope=GlobalScopeSnapshot(

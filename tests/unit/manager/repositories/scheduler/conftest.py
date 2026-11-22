@@ -55,6 +55,7 @@ from ai.backend.manager.models.bootstrap_script.row import (
     UserDefaultBootstrapScriptRow,
 )
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
+from ai.backend.manager.models.compute_cluster.row import ComputeClusterRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
@@ -96,6 +97,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 _SCHEDULER_ROWS: list[type] = [
     DomainRow,
     ResourceGroupRow,
+    ComputeClusterRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,

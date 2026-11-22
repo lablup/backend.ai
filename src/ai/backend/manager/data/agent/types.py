@@ -128,6 +128,8 @@ class AgentHeartbeatUpsert:
     resource_info: AgentResourceInfo
     lost_at: datetime | None
     heartbeat_received: datetime
+    node_shapes: list[dict[str, str]] | None = None
+    """The node shapes a compute cluster's gateway reports; None for any other agent."""
 
     @property
     def insert_fields(self) -> dict[str, Any]:
@@ -196,6 +198,7 @@ class AgentHeartbeatUpsert:
             ),
             lost_at=None,
             heartbeat_received=heartbeat_received,
+            node_shapes=agent_info.node_shapes,
         )
 
 

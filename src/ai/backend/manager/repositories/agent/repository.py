@@ -163,6 +163,11 @@ class AgentRepository:
                 [q.slot_name for q in quantities],
             )
 
+        if upsert_data.node_shapes is not None:
+            await self._db_source.store_compute_cluster_node_shapes(
+                agent_id, upsert_data.node_shapes
+            )
+
         return upsert_result
 
     @agent_repository_resilience.apply()

@@ -3,7 +3,9 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
@@ -40,3 +42,5 @@ class SchedulingFetch:
     # Live session-group members per agent (empty when no pending session
     # carries a placement-engaged group)
     session_group_members: Mapping[AgentId, Mapping[SessionGroupID, int]]
+    # Node shapes of the compute cluster of a `kubernetes` group; None otherwise
+    node_shapes: tuple[Mapping[ResourceSlotName, Decimal], ...] | None = None

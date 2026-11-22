@@ -132,7 +132,10 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
     SessionSpecValidator,
 )
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
-from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
+from ai.backend.manager.views.sokovan.session import (
+    MarkTerminatingResult,
+    PlacementTimeoutRecord,
+)
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
 from ai.backend.sokovan_core.selectors.selector import (
     AgentSelectionCriteria,
@@ -617,6 +620,47 @@ class SchedulingController:
             await self.mark_scheduling_needed(schedule_types)
 
         return result
+
+    async def handle_placement_timeout(
+        self, session_id: SessionId, reason: str, message: str | None
+    ) -> PlacementTimeoutRecord | None:
+        """Send a session its compute cluster could not place back toward the queue.
+
+        The session becomes RESCHEDULING: its SessionWorkload is deleted and its slots are
+        released there, then it is requeued, or cancelled after the last allowed attempt.
+        """
+        record = await self._repository.record_placement_timeout(session_id, reason, message)
+        if record is None:
+            log.trace("placement timeout ignored", session_id=session_id)
+            return None
+        await self._event_producer.broadcast_events_batch([
+            SchedulingBroadcastEvent(
+                session_id=session_id,
+                creation_id="",
+                status_transition=str(SessionStatus.RESCHEDULING),
+                reason=KernelLifecycleEventReason.PLACEMENT_TIMEOUT,
+            )
+        ])
+        await self.mark_scheduling_needed([ScheduleType.RESCHEDULING])
+        log.trace("placement timeout recorded", session_id=session_id, attempts=record.attempts)
+        return record
+
+    async def cancel_rescheduling_sessions(
+        self, session_ids: list[SessionId], reason: KernelLifecycleEventReason
+    ) -> list[SessionId]:
+        """Cancel RESCHEDULING sessions whose kernels are gone instead of requeueing them."""
+        cancelled = await self._repository.cancel_rescheduling_sessions(session_ids, reason)
+        if cancelled:
+            await self._event_producer.broadcast_events_batch([
+                SchedulingBroadcastEvent(
+                    session_id=session_id,
+                    creation_id="",
+                    status_transition=str(SessionStatus.CANCELLED),
+                    reason=reason,
+                )
+                for session_id in cancelled
+            ])
+        return cancelled
 
     async def mark_sessions_status(
         self,

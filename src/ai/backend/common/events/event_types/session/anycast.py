@@ -93,6 +93,18 @@ class SessionStartedAnycastEvent(SessionCreationEvent):
         return "session_started"
 
 
+class SessionPlacementTimeoutAnycastEvent(BaseSessionEvent):
+    """A compute cluster could not place an admitted session within its placement timeout."""
+
+    reason: str
+    message: str | None = None
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_placement_timeout"
+
+
 class SessionTerminationEvent(BaseSessionEvent):
     reason: str = ""
 

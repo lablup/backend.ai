@@ -1,6 +1,7 @@
 """Session related view types."""
 
 from dataclasses import dataclass
+from typing import Final
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
@@ -95,3 +96,27 @@ class MarkTerminatingResult:
             + len(self.terminating_sessions)
             + len(self.force_terminated_sessions)
         )
+
+
+PLACEMENT_PENDING_STATUSES: Final = frozenset({
+    SessionStatus.SCHEDULED,
+    SessionStatus.PREPARING,
+    SessionStatus.PULLING,
+    SessionStatus.PREPARED,
+    SessionStatus.CREATING,
+})
+"""The statuses of an admitted session whose kernels a compute cluster may still be placing."""
+
+PLACEMENT_TIMEOUT_MAX_ATTEMPTS: Final = 3
+"""The placement timeouts after which a session is cancelled instead of requeued."""
+
+
+@dataclass(frozen=True)
+class PlacementTimeoutRecord:
+    """A placement timeout recorded on a session that a compute cluster could not place.
+
+    `attempts` counts the placement timeouts of the session so far, this one included.
+    """
+
+    session_id: SessionId
+    attempts: int

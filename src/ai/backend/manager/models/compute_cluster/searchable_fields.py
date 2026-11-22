@@ -59,6 +59,7 @@ class _ComputeClusterOwnFields(RowDataConverter[ComputeClusterRow, ComputeCluste
             status_changed_at=row.status_changed_at,
             created_at=self.created_at.read(row),
             updated_at=self.updated_at.read(row),
+            node_shapes=tuple(row.node_shapes) if row.node_shapes is not None else None,
         )
 
 

@@ -124,3 +124,67 @@ class TestAgentHeartbeatEvent:
         deserialized = AgentHeartbeatEvent.from_message(event.to_message())
 
         assert deserialized.agent_info.slot_key_and_units == expected_slot_keys
+
+
+def _agent_info(**extra: Any) -> dict[str, Any]:
+    return {
+        "ip": "10.0.0.5",
+        "region": None,
+        "scaling_group": "k8s",
+        "addr": "tcp://10.0.0.5:6001",
+        "public_key": None,
+        "public_host": "gateway",
+        "available_resource_slots": [
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="64"),
+        ],
+        "slot_key_and_units": {"cpu": SlotTypes.COUNT},
+        "version": "26.10.0",
+        "compute_plugins": {},
+        "architecture": "x86_64",
+        "auto_terminate_abusing_kernel": False,
+        **extra,
+    }
+
+
+class TestAgentInfoNodeShapes:
+    def test_an_agent_without_shapes_keeps_none(self) -> None:
+        """A Docker agent's heartbeat names no shapes and round-trips unchanged."""
+        event = AgentHeartbeatEvent(agent_info=AgentInfo.model_validate(_agent_info()))
+
+        deserialized = AgentHeartbeatEvent.from_message(event.to_message())
+
+        assert deserialized.agent_info.node_shapes is None
+
+    def test_shapes_survive_the_round_trip(self) -> None:
+        shapes = [{"cpu": "8", "mem": "34359738368"}, {"cpu": "32", "cuda.shares": "4.5"}]
+        event = AgentHeartbeatEvent(
+            agent_info=AgentInfo.model_validate(_agent_info(node_shapes=shapes))
+        )
+
+        deserialized = AgentHeartbeatEvent.from_message(event.to_message())
+
+        assert deserialized.agent_info.node_shapes == shapes
+
+    def test_duplicate_and_invalid_shapes_are_dropped(self) -> None:
+        shapes = [
+            {"cpu": "8"},
+            {"cpu": "8"},
+            {"cpu": "not-a-number"},
+            {"cpu": "-1"},
+            {"cpu": "NaN"},
+            {},
+            {"cpu": "16"},
+        ]
+
+        info = AgentInfo.model_validate(_agent_info(node_shapes=shapes))
+
+        assert info.node_shapes == [{"cpu": "8"}, {"cpu": "16"}]
+
+    def test_at_most_256_shapes_are_kept(self) -> None:
+        shapes = [{"cpu": str(i)} for i in range(300)]
+
+        info = AgentInfo.model_validate(_agent_info(node_shapes=shapes))
+
+        assert info.node_shapes is not None
+        assert len(info.node_shapes) == 256
+        assert info.node_shapes[-1] == {"cpu": "255"}
