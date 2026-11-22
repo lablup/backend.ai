@@ -8,8 +8,9 @@ from pathlib import Path
 
 import click
 
+from ai.backend.dra.errors import IsolationRequiredError
 from ai.backend.dra.host.isolation import HamiCore
-from ai.backend.dra.host.plugin_host import PluginHost
+from ai.backend.dra.host.plugin_host import DEFAULT_MOUNT_ROOT, PluginHost
 from ai.backend.dra.host.server import serve
 from ai.backend.logging.logger import LocalLogger
 from ai.backend.logging.structured import StructuredLogger
@@ -23,10 +24,13 @@ async def _serve(
     plugin: str,
     plugin_config: dict[str, object],
     socket_path: Path,
+    mount_root: Path,
     shared: bool,
     isolation: HamiCore | None,
 ) -> None:
-    host = await PluginHost.start(plugin, plugin_config, {}, shared=shared, isolation=isolation)
+    host = await PluginHost.start(
+        plugin, plugin_config, {}, mount_root, shared=shared, isolation=isolation
+    )
     runner = await serve(host, socket_path)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -61,10 +65,17 @@ async def _serve(
     required=True,
 )
 @click.option(
+    "--mount-root",
+    envvar="BAI_DRA_MOUNT_ROOT",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_MOUNT_ROOT,
+    help="Node directory, mounted at the same path, for the files plugins mount into containers.",
+)
+@click.option(
     "--shared/--exclusive",
     envvar="BAI_DRA_SHARED",
     default=False,
-    help="Publish devices that several claims split by `shares` capacity.",
+    help="Publish devices that several claims split by `shares` capacity (needs --hami-lib-dir).",
 )
 @click.option(
     "--hami-lib-dir",
@@ -83,13 +94,18 @@ def main(
     plugin: str,
     plugin_config: str,
     socket_path: Path,
+    mount_root: Path,
     shared: bool,
     hami_lib_dir: Path | None,
     log_level: str,
 ) -> None:
     isolation = HamiCore(hami_lib_dir) if hami_lib_dir is not None else None
+    if shared and isolation is None:
+        raise IsolationRequiredError("--shared needs an isolation provider (--hami-lib-dir)")
     with LocalLogger(log_level=LogLevel[log_level]):
-        asyncio.run(_serve(plugin, json.loads(plugin_config), socket_path, shared, isolation))
+        asyncio.run(
+            _serve(plugin, json.loads(plugin_config), socket_path, mount_root, shared, isolation)
+        )
 
 
 if __name__ == "__main__":

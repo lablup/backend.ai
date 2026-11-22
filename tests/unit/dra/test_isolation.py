@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from decimal import Decimal
+
+import pytest
+
+from ai.backend.dra.bridge import parse_quantity
+from ai.backend.dra.errors import InvalidQuantityError
+from ai.backend.dra.host.isolation import limit_from_shares
+
+GIB = 1024**3
+
+
+class TestLimitFromShares:
+    def test_memory_and_sms_follow_the_share_units(self) -> None:
+        limit = limit_from_shares(0, 150, 2 * GIB, 8, 132)
+        # 1.5 shares → 3 GiB and 12 SMs → ceil(12 / 132 × 100) = 10 %.
+        assert (limit.memory_bytes, limit.sm_percent) == (3 * GIB, 10)
+
+    def test_a_small_share_gets_the_minimum_sm_count(self) -> None:
+        # 0.1 share → 0.8 SMs, raised to MIN_SMP_COUNT (4) → ceil(4 / 132 × 100) = 4 %.
+        assert limit_from_shares(0, 10, 2 * GIB, 8, 132).sm_percent == 4
+
+    def test_the_sm_limit_is_capped_at_100(self) -> None:
+        assert limit_from_shares(1, 2000, 2 * GIB, 8, 132).sm_percent == 100
+
+
+class TestParseQuantity:
+    @pytest.mark.parametrize(
+        ("text", "value"),
+        [("150", 150), ("1.5k", 1500), ("2Ki", 2048), ("1e3", 1000), ("500m", Decimal("0.5"))],
+    )
+    def test_kubernetes_quantities(self, text: str, value: Decimal | int) -> None:
+        assert parse_quantity(text) == value
+
+    def test_garbage_is_refused(self) -> None:
+        with pytest.raises(InvalidQuantityError):
+            parse_quantity("lots")
