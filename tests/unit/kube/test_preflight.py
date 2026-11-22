@@ -9,6 +9,8 @@ from ai.backend.kube.preflight import (
     check_crds,
     check_dra_drivers,
     check_gpu_policy,
+    check_shared_counters,
+    shared_counters_probe,
     should_retry,
 )
 
@@ -178,3 +180,21 @@ class TestGPUPolicy:
 
     def test_unknown_policy_fails(self) -> None:
         assert check_gpu_policy("mixed", [], [], []).outcome == Outcome.FAIL
+
+
+class TestSharedCounters:
+    def test_kept_counters_pass(self) -> None:
+        probe = shared_counters_probe("cuda.dra.backend.ai")
+        assert check_shared_counters("cuda.dra.backend.ai", probe).outcome == Outcome.PASS
+
+    def test_dropped_counters_fail(self) -> None:
+        echoed = shared_counters_probe("cuda.dra.backend.ai")
+        del echoed["spec"]["sharedCounters"]
+        check = check_shared_counters("cuda.dra.backend.ai", echoed)
+        assert check.outcome == Outcome.FAIL
+        assert "feature gate" in check.detail
+
+    def test_a_rejected_probe_fails(self) -> None:
+        check = check_shared_counters("cuda.dra.backend.ai", None, "422 Unprocessable Entity")
+        assert check.outcome == Outcome.FAIL
+        assert not check.transient

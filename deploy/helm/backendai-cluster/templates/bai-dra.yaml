@@ -112,6 +112,12 @@ spec:
 {{- if and (contains "accelerator.cuda_open." (.plugin | default "")) (ne ((.pluginConfig | default dict).device_injector | default "") "cdi") }}
 {{- fail (printf "baiDra.drivers %s: the cuda_open plugin needs pluginConfig.device_injector: cdi (a DRA node has no Docker)" $name) }}
 {{- end }}
+{{- if and .dynamicMig (ne $policy "bai") }}
+{{- fail (printf "baiDra.drivers %s: dynamicMig needs gpuAllocationPolicy bai, not %q" $name $policy) }}
+{{- end }}
+{{- if and .dynamicMig (not (include "backendai-cluster.baiDraGpu" .)) }}
+{{- fail (printf "baiDra.drivers %s: dynamicMig is for NVIDIA GPU entries (a CUDA plugin or gpu: true)" $name) }}
+{{- end }}
 {{- if and .shared (eq $policy "device-plugin") }}
 {{- fail (printf "baiDra.drivers %s: gpuAllocationPolicy device-plugin has no fraction (shared) pool" $name) }}
 {{- end }}
@@ -198,6 +204,10 @@ spec:
           env:
             - {name: BAI_DRA_DRIVER_NAME, value: {{ .driverName | quote }}}
             - {name: BAI_DRA_HEALTH_ADDR, value: ":8081"}
+            {{- if .dynamicMig }}
+            - {name: BAI_DRA_DYNAMIC_MIG, value: "true"}
+            - {name: BAI_DRA_NVIDIA_DRIVER_ROOT, value: /driver-root}
+            {{- end }}
             - name: NODE_NAME
               valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
           ports:
@@ -211,6 +221,11 @@ spec:
           readinessProbe:
             httpGet: {path: /readyz, port: health}
             periodSeconds: 10
+          {{- if .dynamicMig }}
+          # NVML changes the MIG layout: the GPU device nodes and the node's libnvidia-ml.
+          securityContext:
+            privileged: true
+          {{- end }}
           resources:
             {{- toYaml (.driverResources | default $.Values.baiDra.resources.driver) | nindent 12 }}
           volumeMounts:
@@ -218,6 +233,9 @@ spec:
             - {name: plugins-registry, mountPath: /var/lib/kubelet/plugins_registry}
             - {name: plugins, mountPath: /var/lib/kubelet/plugins}
             - {name: cdi, mountPath: /var/run/cdi}
+            {{- if .dynamicMig }}
+            - {name: driver-root, mountPath: /driver-root, readOnly: true, mountPropagation: HostToContainer}
+            {{- end }}
         - name: plugin-host
           # An image with the entry's plugin (pluginHostImage), e.g. the enterprise CUDA plugin for bai-hook.
           image: {{ include "backendai-cluster.image" (.pluginHostImage | default $.Values.image) }}
@@ -231,6 +249,7 @@ spec:
             - {name: HOME, value: /tmp}
             - {name: BAI_DRA_SHARED, value: {{ .shared | default false | quote }}}
             - {name: BAI_DRA_ISOLATION, value: {{ $isolation | quote }}}
+            - {name: BAI_DRA_DYNAMIC_MIG, value: {{ .dynamicMig | default false | quote }}}
             {{- if eq $isolation "hami-core" }}
             - {name: BAI_DRA_HAMI_LIB_DIR, value: {{ .hamiCore.libDir | quote }}}
             {{- end }}
@@ -290,6 +309,10 @@ spec:
           hostPath: {path: /var/run/cdi, type: DirectoryOrCreate}
         - name: cdi-static
           hostPath: {path: /etc/cdi, type: DirectoryOrCreate}
+        {{- if .dynamicMig }}
+        - name: driver-root
+          hostPath: {path: {{ $.Values.baiDra.nvidiaDriverRoot | default "/" }}, type: Directory}
+        {{- end }}
         {{- if eq $isolation "hami-core" }}
         - name: hami-core
           hostPath: {path: {{ required "hamiCore.libDir is required" .hamiCore.libDir }}, type: DirectoryOrCreate}

@@ -162,6 +162,9 @@ baiDra:
   # Node directory, mounted at the same path, for the plugin's `agent.var-base-path` (the
   # bai-hook plugin's hook cache, which CDI mounts into containers).
   varBasePath: /var/lib/bai-dra/var
+  # The node's NVIDIA driver root (where libnvidia-ml.so.1 is), for entries with dynamicMig:
+  # "/" for a host-installed driver, /run/nvidia/driver for the GPU Operator's driver container.
+  nvidiaDriverRoot: /
   # A node's devices are unusable while its driver is down: keep it from being evicted.
   priorityClassName: system-node-critical
   resources:
@@ -193,6 +196,23 @@ baiDra:
 #    shared: true
 #    isolation: hami-core                     # a whole allocation runs without isolation
 #    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
+#  # gpuAllocationPolicy bai with dynamic MIG (in place of `cuda`): the driver creates MIG devices
+#  # at prepare (NVML, privileged driver container). Each GPU publishes its whole device and one
+#  # device per MIG placement (slotName cuda.device:<profile>-mig) over shared counters, so a whole
+#  # or fractional allocation and MIG devices exclude each other. Needs DRAPartitionableDevices,
+#  # Hopper or later (an A100 in MIG mode serves MIG only) and the NVIDIA toolkit's CDI spec
+#  # (nvidia.com/gpu=GPU-<uuid>). bai-dra owns the MIG layout: it destroys MIG devices no claim holds.
+#  - name: cuda-dynmig
+#    driverName: cuda.dra.backend.ai
+#    plugin: ai.backend.accelerator.cuda_open.plugin:CUDAPlugin
+#    pluginConfig: {device_injector: cdi}
+#    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/mig: dynamic}
+#    runtimeClassName: nvidia
+#    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
+#    shared: true
+#    isolation: hami-core
+#    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
+#    dynamicMig: true                         # static MIG publishing is off for this entry
 #  # gpuAllocationPolicy nvidia-dra: an fGPU pool next to the NVIDIA DRA driver's GPU nodes.
 #  - name: fgpu
 #    driverName: cuda-shares.dra.backend.ai
@@ -258,6 +278,13 @@ deviceProfiles: []
 #  # gpuAllocationPolicy bai: a static MIG instance, published by bai-dra with the plugin's MIG slot.
 #  - name: cuda-mig-1g-10gb
 #    slotName: cuda.device:1g.10gb-mig
+#    sharingMode: partition
+#    driverName: cuda.dra.backend.ai
+#    deviceClassName: cuda.dra.backend.ai
+#  # gpuAllocationPolicy bai, dynamic MIG (baiDra.drivers `cuda-dynmig` above): one profile per MIG
+#  # profile to offer. The slot is the one of static MIG; the device is created at prepare.
+#  - name: cuda-mig-3g-40gb
+#    slotName: cuda.device:3g.40gb-mig
 #    sharingMode: partition
 #    driverName: cuda.dra.backend.ai
 #    deviceClassName: cuda.dra.backend.ai

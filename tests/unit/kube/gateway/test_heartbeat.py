@@ -126,3 +126,100 @@ class TestNodeShapes:
     def test_at_most_256_shapes_are_reported(self) -> None:
         nodes = [_node([], name=f"n{i}", cpu=str(i + 1)) for i in range(300)]
         assert len(cluster_capacity(nodes).node_shapes) == 256
+
+
+def _counters(slices: range) -> dict[str, dict[str, str]]:
+    return {f"memory-slice-{i}": {"value": "1"} for i in slices}
+
+
+def _mig_device(name: str, slot: str, slices: range) -> dict[str, Any]:
+    return {
+        "name": name,
+        "attributes": {"slotName": {"string": slot}},
+        "consumesCounters": [{"counterSet": "gpu-0", "counters": _counters(slices)}],
+    }
+
+
+def _holding(*devices: str) -> list[dict[str, Any]]:
+    results = [{"driver": "gpu.x", "pool": "n1", "device": d} for d in devices]
+    return [{"status": {"allocation": {"devices": {"results": results}}}}]
+
+
+@pytest.fixture
+def dynamic_mig_slices() -> list[dict[str, Any]]:
+    """One GPU of 4 memory slices: the whole device, 1g at 0..3, 2g at 0 and 2 (split slices)."""
+    whole = _mig_device("dev-0", "cuda.shares", range(4))
+    whole["capacity"] = {"shares": {"value": "1000"}}
+    devices = [whole]
+    devices += [
+        _mig_device(f"1g-{i}", "cuda.device:1g.10gb-mig", range(i, i + 1)) for i in range(4)
+    ]
+    devices += [_mig_device(f"2g-{i}", "cuda.device:2g.20gb-mig", range(i, i + 2)) for i in (0, 2)]
+    base = {"nodeName": "n1", "driver": "gpu.x", "pool": {"name": "n1"}}
+    return [
+        {"spec": {**base, "sharedCounters": [{"name": "gpu-0", "counters": _counters(range(4))}]}},
+        {"spec": {**base, "devices": devices}},
+    ]
+
+
+@pytest.fixture
+def dynamic_mig_profiles() -> list[DeviceProfileSpec]:
+    profiles = [
+        DeviceProfileSpec(
+            slot_name=slot,
+            sharing_mode=SharingMode.PARTITION,
+            driver_name="gpu.x",
+            device_class_name="gpu.x",
+        )
+        for slot in ("cuda.device:1g.10gb-mig", "cuda.device:2g.20gb-mig")
+    ]
+    profiles.append(
+        DeviceProfileSpec(
+            slot_name="cuda.shares",
+            sharing_mode=SharingMode.FRACTION,
+            driver_name="gpu.x",
+            device_class_name="gpu.x",
+        )
+    )
+    return profiles
+
+
+class TestDynamicMIGCapacity:
+    @staticmethod
+    def _slots(
+        slices: list[dict[str, Any]],
+        profiles: list[DeviceProfileSpec],
+        claims: list[dict[str, Any]],
+    ) -> dict[str, str]:
+        capacity = cluster_capacity([_node([])], slices, profiles, claims)
+        return {str(e.resource_type): e.quantity for e in capacity.slots}
+
+    def test_an_idle_gpu_reports_each_profile_alone(
+        self,
+        dynamic_mig_slices: list[dict[str, Any]],
+        dynamic_mig_profiles: list[DeviceProfileSpec],
+    ) -> None:
+        slots = self._slots(dynamic_mig_slices, dynamic_mig_profiles, [])
+        assert slots["cuda.device:1g.10gb-mig"] == "4"
+        assert slots["cuda.device:2g.20gb-mig"] == "2"
+        assert slots["cuda.shares"] == "10"
+
+    def test_a_held_placement_counts_and_what_overlaps_it_does_not(
+        self,
+        dynamic_mig_slices: list[dict[str, Any]],
+        dynamic_mig_profiles: list[DeviceProfileSpec],
+    ) -> None:
+        slots = self._slots(dynamic_mig_slices, dynamic_mig_profiles, _holding("2g-0"))
+        assert slots["cuda.device:2g.20gb-mig"] == "2"  # the held one and 2g-2
+        assert slots["cuda.device:1g.10gb-mig"] == "2"  # 1g-2 and 1g-3
+        assert slots["cuda.shares"] == "0"
+
+    def test_a_gpu_in_use_whole_or_by_shares_reports_no_mig(
+        self,
+        dynamic_mig_slices: list[dict[str, Any]],
+        dynamic_mig_profiles: list[DeviceProfileSpec],
+    ) -> None:
+        slots = self._slots(dynamic_mig_slices, dynamic_mig_profiles, _holding("dev-0"))
+        assert slots["cuda.device:1g.10gb-mig"] == "0"
+        assert slots["cuda.device:2g.20gb-mig"] == "0"
+        assert slots["cuda.shares"] == "10"

@@ -139,3 +139,14 @@ NotIn on the labels of nodes whose GPUs another allocator owns. (dict "root" $ "
 {{- end -}}
 {{- uniq $drivers | join "," -}}
 {{- end -}}
+
+{{/* Comma-separated driver names of the baiDra.drivers entries with dynamicMig (pre-flight). */}}
+{{- define "backendai-cluster.baiDraDynamicMigDrivers" -}}
+{{- $drivers := list -}}
+{{- range .Values.baiDra.drivers -}}
+{{- if .dynamicMig -}}
+{{- $drivers = append $drivers .driverName -}}
+{{- end -}}
+{{- end -}}
+{{- uniq $drivers | join "," -}}
+{{- end -}}

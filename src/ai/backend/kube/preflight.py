@@ -2,7 +2,7 @@
 cluster, run as a Helm hook Job. Exits non-zero when a required check fails.
 
 python -m ai.backend.kube.preflight [--json] [--gpu-allocation-policy bai|nvidia-dra|device-plugin]
-    [--bai-gpu-drivers <driver,...>] [--wait-seconds <n>]
+    [--bai-gpu-drivers <driver,...>] [--dynamic-mig-drivers <driver,...>] [--wait-seconds <n>]
 """
 
 from __future__ import annotations
@@ -277,6 +277,51 @@ def check_consumable_capacity(
     ]
 
 
+PROBE_COUNTER_SET: Final = "backendai-preflight"
+
+
+def shared_counters_probe(driver: str) -> dict[str, Any]:
+    """A counters-only ResourceSlice, created with dry run: the API server drops the field when
+    DRAPartitionableDevices is off."""
+    return {
+        "apiVersion": "resource.k8s.io/v1",
+        "kind": "ResourceSlice",
+        "metadata": {"generateName": "backendai-preflight-"},
+        "spec": {
+            "driver": driver,
+            "allNodes": True,
+            "pool": {"name": "backendai-preflight", "generation": 0, "resourceSliceCount": 1},
+            "sharedCounters": [
+                {"name": PROBE_COUNTER_SET, "counters": {"memory-slice-0": {"value": "1"}}}
+            ],
+        },
+    }
+
+
+def check_shared_counters(
+    driver: str, echoed: Mapping[str, Any] | None, error: str | None = None
+) -> Check:
+    """Dynamic MIG needs shared counters: the dry-run slice must keep them."""
+    name = f"DRAPartitionableDevices ({driver})"
+    if error is not None:
+        return Check(name, Outcome.FAIL, f"dynamic MIG: the API server rejects counters: {error}")
+    kept = ((echoed or {}).get("spec") or {}).get("sharedCounters") or []
+    if not any(c.get("name") == PROBE_COUNTER_SET for c in kept):
+        detail = "dynamic MIG: the API server drops shared counters (feature gate off?)"
+        return Check(name, Outcome.FAIL, detail)
+    return Check(name, Outcome.PASS, "shared counters accepted")
+
+
+async def probe_shared_counters(custom: client.CustomObjectsApi, driver: str) -> Check:
+    try:
+        echoed = await custom.create_cluster_custom_object(
+            "resource.k8s.io", "v1", "resourceslices", shared_counters_probe(driver), dry_run="All"
+        )
+    except ApiException as e:
+        return check_shared_counters(driver, None, f"{e.status} {e.reason}")
+    return check_shared_counters(driver, echoed)
+
+
 def should_retry(checks: Sequence[Check]) -> bool:
     """Some check failed, and every failure may still pass once the DaemonSets register."""
     failed = [c for c in checks if c.outcome == Outcome.FAIL]
@@ -284,7 +329,10 @@ def should_retry(checks: Sequence[Check]) -> bool:
 
 
 async def run_checks(
-    api: client.ApiClient, gpu_policy: str, gpu_drivers: Collection[str] | None = None
+    api: client.ApiClient,
+    gpu_policy: str,
+    gpu_drivers: Collection[str] | None = None,
+    dynamic_mig_drivers: Collection[str] = (),
 ) -> list[Check]:
     ext = client.ApiextensionsV1Api(api)
     core = client.CoreV1Api(api)
@@ -312,17 +360,23 @@ async def run_checks(
     checks += check_bai_node_ownership(nodes, slices, gpu_drivers)
     checks.append(check_gpu_policy(gpu_policy, nodes, slices, profiles, gpu_drivers))
     checks += check_consumable_capacity(profiles, slices)
+    for driver in dynamic_mig_drivers:
+        checks.append(await probe_shared_counters(custom, driver))
     return checks
 
 
 async def _main(
-    as_json: bool, gpu_policy: str, gpu_drivers: Collection[str] | None, wait_seconds: float
+    as_json: bool,
+    gpu_policy: str,
+    gpu_drivers: Collection[str] | None,
+    dynamic_mig_drivers: Collection[str],
+    wait_seconds: float,
 ) -> int:
     await load_kube_config()
     deadline = time.monotonic() + wait_seconds
     async with client.ApiClient() as api:
         while True:
-            checks = await run_checks(api, gpu_policy, gpu_drivers)
+            checks = await run_checks(api, gpu_policy, gpu_drivers, dynamic_mig_drivers)
             if not should_retry(checks) or time.monotonic() >= deadline:
                 break
             click.echo("waiting for the bai-dra drivers to register", err=True)
@@ -352,20 +406,34 @@ async def _main(
     help="Comma-separated bai-dra drivers of GPUs. Unset: check every driver-mode=bai node.",
 )
 @click.option(
+    "--dynamic-mig-drivers",
+    envvar="BACKENDAI_PREFLIGHT_DYNAMIC_MIG_DRIVERS",
+    default="",
+    help="Comma-separated bai-dra drivers with dynamic MIG: checks that the API server keeps"
+    " shared counters (DRAPartitionableDevices).",
+)
+@click.option(
     "--wait-seconds",
     envvar="BACKENDAI_PREFLIGHT_WAIT_SECONDS",
     type=click.FloatRange(min=0),
     default=0,
     help="Retry this long while the only failures are drivers that have not registered yet.",
 )
-def main(as_json: bool, gpu_policy: str, bai_gpu_drivers: str | None, wait_seconds: float) -> None:
+def main(
+    as_json: bool,
+    gpu_policy: str,
+    bai_gpu_drivers: str | None,
+    dynamic_mig_drivers: str,
+    wait_seconds: float,
+) -> None:
     quiet_client_logs()
     gpu_drivers = (
         None
         if bai_gpu_drivers is None
         else [d.strip() for d in bai_gpu_drivers.split(",") if d.strip()]
     )
-    sys.exit(asyncio.run(_main(as_json, gpu_policy, gpu_drivers, wait_seconds)))
+    mig_drivers = [d.strip() for d in dynamic_mig_drivers.split(",") if d.strip()]
+    sys.exit(asyncio.run(_main(as_json, gpu_policy, gpu_drivers, mig_drivers, wait_seconds)))
 
 
 if __name__ == "__main__":
