@@ -164,6 +164,13 @@ class TestBuildSessionObjects:
             "admission": "all_or_none",
             "memberCount": 3,
         }
+        parsed = SessionWorkload.model_validate(objects.workload).spec.session_group
+        assert parsed is not None
+        assert (parsed.direction, parsed.admission, parsed.member_count) == (
+            "spread",
+            "all_or_none",
+            3,
+        )
 
     def test_an_independent_group_has_no_member_count(
         self, placement: SessionPlacement, cluster_info: ClusterInfo
