@@ -1,10 +1,30 @@
 {{- $policy := include "backendai-cluster.gpuAllocationPolicy" . }}
-{{- range .Values.deviceProfiles }}
+{{- $profiles := .Values.deviceProfiles }}
+{{- range $profiles }}
 {{- if and (eq $policy "device-plugin") (eq .sharingMode "fraction") }}
 {{- fail (printf "deviceProfiles %s: gpuAllocationPolicy device-plugin allows no fraction profile" .name) }}
 {{- end }}
 {{- if and .extendedResourceName (ne .sharingMode "exclusive") }}
 {{- fail (printf "deviceProfiles %s: extendedResourceName needs sharingMode exclusive" .name) }}
+{{- end }}
+{{- if .sharedSlot }}
+{{- $name := .name }}
+{{- if eq $policy "device-plugin" }}
+{{- fail (printf "deviceProfiles %s: gpuAllocationPolicy device-plugin has no shared devices for sharedSlot" $name) }}
+{{- end }}
+{{- if ne .sharingMode "exclusive" }}
+{{- fail (printf "deviceProfiles %s: sharedSlot needs sharingMode exclusive" $name) }}
+{{- end }}
+{{- $match := false }}
+{{- $profile := . }}
+{{- range $profiles }}
+{{- if and (eq .slotName $profile.sharedSlot) (eq .sharingMode "fraction") (eq .driverName $profile.driverName) (eq .deviceClassName $profile.deviceClassName) }}
+{{- $match = true }}
+{{- end }}
+{{- end }}
+{{- if not $match }}
+{{- fail (printf "deviceProfiles %s: sharedSlot %s needs a fraction profile of that slot with the same driverName and deviceClassName" $name .sharedSlot) }}
+{{- end }}
 {{- end }}
 ---
 apiVersion: scheduling.backend.ai/v1alpha1

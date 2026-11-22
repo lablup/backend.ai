@@ -2,6 +2,7 @@
 
 Fraction slots (`cuda.shares`) are absolute shares: `s` becomes a `shares: round(s * 100)`
 capacity request, split across devices when no single device holds it (suggestion 5.3, 5.4).
+An exclusive profile with `sharedSlot` asks for whole devices of that fraction slot.
 """
 
 from __future__ import annotations
@@ -83,14 +84,21 @@ class DeviceClaim:
         return any(r.shares is not None for r in self.requests)
 
     @property
+    def on_shared_devices(self) -> bool:
+        """The claim's devices have `shares` capacity, which the scheduler accounts by claim."""
+        return self.is_fraction or self.profile.shared_slot is not None
+
+    @property
     def whole_devices(self) -> int:
-        """Devices the claim holds alone; a share of a device is not counted."""
-        return 0 if self.is_fraction else self.count
+        """Devices of the profile's own slot the claim holds alone."""
+        return 0 if self.on_shared_devices else self.count
 
     @property
     def shared_devices(self) -> int:
-        """Distinct devices the claim takes a share of."""
-        return len(self.requests) if self.is_fraction else 0
+        """Distinct devices with `shares` capacity the claim takes a share of, or all of."""
+        if self.is_fraction:
+            return len(self.requests)
+        return self.count if self.profile.shared_slot is not None else 0
 
 
 @dataclass(frozen=True)
@@ -174,7 +182,7 @@ def share_pools(
 def translate(
     kernel: KernelSpec,
     profiles: Mapping[str, DeviceProfileSpec],
-    policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
+    policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI,
     pools: Mapping[str, SharePool] | None = None,
 ) -> list[DeviceClaim]:
     claims = []
@@ -184,6 +192,8 @@ def translate(
         if profile is None:
             unsupported.append(slot)
             continue
+        if profile.shared_slot is not None:
+            _check_shared_slot(kernel, profile, profiles, policy)
         pool = (pools or {}).get(slot, SharePool())
         claims.append(_claim(kernel, slot, amount, profile, policy, pool))
     if unsupported:
@@ -191,6 +201,35 @@ def translate(
             f"kernel {kernel.kernel_id}: no DeviceProfile for slots {', '.join(unsupported)}"
         )
     return claims
+
+
+def _check_shared_slot(
+    kernel: KernelSpec,
+    profile: DeviceProfileSpec,
+    profiles: Mapping[str, DeviceProfileSpec],
+    policy: GPUAllocationPolicy,
+) -> None:
+    """A `sharedSlot` profile is exclusive and matches the driver and DeviceClass of the fraction
+    profile of that slot."""
+    prefix = f"kernel {kernel.kernel_id}: {profile.slot_name} (sharedSlot {profile.shared_slot})"
+    if policy == GPUAllocationPolicy.DEVICE_PLUGIN:
+        raise InvalidSessionWorkloadError(
+            f"{prefix}: the device-plugin GPU allocation policy has no shared devices"
+        )
+    if profile.sharing_mode != SharingMode.EXCLUSIVE:
+        raise InvalidSessionWorkloadError(
+            f"{prefix}: sharing mode is {profile.sharing_mode}, not exclusive"
+        )
+    shared = profiles.get(profile.shared_slot or "")
+    if shared is None or shared.sharing_mode != SharingMode.FRACTION:
+        raise InvalidSessionWorkloadError(f"{prefix}: no fraction DeviceProfile for that slot")
+    if (shared.driver_name, shared.device_class_name) != (
+        profile.driver_name,
+        profile.device_class_name,
+    ):
+        raise InvalidSessionWorkloadError(
+            f"{prefix}: driver and DeviceClass differ from those of {shared.slot_name}"
+        )
 
 
 def _claim(
@@ -335,7 +374,9 @@ def slot_selector(profile: DeviceProfileSpec) -> str | None:
         and SLOT_NAME_ATTRIBUTE not in profile.attribute_map
     ):
         return None
-    return attribute_selector(profile, SLOT_NAME_ATTRIBUTE, profile.slot_name)
+    return attribute_selector(
+        profile, SLOT_NAME_ATTRIBUTE, profile.shared_slot or profile.slot_name
+    )
 
 
 def capacity_selector(profile: DeviceProfileSpec, capacity_name: str, value: int) -> str:
@@ -347,8 +388,8 @@ def capacity_selector(profile: DeviceProfileSpec, capacity_name: str, value: int
 
 
 def device_key(profile: DeviceProfileSpec) -> str:
-    """How sokovan counts the devices of a profile: `<driver>/<slot>`."""
-    return f"{profile.driver_name}/{profile.slot_name}"
+    """How sokovan counts the devices of a profile: `<driver>/<slot it is published for>`."""
+    return f"{profile.driver_name}/{profile.shared_slot or profile.slot_name}"
 
 
 def resource_claim_name(workload: SessionWorkload, kernel: KernelSpec, claim: DeviceClaim) -> str:
@@ -493,7 +534,7 @@ def pod_device_parts(
     for c in claims:
         if c.extended_resource is not None:
             extended[c.extended_resource] = extended.get(c.extended_resource, 0) + c.count
-        elif c.whole_devices:
+        elif not c.on_shared_devices:
             key = device_key(c.profile)
             whole[key] = whole.get(key, 0) + c.whole_devices
         else:

@@ -310,3 +310,28 @@ func TestAnAdminAccessAllocationLeavesItsDeviceFree(t *testing.T) {
 		t.Fatalf("both devices must stay usable: %+v %v", resp, err)
 	}
 }
+
+// A request without capacity on a shared device consumes the request policy default, the
+// full shares: it takes a whole device, and no share of it is left.
+func TestACapacityFreeRequestTakesWholeSharedDevices(t *testing.T) {
+	whole := claim("whole")
+	whole.Spec.Devices.Requests[0].Exactly.Count = 2
+	a := sharedAllocator(t, whole, shareClaim("part", 1))
+	resp, err := a.allocate(context.Background(), &AllocateRequest{Pods: []PodPlacement{pod("p0", "whole")}})
+	if err != nil || !resp.Fits {
+		t.Fatalf("two whole devices must fit: %+v %v", resp, err)
+	}
+	results := resp.Pods[0].Allocations[0].Allocation.Devices.Results
+	if len(results) != 2 || results[0].Device == results[1].Device {
+		t.Fatalf("expected two distinct devices, got %+v", results)
+	}
+	for _, r := range results {
+		if consumed := r.ConsumedCapacity["shares"]; consumed.Value() != 100 {
+			t.Fatalf("expected the full 100 shares, got %+v", r)
+		}
+	}
+	resp, err = a.allocate(context.Background(), &AllocateRequest{Pods: []PodPlacement{pod("p0", "whole"), pod("p1", "part")}})
+	if err != nil || resp.Fits {
+		t.Fatalf("no share may be left: %+v %v", resp, err)
+	}
+}

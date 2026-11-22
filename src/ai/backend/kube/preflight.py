@@ -1,7 +1,7 @@
 """Pre-flight checks of a workload cluster (suggestion-1122 12): what an install needs from the
 cluster, run as a Helm hook Job. Exits non-zero when a required check fails.
 
-python -m ai.backend.kube.preflight [--json] [--gpu-allocation-policy dra|device-plugin]
+python -m ai.backend.kube.preflight [--json] [--gpu-allocation-policy bai|nvidia-dra|device-plugin]
     [--bai-gpu-drivers <driver,...>] [--wait-seconds <n>]
 """
 
@@ -30,6 +30,12 @@ from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
 DRIVER_MODE_LABEL: Final = "dra.backend.ai/driver-mode"
 NVIDIA_DRA_DRIVER: Final = "gpu.nvidia.com"
 NVIDIA_EXTENDED_RESOURCE: Final = "nvidia.com/gpu"
+# What turns the other NVIDIA GPU allocators off on the nodes bai-dra owns.
+BAI_POLICY_HINT: Final = (
+    "set the NVIDIA DRA driver's gpus.enabled=false (AICR: gpuResourcesEnabledOverride=false;"
+    " ComputeDomain stays on) and turn the device plugin off (gpu-operator"
+    " devicePlugin.enabled=false, or node label nvidia.com/gpu.deploy.device-plugin=false)"
+)
 RETRY_INTERVAL_SECONDS: Final = 10.0
 _CRDS: Final[Sequence[type[CustomResource]]] = (
     SessionWorkload,
@@ -140,31 +146,45 @@ def _gpu_driver_nodes(slices: Sequence[Mapping[str, Any]], drivers: Collection[s
     }
 
 
+def _bai_gpu_nodes(
+    nodes: Sequence[Mapping[str, Any]],
+    slices: Sequence[Mapping[str, Any]],
+    gpu_drivers: Collection[str] | None,
+) -> list[Mapping[str, Any]]:
+    """`driver-mode=bai` nodes where bai-dra allocates GPUs. `gpu_drivers`: the bai-dra drivers
+    of GPUs (None: every `driver-mode=bai` node)."""
+    gpu_nodes = None if gpu_drivers is None else _gpu_driver_nodes(slices, gpu_drivers)
+    return [
+        node
+        for node in nodes
+        if (node["metadata"].get("labels") or {}).get(DRIVER_MODE_LABEL) == "bai"
+        and (gpu_nodes is None or node["metadata"]["name"] in gpu_nodes)
+    ]
+
+
+def _other_allocators(node: Mapping[str, Any], nvidia_dra: Mapping[str, int]) -> list[str]:
+    others = []
+    if (count := _gpu_allocatable(node)) > 0:
+        others.append(f"device plugin ({NVIDIA_EXTENDED_RESOURCE}: {count})")
+    if (count := nvidia_dra.get(node["metadata"]["name"], 0)) > 0:
+        others.append(f"{NVIDIA_DRA_DRIVER} ({count} devices)")
+    return others
+
+
 def check_bai_node_ownership(
     nodes: Sequence[Mapping[str, Any]],
     slices: Sequence[Mapping[str, Any]],
     gpu_drivers: Collection[str] | None = None,
 ) -> list[Check]:
     """A node where bai-dra allocates GPUs has no other GPU allocator (device plugin, NVIDIA DRA
-    driver). `gpu_drivers`: the bai-dra drivers of GPUs (None: every `driver-mode=bai` node);
-    a node whose bai-dra devices are NPUs may keep its GPUs on another allocator."""
+    driver); a node whose bai-dra devices are NPUs may keep its GPUs on another allocator."""
     nvidia_dra = _nvidia_dra_devices(slices)
-    gpu_nodes = None if gpu_drivers is None else _gpu_driver_nodes(slices, gpu_drivers)
     checks = []
-    for node in nodes:
-        meta = node["metadata"]
-        if (meta.get("labels") or {}).get(DRIVER_MODE_LABEL) != "bai":
-            continue
-        if gpu_nodes is not None and meta["name"] not in gpu_nodes:
-            continue
-        others = []
-        if (count := _gpu_allocatable(node)) > 0:
-            others.append(f"device plugin ({NVIDIA_EXTENDED_RESOURCE}: {count})")
-        if (count := nvidia_dra.get(meta["name"], 0)) > 0:
-            others.append(f"{NVIDIA_DRA_DRIVER} ({count} devices)")
+    for node in _bai_gpu_nodes(nodes, slices, gpu_drivers):
+        others = _other_allocators(node, nvidia_dra)
         checks.append(
             Check(
-                f"single allocator on {meta['name']}",
+                f"single allocator on {node['metadata']['name']}",
                 Outcome.FAIL if others else Outcome.PASS,
                 "GPUs also allocated by " + ", ".join(others) if others else "bai-dra only",
             )
@@ -177,8 +197,10 @@ def check_gpu_policy(
     nodes: Sequence[Mapping[str, Any]],
     slices: Sequence[Mapping[str, Any]],
     profiles: Sequence[Mapping[str, Any]],
+    gpu_drivers: Collection[str] | None = None,
 ) -> Check:
-    """The cluster's NVIDIA GPUs and DeviceProfiles agree with the GPU allocation policy."""
+    """The cluster's NVIDIA GPUs and DeviceProfiles agree with the GPU allocation policy.
+    The NVIDIA DRA driver's ComputeDomain devices (another driver name) are not GPUs."""
     name = "gpu allocation policy"
     try:
         parsed = GPUAllocationPolicy(policy)
@@ -187,17 +209,30 @@ def check_gpu_policy(
     nvidia_dra = sum(_nvidia_dra_devices(slices).values())
     plugin_gpus = sum(_gpu_allocatable(n) for n in nodes)
     match parsed:
-        case GPUAllocationPolicy.DRA:
+        case GPUAllocationPolicy.BAI:
+            by_node = _nvidia_dra_devices(slices)
+            owned = _bai_gpu_nodes(nodes, slices, gpu_drivers)
+            shared = sorted(
+                f"{n['metadata']['name']}: {', '.join(others)}"
+                for n in owned
+                if (others := _other_allocators(n, by_node))
+            )
+            if shared:
+                detail = f"GPUs of bai-dra nodes also allocated by {'; '.join(shared)}"
+                return Check(name, Outcome.FAIL, f"bai: {detail}; {BAI_POLICY_HINT}")
+            return Check(name, Outcome.PASS, f"bai: {len(owned)} bai-dra GPU nodes")
+        case GPUAllocationPolicy.NVIDIA_DRA:
             wants_nvidia = any(
                 p.get("spec", {}).get("driverName") == NVIDIA_DRA_DRIVER for p in profiles
             )
             if wants_nvidia and nvidia_dra == 0:
                 detail = f"a DeviceProfile uses {NVIDIA_DRA_DRIVER} but no node publishes it"
-                return Check(name, Outcome.FAIL, f"dra: {detail}")
+                return Check(name, Outcome.FAIL, f"nvidia-dra: {detail}")
             if nvidia_dra > 0 and plugin_gpus > 0:
                 detail = f"{NVIDIA_DRA_DRIVER} and the device plugin both allocate GPUs"
-                return Check(name, Outcome.FAIL, f"dra: {detail}")
-            return Check(name, Outcome.PASS, f"dra: {nvidia_dra} {NVIDIA_DRA_DRIVER} devices")
+                return Check(name, Outcome.FAIL, f"nvidia-dra: {detail}")
+            detail = f"{nvidia_dra} {NVIDIA_DRA_DRIVER} devices"
+            return Check(name, Outcome.PASS, f"nvidia-dra: {detail}")
         case GPUAllocationPolicy.DEVICE_PLUGIN:
             fractions = sorted(
                 p["metadata"]["name"]
@@ -275,7 +310,7 @@ async def run_checks(
     nodes = [api.sanitize_for_serialization(n) for n in (await core.list_node()).items]
     checks += check_dra_drivers(nodes, slices, profiles)
     checks += check_bai_node_ownership(nodes, slices, gpu_drivers)
-    checks.append(check_gpu_policy(gpu_policy, nodes, slices, profiles))
+    checks.append(check_gpu_policy(gpu_policy, nodes, slices, profiles, gpu_drivers))
     checks += check_consumable_capacity(profiles, slices)
     return checks
 
@@ -306,8 +341,9 @@ async def _main(
     "--gpu-allocation-policy",
     "gpu_policy",
     envvar="BACKENDAI_GPU_ALLOCATION_POLICY",
-    default=GPUAllocationPolicy.DRA.value,
-    help="Who allocates NVIDIA GPUs: dra (the NVIDIA DRA driver) or device-plugin.",
+    default=GPUAllocationPolicy.BAI.value,
+    help="Who allocates NVIDIA GPUs: bai (bai-dra), nvidia-dra (the NVIDIA DRA driver) or"
+    " device-plugin.",
 )
 @click.option(
     "--bai-gpu-drivers",

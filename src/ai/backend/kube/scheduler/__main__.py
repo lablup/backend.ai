@@ -77,8 +77,9 @@ async def _serve(
     "--gpu-allocation-policy",
     envvar="BACKENDAI_GPU_ALLOCATION_POLICY",
     type=click.Choice([p.value for p in GPUAllocationPolicy]),
-    default=GPUAllocationPolicy.DRA.value,
-    help="Who holds the NVIDIA GPUs: DRA drivers, or the device plugin (whole GPUs only).",
+    default=GPUAllocationPolicy.BAI.value,
+    help="Who holds the NVIDIA GPUs: bai-dra (bai), the NVIDIA DRA driver (nvidia-dra), or the"
+    " device plugin (device-plugin, whole GPUs only).",
 )
 @click.option(
     "--allocator-url",

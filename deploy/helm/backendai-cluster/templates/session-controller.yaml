@@ -98,7 +98,8 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "create", "delete"]
-  # A multi-node session on NVIDIA DeviceProfiles with computeDomain gets a ComputeDomain (IMEX).
+  # A multi-node session on DeviceProfiles with computeDomain gets a ComputeDomain (IMEX), whichever
+  # driver serves its GPUs.
   - apiGroups: ["resource.nvidia.com"]
     resources: ["computedomains"]
     verbs: ["get", "list", "watch", "create", "delete"]

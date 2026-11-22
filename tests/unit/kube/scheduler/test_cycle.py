@@ -28,7 +28,7 @@ def _schedule(
     nodes: Sequence[NodeState],
     groups: Sequence[PendingGroup],
     strategy: AgentSelectionStrategy = AgentSelectionStrategy.CONCENTRATED,
-    policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
+    policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI,
 ) -> list[Placement | Skip]:
     return schedule(nodes, groups, NodeSelector(strategy), policy)
 
@@ -300,6 +300,16 @@ class TestShares:
         whole = ShareRequest("gpu.x", (ShareOption(None),))
         node = _share_node("n", {"d0": 1, "d1": 1})
         [result] = _schedule([node], [_share_group((whole,))])
+        assert isinstance(result, Skip)
+
+    def test_whole_devices_take_their_full_capacity(self) -> None:
+        whole = ShareRequest("gpu.x", (ShareOption(None, 2),))
+        node = _share_node("n")
+        [result] = _schedule([node], [_share_group((whole,))])
+        assert isinstance(result, Placement)
+        assert node.share_used == {"gpu.x": {"d0": 1650, "d1": 1000}}
+        part = ShareRequest("gpu.x", (ShareOption(1),))
+        [result] = _schedule([node], [_share_group((part,))])
         assert isinstance(result, Skip)
 
     def test_the_device_plugin_policy_refuses_shares(self) -> None:

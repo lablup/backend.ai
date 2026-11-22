@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.kube.scheduler.cycle import Resources
+from ai.backend.kube.scheduler.cycle import Resources, ShareOption
 from ai.backend.kube.scheduler.snapshot import (
     bind_requested,
     build_nodes,
@@ -264,6 +264,45 @@ class TestDeviceAccounting:
         )
         [share_request] = pending.pods[0].share_claims[0]
         assert share_request.driver == "gpu.x" and share_request.options[0].shares == 150
+
+    def test_a_whole_device_request_of_a_shared_slot_asks_for_unused_devices(self) -> None:
+        profiles = [
+            {
+                "spec": {
+                    "slotName": slot,
+                    "driverName": "gpu.x",
+                    "deviceClassName": "shares.gpu.x",
+                    "sharingMode": mode,
+                }
+            }
+            for slot, mode in (("cuda.shares", "fraction"), ("cuda.device", "exclusive"))
+        ]
+        request = {"name": "r0", "exactly": {"deviceClassName": "shares.gpu.x", "count": 2}}
+        claim = {
+            "metadata": {"name": "p-cuda-device", "namespace": "ns"},
+            "spec": {"devices": {"requests": [request]}},
+        }
+        pod = _pod("p", gated=True)
+        pod["spec"]["resourceClaims"] = [{"name": "c", "resourceClaimName": "p-cuda-device"}]
+        [pending] = build_pending_groups(
+            [_group_obj(1)], [pod], {}, (), [claim], slot_profiles(profiles)
+        )
+        [share_request] = pending.pods[0].share_claims[0]
+        assert share_request.options == (ShareOption(None, 2),)
+
+    def test_a_whole_device_allocation_uses_the_full_capacity(self) -> None:
+        slices = [
+            _gpu_slice("n1", "n1", [{"name": "d0", "capacity": {"shares": {"value": "1650"}}}])
+        ]
+        claim = _foreign_claim({
+            "pool": "n1",
+            "driver": "gpu.x",
+            "device": "d0",
+            "shareID": "s1",
+            "consumedCapacity": {"shares": "1650"},
+        })
+        [node] = build_nodes([_node("n1")], [], slices, [claim])
+        assert node.share_used == {"gpu.x": {"n1/d0": 1650}}
 
 
 class TestReservedClaims:

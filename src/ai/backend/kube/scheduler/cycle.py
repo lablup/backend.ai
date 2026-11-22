@@ -335,7 +335,7 @@ def schedule(
     nodes: Sequence[NodeState],
     groups: Sequence[PendingGroup],
     selector: NodeSelector,
-    policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
+    policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI,
 ) -> list[Placement | Skip]:
     """Place the pending groups in order: higher priority, then the older SessionWorkload,
     then the name.
@@ -365,7 +365,7 @@ def schedule(
                 Skip(
                     group,
                     SkipReason.UNSUPPORTED,
-                    "device shares need the dra GPU allocation policy",
+                    "device shares need the bai or nvidia-dra GPU allocation policy",
                 )
             )
             continue

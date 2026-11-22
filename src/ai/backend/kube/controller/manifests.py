@@ -79,7 +79,7 @@ class ControllerSettings:
     termination_grace_seconds: int = 10
     bind_mode: SokovanBindMode = SokovanBindMode.GATE
     kueue_cluster_queue: str = "backendai"
-    gpu_allocation_policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA
+    gpu_allocation_policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI
     # An admitted session not placed this long is handed back to the Manager (contract C11).
     placement_timeout_seconds: float = 600.0
 

@@ -144,8 +144,9 @@ async def _serve(
     "--gpu-allocation-policy",
     envvar="BACKENDAI_GPU_ALLOCATION_POLICY",
     type=click.Choice([p.value for p in GPUAllocationPolicy]),
-    default=GPUAllocationPolicy.DRA.value,
-    help="dra: devices through ResourceClaims; device-plugin: NVIDIA GPUs as extended resources.",
+    default=GPUAllocationPolicy.BAI.value,
+    help="bai or nvidia-dra: devices through ResourceClaims; device-plugin: NVIDIA GPUs as extended"
+    " resources.",
 )
 @click.option(
     "--metrics-port",
