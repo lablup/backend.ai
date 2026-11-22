@@ -232,3 +232,78 @@ class TestReportedPhase:
             p["kernels"][0]["reportedPhase"] for p in _status_patches(apis) if "kernels" in p
         ]
         assert recorded[:3] == ["Pulling", "Creating", "Running"]
+
+
+def _requeue(raw: dict[str, Any], when: str = "2026-01-01T00:00:00Z") -> None:
+    raw["metadata"]["annotations"] = {"sokovan.backend.ai/requeue": when}
+
+
+def _claims(apis: Apis, *names: str) -> None:
+    apis.custom.list_namespaced_custom_object.return_value = {
+        "items": [{"metadata": {"name": n}} for n in names]
+    }
+
+
+class TestRequeue:
+    async def test_a_new_requeue_deletes_pods_and_claims_without_error(
+        self, reconciler: SessionReconciler, raw: dict[str, Any], apis: Apis
+    ) -> None:
+        _started(raw)
+        _requeue(raw)
+        _claims(apis, "s-1-main1-cuda-device")
+        apis.core.list_namespaced_pod.return_value = SimpleNamespace(items=[_pod()])
+        await reconciler.reconcile("bai-p", "s-1")
+        apis.core.delete_collection_namespaced_pod.assert_awaited_once()
+        apis.custom.delete_collection_namespaced_custom_object.assert_awaited_once()
+        apis.core.create_namespaced_pod.assert_not_called()
+        [status] = _status_patches(apis)
+        assert status["phase"] == "Pending" and status["reason"] == "Requeued"
+        assert (status["requeueCount"], status["requeuing"]) == (1, True)
+        assert status["lastRequeue"] == "2026-01-01T00:00:00Z"
+        assert status["kernels"][0]["podUid"] is None
+
+    async def test_pods_are_recreated_once_the_old_ones_are_gone(
+        self, reconciler: SessionReconciler, raw: dict[str, Any], apis: Apis
+    ) -> None:
+        _started(raw)
+        _requeue(raw)
+        raw["status"].update(lastRequeue="2026-01-01T00:00:00Z", requeueCount=1, requeuing=True)
+        raw["status"]["kernels"][0]["podUid"] = None
+        _claims(apis)
+        await reconciler.reconcile("bai-p", "s-1")
+        apis.core.create_namespaced_pod.assert_awaited_once()
+        assert all(p.get("phase") != "Error" for p in _status_patches(apis))
+        assert _status_patches(apis)[-1]["requeuing"] is False
+
+    async def test_a_handled_requeue_is_not_repeated(
+        self, reconciler: SessionReconciler, raw: dict[str, Any], apis: Apis
+    ) -> None:
+        _started(raw)
+        _requeue(raw)
+        raw["status"].update(lastRequeue="2026-01-01T00:00:00Z", requeueCount=1)
+        apis.core.list_namespaced_pod.return_value = SimpleNamespace(items=[_pod()])
+        await reconciler.reconcile("bai-p", "s-1")
+        apis.core.delete_collection_namespaced_pod.assert_not_called()
+
+    async def test_too_many_requeues_end_the_session(
+        self, reconciler: SessionReconciler, raw: dict[str, Any], apis: Apis
+    ) -> None:
+        _started(raw)
+        _requeue(raw, "2026-01-02T00:00:00Z")
+        raw["status"].update(lastRequeue="2026-01-01T00:00:00Z", requeueCount=3)
+        await reconciler.reconcile("bai-p", "s-1")
+        status = _status_patches(apis)[-1]
+        assert (status["phase"], status["reason"]) == ("Error", "RequeueLimitExceeded")
+
+    async def test_an_admission_rejection_is_a_requeue(
+        self, reconciler: SessionReconciler, raw: dict[str, Any], apis: Apis
+    ) -> None:
+        _started(raw, "Pulling")
+        rejected = _pod()
+        rejected["status"] = {"phase": "Failed", "reason": "OutOfnvidia.com/gpu"}
+        apis.core.list_namespaced_pod.return_value = SimpleNamespace(items=[rejected])
+        _claims(apis)
+        await reconciler.reconcile("bai-p", "s-1")
+        [status] = _status_patches(apis)
+        assert (status["reason"], status["requeueCount"]) == ("Requeued", 1)
+        apis.core.delete_collection_namespaced_pod.assert_awaited_once()

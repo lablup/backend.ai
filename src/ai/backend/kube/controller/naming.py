@@ -28,6 +28,8 @@ SOKOVAN_SCHEDULER: Final = "sokovan"
 SOKOVAN_GATE: Final = "scheduling.backend.ai/sokovan"
 
 FINALIZER: Final = "backend.ai/session-controller"
+# RFC 3339 time set on a SessionWorkload by sokovan: recreate the session's kernel Pods.
+ANNOTATION_REQUEUE: Final = "sokovan.backend.ai/requeue"
 
 KERNEL_CONTAINER: Final = "kernel"
 KRUNNER_CONTAINER: Final = "krunner"

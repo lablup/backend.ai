@@ -38,7 +38,12 @@ from ai.backend.kube.controller.manifests import (
     owner_reference,
     scheduler_adapter,
 )
-from ai.backend.kube.controller.naming import FINALIZER, LABEL_KERNEL_ID, LABEL_SESSION_ID
+from ai.backend.kube.controller.naming import (
+    ANNOTATION_REQUEUE,
+    FINALIZER,
+    LABEL_KERNEL_ID,
+    LABEL_SESSION_ID,
+)
 from ai.backend.kube.controller.reporter import Persist, StatusReporter
 from ai.backend.kube.controller.status import kernel_status_from_pod, session_phase
 from ai.backend.kube.controller.volumes import (
@@ -69,6 +74,10 @@ MAX_TRANSIENT_FAILURES: Final = 5
 # Pods still there this long after the session's deletion grace are force-deleted when their
 # node is NotReady or gone: no kubelet will ever confirm their end.
 FORCE_DELETE_AFTER_SECONDS: Final = 60
+# Requeues of one session (sokovan's or a kubelet admission rejection) before it ends in ERROR.
+MAX_REQUEUES: Final = 3
+# A Failed Pod with such a reason was rejected by the kubelet's admission (OutOfcpu, ...).
+_ADMISSION_REJECTION_PREFIX: Final = "OutOf"
 _MERGE_PATCH: Final = "application/merge-patch+json"
 _JSON_PATCH: Final = "application/json-patch+json"
 _SW = SessionWorkload.crd
@@ -128,10 +137,101 @@ class SessionReconciler:
             if workload.status is not None and workload.status.phase in _ENDED:
                 # Nothing changes for an ended session until the Manager deletes it.
                 return
+            pods: list[dict[str, Any]] | None = await self._session_pods(workload)
+            if not await self._handle_requeue(workload, raw, pods or []):
+                return
             if self._needs_children(workload, raw):
                 if not await self._try_ensure_children(workload, raw):
                     return
-            await self._update_status(workload, deleting=False)
+                pods = None
+            await self._update_status(workload, deleting=False, pods=pods)
+
+    def _requeue_request(self, workload: SessionWorkload, pods: list[dict[str, Any]]) -> str | None:
+        """The time of a requeue not handled yet: sokovan's annotation, or now when the kubelet
+        rejected a kernel Pod at admission."""
+        last = _parse_rfc3339((workload.status or _EMPTY).last_requeue)
+        requested = (workload.metadata.get("annotations") or {}).get(ANNOTATION_REQUEUE)
+        when = _parse_rfc3339(requested)
+        if when is not None and (last is None or when > last):
+            return requested
+        if (workload.status or _EMPTY).requeuing:
+            return None
+        for pod in pods:
+            if pod["metadata"].get("deletionTimestamp"):
+                continue
+            status = pod.get("status") or {}
+            if status.get("phase") == "Failed" and str(status.get("reason") or "").startswith(
+                _ADMISSION_REJECTION_PREFIX
+            ):
+                return datetime.now(UTC).isoformat()
+        return None
+
+    async def _handle_requeue(
+        self, workload: SessionWorkload, raw: Mapping[str, Any], pods: list[dict[str, Any]]
+    ) -> bool:
+        """Delete the kernel Pods and claims of a requeue and wait until they are gone; False
+        while that is in progress or when the session ended."""
+        current = workload.status or _EMPTY
+        if (requested := self._requeue_request(workload, pods)) is not None:
+            if current.requeue_count >= MAX_REQUEUES:
+                await self._fail(
+                    workload,
+                    raw,
+                    "RequeueLimitExceeded",
+                    f"the session was requeued {current.requeue_count} times",
+                )
+                return False
+            log.debug("requeueing the session", requeue=requested)
+            # The kernels start over: no Pod is recorded, so none counts as deleted.
+            kernels = [
+                KernelStatus(
+                    kernel_id=k.kernel_id,
+                    reported_phase=k.reported_phase,
+                )
+                for k in current.kernels
+            ]
+            await self._write_status(
+                workload,
+                current.model_copy(
+                    update={
+                        "phase": SessionPhase.PENDING,
+                        "reason": "Requeued",
+                        "message": None,
+                        "kernels": kernels,
+                        "last_requeue": requested,
+                        "requeue_count": current.requeue_count + 1,
+                        "requeuing": True,
+                    }
+                ),
+            )
+            current = workload.status or _EMPTY
+        if not current.requeuing:
+            return True
+        ns = workload.metadata["namespace"]
+        selector = f"{LABEL_SESSION_ID}={workload.spec.session_id}"
+        if any(not p["metadata"].get("deletionTimestamp") for p in pods):
+            await self._delete_kernel_pods(workload)
+        claims = await self._custom.list_namespaced_custom_object(
+            DRA_GROUP,
+            DRA_VERSION,
+            ns,
+            "resourceclaims",
+            label_selector=selector,
+            _request_timeout=API_TIMEOUT,
+        )
+        if claims["items"]:
+            await self._custom.delete_collection_namespaced_custom_object(
+                DRA_GROUP,
+                DRA_VERSION,
+                ns,
+                "resourceclaims",
+                label_selector=selector,
+                _request_timeout=API_TIMEOUT,
+            )
+        if pods or claims["items"]:
+            return False
+        await self._write_status(workload, current.model_copy(update={"requeuing": False}))
+        return True
 
     def _needs_children(self, workload: SessionWorkload, raw: Mapping[str, Any]) -> bool:
         """Whether a child object may be missing: a new generation or a kernel without a Pod."""
@@ -208,6 +308,7 @@ class SessionReconciler:
                 message=message,
                 observed_generation=raw["metadata"].get("generation"),
                 kernels=kernels,
+                **_requeue_fields(workload),
             ),
         )
 
@@ -365,10 +466,15 @@ class SessionReconciler:
         return [self._api.sanitize_for_serialization(p) for p in pods.items]
 
     async def _update_status(
-        self, workload: SessionWorkload, *, deleting: bool
+        self,
+        workload: SessionWorkload,
+        *,
+        deleting: bool,
+        pods: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """Report the kernels' phases and record them; return the session's Pods."""
-        pods = await self._session_pods(workload)
+        if pods is None:
+            pods = await self._session_pods(workload)
         by_kernel = {p["metadata"]["labels"].get(LABEL_KERNEL_ID): p for p in pods}
         previous = {k.kernel_id: k for k in workload.status.kernels} if workload.status else {}
         kernels = []
@@ -409,6 +515,7 @@ class SessionReconciler:
                 message=message,
                 observed_generation=workload.metadata.get("generation"),
                 kernels=kernels,
+                **_requeue_fields(workload),
             ),
         )
         return pods
@@ -616,6 +723,25 @@ def _started_kernels(workload: SessionWorkload) -> set[str]:
     if workload.status is None:
         return set()
     return {k.kernel_id for k in workload.status.kernels if k.pod_uid is not None}
+
+
+def _requeue_fields(workload: SessionWorkload) -> dict[str, Any]:
+    status = workload.status or _EMPTY
+    return {
+        "last_requeue": status.last_requeue,
+        "requeue_count": status.requeue_count,
+        "requeuing": status.requeuing,
+    }
+
+
+def _parse_rfc3339(raw: str | None) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def _parse_time(raw: Any) -> datetime:

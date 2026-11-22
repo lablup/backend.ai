@@ -156,6 +156,15 @@ class SessionWorkloadStatus(CRDModel):
     observed_generation: int | None = None
     kernels: list[KernelStatus] = Field(default_factory=list)
     conditions: list[Condition] = Field(default_factory=list)
+    last_requeue: str | None = Field(
+        default=None,
+        description="RFC 3339 time of the last requeue the controller handled",
+    )
+    requeue_count: int = Field(default=0, description="Requeues handled so far")
+    requeuing: bool = Field(
+        default=False,
+        description="The kernel Pods and claims of a requeue are being deleted",
+    )
 
 
 class SessionWorkload(CustomResource):

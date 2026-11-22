@@ -346,6 +346,18 @@ spec:
                   - status
                   type: object
                 type: array
+              lastRequeue:
+                type: string
+                description: RFC 3339 time of the last requeue the controller handled
+                nullable: true
+              requeueCount:
+                default: 0
+                description: Requeues handled so far
+                type: integer
+              requeuing:
+                default: false
+                description: The kernel Pods and claims of a requeue are being deleted
+                type: boolean
             type: object
     additionalPrinterColumns:
     - name: Session
