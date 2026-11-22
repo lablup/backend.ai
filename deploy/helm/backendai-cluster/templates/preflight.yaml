@@ -70,4 +70,5 @@ spec:
           env:
             - {name: HOME, value: /tmp}
             {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
+            - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
 {{- end }}

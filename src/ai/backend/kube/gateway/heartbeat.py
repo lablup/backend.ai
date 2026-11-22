@@ -30,7 +30,7 @@ from ai.backend.common.types import ResourceSlotEntry, SlotTypes
 from ai.backend.kube.controller.devices import device_key
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.device import DeviceProfile, DeviceProfileSpec, SharingMode
-from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, build_nodes
+from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, build_nodes, is_dedicated
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -62,9 +62,12 @@ def cluster_slots(
     nodes: Sequence[Mapping[str, Any]],
     resource_slices: Sequence[Mapping[str, Any]] = (),
     profiles: Sequence[DeviceProfileSpec] = (),
+    *,
+    dedicated_only: bool = False,
 ) -> list[ResourceSlotEntry]:
     """CPU cores, memory, whole devices and device shares of the nodes a session Pod can land
-    on (the sokovan dedicated taint is tolerated by session Pods)."""
+    on (the sokovan dedicated taint is tolerated by session Pods). `dedicated_only`: sokovan's
+    binder places Pods only on nodes with that taint."""
     cpu = Decimal(0)
     mem = 0
     devices: dict[str, int] = {}
@@ -75,6 +78,8 @@ def cluster_slots(
             t.effect in ("NoSchedule", "NoExecute") and t.key != DEDICATED_TAINT_KEY
             for t in node.taints
         )
+        if dedicated_only and not is_dedicated(node):
+            continue
         if node.schedulable and not blocked:
             cpu += Decimal(node.allocatable.cpu_milli) / 1000
             mem += node.allocatable.memory
@@ -112,15 +117,22 @@ class GatewayHeartbeat:
     _custom: client.CustomObjectsApi
     _producer: EventProducer
     _identity: GatewayIdentity
+    _dedicated_only: bool
 
     def __init__(
-        self, api: client.ApiClient, producer: EventProducer, identity: GatewayIdentity
+        self,
+        api: client.ApiClient,
+        producer: EventProducer,
+        identity: GatewayIdentity,
+        *,
+        dedicated_only: bool = False,
     ) -> None:
         self._api = api
         self._core = client.CoreV1Api(api)
         self._custom = client.CustomObjectsApi(api)
         self._producer = producer
         self._identity = identity
+        self._dedicated_only = dedicated_only
 
     async def run(self) -> None:
         started = False
@@ -143,7 +155,9 @@ class GatewayHeartbeat:
         )
         raw_nodes = [self._api.sanitize_for_serialization(n) for n in nodes.items]
         profiles = [DeviceProfile.model_validate(p).spec for p in listed_profiles["items"]]
-        slots = cluster_slots(raw_nodes, slices["items"], profiles)
+        slots = cluster_slots(
+            raw_nodes, slices["items"], profiles, dedicated_only=self._dedicated_only
+        )
         host = self._identity.advertised_addr.removeprefix("tcp://").rsplit(":", 1)[0]
         info = AgentInfo(
             ip=host,

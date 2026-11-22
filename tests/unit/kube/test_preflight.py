@@ -9,6 +9,7 @@ from ai.backend.kube.preflight import (
     check_crds,
     check_dra_drivers,
     check_gpu_policy,
+    check_sokovan_nodes,
 )
 
 
@@ -120,3 +121,22 @@ class TestGPUPolicy:
 
     def test_unknown_policy_fails(self) -> None:
         assert check_gpu_policy("mixed", [], [], []).outcome == Outcome.FAIL
+
+
+class TestSokovanNodes:
+    def test_binder_mode_needs_a_dedicated_node(self) -> None:
+        check = check_sokovan_nodes([_node("n1", None)], "binder")
+        assert check.outcome == Outcome.FAIL
+
+    def test_a_dedicated_node_passes(self) -> None:
+        node = _node("n1", None)
+        node["spec"] = {
+            "taints": [
+                {"key": "sokovan.backend.ai/dedicated", "value": "true", "effect": "NoSchedule"}
+            ]
+        }
+        check = check_sokovan_nodes([node], "binder")
+        assert (check.outcome, check.detail) == (Outcome.PASS, "n1")
+
+    def test_gate_mode_needs_no_taint(self) -> None:
+        assert check_sokovan_nodes([_node("n1", None)], "gate").outcome == Outcome.PASS

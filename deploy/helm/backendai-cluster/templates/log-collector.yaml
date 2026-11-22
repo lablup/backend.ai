@@ -90,10 +90,8 @@ spec:
       {{- with .Values.logCollector.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
-      {{- with .Values.logCollector.tolerations }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "backendai-cluster.sessionNodeTolerations" (dict "extra" .Values.logCollector.tolerations) | nindent 8 }}
       containers:
         - name: promtail
           image: {{ .Values.logCollector.image }}

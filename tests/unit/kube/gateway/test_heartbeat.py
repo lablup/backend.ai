@@ -48,3 +48,11 @@ class TestClusterSlots:
         entries = cluster_slots([_node([])], [_shares_slice()], [profile])
         slots = {str(e.resource_type): e.quantity for e in entries}
         assert slots["cuda.shares"] == "26.5"
+
+    def test_binder_mode_counts_only_sokovan_dedicated_nodes(self) -> None:
+        taint = {"key": "sokovan.backend.ai/dedicated", "value": "true", "effect": "NoSchedule"}
+        nodes = [_node([taint]), _node([])]
+        slots = {
+            str(e.resource_type): e.quantity for e in cluster_slots(nodes, dedicated_only=True)
+        }
+        assert slots["cpu"] == "8"

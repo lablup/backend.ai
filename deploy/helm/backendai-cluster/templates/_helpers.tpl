@@ -103,3 +103,11 @@ labels of nodes whose GPUs another allocator owns. (dict "root" $ "driver" <baiD
 {{- $_ = set $affinity "nodeAffinity" $nodeAffinity -}}
 {{- toYaml $affinity -}}
 {{- end -}}
+
+{{/* Tolerations of a DaemonSet that serves session nodes: sokovan's dedicated taint, then `extra`. */}}
+{{- define "backendai-cluster.sessionNodeTolerations" -}}
+- {key: sokovan.backend.ai/dedicated, operator: Equal, value: "true", effect: NoSchedule}
+{{- with .extra }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}

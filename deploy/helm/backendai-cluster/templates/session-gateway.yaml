@@ -131,6 +131,8 @@ spec:
             - {name: BACKENDAI_MANAGER_PUBLIC_KEY, value: /etc/backend.ai/keys/manager.key}
             - {name: BACKENDAI_GATEWAY_KEYPAIR, value: /etc/backend.ai/keys/gateway.key_secret}
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sessionGateway.logLevel | quote }}}
+            # In binder mode only the nodes with sokovan's dedicated taint hold sessions.
+            - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
           ports:
             - {name: rpc, containerPort: {{ .Values.sessionGateway.rpcPort }}}
           readinessProbe:

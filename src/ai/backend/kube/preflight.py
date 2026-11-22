@@ -2,6 +2,7 @@
 cluster, run as a Helm hook Job. Exits non-zero when a required check fails.
 
 python -m ai.backend.kube.preflight [--json] [--gpu-allocation-policy dra|device-plugin]
+    [--sokovan-bind-mode gate|binder]
 """
 
 from __future__ import annotations
@@ -20,10 +21,11 @@ from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.crd.base import CRD_VERSION, CustomResource
 from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
-from ai.backend.kube.crd.scheduling import BindRequest, PodGroup, Queue
+from ai.backend.kube.crd.scheduling import BindRequest, PodGroup, Queue, SokovanBindMode
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.crd.storage import StorageBinding
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
+from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, DEDICATED_TAINT_VALUE
 
 DRIVER_MODE_LABEL: Final = "dra.backend.ai/driver-mode"
 NVIDIA_DRA_DRIVER: Final = "gpu.nvidia.com"
@@ -126,6 +128,30 @@ def _nvidia_dra_devices(slices: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def check_sokovan_nodes(nodes: Sequence[Mapping[str, Any]], bind_mode: str) -> Check:
+    """In binder mode sokovan places sessions only on nodes with its dedicated taint."""
+    name = "sokovan nodes"
+    if bind_mode != SokovanBindMode.BINDER:
+        return Check(name, Outcome.PASS, f"{bind_mode} mode: kube-scheduler binds")
+    dedicated = sorted(
+        node["metadata"]["name"]
+        for node in nodes
+        if any(
+            t.get("key") == DEDICATED_TAINT_KEY
+            and t.get("value") == DEDICATED_TAINT_VALUE
+            and t.get("effect") == "NoSchedule"
+            for t in (node.get("spec") or {}).get("taints") or []
+        )
+    )
+    if not dedicated:
+        return Check(
+            name,
+            Outcome.FAIL,
+            f"binder mode but no node has {DEDICATED_TAINT_KEY}={DEDICATED_TAINT_VALUE}:NoSchedule",
+        )
+    return Check(name, Outcome.PASS, ", ".join(dedicated))
+
+
 def check_bai_node_ownership(
     nodes: Sequence[Mapping[str, Any]], slices: Sequence[Mapping[str, Any]]
 ) -> list[Check]:
@@ -220,7 +246,7 @@ def check_consumable_capacity(
     ]
 
 
-async def run_checks(api: client.ApiClient, gpu_policy: str) -> list[Check]:
+async def run_checks(api: client.ApiClient, gpu_policy: str, bind_mode: str) -> list[Check]:
     ext = client.ApiextensionsV1Api(api)
     core = client.CoreV1Api(api)
     custom = client.CustomObjectsApi(api)
@@ -243,6 +269,7 @@ async def run_checks(api: client.ApiClient, gpu_policy: str) -> list[Check]:
             )
         )["items"]
     nodes = [api.sanitize_for_serialization(n) for n in (await core.list_node()).items]
+    checks.append(check_sokovan_nodes(nodes, bind_mode))
     checks += check_dra_drivers(nodes, slices, profiles)
     checks += check_bai_node_ownership(nodes, slices)
     checks.append(check_gpu_policy(gpu_policy, nodes, slices, profiles))
@@ -250,10 +277,10 @@ async def run_checks(api: client.ApiClient, gpu_policy: str) -> list[Check]:
     return checks
 
 
-async def _main(as_json: bool, gpu_policy: str) -> int:
+async def _main(as_json: bool, gpu_policy: str, bind_mode: str) -> int:
     await load_kube_config()
     async with client.ApiClient() as api:
-        checks = await run_checks(api, gpu_policy)
+        checks = await run_checks(api, gpu_policy, bind_mode)
     if as_json:
         click.echo(json.dumps([asdict(c) for c in checks], indent=2))
     else:
@@ -271,9 +298,17 @@ async def _main(as_json: bool, gpu_policy: str) -> int:
     default=GPUAllocationPolicy.DRA.value,
     help="Who allocates NVIDIA GPUs: dra (the NVIDIA DRA driver) or device-plugin.",
 )
-def main(as_json: bool, gpu_policy: str) -> None:
+@click.option(
+    "--sokovan-bind-mode",
+    "bind_mode",
+    envvar="BACKENDAI_SOKOVAN_BIND_MODE",
+    type=click.Choice([m.value for m in SokovanBindMode]),
+    default=SokovanBindMode.GATE.value,
+    help="How sokovan binds placed Pods; binder needs nodes with its dedicated taint.",
+)
+def main(as_json: bool, gpu_policy: str, bind_mode: str) -> None:
     quiet_client_logs()
-    sys.exit(asyncio.run(_main(as_json, gpu_policy)))
+    sys.exit(asyncio.run(_main(as_json, gpu_policy, bind_mode)))
 
 
 if __name__ == "__main__":
