@@ -14,16 +14,16 @@ from kubernetes.utils.quantity import parse_quantity
 
 from ai.backend.kube.controller.naming import (
     ANNOTATION_DEVICES,
-    ANNOTATION_POD_GROUP,
     ANNOTATION_SHARED_DEVICES,
     HOSTNAME_LABEL,
     LABEL_MANAGED_BY,
+    LABEL_SESSION_ID,
     MANAGED_BY,
     SOKOVAN_GATE,
     SOKOVAN_SCHEDULER,
 )
-from ai.backend.kube.crd.scheduling import BindRequestPhase, PodGroupPhase
-from ai.backend.kube.crd.session import SessionWorkload
+from ai.backend.kube.crd.scheduling import BindRequestPhase
+from ai.backend.kube.crd.session import PlacementPhase, SessionPhase
 from ai.backend.kube.scheduler.cycle import (
     NodeState,
     PendingGroup,
@@ -50,6 +50,13 @@ NEEDS_RECYCLE_CONDITION: Final = "nvke.nvidia.com/NeedsRecycle"
 type PodKey = tuple[str, str]  # namespace, name
 type PodUid = str
 type ClaimKey = tuple[str, str]  # namespace, name
+type SessionKey = tuple[str, str]  # namespace, SessionWorkload name
+type SessionIndex = Mapping[tuple[str, str], str]  # (namespace, session id) → SessionWorkload
+_UNPLACEABLE_PHASES: Final = frozenset({
+    SessionPhase.TERMINATING,
+    SessionPhase.TERMINATED,
+    SessionPhase.ERROR,
+})
 
 
 @dataclass(frozen=True)
@@ -455,35 +462,64 @@ def _slot_name(driver: str, device: Mapping[str, Any]) -> str:
     return str(attribute.get("string") or driver)
 
 
-def pod_group_of(pod: Mapping[str, Any]) -> str | None:
-    return (pod["metadata"].get("annotations") or {}).get(ANNOTATION_POD_GROUP)
+def is_sokovan_session(workload: Mapping[str, Any]) -> bool:
+    scheduler = (workload.get("spec") or {}).get("schedulerName", SOKOVAN_SCHEDULER)
+    return str(scheduler) == SOKOVAN_SCHEDULER
+
+
+def session_index(workloads: Iterable[Mapping[str, Any]]) -> dict[tuple[str, str], str]:
+    """The sokovan SessionWorkloads by namespace and session id."""
+    return {
+        (w["metadata"]["namespace"], str(w["spec"]["sessionId"])): w["metadata"]["name"]
+        for w in workloads
+        if is_sokovan_session(w) and (w.get("spec") or {}).get("sessionId")
+    }
+
+
+def session_of(pod: Mapping[str, Any], sessions: SessionIndex) -> str | None:
+    """The sokovan SessionWorkload a kernel Pod belongs to, by its session label."""
+    meta = pod["metadata"]
+    labels = meta.get("labels") or {}
+    if labels.get(LABEL_MANAGED_BY) != MANAGED_BY or LABEL_SESSION_ID not in labels:
+        return None
+    return sessions.get((meta.get("namespace", ""), labels[LABEL_SESSION_ID]))
+
+
+def required_levels(spec: Mapping[str, Any]) -> list[str]:
+    """A single-node session keeps all its kernels on one node, as on one Agent."""
+    single = spec.get("clusterMode", "single-node") == "single-node"
+    return [HOSTNAME_LABEL] if single and len(spec.get("kernels") or []) > 1 else []
+
+
+def placement_of(workload: Mapping[str, Any]) -> Mapping[str, Any]:
+    placement: Mapping[str, Any] = (workload.get("status") or {}).get("placement") or {}
+    return placement
 
 
 def build_pending_groups(
-    pod_groups: Iterable[Mapping[str, Any]],
+    workloads: Iterable[Mapping[str, Any]],
     pods: Iterable[Mapping[str, Any]],
     in_flight: Mapping[PodUid, str] | None = None,
     has_bind_request: Collection[PodUid] = (),
     resource_claims: Iterable[Mapping[str, Any]] = (),
     profiles: Sequence[SlotProfile] = (),
-    workloads: Iterable[Mapping[str, Any]] = (),
 ) -> list[PendingGroup]:
+    """One gang per sokovan SessionWorkload with kernel Pods waiting: its members are the
+    session's kernels, its order and topology come from the SessionWorkload."""
     in_flight = in_flight or {}
-    workload_created = {
-        str(w["metadata"].get("uid")): str(w["metadata"].get("creationTimestamp", ""))
-        for w in workloads
-    }
+    workloads = list(workloads)
+    sessions = session_index(workloads)
     claims = {
         (c["metadata"].get("namespace", ""), c["metadata"]["name"]): c for c in resource_claims
     }
-    gated: dict[tuple[str, str], list[PendingPod]] = defaultdict(list)
-    placed: dict[tuple[str, str], list[str]] = defaultdict(list)
+    gated: dict[SessionKey, list[PendingPod]] = defaultdict(list)
+    placed: dict[SessionKey, list[str]] = defaultdict(list)
     for pod in pods:
         meta = pod["metadata"]
-        group = pod_group_of(pod)
-        if group is None or meta.get("deletionTimestamp") or not holds_resources(pod):
+        session = session_of(pod, sessions)
+        if session is None or meta.get("deletionTimestamp") or not holds_resources(pod):
             continue
-        key = (meta["namespace"], group)
+        key = (meta["namespace"], session)
         if (node := target_node(pod, in_flight)) is not None:
             placed[key].append(node)
             continue
@@ -509,29 +545,23 @@ def build_pending_groups(
             )
         )
     groups = []
-    for pg in pod_groups:
-        meta, spec = pg["metadata"], pg["spec"]
-        phase = (pg.get("status") or {}).get("phase", PodGroupPhase.PENDING)
+    for workload in workloads:
+        meta, spec = workload["metadata"], workload.get("spec") or {}
         key = (meta["namespace"], meta["name"])
-        # A Scheduled or Running group whose Pods wait again lost a member's bind (binder
-        # failure, timeout): only the missing members are placed.
-        placeable = (
-            PodGroupPhase.PENDING,
-            PodGroupPhase.ADMITTED,
-            PodGroupPhase.SCHEDULED,
-            PodGroupPhase.RUNNING,
-        )
-        if phase not in placeable or key not in gated:
+        phase = (workload.get("status") or {}).get("phase")
+        # A placed session whose Pods wait again lost a member's bind (binder failure,
+        # timeout): only the missing members are placed.
+        if key not in gated or meta.get("deletionTimestamp") or phase in _UNPLACEABLE_PHASES:
             continue
         groups.append(
             PendingGroup(
                 namespace=meta["namespace"],
                 name=meta["name"],
-                priority=spec.get("priority", 0),
-                created_at=_workload_created(meta, workload_created),
-                min_member=spec["minMember"],
+                priority=int(spec.get("priority") or 0),
+                created_at=str(meta.get("creationTimestamp", "")),
+                min_member=len(spec.get("kernels") or []),
                 pods=gated[key],
-                required_levels=(spec.get("topology") or {}).get("requiredLevels") or [],
+                required_levels=required_levels(spec),
                 placed_members=len(placed[key]),
                 placed_nodes=sorted(set(placed[key])),
                 session_id=spec.get("sessionId"),
@@ -540,11 +570,26 @@ def build_pending_groups(
     return groups
 
 
-def _workload_created(meta: Mapping[str, Any], created: Mapping[str, str]) -> str:
-    """The creation time of the SessionWorkload owning a PodGroup: it stays the same when the
-    session controller recreates the PodGroup and its Pods."""
-    crd = SessionWorkload.crd
-    for ref in meta.get("ownerReferences") or []:
-        if ref.get("kind") == crd.kind and (at := created.get(str(ref.get("uid")))):
-            return at
-    return str(meta.get("creationTimestamp", ""))
+def newly_bound(
+    workloads: Iterable[Mapping[str, Any]], pods: Iterable[Mapping[str, Any]]
+) -> list[tuple[Mapping[str, Any], int]]:
+    """Placed sessions whose every kernel Pod is bound to a node now, with their kernel count."""
+    workloads = list(workloads)
+    sessions = session_index(workloads)
+    bound: dict[SessionKey, int] = defaultdict(int)
+    for pod in pods:
+        session = session_of(pod, sessions)
+        if session is not None and pod.get("spec", {}).get("nodeName"):
+            bound[pod["metadata"]["namespace"], session] += 1
+    out = []
+    for workload in workloads:
+        meta, spec = workload["metadata"], workload.get("spec") or {}
+        key = (meta["namespace"], meta["name"])
+        kernels = len(spec.get("kernels") or [])
+        if (
+            placement_of(workload).get("phase") == PlacementPhase.PLACED
+            and kernels
+            and bound[key] >= kernels
+        ):
+            out.append((workload, kernels))
+    return out

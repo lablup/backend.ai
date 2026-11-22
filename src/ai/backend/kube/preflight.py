@@ -22,7 +22,7 @@ from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.crd.base import CRD_VERSION, CustomResource
 from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
-from ai.backend.kube.crd.scheduling import BindRequest, PodGroup, Queue
+from ai.backend.kube.crd.scheduling import BindRequest, Queue
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.crd.storage import StorageBinding
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
@@ -40,7 +40,6 @@ RETRY_INTERVAL_SECONDS: Final = 10.0
 _CRDS: Final[Sequence[type[CustomResource]]] = (
     SessionWorkload,
     StorageBinding,
-    PodGroup,
     Queue,
     BindRequest,
     DeviceProfile,

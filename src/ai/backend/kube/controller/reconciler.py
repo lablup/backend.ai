@@ -40,7 +40,6 @@ from ai.backend.kube.controller.manifests import (
     SessionSecrets,
     build_kernel_pod,
     build_kernel_secret,
-    build_pod_group,
     build_session_network_policy,
     build_session_service,
     owner_reference,
@@ -63,9 +62,9 @@ from ai.backend.kube.controller.volumes import (
 )
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.device import DeviceProfile, DeviceProfileSpec
-from ai.backend.kube.crd.scheduling import PodGroup
 from ai.backend.kube.crd.session import (
     KernelStatus,
+    PlacementPhase,
     SessionPhase,
     SessionWorkload,
     SessionWorkloadStatus,
@@ -95,10 +94,12 @@ _ADMISSION_REJECTION_PREFIX: Final = "OutOf"
 _MERGE_PATCH: Final = "application/merge-patch+json"
 _JSON_PATCH: Final = "application/json-patch+json"
 _SW = SessionWorkload.crd
-_PG = PodGroup.crd
 _ENDED: Final = frozenset({SessionPhase.ERROR, SessionPhase.TERMINATED})
 _ENDED_POD_PHASES: Final = frozenset({"Succeeded", "Failed"})
 _EMPTY: Final = SessionWorkloadStatus()
+# Status fields the sokovan scheduler writes; the controller never sends them.
+_SCHEDULER_FIELDS: Final[set[str]] = {"placement"}
+_PLACED: Final = frozenset({PlacementPhase.PLACED, PlacementPhase.BOUND})
 
 
 @dataclass(frozen=True)
@@ -428,12 +429,6 @@ class SessionReconciler:
             )
         )
         adapter = scheduler_adapter(workload, self._settings)
-        if isinstance(adapter, SokovanAdapter):
-            await self._create(
-                self._custom.create_namespaced_custom_object(
-                    _PG.group, CRD_VERSION, ns, _PG.plural, build_pod_group(workload), **t
-                )
-            )
         for obj in adapter.group_objects(workload):
             group, _, version = obj["apiVersion"].partition("/")
             await self._create(
@@ -710,38 +705,30 @@ class SessionReconciler:
     async def _pending_reason(
         self, workload: SessionWorkload, pods: list[dict[str, Any]]
     ) -> tuple[str | None, str | None]:
-        """Why the scheduler has not placed the session yet: sokovan's PodGroup, or the Pods."""
+        """Why the scheduler has not placed the session yet: sokovan's placement status, or
+        the Pods."""
         if not isinstance(scheduler_adapter(workload, self._settings), SokovanAdapter):
             return pod_pending_reason(pods)
-        try:
-            group = await self._custom.get_namespaced_custom_object(
-                _PG.group,
-                CRD_VERSION,
-                workload.metadata["namespace"],
-                _PG.plural,
-                workload.metadata["name"],
-                _request_timeout=API_TIMEOUT,
-            )
-        except ApiException as e:
-            if e.status == 404:
-                return None, None
-            raise
-        for cond in (group.get("status") or {}).get("conditions") or []:
-            if cond.get("type") == "Scheduled" and cond.get("status") == "False":
-                return cond.get("reason"), cond.get("message")
-        return None, None
+        placement = workload.status.placement if workload.status else None
+        if placement is None or placement.phase in _PLACED:
+            return None, None
+        return placement.reason, placement.message
 
     async def _write_status(self, workload: SessionWorkload, status: SessionWorkloadStatus) -> None:
+        """Write the status the controller owns; `placement` stays sokovan's."""
         current = (
-            workload.status.model_dump(by_alias=True, mode="json") if workload.status else None
+            workload.status.model_dump(by_alias=True, mode="json", exclude=_SCHEDULER_FIELDS)
+            if workload.status
+            else None
         )
-        desired = status.model_dump(by_alias=True, mode="json")
+        desired = status.model_dump(by_alias=True, mode="json", exclude=_SCHEDULER_FIELDS)
         if current == desired:
             return
         if workload.status is None or workload.status.phase != status.phase:
             log.debug("session phase changed", phase=str(status.phase))
         await self._patch_status(workload, desired)
-        workload.status = status
+        placement = workload.status.placement if workload.status else None
+        workload.status = status.model_copy(update={"placement": placement})
 
     async def _patch_status(self, workload: SessionWorkload, status: Mapping[str, Any]) -> None:
         await self._custom.patch_namespaced_custom_object_status(

@@ -1,9 +1,10 @@
 {{- $ns := .Release.Namespace }}
 {{- $sa := printf "system:serviceaccount:%s:" $ns }}
 # Who writes what of the session objects, beyond RBAC (suggestion-1122 3.3): the Manager owns
-# a SessionWorkload's lifecycle and spec, the session controller its status and finalizer, the
-# sokovan scheduler only its requeue annotation. Users and kube-system controllers (namespace
-# deletion, garbage collection) stay under RBAC alone.
+# a SessionWorkload's lifecycle and spec, the session controller its status (but
+# status.placement) and finalizer, the sokovan scheduler status.placement and its requeue
+# annotation. Users and kube-system controllers (namespace deletion, garbage collection) stay
+# under RBAC alone.
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
@@ -40,6 +41,23 @@ spec:
       expression: object.metadata.?annotations.orValue({})
     - name: oldAnnotations
       expression: oldObject.metadata.?annotations.orValue({})
+    - name: samePlacement
+      expression: object.?status.?placement == oldObject.?status.?placement
+    # Every status field but placement: one comparison per field of SessionWorkloadStatus.
+    - name: onlyPlacement
+      expression: >-
+        object.?status.?phase == oldObject.?status.?phase &&
+        object.?status.?reason == oldObject.?status.?reason &&
+        object.?status.?message == oldObject.?status.?message &&
+        object.?status.?observedGeneration == oldObject.?status.?observedGeneration &&
+        object.?status.?kernels == oldObject.?status.?kernels &&
+        object.?status.?conditions == oldObject.?status.?conditions &&
+        object.?status.?lastRequeue == oldObject.?status.?lastRequeue &&
+        object.?status.?requeueCount == oldObject.?status.?requeueCount &&
+        object.?status.?requeuing == oldObject.?status.?requeuing &&
+        object.?status.?admissionRequeueCount == oldObject.?status.?admissionRequeueCount &&
+        object.?status.?transientFailures == oldObject.?status.?transientFailures &&
+        object.?status.?placementTimeoutReportedAt == oldObject.?status.?placementTimeoutReportedAt
     # Spec, labels and owners unchanged (the finalizers and annotations are checked apart).
     - name: sameSpec
       expression: >-
@@ -54,8 +72,13 @@ spec:
           (k in variables.oldAnnotations && variables.oldAnnotations[k] == variables.newAnnotations[k])) &&
         variables.oldAnnotations.all(k, k == variables.requeue || k in variables.newAnnotations)
   validations:
-    - expression: '!variables.status || variables.user == variables.controller'
-      message: Only session-controller writes the status of a SessionWorkload.
+    - expression: >-
+        !variables.status ||
+        (variables.user == variables.controller && variables.samePlacement) ||
+        (variables.user == variables.scheduler && variables.onlyPlacement)
+      message: >-
+        Only session-controller writes the status of a SessionWorkload, and only
+        sokovan-scheduler its status.placement.
     - expression: >-
         variables.status || request.operation == "UPDATE" ||
         variables.user == variables.manager
@@ -172,7 +195,7 @@ spec:
       - apiGroups: ["scheduling.backend.ai"]
         apiVersions: ["*"]
         operations: ["CREATE", "UPDATE", "DELETE"]
-        resources: ["bindrequests", "bindrequests/status", "podgroups", "podgroups/status"]
+        resources: ["bindrequests", "bindrequests/status"]
       - apiGroups: ["resource.k8s.io"]
         apiVersions: ["*"]
         operations: ["CREATE", "UPDATE", "DELETE"]
@@ -180,7 +203,7 @@ spec:
       - apiGroups: ["backend.ai"]
         apiVersions: ["*"]
         operations: ["CREATE", "UPDATE", "DELETE"]
-        resources: ["sessionworkloads"]
+        resources: ["sessionworkloads", "sessionworkloads/status"]
   matchConditions:
     - name: placer
       expression: >-

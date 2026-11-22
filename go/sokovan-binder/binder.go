@@ -55,9 +55,11 @@ const (
 var bindRequestGVR = schema.GroupVersionResource{Group: "scheduling.backend.ai", Version: "v1alpha1", Resource: "bindrequests"}
 
 type bindRequestSpec struct {
-	PodName                  string            `json:"podName"`
-	PodUID                   string            `json:"podUid"`
-	SelectedNode             string            `json:"selectedNode"`
+	PodName      string `json:"podName"`
+	PodUID       string `json:"podUid"`
+	SelectedNode string `json:"selectedNode"`
+	// The SessionWorkload of the Pod; the scheduler groups the binds of a gang by it.
+	Session                  string            `json:"session,omitempty"`
 	ResourceClaimAllocations []ClaimAllocation `json:"resourceClaimAllocations"`
 	BackoffLimit             int               `json:"backoffLimit"`
 }

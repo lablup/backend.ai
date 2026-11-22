@@ -6,13 +6,12 @@ from pydantic import BaseModel
 
 from ai.backend.kube.crd.base import CRD_VERSION, CustomResource
 from ai.backend.kube.crd.device import DeviceProfile
-from ai.backend.kube.crd.scheduling import BindRequest, PodGroup, Queue
+from ai.backend.kube.crd.scheduling import BindRequest, Queue
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.crd.storage import StorageBinding
 
 ALL_RESOURCES: tuple[type[CustomResource], ...] = (
     SessionWorkload,
-    PodGroup,
     Queue,
     BindRequest,
     DeviceProfile,

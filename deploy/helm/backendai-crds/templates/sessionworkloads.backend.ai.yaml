@@ -374,6 +374,36 @@ spec:
                 description: RFC 3339 time the controller reported the current placement
                   attempt as timed out
                 nullable: true
+              placement:
+                description: Written only by the sokovan scheduler (admission keeps
+                  the session controller out).
+                properties:
+                  phase:
+                    description: Where sokovan is with the placement of the session's
+                      kernels.
+                    enum:
+                    - Pending
+                    - Placed
+                    - Bound
+                    - Unschedulable
+                    type: string
+                    default: Pending
+                  scheduled:
+                    default: 0
+                    description: Kernels bound or with a node chosen
+                    type: integer
+                  lastAttempt:
+                    type: string
+                    description: RFC 3339 time of the last try
+                    nullable: true
+                  reason:
+                    type: string
+                    nullable: true
+                  message:
+                    type: string
+                    nullable: true
+                type: object
+                nullable: true
             type: object
     additionalPrinterColumns:
     - name: Session
@@ -385,6 +415,9 @@ spec:
     - name: Size
       type: integer
       jsonPath: .spec.clusterSize
+    - name: Placement
+      type: string
+      jsonPath: .status.placement.phase
     - name: Age
       type: date
       jsonPath: .metadata.creationTimestamp

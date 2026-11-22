@@ -3,7 +3,7 @@
 
 | adapter | gang | queue | devices |
 |---|---|---|---|
-| sokovan | PodGroup | Queue | sokovan + DRA allocator |
+| sokovan | SessionWorkload | Queue | sokovan + DRA allocator |
 | kueue | pod group labels | LocalQueue → ClusterQueue | kube-scheduler |
 | kube | none: single-node sessions only | none | kube-scheduler |
 """
@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Final, override
 
 from ai.backend.kube.controller.naming import (
-    ANNOTATION_POD_GROUP,
     HOSTNAME_LABEL,
     LABEL_SESSION_ID,
     SOKOVAN_DEDICATED_TAINT,
@@ -80,8 +79,8 @@ class SokovanAdapter(SchedulerAdapter):
 
     @override
     def pod(self, workload: SessionWorkload) -> PodScheduling:
-        """sokovan holds each Pod at a scheduling gate until the whole group fits. With the binder
-        the Pod names sokovan as its scheduler, so kube-scheduler never takes it."""
+        """sokovan holds each Pod at a scheduling gate until the whole session fits. With the
+        binder the Pod names sokovan as its scheduler, so kube-scheduler never takes it."""
         binder = self._bind_mode == SokovanBindMode.BINDER
         spec: dict[str, Any] = {
             "schedulerName": SOKOVAN_SCHEDULER if binder else "default-scheduler",
@@ -100,7 +99,7 @@ class SokovanAdapter(SchedulerAdapter):
         return PodScheduling(
             spec=spec,
             labels={},
-            annotations={ANNOTATION_POD_GROUP: workload.metadata["name"]},
+            annotations={},
         )
 
 

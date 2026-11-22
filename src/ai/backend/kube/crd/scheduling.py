@@ -13,7 +13,6 @@ from ai.backend.kube.crd.base import (
     CustomResource,
     PrinterColumn,
 )
-from ai.backend.kube.crd.session import Condition
 
 
 class SokovanBindMode(enum.StrEnum):
@@ -21,61 +20,6 @@ class SokovanBindMode(enum.StrEnum):
 
     GATE = "gate"  # Kueue form: release the gate, pin the node, kube-scheduler binds
     BINDER = "binder"  # KAI form: a BindRequest, the binder records claims and binds
-
-
-class PodGroupPhase(enum.StrEnum):
-    PENDING = "Pending"
-    ADMITTED = "Admitted"
-    SCHEDULED = "Scheduled"
-    RUNNING = "Running"
-    FAILED = "Failed"
-
-
-class TopologyConstraint(CRDModel):
-    required_levels: list[str] = Field(default_factory=list)
-    preferred_levels: list[str] = Field(default_factory=list)
-
-
-class SubGroup(CRDModel):
-    name: str
-    min_member: int = Field(ge=1)
-
-
-class PodGroupSpec(CRDModel):
-    min_member: int = Field(ge=1)
-    queue: str
-    priority: int = 0
-    session_id: str | None = None
-    topology: TopologyConstraint | None = None
-    sub_groups: list[SubGroup] = Field(default_factory=list)
-
-
-class PodGroupStatus(CRDModel):
-    phase: PodGroupPhase = PodGroupPhase.PENDING
-    scheduled: int = 0
-    running: int = 0
-    failed: int = 0
-    last_scheduling_attempt: str | None = None
-    conditions: list[Condition] = Field(default_factory=list)
-
-
-class PodGroup(CustomResource):
-    crd: ClassVar[CRDInfo] = CRDInfo(
-        group=SCHEDULING_GROUP,
-        kind="PodGroup",
-        plural="podgroups",
-        scope=CRDScope.NAMESPACED,
-        short_names=("pg",),
-        printer_columns=(
-            PrinterColumn("Queue", ".spec.queue"),
-            PrinterColumn("MinMember", ".spec.minMember", "integer"),
-            PrinterColumn("Phase", ".status.phase"),
-            PrinterColumn("Age", ".metadata.creationTimestamp", "date"),
-        ),
-    )
-
-    spec: PodGroupSpec
-    status: PodGroupStatus | None = None
 
 
 class QueueResource(CRDModel):
@@ -131,7 +75,7 @@ class BindRequestSpec(CRDModel):
     pod_name: str
     pod_uid: str
     selected_node: str
-    pod_group: str | None = None
+    session: str | None = Field(default=None, description="The SessionWorkload of the Pod")
     resource_claim_allocations: list[ClaimAllocation] = Field(default_factory=list)
     backoff_limit: int = 3
 

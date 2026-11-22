@@ -14,7 +14,6 @@ LABEL_USER_ID: Final = "backend.ai/user-id"
 LABEL_RESOURCE_GROUP: Final = "backend.ai/resource-group"
 LABEL_NETWORK_ID: Final = "backend.ai/network-id"
 LABEL_QUEUE: Final = "scheduling.backend.ai/queue"
-ANNOTATION_POD_GROUP: Final = "scheduling.backend.ai/pod-group"
 ANNOTATION_DEVICES: Final = "scheduling.backend.ai/devices"  # {"<DRA driver>/<slot>": <count>}
 # {"<DRA driver>": <count>} of devices the Pod takes a share of; the node must have them.
 ANNOTATION_SHARED_DEVICES: Final = "scheduling.backend.ai/shared-devices"
@@ -36,7 +35,7 @@ KRUNNER_CONTAINER: Final = "krunner"
 
 
 def session_object_name(session_id: str) -> str:
-    """Name of the SessionWorkload, PodGroup and headless Service of a session."""
+    """Name of the SessionWorkload and headless Service of a session."""
     return f"s-{session_id}"
 
 
