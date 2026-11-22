@@ -348,7 +348,8 @@ spec:
                 type: array
               lastRequeue:
                 type: string
-                description: RFC 3339 time of the last requeue the controller handled
+                description: The `sokovan.backend.ai/requeue` annotation value last
+                  handled, verbatim
                 nullable: true
               requeueCount:
                 default: 0
@@ -358,6 +359,21 @@ spec:
                 default: false
                 description: The kernel Pods and claims of a requeue are being deleted
                 type: boolean
+              admissionRequeueCount:
+                default: 0
+                description: Requeues after a kubelet rejected a kernel Pod at admission
+                  (OutOf*)
+                type: integer
+              transientFailures:
+                default: 0
+                description: Consecutive transient failures (5xx, 403, 429, timeouts)
+                  creating objects
+                type: integer
+              placementTimeoutReportedAt:
+                type: string
+                description: RFC 3339 time the controller reported the current placement
+                  attempt as timed out
+                nullable: true
             type: object
     additionalPrinterColumns:
     - name: Session

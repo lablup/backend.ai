@@ -158,12 +158,26 @@ class SessionWorkloadStatus(CRDModel):
     conditions: list[Condition] = Field(default_factory=list)
     last_requeue: str | None = Field(
         default=None,
-        description="RFC 3339 time of the last requeue the controller handled",
+        description="The `sokovan.backend.ai/requeue` annotation value last handled, verbatim",
     )
     requeue_count: int = Field(default=0, description="Requeues handled so far")
     requeuing: bool = Field(
         default=False,
         description="The kernel Pods and claims of a requeue are being deleted",
+    )
+    admission_requeue_count: int = Field(
+        default=0,
+        description="Requeues after a kubelet rejected a kernel Pod at admission (OutOf*)",
+    )
+    transient_failures: int = Field(
+        default=0,
+        description="Consecutive transient failures (5xx, 403, 429, timeouts) creating objects",
+    )
+    placement_timeout_reported_at: str | None = Field(
+        default=None,
+        description=(
+            "RFC 3339 time the controller reported the current placement attempt as timed out"
+        ),
     )
 
 

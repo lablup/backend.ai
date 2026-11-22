@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, override
 
 import pytest
 from kubernetes_asyncio import client
@@ -207,3 +207,110 @@ class TestLeader:
 
         await _elector("me", clock).run(work)
         assert api.lease is not None and api.lease.spec.holder_identity == ""
+
+
+class HangingLeaseApi(FakeLeaseApi):
+    """Lease updates that never answer once `hanging` is set (an API server gone silent)."""
+
+    hanging: bool
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.hanging = False
+
+    @override
+    async def replace_namespaced_lease(
+        self, _name: str, _ns: str, body: client.V1Lease, **kw: Any
+    ) -> None:
+        if self.hanging:
+            await asyncio.Event().wait()
+        await super().replace_namespaced_lease(_name, _ns, body, **kw)
+
+
+class FakeSleep:
+    """Advances the fake clock, after letting ready tasks (instant fake API calls) run first."""
+
+    clock: FakeClock
+
+    def __init__(self, clock: FakeClock) -> None:
+        self.clock = clock
+
+    async def __call__(self, seconds: float) -> None:
+        for _ in range(20):
+            await asyncio.sleep(0)
+        self.clock.advance(seconds)
+
+
+@pytest.fixture
+def hanging_api(monkeypatch: pytest.MonkeyPatch) -> HangingLeaseApi:
+    fake = HangingLeaseApi()
+    monkeypatch.setattr(client, "CoordinationV1Api", lambda _api: fake)
+    return fake
+
+
+class TestRenewDeadline:
+    async def test_a_hanging_renewal_stops_the_work_before_a_standby_takes_over(
+        self, hanging_api: HangingLeaseApi, clock: FakeClock
+    ) -> None:
+        sleep = FakeSleep(clock)
+        leader = _elector("me", clock, sleep=sleep)
+        standby = _elector("other", clock, sleep=sleep)
+        acquired_at = clock.now
+        stopped_at: list[float] = []
+
+        async def work() -> None:
+            hanging_api.hanging = True
+            assert not await standby.try_acquire()  # the standby sees the record now
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                stopped_at.append(clock.now)
+                raise
+
+        await asyncio.wait_for(leader.run(work), timeout=5)
+        [stopped] = stopped_at
+        assert stopped - acquired_at <= leader_module.RENEW_DEADLINE
+        assert stopped - acquired_at < leader_module.LEASE_DURATION
+        # Up to the moment the leader stopped, the standby could not take the Lease.
+        hanging_api.hanging = False
+        clock.now = stopped
+        assert not await standby.try_acquire()
+
+    async def test_work_that_ignores_the_cancel_is_left_after_the_stop_grace(
+        self, hanging_api: HangingLeaseApi, clock: FakeClock
+    ) -> None:
+        sleep = FakeSleep(clock)
+        leader = _elector("me", clock, sleep=sleep)
+        acquired_at = clock.now
+        release = asyncio.Event()
+
+        async def work() -> None:
+            hanging_api.hanging = True
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    continue
+
+        await asyncio.wait_for(leader.run(work), timeout=5)
+        assert clock.now - acquired_at < leader_module.LEASE_DURATION
+        # The Lease is not released while the work may still run.
+        assert hanging_api.lease is not None
+        assert hanging_api.lease.spec.holder_identity == "me"
+        release.set()
+        await asyncio.sleep(0)
+
+    async def test_renewals_in_time_keep_the_work_running(
+        self, hanging_api: HangingLeaseApi, clock: FakeClock
+    ) -> None:
+        sleep = FakeSleep(clock)
+        leader = _elector("me", clock, sleep=sleep)
+        acquired_at = clock.now
+
+        async def work() -> None:
+            while clock.now - acquired_at < 3 * leader_module.LEASE_DURATION:
+                await sleep(1)
+
+        await asyncio.wait_for(leader.run(work), timeout=5)
+        assert clock.now - acquired_at >= 3 * leader_module.LEASE_DURATION
+        assert hanging_api.lease is not None and hanging_api.lease.spec.holder_identity == ""

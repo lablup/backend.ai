@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from ai.backend.kube.controller.runner import WorkQueue
+from ai.backend.kube.controller.runner import WorkQueue, retry_delay
 
 
 @pytest.fixture
@@ -26,3 +26,11 @@ class TestWorkQueue:
         queue.add(key)
         queue.done(key)
         assert await asyncio.wait_for(queue.get(), 0.05) == key
+
+
+class TestRetryDelay:
+    def test_doubles_up_to_a_minute(self) -> None:
+        assert [retry_delay(n) for n in range(8)] == [1, 2, 4, 8, 16, 32, 60, 60]
+
+    def test_a_long_failing_key_stays_at_the_cap(self) -> None:
+        assert retry_delay(10_000) == 60
