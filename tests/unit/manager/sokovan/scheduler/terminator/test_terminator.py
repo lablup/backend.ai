@@ -11,13 +11,16 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import AgentId, KernelId
+from ai.backend.manager.data.compute_cluster.types import (
+    ComputeClusterData,
+    ResourceGroupComputeCluster,
+)
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterTarget
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
+    COMPUTE_CLUSTER_GONE_REASON,
     SessionTerminator,
-    SessionTerminatorArgs,
 )
 from ai.backend.manager.views.sokovan.session import TerminatingSessionData
 
@@ -387,30 +390,67 @@ class TestSessionTerminatorStaleDetection:
 class TestSessionTerminatorComputeCluster:
     """A kernel of a compute cluster ends by deleting its session's workload."""
 
-    async def test_workload_is_deleted_instead_of_agent_rpc(
+    @staticmethod
+    def _on_cluster(
+        session: TerminatingSessionData, cluster: ComputeClusterData | None
+    ) -> dict[AgentId, ResourceGroupComputeCluster]:
+        return {
+            kernel.agent_id: ResourceGroupComputeCluster(
+                resource_group="k8s-rg",
+                cluster_name="k8s-local",
+                cluster=cluster,
+                scheduler="sokovan",
+                system_namespace="backendai-system",
+            )
+            for kernel in session.kernels
+            if kernel.agent_id is not None
+        }
+
+    async def test_workload_is_deleted_once_instead_of_agent_rpc(
         self,
-        mock_repository: AsyncMock,
+        terminator_on_cluster: SessionTerminator,
+        cluster_lookup: dict[AgentId, ResourceGroupComputeCluster],
+        compute_cluster_data: ComputeClusterData,
+        cluster_client: AsyncMock,
         mock_agent_client_pool: MagicMock,
-        mock_valkey_schedule: AsyncMock,
         terminating_session_multi_kernel: TerminatingSessionData,
     ) -> None:
-        cluster_client = AsyncMock()
-        resolver = AsyncMock()
-        resolver.for_agent.return_value = ComputeClusterTarget(
-            name="k8s-local", namespace_prefix="bai-", client=cluster_client
-        )
-        terminator = SessionTerminator(
-            SessionTerminatorArgs(
-                repository=mock_repository,
-                agent_client_pool=mock_agent_client_pool,
-                valkey_schedule=mock_valkey_schedule,
-                compute_clusters=resolver,
-            )
-        )
         session = terminating_session_multi_kernel
+        cluster_lookup.update(self._on_cluster(session, compute_cluster_data))
         with RecorderContext.scope("test", entity_ids=[session.session_id]):
-            await terminator.terminate_sessions_for_handler([session])
+            await terminator_on_cluster.terminate_sessions_for_handler([session])
 
-        assert cluster_client.destroy_session.await_count == len(session.kernels)
-        cluster_client.destroy_session.assert_awaited_with(session.session_id, session.status_info)
+        cluster_client.destroy_session.assert_awaited_once_with(
+            session.session_id, session.status_info
+        )
         mock_agent_client_pool._mock_client.destroy_kernel.assert_not_awaited()
+
+    async def test_one_lookup_for_the_batch(
+        self,
+        terminator_on_cluster: SessionTerminator,
+        cluster_repository: AsyncMock,
+        terminating_sessions_multiple: list[TerminatingSessionData],
+    ) -> None:
+        sessions = terminating_sessions_multiple
+        with RecorderContext.scope("test", entity_ids=[s.session_id for s in sessions]):
+            await terminator_on_cluster.terminate_sessions_for_handler(sessions)
+
+        cluster_repository.get_compute_clusters_of_agents.assert_awaited_once()
+
+    async def test_kernels_are_marked_terminated_when_the_cluster_is_gone(
+        self,
+        terminator_on_cluster: SessionTerminator,
+        cluster_lookup: dict[AgentId, ResourceGroupComputeCluster],
+        cluster_repository: AsyncMock,
+        cluster_client: AsyncMock,
+        terminating_session_multi_kernel: TerminatingSessionData,
+    ) -> None:
+        session = terminating_session_multi_kernel
+        cluster_lookup.update(self._on_cluster(session, None))
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await terminator_on_cluster.terminate_sessions_for_handler([session])
+
+        cluster_repository.update_kernels_to_terminated.assert_awaited_once_with(
+            [str(kernel.kernel_id) for kernel in session.kernels], COMPUTE_CLUSTER_GONE_REASON
+        )
+        cluster_client.destroy_session.assert_not_awaited()

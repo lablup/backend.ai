@@ -5,20 +5,20 @@ from typing import override
 from aiohttp import web
 
 from ai.backend.common.data.entity.compute_cluster import ComputeClusterEntityType
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.exception import ErrorDetail
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 
 __all__ = (
     "ComputeClusterConflict",
+    "ComputeClusterInUse",
+    "ComputeClusterLost",
     "ComputeClusterNotFound",
+    "InvalidKubeconfig",
+    "InvalidResourceGroupDriverOptions",
     "KubernetesResourceGroupDisabled",
+    "ResourceGroupDriverChangeConflict",
 )
 
 
@@ -33,27 +33,78 @@ class ComputeClusterConflict(EntityError, web.HTTPConflict):
         )
 
 
-class ComputeClusterNotFound(BackendAIError, web.HTTPNotFound):
+class ComputeClusterNotFound(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/compute-cluster-not-found"
     error_title = "The compute cluster is not found."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ComputeClusterEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class KubernetesResourceGroupDisabled(BackendAIError, web.HTTPServiceUnavailable):
+class ComputeClusterInUse(EntityError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/compute-cluster-in-use"
+    error_title = "A resource group still runs its sessions in the compute cluster."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ComputeClusterEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT
+        )
+
+
+class ComputeClusterLost(EntityError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/compute-cluster-lost"
+    error_title = "The compute cluster is LOST; no new sessions are placed in it."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ComputeClusterEntityType(), ActionOperationType.GET, ErrorDetail.UNAVAILABLE
+        )
+
+
+class InvalidKubeconfig(EntityError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-kubeconfig"
+    error_title = "The kubeconfig is invalid or uses a credential the manager does not accept."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ComputeClusterEntityType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
+class KubernetesResourceGroupDisabled(EntityError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/kubernetes-resource-group-disabled"
     error_title = "Kubernetes resource groups are disabled in the manager configuration."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.UNAVAILABLE,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourceGroupEntityType(), ActionOperationType.GET, ErrorDetail.UNAVAILABLE
+        )
+
+
+class InvalidResourceGroupDriverOptions(EntityError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-resource-group-driver-options"
+    error_title = "The resource group's driver options do not fit its driver."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourceGroupEntityType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
+class ResourceGroupDriverChangeConflict(EntityError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/resource-group-driver-change-conflict"
+    error_title = "The driver or compute cluster of a resource group cannot change while it has live sessions."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ResourceGroupEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
         )

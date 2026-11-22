@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable
 from dataclasses import dataclass
+from typing import Final
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
@@ -14,6 +15,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.data.compute_cluster.types import ResourceGroupComputeCluster
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
@@ -21,6 +23,7 @@ from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterR
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.views.sokovan.session import (
     KernelTerminationResult,
+    TerminatingKernelData,
     TerminatingSessionData,
 )
 
@@ -35,6 +38,14 @@ class SessionTerminatorArgs:
     agent_client_pool: AgentClientPool
     valkey_schedule: ValkeyScheduleClient
     compute_clusters: ComputeClusterResolver
+
+
+COMPUTE_CLUSTER_GONE_REASON: Final = "compute-cluster-not-found"
+"""The status reason of a kernel whose compute cluster was unregistered while it ended."""
+
+
+async def _as_list[T](awaitable: Awaitable[T]) -> list[T]:
+    return [await awaitable]
 
 
 class SessionTerminator:
@@ -84,25 +95,47 @@ class SessionTerminator:
                 preemption_plan=[],
             )
 
+        # One lookup for the batch: the agents that are the gateway of a compute cluster.
+        agent_ids = {
+            kernel.agent_id
+            for session in terminating_sessions
+            for kernel in session.kernels
+            if kernel.agent_id
+        }
+        compute_clusters = await self._compute_clusters.of_agents(agent_ids) if agent_ids else {}
+
         # Collect all termination tasks from all sessions
-        all_tasks: list[Awaitable[KernelTerminationResult]] = []
+        all_tasks: list[Awaitable[list[KernelTerminationResult]]] = []
         skipped_kernels = 0
 
         for session in terminating_sessions:
+            cluster_kernels: list[TerminatingKernelData] = []
+            found: ResourceGroupComputeCluster | None = None
             for kernel in session.kernels:
                 # Only process kernels with assigned agents
-                if kernel.agent_id:
-                    task = self._terminate_kernel(
-                        kernel.agent_id,
-                        kernel.kernel_id,
-                        session.session_id,
-                        session.status_info,
-                        kernel.occupied_slots,
-                    )
-                    all_tasks.append(task)
-                else:
+                if not kernel.agent_id:
                     # Kernel has no agent assigned - needs sweep
                     skipped_kernels += 1
+                    continue
+                if (in_cluster := compute_clusters.get(kernel.agent_id)) is not None:
+                    found = in_cluster
+                    cluster_kernels.append(kernel)
+                    continue
+                all_tasks.append(
+                    _as_list(
+                        self._terminate_kernel(
+                            kernel.agent_id,
+                            kernel.kernel_id,
+                            session.session_id,
+                            session.status_info,
+                            kernel.occupied_slots,
+                        )
+                    )
+                )
+            if found is not None:
+                all_tasks.append(
+                    self._terminate_in_compute_cluster(session, found, cluster_kernels)
+                )
 
         # Kernels without agents will be handled by retry/timeout mechanism
         if skipped_kernels > 0:
@@ -132,14 +165,15 @@ class SessionTerminator:
         # Log results but don't update DB (handled by events and sweep)
         success_count = 0
         failed_count = 0
-        for r in results:
-            if isinstance(r, BaseException):
+        for task_results in results:
+            if isinstance(task_results, BaseException):
                 failed_count += 1
                 continue
-            if not r.success:
-                failed_count += 1
-                continue
-            success_count += 1
+            for r in task_results:
+                if r.success:
+                    success_count += 1
+                else:
+                    failed_count += 1
 
         log.debug(
             "session termination requested",
@@ -154,6 +188,52 @@ class SessionTerminator:
             reserved_session_ids=[],
             preemption_plan=[],
         )
+
+    async def _terminate_in_compute_cluster(
+        self,
+        session: TerminatingSessionData,
+        found: ResourceGroupComputeCluster,
+        kernels: list[TerminatingKernelData],
+    ) -> list[KernelTerminationResult]:
+        """Delete the session's workload once; that ends every kernel of the session.
+
+        When the cluster's registration is gone, nothing is left to report the kernels' end,
+        so they are marked terminated here instead of retrying forever.
+        """
+        with with_log_context(session_id=session.session_id):
+            try:
+                if found.cluster is None:
+                    await self._repository.update_kernels_to_terminated(
+                        [str(kernel.kernel_id) for kernel in kernels],
+                        COMPUTE_CLUSTER_GONE_REASON,
+                    )
+                    log.warning(
+                        "kernels marked terminated without a compute cluster",
+                        resource_group=found.resource_group,
+                        compute_cluster=found.cluster_name,
+                        kernel_count=len(kernels),
+                    )
+                else:
+                    async with self._compute_clusters.connect(found, found.cluster) as target:
+                        await target.client.destroy_session(session.session_id, session.status_info)
+                error = None
+            except Exception as e:
+                log.warning(
+                    "session workload deletion failed",
+                    compute_cluster=found.cluster_name,
+                    exc_info=e,
+                )
+                error = str(e)
+        return [
+            KernelTerminationResult(
+                kernel_id=kernel.kernel_id,
+                agent_id=kernel.agent_id,
+                occupied_slots=kernel.occupied_slots,
+                success=error is None,
+                error=error,
+            )
+            for kernel in kernels
+        ]
 
     async def _terminate_kernel(
         self,
@@ -174,17 +254,11 @@ class SessionTerminator:
         """
         with with_log_context(session_id=session_id):
             try:
-                compute_cluster = await self._compute_clusters.for_agent(agent_id)
-                if compute_cluster is not None:
-                    # Deleting the workload ends every kernel of the session; the other
-                    # kernels' calls find it gone.
-                    await compute_cluster.client.destroy_session(session_id, reason)
-                else:
-                    async with self._agent_client_pool.acquire(agent_id) as client:
-                        # Call agent's destroy_kernel RPC method with correct parameters
-                        await client.destroy_kernel(
-                            kernel_id, session_id, reason, suppress_events=False
-                        )
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    # Call agent's destroy_kernel RPC method with correct parameters
+                    await client.destroy_kernel(
+                        kernel_id, session_id, reason, suppress_events=False
+                    )
                 return KernelTerminationResult(
                     kernel_id=kernel_id,
                     agent_id=agent_id,

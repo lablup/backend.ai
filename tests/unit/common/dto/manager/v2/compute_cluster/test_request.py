@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
@@ -13,16 +15,61 @@ from ai.backend.common.dto.manager.v2.compute_cluster.types import ComputeCluste
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.tristate.unset import UNSET
 
+_KUBECONFIG = """\
+apiVersion: v1
+kind: Config
+clusters:
+- name: k8s-a
+  cluster:
+    server: https://10.0.0.1:6443
+    certificate-authority-data: Y2E=
+users:
+- name: manager
+  user:
+    token: secret-token
+contexts:
+- name: k8s-a
+  context:
+    cluster: k8s-a
+    user: manager
+current-context: k8s-a
+"""
+
 
 class TestCreateComputeClusterInput:
     def test_namespace_prefix_defaults_to_bai(self) -> None:
         inp = CreateComputeClusterInput(
-            name="k8s-a", api_server="https://10.0.0.1:6443", kubeconfig="apiVersion: v1"
+            name="k8s-a", api_server="https://10.0.0.1:6443", kubeconfig=_KUBECONFIG
         )
         assert inp.namespace_prefix == "bai-"
         assert inp.description is None
         assert inp.gateway_addr is None
         assert inp.gateway_public_key is None
+
+    @pytest.mark.parametrize("prefix", ["Bai-", "bai_", "-bai", "a" * 27])
+    def test_namespace_prefix_outside_dns_label_rules_rejected(self, prefix: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateComputeClusterInput(name="k8s-a", kubeconfig=_KUBECONFIG, namespace_prefix=prefix)
+
+    def test_longest_namespace_prefix_fits_a_namespace_name(self) -> None:
+        inp = CreateComputeClusterInput(
+            name="k8s-a", kubeconfig=_KUBECONFIG, namespace_prefix="a" * 26
+        )
+        assert len(f"{inp.namespace_prefix}{uuid.uuid4()}") <= 63
+
+    def test_api_server_is_optional(self) -> None:
+        inp = CreateComputeClusterInput(name="k8s-a", kubeconfig=_KUBECONFIG)
+        assert inp.api_server is None
+
+    def test_api_server_mismatch_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateComputeClusterInput(
+                name="k8s-a", api_server="https://other:6443", kubeconfig=_KUBECONFIG
+            )
+
+    def test_unparsable_kubeconfig_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateComputeClusterInput(name="k8s-a", kubeconfig="apiVersion: v1")
 
     def test_kubeconfig_required(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
@@ -40,7 +87,7 @@ class TestCreateComputeClusterInput:
     def test_name_too_long_rejected(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateComputeClusterInput(
-                name="a" * 65, api_server="https://10.0.0.1:6443", kubeconfig="apiVersion: v1"
+                name="a" * 65, api_server="https://10.0.0.1:6443", kubeconfig=_KUBECONFIG
             )
 
 
@@ -76,6 +123,18 @@ class TestUpdateComputeClusterInput:
             UpdateComputeClusterInput(namespace_prefix="")
 
     def test_omitted_fields_from_json_are_unset(self) -> None:
-        inp = UpdateComputeClusterInput.model_validate({"api_server": "https://k8s:6443"})
-        assert inp.api_server == "https://k8s:6443"
+        inp = UpdateComputeClusterInput.model_validate({"description": "d"})
+        assert inp.description == "d"
         assert inp.kubeconfig is UNSET
+
+    def test_api_server_without_kubeconfig_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateComputeClusterInput.model_validate({"api_server": "https://k8s:6443"})
+
+    def test_kubeconfig_with_file_path_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateComputeClusterInput(
+                kubeconfig=_KUBECONFIG.replace(
+                    "certificate-authority-data: Y2E=", "certificate-authority: /etc/ca"
+                )
+            )

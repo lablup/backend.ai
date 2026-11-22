@@ -108,7 +108,12 @@ def search(
 
 @compute_cluster.command()
 @click.option("--name", required=True, type=str, help="Unique compute cluster name.")
-@click.option("--api-server", required=True, type=str, help="Kubernetes API server URL.")
+@click.option(
+    "--api-server",
+    default=None,
+    type=str,
+    help="Kubernetes API server URL; read from the kubeconfig when omitted, must match it.",
+)
 @click.option(
     "--kubeconfig",
     "kubeconfig_file",
@@ -128,7 +133,7 @@ def search(
 @click.option("--gateway-public-key", default=None, type=str, help="Gateway public key.")
 def create(
     name: str,
-    api_server: str,
+    api_server: str | None,
     kubeconfig_file: IO[str],
     description: str | None,
     namespace_prefix: str,
@@ -165,7 +170,12 @@ def create(
 @click.argument("compute_cluster_id", type=click.UUID)
 @click.option("--description", default=None, type=str, help="Updated description.")
 @click.option("--set-null-description", is_flag=True, help="Clear the current description.")
-@click.option("--api-server", default=None, type=str, help="Updated API server URL.")
+@click.option(
+    "--api-server",
+    default=None,
+    type=str,
+    help="API server URL; only with --kubeconfig, and must match it.",
+)
 @click.option(
     "--kubeconfig",
     "kubeconfig_file",

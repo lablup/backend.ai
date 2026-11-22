@@ -356,3 +356,15 @@ class TestUpdateResourceGroupConfigInputDriver:
     def test_kubernetes_driver_without_compute_cluster_is_rejected(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateResourceGroupConfigInput(resource_group_name="rg", driver="kubernetes")
+
+
+class TestSystemNamespaceDriverOption:
+    def test_accepts_a_dns_label(self) -> None:
+        inp = UpdateResourceGroupInput(driver_opts={"system_namespace": "bai-system"})
+        assert not isinstance(inp.driver_opts, Unset)
+        assert inp.driver_opts["system_namespace"] == "bai-system"
+
+    @pytest.mark.parametrize("value", ["Bai", "bai_system", "-bai", "a" * 64, 3])
+    def test_rejects_what_is_not_a_dns_label(self, value: object) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateResourceGroupInput(driver_opts={"system_namespace": value})

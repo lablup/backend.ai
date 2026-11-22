@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from ai.backend.common.dto.manager.v2.compute_cluster.kubeconfig import (
+    InvalidKubeconfigError,
+    ParsedKubeconfig,
+    parse_kubeconfig,
+)
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
 from ai.backend.manager.data.compute_cluster.types import ComputeClusterData
+from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 from ai.backend.manager.models.compute_cluster.creators import ComputeClusterCreator
 from ai.backend.manager.models.compute_cluster.row import COMPUTE_CLUSTER_KUBECONFIG_CONTEXT
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -19,8 +25,22 @@ from ai.backend.manager.types import OptionalState
 __all__ = ("ComputeClusterService",)
 
 
+def _validate_kubeconfig(kubeconfig: str, api_server: str | None) -> ParsedKubeconfig:
+    """The kubeconfig's current context; a given ``api_server`` must be its server."""
+    try:
+        parsed = parse_kubeconfig(kubeconfig)
+    except InvalidKubeconfigError as e:
+        raise InvalidKubeconfig(str(e)) from e
+    if api_server is not None and api_server.rstrip("/") != parsed.server.rstrip("/"):
+        raise InvalidKubeconfig(
+            f"api_server {api_server!r} differs from the kubeconfig's server {parsed.server!r}"
+        )
+    return parsed
+
+
 class ComputeClusterService:
-    """The writes that carry a kubeconfig, which is encrypted before it reaches the spec.
+    """The writes that carry a kubeconfig, which is validated and encrypted before it reaches
+    the spec. The API server is always the kubeconfig's.
 
     Get, search and purge run straight against ops.
     """
@@ -39,13 +59,14 @@ class ComputeClusterService:
     async def create(
         self, action: CreateComputeClusterAction
     ) -> CreatedEntityOpsResult[ComputeClusterData]:
+        parsed = _validate_kubeconfig(action.kubeconfig, action.api_server)
         kubeconfig = await self._key_provider_pool.encrypt(
             action.kubeconfig, COMPUTE_CLUSTER_KUBECONFIG_CONTEXT
         )
         creator = ComputeClusterCreator(
             name=action.name,
             description=action.description,
-            api_server=action.api_server,
+            api_server=parsed.server,
             kubeconfig=kubeconfig,
             namespace_prefix=action.namespace_prefix,
             gateway_addr=action.gateway_addr,
@@ -57,10 +78,21 @@ class ComputeClusterService:
         self, action: UpdateComputeClusterAction
     ) -> EntityOpsResult[ComputeClusterData]:
         updater = action.updater
+        requested_server = updater.api_server.optional_value()
         plaintext = action.kubeconfig.optional_value()
-        if plaintext is not None:
+        if plaintext is None:
+            if requested_server is not None:
+                raise InvalidKubeconfig(
+                    "api_server is read from the kubeconfig; send the kubeconfig instead"
+                )
+        else:
+            parsed = _validate_kubeconfig(plaintext, requested_server)
             encrypted = await self._key_provider_pool.encrypt(
                 plaintext, COMPUTE_CLUSTER_KUBECONFIG_CONTEXT
             )
-            updater = replace(updater, kubeconfig=OptionalState.update(encrypted))
+            updater = replace(
+                updater,
+                kubeconfig=OptionalState.update(encrypted),
+                api_server=OptionalState.update(parsed.server),
+            )
         return EntityOpsResult(data=await self._ops_repository.update(updater))

@@ -7,6 +7,9 @@ from uuid import UUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    KUBERNETES_RESOURCE_GROUP_DRIVER,
+)
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -22,6 +25,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
+from ai.backend.manager.errors.compute_cluster import ComputeClusterNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
@@ -79,8 +83,15 @@ class ResourceGroupRepository:
     ) -> ResourceGroupData:
         """Register a resource group as the scope it becomes.
 
-        Raises ResourceGroupConflict if a resource group with the same name already exists.
+        Raises ResourceGroupConflict if a resource group with the same name already exists,
+        and ComputeClusterNotFound if a `kubernetes` one names an unregistered cluster.
         """
+        if creator.driver == KUBERNETES_RESOURCE_GROUP_DRIVER:
+            cluster = creator.driver_opts.get("compute_cluster")
+            if not isinstance(cluster, str) or not await self._db_source.compute_cluster_exists(
+                cluster
+            ):
+                raise ComputeClusterNotFound(f"compute cluster {cluster!r} is not registered")
         async with self._v2_ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
 

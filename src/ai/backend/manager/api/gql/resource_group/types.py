@@ -1078,20 +1078,27 @@ class UpdateResourceGroupV2InputGQL(PydanticInputMixin[UpdateResourceGroupInputD
         ),
         default=UNSET,
     )
-    driver: str | None = gql_field(
-        description=(
-            "Resource group driver. `static`: sessions run on the agents of the resource group."
-            " `kubernetes`: sessions run as Pods in the compute cluster named by"
-            " `driverOpts.compute_cluster`."
-            " Omit to leave unchanged; `kubernetes` requires `driverOpts` in the same update."
+    driver: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Resource group driver. `static`: sessions run on the agents of the resource"
+                " group. `kubernetes`: sessions run as Pods in the compute cluster named by"
+                " `driverOpts.compute_cluster`. Omit to leave unchanged; `kubernetes` requires"
+                " `driverOpts` in the same update."
+            ),
         ),
         default=UNSET,
     )
-    driver_opts: JSON | None = gql_field(
-        description=(
-            "Options of the resource group driver. Empty for `static`; `kubernetes` requires"
-            " `compute_cluster`, the name of a registered compute cluster."
-            " Replaces the stored options. Omit to leave unchanged."
+    driver_opts: JSON | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Options of the resource group driver. Empty for `static`; `kubernetes` requires"
+                " `compute_cluster`, the name of a registered compute cluster, and accepts"
+                " `system_namespace` and `scheduler`. Replaces the stored options. Omit to leave"
+                " unchanged."
+            ),
         ),
         default=UNSET,
     )

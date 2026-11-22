@@ -225,13 +225,26 @@ class ComputeClusterOrderByGQL(PydanticInputMixin[ComputeClusterOrderDTO]):
 )
 class CreateComputeClusterInputGQL(PydanticInputMixin[CreateComputeClusterInputDTO]):
     name: str = gql_field(description="Unique compute cluster name.")
-    api_server: str = gql_field(description="URL of the cluster's Kubernetes API server.")
+    api_server: str | None = gql_field(
+        default=None,
+        description=(
+            "URL of the cluster's Kubernetes API server. Read from the kubeconfig's current"
+            " context; a different value is rejected."
+        ),
+    )
     kubeconfig: str = gql_field(
-        description="Kubeconfig the manager uses to reach the cluster. Stored encrypted."
+        description=(
+            "Kubeconfig the manager uses to reach the cluster. Stored encrypted. Only inline"
+            " credentials are accepted; `exec`, `auth-provider` and file paths are rejected."
+        )
     )
     description: str | None = gql_field(default=None, description="Optional description.")
     namespace_prefix: str = gql_field(
-        default="bai-", description="Prefix of the namespaces created in the cluster."
+        default="bai-",
+        description=(
+            "Prefix of the namespaces created in the cluster: lowercase alphanumerics and '-',"
+            " at most 26 characters."
+        ),
     )
     gateway_addr: str | None = gql_field(
         default=None, description="Address of the cluster's network gateway."
@@ -264,7 +277,13 @@ class UpdateComputeClusterInputGQL(PydanticInputMixin[UpdateComputeClusterInputD
     description: str | None = gql_field(
         default=UNSET, description="Updated description. Null clears it."
     )
-    api_server: str | None = gql_field(default=UNSET, description="Updated API server URL.")
+    api_server: str | None = gql_field(
+        default=UNSET,
+        description=(
+            "API server URL. Read from the kubeconfig; only accepted together with `kubeconfig`"
+            " and must match it."
+        ),
+    )
     kubeconfig: str | None = gql_field(
         default=UNSET, description="Replacement kubeconfig. Stored encrypted."
     )

@@ -11,12 +11,18 @@ Test Scenarios:
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
 from ai.backend.common.types import AutoPullBehavior
+from ai.backend.manager.data.compute_cluster.types import (
+    ComputeClusterData,
+    ComputeClusterStatus,
+    ResourceGroupComputeCluster,
+)
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
@@ -552,6 +558,7 @@ class TestSessionLauncherComputeCluster:
 
         cluster_client.ensure_namespace.assert_awaited_once()
         assert cluster_client.ensure_namespace.call_args[0][0] == f"bai-{session.project_id}"
+        assert cluster_client.ensure_namespace.call_args.kwargs["system_namespace"] == "bai-system"
         cluster_client.create_session.assert_awaited_once()
         objects = cluster_client.create_session.call_args[0][0]
         assert objects.workload["spec"]["queue"] == "k8s.project"
@@ -559,3 +566,63 @@ class TestSessionLauncherComputeCluster:
         assert [k["kernelId"] for k in kernels] == [str(k.kernel_id) for k in session.kernels]
         mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
         mock_agent_client_pool._mock_client.create_local_network.assert_not_awaited()
+
+    async def test_kernels_on_two_agents_form_one_workload(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        cluster_client: AsyncMock,
+        session_for_start_on_two_agents: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        session = session_for_start_on_two_agents
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher_on_cluster.start_sessions_for_handler([session], image_config_default)
+
+        cluster_client.create_session.assert_awaited_once()
+        objects = cluster_client.create_session.call_args[0][0]
+        kernels = objects.workload["spec"]["kernels"]
+        assert [k["kernelId"] for k in kernels] == [str(k.kernel_id) for k in session.kernels]
+        assert objects.workload["spec"]["clusterSize"] == 2
+
+    async def test_lost_cluster_refuses_the_session(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        cluster_client: AsyncMock,
+        compute_cluster_data: ComputeClusterData,
+        cluster_repository: AsyncMock,
+        mock_repository: AsyncMock,
+        session_for_start_multi_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        lost = replace(compute_cluster_data, status=ComputeClusterStatus.LOST)
+        cluster_repository.get_compute_clusters_of_resource_groups.side_effect = None
+        cluster_repository.get_compute_clusters_of_resource_groups.return_value = {
+            k.resource_group: ResourceGroupComputeCluster(
+                resource_group=k.resource_group,
+                cluster_name=lost.name,
+                cluster=lost,
+                scheduler="sokovan",
+                system_namespace="bai-system",
+            )
+            for k in session_for_start_multi_kernel.kernels
+        }
+        session = session_for_start_multi_kernel
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher_on_cluster.start_sessions_for_handler([session], image_config_default)
+
+        cluster_client.create_session.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited_once()
+
+    async def test_one_lookup_for_the_batch(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        cluster_repository: AsyncMock,
+        session_for_start_multi_kernel: SessionDataForStart,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        sessions = [session_for_start_multi_kernel, session_for_start_single_kernel]
+        with RecorderContext.scope("test", entity_ids=[s.session_id for s in sessions]):
+            await launcher_on_cluster.start_sessions_for_handler(sessions, image_config_default)
+
+        cluster_repository.get_compute_clusters_of_resource_groups.assert_awaited_once()

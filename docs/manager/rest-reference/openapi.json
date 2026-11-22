@@ -17113,23 +17113,32 @@
             "title": "Description"
           },
           "api_server": {
-            "description": "Added in 26.10.0. URL of the cluster's Kubernetes API server.",
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Api Server",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. URL of the cluster's Kubernetes API server. Read from the kubeconfig's current context; a different value is rejected.",
+            "title": "Api Server"
           },
           "kubeconfig": {
-            "description": "Added in 26.10.0. Kubeconfig the manager uses to reach the cluster. Stored encrypted and never returned.",
+            "description": "Added in 26.10.0. Kubeconfig the manager uses to reach the cluster. Stored encrypted and never returned. Only inline credentials are accepted: `certificate-authority-data`, `client-certificate-data`, `client-key-data` and `token`; `exec`, `auth-provider` and file paths are rejected.",
             "minLength": 1,
             "title": "Kubeconfig",
             "type": "string"
           },
           "namespace_prefix": {
             "default": "bai-",
-            "description": "Added in 26.10.0. Prefix of the namespaces created in the cluster.",
-            "maxLength": 32,
+            "description": "Added in 26.10.0. Prefix of the namespaces created in the cluster: lowercase alphanumerics and '-', at most 26 characters.",
+            "maxLength": 26,
             "minLength": 1,
+            "pattern": "^[a-z0-9]([-a-z0-9]*)?$",
             "title": "Namespace Prefix",
             "type": "string"
           },
@@ -17164,7 +17173,6 @@
         },
         "required": [
           "name",
-          "api_server",
           "kubeconfig"
         ],
         "title": "CreateComputeClusterInput",
@@ -17515,7 +17523,7 @@
                 "type": "null"
               }
             ],
-            "description": "Added in 26.10.0. Omit to leave unchanged.",
+            "description": "Added in 26.10.0. URL of the cluster's Kubernetes API server. Read from the kubeconfig's current context; a different value is rejected. Only accepted together with `kubeconfig`.",
             "title": "Api Server"
           },
           "kubeconfig": {
@@ -17528,14 +17536,15 @@
                 "type": "null"
               }
             ],
-            "description": "Added in 26.10.0. Replaces the stored kubeconfig. Omit to leave unchanged.",
+            "description": "Added in 26.10.0. Kubeconfig the manager uses to reach the cluster. Stored encrypted and never returned. Only inline credentials are accepted: `certificate-authority-data`, `client-certificate-data`, `client-key-data` and `token`; `exec`, `auth-provider` and file paths are rejected. Replaces the stored kubeconfig. Omit to leave unchanged.",
             "title": "Kubeconfig"
           },
           "namespace_prefix": {
             "anyOf": [
               {
-                "maxLength": 32,
+                "maxLength": 26,
                 "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*)?$",
                 "type": "string"
               },
               {
@@ -26614,7 +26623,7 @@
           },
           "driver_opts": {
             "additionalProperties": true,
-            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster.",
+            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster, and accepts `system_namespace` (default `backendai-system`), the namespace of the cluster's Backend.AI components, and `scheduler`.",
             "title": "Driver Opts",
             "type": "object"
           }
@@ -26888,7 +26897,7 @@
           },
           "driver_opts": {
             "additionalProperties": true,
-            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster. Replaces the stored options. Omit to leave unchanged.",
+            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster, and accepts `system_namespace` (default `backendai-system`), the namespace of the cluster's Backend.AI components, and `scheduler`. Replaces the stored options. Omit to leave unchanged.",
             "title": "Driver Opts",
             "type": "object"
           }
@@ -27159,7 +27168,7 @@
           },
           "driver_opts": {
             "additionalProperties": true,
-            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster. Replaces the stored options. Omit to leave unchanged.",
+            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster, and accepts `system_namespace` (default `backendai-system`), the namespace of the cluster's Backend.AI components, and `scheduler`. Replaces the stored options. Omit to leave unchanged.",
             "title": "Driver Opts",
             "type": "object"
           }

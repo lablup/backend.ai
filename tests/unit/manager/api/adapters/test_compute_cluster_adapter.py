@@ -32,7 +32,25 @@ from ai.backend.manager.models.specs.pagination import (
 )
 from ai.backend.manager.secret.types import SecretValue
 
-_KUBECONFIG = "apiVersion: v1\nkind: Config\n"
+_KUBECONFIG = """\
+apiVersion: v1
+kind: Config
+clusters:
+- name: k8s-a
+  cluster:
+    server: https://10.0.0.1:6443
+    certificate-authority-data: Y2E=
+users:
+- name: manager
+  user:
+    token: secret-token
+contexts:
+- name: k8s-a
+  context:
+    cluster: k8s-a
+    user: manager
+current-context: k8s-a
+"""
 
 
 @pytest.fixture

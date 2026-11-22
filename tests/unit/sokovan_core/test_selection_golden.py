@@ -1,7 +1,7 @@
-"""Parity between the manager's agent selection entry point and the core API.
+"""Golden agent choices of the core selector and the manager's entry point.
 
-The manager path builds the selector with its recorder and converts a
-`SessionWorkload`; the core path feeds `AgentSelectionCriteria` directly.
+Every `expected` was produced by running these scenarios against the selector of
+`main` before it moved to `sokovan_core` (`manager/sokovan/scheduler/provisioner/selectors`).
 """
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ class Scenario:
     strategy: AgentSelectionStrategy
     agents: Sequence[AgentSpec]
     sessions: Sequence[SessionSpec]
-    # The outcome of each session, in order: chosen agent ids or the error type name
+    # The outcome of each session on main, in order: chosen agent ids or the error type name
     expected: Sequence[tuple[str, ...] | str]
     max_container_count: int | None = None
     group_members: Mapping[str, int] = field(default_factory=dict)
@@ -419,6 +419,37 @@ SCENARIOS: dict[str, Scenario] = {
         ],
         expected=["NoCompatibleAgentError"],
     ),
+    "concentrated-picks-the-busiest-that-fits": Scenario(
+        strategy=AgentSelectionStrategy.CONCENTRATED,
+        agents=(
+            AgentSpec("a1", cpu_used="4"),
+            AgentSpec("a2", cpu_used="15"),
+            AgentSpec("a3", cpu_used="10"),
+        ),
+        sessions=[SessionSpec(kernel_slots=[{"cpu": "4", "mem": "1024"}])],
+        expected=[("a3",)],
+    ),
+    "dispersed-picks-the-idlest": Scenario(
+        strategy=AgentSelectionStrategy.DISPERSED,
+        agents=(
+            AgentSpec("a1", cpu_used="4"),
+            AgentSpec("a2", cpu_used="1"),
+            AgentSpec("a3", cpu_used="10"),
+        ),
+        sessions=[SessionSpec(kernel_slots=[_SMALL])],
+        expected=[("a2",)],
+    ),
+    "dispersed-multi-node-spreads-in-order": Scenario(
+        strategy=AgentSelectionStrategy.DISPERSED,
+        agents=(AgentSpec("a1", cpu_used="2"), AgentSpec("a2"), AgentSpec("a3", cpu_used="1")),
+        sessions=[
+            SessionSpec(
+                kernel_slots=[{"cpu": "8", "mem": "1024"}] * 3,
+                cluster_mode=ClusterMode.MULTI_NODE,
+            )
+        ],
+        expected=[("a2", "a3", "a1")],
+    ),
 }
 
 
@@ -430,16 +461,34 @@ def _summary(outcome: Outcome) -> tuple[str, ...] | str:
             return error_type
 
 
-class TestManagerCoreParity:
+def _session_ids(scenario: Scenario) -> list[SessionId]:
+    return [SessionId(uuid.UUID(int=1000 + i)) for i in range(len(scenario.sessions))]
+
+
+class TestCoreSelectionGolden:
     @pytest.mark.parametrize("scenario", SCENARIOS.values(), ids=SCENARIOS.keys())
-    async def test_same_agents_and_errors(self, scenario: Scenario) -> None:
-        session_ids = [SessionId(uuid.UUID(int=1000 + i)) for i in range(len(scenario.sessions))]
+    async def test_chooses_what_main_chose(self, scenario: Scenario) -> None:
+        outcomes = await _run_core(scenario, _session_ids(scenario))
 
-        manager_outcomes = await _run_manager(scenario, session_ids)
-        core_outcomes = await _run_core(scenario, session_ids)
+        assert [_summary(outcome) for outcome in outcomes] == list(scenario.expected)
 
-        assert manager_outcomes == core_outcomes
-        assert [_summary(outcome) for outcome in core_outcomes] == list(scenario.expected)
+    @pytest.mark.parametrize(
+        "scenario",
+        [s for s in SCENARIOS.values() if any(isinstance(e, str) for e in s.expected)],
+    )
+    async def test_failures_report_unavailable(self, scenario: Scenario) -> None:
+        outcomes = await _run_core(scenario, _session_ids(scenario))
+
+        codes = {outcome.error_code for outcome in outcomes if isinstance(outcome, Failed)}
+        assert codes and all(code.endswith("unavailable") for code in codes)
+
+
+class TestManagerSelectionGolden:
+    @pytest.mark.parametrize("scenario", SCENARIOS.values(), ids=SCENARIOS.keys())
+    async def test_chooses_what_main_chose(self, scenario: Scenario) -> None:
+        outcomes = await _run_manager(scenario, _session_ids(scenario))
+
+        assert [_summary(outcome) for outcome in outcomes] == list(scenario.expected)
 
 
 class TestManagerRecording:

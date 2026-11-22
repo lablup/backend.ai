@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Final, Self
 
-import yaml
 from kubernetes_asyncio import client
 from kubernetes_asyncio.client.exceptions import ApiException
 from kubernetes_asyncio.config import kube_config
 
+from ai.backend.common.dto.manager.v2.compute_cluster.kubeconfig import (
+    InvalidKubeconfigError,
+    parse_kubeconfig,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    DEFAULT_KUBERNETES_SYSTEM_NAMESPACE,
+)
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.kube.crd.base import CRD_VERSION
@@ -25,6 +32,7 @@ from ai.backend.manager.clients.compute_cluster.mapping import (
     queue_name,
 )
 from ai.backend.manager.data.compute_cluster.types import ProjectQueueData
+from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -35,39 +43,124 @@ _SW = SessionWorkload.crd
 _Q = Queue.crd
 
 
+@dataclass(frozen=True)
+class NamespacedBinding:
+    """A RoleBinding the Manager writes in every session namespace."""
+
+    name: str
+    cluster_role: str
+    service_account: str
+
+
+SESSION_NAMESPACE_BINDINGS: Final = (
+    NamespacedBinding(
+        "backendai-session-controller",
+        "backendai-session-controller-namespaced",
+        "session-controller",
+    ),
+    NamespacedBinding(
+        "backendai-session-gateway", "backendai-session-gateway-namespaced", "session-gateway"
+    ),
+    NamespacedBinding("backendai-manager", "backendai-manager-namespaced", "backendai-manager"),
+)
+"""The cluster components get their namespaced rights only in session namespaces."""
+
+
+def role_binding_manifest(
+    binding: NamespacedBinding, namespace: str, system_namespace: str
+) -> dict[str, Any]:
+    return {
+        "apiVersion": "rbac.authorization.k8s.io/v1",
+        "kind": "RoleBinding",
+        "metadata": {
+            "name": binding.name,
+            "namespace": namespace,
+            "labels": {LABEL_MANAGED_BY: MANAGED_BY},
+        },
+        "roleRef": {
+            "apiGroup": "rbac.authorization.k8s.io",
+            "kind": "ClusterRole",
+            "name": binding.cluster_role,
+        },
+        "subjects": [
+            {
+                "kind": "ServiceAccount",
+                "name": binding.service_account,
+                "namespace": system_namespace,
+            }
+        ],
+    }
+
+
 class ComputeClusterClient:
     """One compute cluster's API server, reached with the kubeconfig the cluster was registered with."""
 
     _api: client.ApiClient
     _core: client.CoreV1Api
     _custom: client.CustomObjectsApi
+    _rbac: client.RbacAuthorizationV1Api
 
     def __init__(self, api: client.ApiClient) -> None:
         self._api = api
         self._core = client.CoreV1Api(api)
         self._custom = client.CustomObjectsApi(api)
+        self._rbac = client.RbacAuthorizationV1Api(api)
 
     @classmethod
     async def from_kubeconfig(cls, kubeconfig: str) -> Self:
+        """Load only the validated current context, so a stored kubeconfig never runs a
+        command or reads a file on the Manager's host."""
+        try:
+            parsed = parse_kubeconfig(kubeconfig)
+        except InvalidKubeconfigError as e:
+            raise InvalidKubeconfig(str(e)) from e
         configuration = client.Configuration()
         await kube_config.load_kube_config_from_dict(
-            yaml.safe_load(kubeconfig), client_configuration=configuration
+            dict(parsed.config), client_configuration=configuration
         )
         return cls(client.ApiClient(configuration=configuration))
 
     async def close(self) -> None:
         await self._api.close()
 
-    async def ensure_namespace(self, name: str, labels: dict[str, str]) -> None:
+    async def ensure_namespace(
+        self,
+        name: str,
+        labels: dict[str, str],
+        *,
+        system_namespace: str = DEFAULT_KUBERNETES_SYSTEM_NAMESPACE,
+    ) -> None:
+        """Create the session namespace and bind the cluster components' namespaced
+        ClusterRoles to their ServiceAccounts in `system_namespace`."""
+        all_labels = {LABEL_MANAGED_BY: MANAGED_BY, **labels}
         try:
             await self._core.create_namespace({
                 "apiVersion": "v1",
                 "kind": "Namespace",
-                "metadata": {"name": name, "labels": {LABEL_MANAGED_BY: MANAGED_BY, **labels}},
+                "metadata": {"name": name, "labels": all_labels},
             })
         except ApiException as e:
             if e.status != 409:
                 raise
+            await self._core.patch_namespace(
+                name, {"metadata": {"labels": all_labels}}, _content_type=_MERGE_PATCH
+            )
+        for binding in SESSION_NAMESPACE_BINDINGS:
+            body = role_binding_manifest(binding, name, system_namespace)
+            try:
+                await self._rbac.create_namespaced_role_binding(name, body)
+            except ApiException as e:
+                if e.status != 409:
+                    raise
+                await self._rbac.patch_namespaced_role_binding(
+                    binding.name,
+                    name,
+                    {
+                        "metadata": {"labels": body["metadata"]["labels"]},
+                        "subjects": body["subjects"],
+                    },
+                    _content_type=_MERGE_PATCH,
+                )
 
     async def sync_project_queue(self, resource_group: str, queue: ProjectQueueData) -> str:
         """Make the resource group's queue and the project's queue under it match the Manager.
