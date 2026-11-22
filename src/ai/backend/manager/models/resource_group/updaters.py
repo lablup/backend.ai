@@ -13,29 +13,45 @@ from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    KUBERNETES_RESOURCE_GROUP_DRIVER,
+)
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     ResourceGroupData,
 )
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.compute_cluster import (
+    ComputeClusterNotFound,
+    InvalidResourceGroupDriverOptions,
+    ResourceGroupDriverChangeConflict,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
+from ai.backend.manager.models.compute_cluster.row import ComputeClusterRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_RESOURCE_GROUP_INDEX = "uq_scaling_groups_is_default"
 
 
 @dataclass
-class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
+class ResourceGroupUpdater(GuardedDataUpdater[ResourceGroupRow, ResourceGroupData]):
     """Edits a resource group's status, metadata, network, driver, scheduler and
-    fair-share settings."""
+    fair-share settings.
+
+    A driver change is checked against the stored driver: a `kubernetes` group must name a
+    registered compute cluster, and neither the driver nor the cluster changes while the
+    group has live sessions.
+    """
 
     resource_group_id: ResourceGroupID
     is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
@@ -72,6 +88,66 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
     @override
     def target_id_value(self) -> ResourceGroupID:
         return self.resource_group_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        new_driver = self.driver.optional_value()
+        new_opts = self.driver_opts.optional_value()
+        if new_driver is None and new_opts is None:
+            return ()
+        stored_cluster = ResourceGroupRow.driver_opts["compute_cluster"].astext
+        driver: sa.ColumnElement[Any] = (
+            sa.literal(new_driver) if new_driver is not None else ResourceGroupRow.driver.expression
+        )
+        compute_cluster: sa.ColumnElement[Any] = stored_cluster
+        new_cluster: Any = None
+        if new_opts is not None:
+            new_cluster = new_opts.get("compute_cluster")
+            compute_cluster = sa.literal(new_cluster, sa.String)
+        is_kubernetes = driver == KUBERNETES_RESOURCE_GROUP_DRIVER
+        checks: list[GuardCheck] = []
+        if new_driver is None and not (isinstance(new_cluster, str) and new_cluster.strip()):
+            checks.append(
+                GuardCheck(
+                    condition=lambda: ResourceGroupRow.driver != KUBERNETES_RESOURCE_GROUP_DRIVER,
+                    error=InvalidResourceGroupDriverOptions(
+                        "driver_opts.compute_cluster must be a non-empty string"
+                        " for a kubernetes resource group"
+                    ),
+                )
+            )
+        if new_driver is None or new_driver == KUBERNETES_RESOURCE_GROUP_DRIVER:
+            checks.append(
+                GuardCheck(
+                    condition=lambda: sa.or_(
+                        sa.not_(is_kubernetes),
+                        sa.exists().where(ComputeClusterRow.name == compute_cluster),
+                    ),
+                    error=ComputeClusterNotFound(
+                        f"compute cluster {new_cluster!r} is not registered"
+                        if new_opts is not None
+                        else "the stored compute cluster is not registered"
+                    ),
+                )
+            )
+        changes = sa.or_(
+            driver.is_distinct_from(ResourceGroupRow.driver),
+            sa.and_(is_kubernetes, compute_cluster.is_distinct_from(stored_cluster)),
+        )
+        live_sessions = sa.exists().where(
+            SessionRow.scaling_group_name == ResourceGroupRow.name,
+            SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+        )
+        checks.append(
+            GuardCheck(
+                condition=lambda: sa.or_(sa.not_(changes), sa.not_(live_sessions)),
+                error=ResourceGroupDriverChangeConflict(
+                    f"Resource group {self.resource_group_id} has live sessions;"
+                    " terminate them before changing its driver or compute cluster"
+                ),
+            )
+        )
+        return checks
 
     @property
     @override

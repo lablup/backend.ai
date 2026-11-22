@@ -229,4 +229,8 @@ class SokovanOrchestratorDependency(
 
         log.info("sokovan orchestrator initialized")
 
-        yield orchestrator
+        try:
+            yield orchestrator
+        finally:
+            if scheduler_components.compute_clusters is not None:
+                await scheduler_components.compute_clusters.close()

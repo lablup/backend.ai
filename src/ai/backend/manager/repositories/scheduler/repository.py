@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -319,11 +319,18 @@ class SchedulerRepository:
         return await self._db_source.admit_prereserved_kernels(session_ids)
 
     @scheduler_repository_resilience.apply()
-    async def get_compute_cluster_of_resource_group(
-        self, resource_group: str
-    ) -> ResourceGroupComputeCluster | None:
-        """The compute cluster a `kubernetes` resource group runs its sessions in, if any."""
-        return await self._db_source.get_compute_cluster_of_resource_group(resource_group)
+    async def get_compute_clusters_of_resource_groups(
+        self, resource_groups: Collection[str]
+    ) -> dict[str, ResourceGroupComputeCluster]:
+        """The compute cluster of each `kubernetes` resource group among the given ones."""
+        return await self._db_source.get_compute_clusters_of_resource_groups(resource_groups)
+
+    @scheduler_repository_resilience.apply()
+    async def get_compute_clusters_of_agents(
+        self, agent_ids: Collection[AgentId]
+    ) -> dict[AgentId, ResourceGroupComputeCluster]:
+        """The compute cluster of each given agent whose resource group is `kubernetes`."""
+        return await self._db_source.get_compute_clusters_of_agents(agent_ids)
 
     @scheduler_repository_resilience.apply()
     async def get_project_queue_data(
@@ -331,10 +338,6 @@ class SchedulerRepository:
     ) -> ProjectQueueData:
         """The limit and fair share factor of a project's queue in a compute cluster."""
         return await self._db_source.get_project_queue_data(project_id, resource_group)
-
-    @scheduler_repository_resilience.apply()
-    async def get_resource_group_of_agent(self, agent_id: AgentId) -> str | None:
-        return await self._db_source.get_resource_group_of_agent(agent_id)
 
     @scheduler_repository_resilience.apply()
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:

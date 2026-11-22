@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Collection
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -13,6 +13,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
@@ -24,6 +25,11 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
+)
+from ai.backend.manager.data.compute_cluster.types import (
+    ComputeClusterData,
+    ComputeClusterStatus,
+    ResourceGroupComputeCluster,
 )
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -46,6 +52,8 @@ from ai.backend.manager.data.kernel.types import (
     Metrics as KernelMetrics,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
@@ -344,6 +352,82 @@ def valkey_one_stale_response(
 def _no_compute_cluster() -> AsyncMock:
     """A resolver for which no agent belongs to a compute cluster."""
     resolver = AsyncMock()
-    resolver.for_resource_group.return_value = None
-    resolver.for_agent.return_value = None
+    resolver.of_resource_groups.return_value = {}
+    resolver.of_agents.return_value = {}
     return resolver
+
+
+@pytest.fixture
+def cluster_client() -> AsyncMock:
+    return AsyncMock()
+
+
+@pytest.fixture
+def compute_cluster_data() -> ComputeClusterData:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    return ComputeClusterData(
+        id=ComputeClusterID(uuid4()),
+        name="k8s-local",
+        description=None,
+        api_server="https://10.0.0.1:6443",
+        kubeconfig=SecretValue("ciphertext"),
+        namespace_prefix="bai-",
+        gateway_addr=None,
+        gateway_public_key=None,
+        status=ComputeClusterStatus.ALIVE,
+        status_changed_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@pytest.fixture
+def cluster_lookup() -> dict[AgentId, ResourceGroupComputeCluster]:
+    """What the repository answers per agent; a test fills it in."""
+    return {}
+
+
+@pytest.fixture
+def cluster_repository(
+    mock_repository: AsyncMock, cluster_lookup: dict[AgentId, ResourceGroupComputeCluster]
+) -> AsyncMock:
+    async def of_agents(
+        agent_ids: Collection[AgentId],
+    ) -> dict[AgentId, ResourceGroupComputeCluster]:
+        return {
+            agent_id: cluster_lookup[agent_id]
+            for agent_id in agent_ids
+            if agent_id in cluster_lookup
+        }
+
+    mock_repository.get_compute_clusters_of_agents.side_effect = of_agents
+    return mock_repository
+
+
+@pytest.fixture
+def terminator_on_cluster(
+    cluster_repository: AsyncMock,
+    mock_agent_client_pool: MagicMock,
+    mock_valkey_schedule: AsyncMock,
+    cluster_client: AsyncMock,
+) -> SessionTerminator:
+    """A terminator whose resolver lends `cluster_client`. Kubernetes is disabled in the
+    config: termination does not depend on it."""
+    key_provider_pool = MagicMock()
+    key_provider_pool.decrypt = AsyncMock(return_value="kubeconfig")
+    config_provider = MagicMock()
+    config_provider.config.kubernetes.enabled = False
+    resolver = ComputeClusterResolver(
+        cluster_repository,
+        key_provider_pool,
+        config_provider,
+        client_factory=AsyncMock(return_value=cluster_client),
+    )
+    return SessionTerminator(
+        SessionTerminatorArgs(
+            repository=cluster_repository,
+            agent_client_pool=mock_agent_client_pool,
+            valkey_schedule=mock_valkey_schedule,
+            compute_clusters=resolver,
+        )
+    )

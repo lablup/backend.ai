@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Collection
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
@@ -26,9 +27,15 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.compute_cluster.types import (
+    ComputeClusterData,
+    ComputeClusterStatus,
+    ResourceGroupComputeCluster,
+)
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.models.network.row import NetworkType
-from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterTarget
+from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -384,8 +391,8 @@ def image_config_default() -> dict[UUID, ImageConfigData]:
 def _no_compute_cluster() -> AsyncMock:
     """A resolver for which no resource group runs on a compute cluster."""
     resolver = AsyncMock()
-    resolver.for_resource_group.return_value = None
-    resolver.for_agent.return_value = None
+    resolver.of_resource_groups.return_value = {}
+    resolver.of_agents.return_value = {}
     return resolver
 
 
@@ -398,28 +405,100 @@ def cluster_client() -> AsyncMock:
 
 
 @pytest.fixture
+def compute_cluster_data() -> ComputeClusterData:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    return ComputeClusterData(
+        id=ComputeClusterID(uuid4()),
+        name="k8s-local",
+        description=None,
+        api_server="https://10.0.0.1:6443",
+        kubeconfig=SecretValue("ciphertext"),
+        namespace_prefix="bai-",
+        gateway_addr=None,
+        gateway_public_key=None,
+        status=ComputeClusterStatus.ALIVE,
+        status_changed_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@pytest.fixture
+def cluster_repository(compute_cluster_data: ComputeClusterData) -> AsyncMock:
+    """Every resource group asked about runs on `compute_cluster_data`."""
+    repository = AsyncMock()
+
+    async def of_resource_groups(names: Collection[str]) -> dict[str, ResourceGroupComputeCluster]:
+        return {
+            name: ResourceGroupComputeCluster(
+                resource_group=name,
+                cluster_name=compute_cluster_data.name,
+                cluster=compute_cluster_data,
+                scheduler="sokovan",
+                system_namespace="bai-system",
+            )
+            for name in names
+        }
+
+    repository.get_compute_clusters_of_resource_groups.side_effect = of_resource_groups
+    return repository
+
+
+@pytest.fixture
+def cluster_config_provider(mock_config_provider: MagicMock) -> MagicMock:
+    mock_config_provider.config.kubernetes.enabled = True
+    return mock_config_provider
+
+
+@pytest.fixture
+def compute_cluster_resolver(
+    cluster_repository: AsyncMock,
+    cluster_config_provider: MagicMock,
+    cluster_client: AsyncMock,
+) -> ComputeClusterResolver:
+    key_provider_pool = MagicMock()
+    key_provider_pool.decrypt = AsyncMock(return_value="kubeconfig")
+    return ComputeClusterResolver(
+        cluster_repository,
+        key_provider_pool,
+        cluster_config_provider,
+        client_factory=AsyncMock(return_value=cluster_client),
+    )
+
+
+@pytest.fixture
 def launcher_on_cluster(
     mock_repository: AsyncMock,
     mock_system_session_environ_repository: AsyncMock,
     mock_agent_client_pool: MagicMock,
     mock_network_plugin_ctx: MagicMock,
-    mock_config_provider: MagicMock,
+    cluster_config_provider: MagicMock,
     mock_valkey_schedule: AsyncMock,
-    cluster_client: AsyncMock,
+    compute_cluster_resolver: ComputeClusterResolver,
 ) -> SessionLauncher:
     """A launcher for which every resource group runs on a compute cluster."""
-    resolver = AsyncMock()
-    resolver.for_resource_group.return_value = ComputeClusterTarget(
-        name="k8s-local", namespace_prefix="bai-", client=cluster_client
-    )
     return SessionLauncher(
         SessionLauncherArgs(
             scheduler_repository=mock_repository,
             system_session_environ_repository=mock_system_session_environ_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
-            config_provider=mock_config_provider,
+            config_provider=cluster_config_provider,
             valkey_schedule=mock_valkey_schedule,
-            compute_clusters=resolver,
+            compute_clusters=compute_cluster_resolver,
         )
+    )
+
+
+@pytest.fixture
+def session_for_start_on_two_agents() -> SessionDataForStart:
+    """A cluster session whose kernels were bound to two agent rows."""
+    return _create_session_for_start(
+        kernels=[
+            _create_kernel_binding_data(agent_id=AgentId("agent-1"), cluster_idx=0),
+            _create_kernel_binding_data(
+                agent_id=AgentId("agent-2"), cluster_role="sub", cluster_idx=1
+            ),
+        ],
+        cluster_mode=ClusterMode.MULTI_NODE,
     )

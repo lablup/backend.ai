@@ -386,6 +386,6 @@ class TestTerminateSessions:
 def _no_compute_cluster() -> AsyncMock:
     """A resolver for which no agent belongs to a compute cluster."""
     resolver = AsyncMock()
-    resolver.for_resource_group.return_value = None
-    resolver.for_agent.return_value = None
+    resolver.of_resource_groups.return_value = {}
+    resolver.of_agents.return_value = {}
     return resolver

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
@@ -43,6 +45,17 @@ class TestCreateComputeClusterInput:
         assert inp.description is None
         assert inp.gateway_addr is None
         assert inp.gateway_public_key is None
+
+    @pytest.mark.parametrize("prefix", ["Bai-", "bai_", "-bai", "a" * 27])
+    def test_namespace_prefix_outside_dns_label_rules_rejected(self, prefix: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateComputeClusterInput(name="k8s-a", kubeconfig=_KUBECONFIG, namespace_prefix=prefix)
+
+    def test_longest_namespace_prefix_fits_a_namespace_name(self) -> None:
+        inp = CreateComputeClusterInput(
+            name="k8s-a", kubeconfig=_KUBECONFIG, namespace_prefix="a" * 26
+        )
+        assert len(f"{inp.namespace_prefix}{uuid.uuid4()}") <= 63
 
     def test_api_server_is_optional(self) -> None:
         inp = CreateComputeClusterInput(name="k8s-a", kubeconfig=_KUBECONFIG)

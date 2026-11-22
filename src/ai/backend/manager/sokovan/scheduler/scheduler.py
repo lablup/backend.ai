@@ -6,6 +6,7 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
 
 from .hooks.registry import HookRegistry, HookRegistryArgs
 from .launcher.launcher import SessionLauncher
@@ -28,6 +29,8 @@ class SchedulerComponents:
     repository: SchedulerRepository
     config_provider: ManagerConfigProvider
     hook_registry: HookRegistry
+    compute_clusters: ComputeClusterResolver | None = None
+    """Closed with the orchestrator, after the last scheduling cycle."""
 
 
 def create_scheduler_components(
@@ -38,6 +41,7 @@ def create_scheduler_components(
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
+    compute_clusters: ComputeClusterResolver | None = None,
 ) -> SchedulerComponents:
     """Create SchedulerComponents with all required dependencies."""
     hook_registry = HookRegistry(
@@ -54,4 +58,5 @@ def create_scheduler_components(
         repository=repository,
         config_provider=config_provider,
         hook_registry=hook_registry,
+        compute_clusters=compute_clusters,
     )

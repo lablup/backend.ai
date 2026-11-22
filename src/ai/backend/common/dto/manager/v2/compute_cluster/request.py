@@ -27,7 +27,14 @@ __all__ = (
 )
 
 _ApiServer = Annotated[str, StringConstraints(min_length=1, max_length=2048)]
-_NamespacePrefix = Annotated[str, StringConstraints(min_length=1, max_length=32)]
+NAMESPACE_PREFIX_MAX_LENGTH = 26
+"""The prefix plus a 36-character project id stays within a 63-character namespace name."""
+_NamespacePrefix = Annotated[
+    str,
+    StringConstraints(
+        min_length=1, max_length=NAMESPACE_PREFIX_MAX_LENGTH, pattern=r"^[a-z0-9]([-a-z0-9]*)?$"
+    ),
+]
 _Description = Annotated[str, StringConstraints(max_length=512)]
 _GatewayAddr = Annotated[str, StringConstraints(min_length=1, max_length=256)]
 _Kubeconfig = Annotated[str, StringConstraints(min_length=1)]
@@ -83,7 +90,8 @@ class CreateComputeClusterInput(BaseRequestModel):
     namespace_prefix: _NamespacePrefix = Field(
         default="bai-",
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Prefix of the namespaces created in the cluster."
+            f"Added in {NEXT_RELEASE_VERSION}. Prefix of the namespaces created in the cluster:"
+            " lowercase alphanumerics and '-', at most 26 characters."
         ),
     )
     gateway_addr: _GatewayAddr | None = Field(

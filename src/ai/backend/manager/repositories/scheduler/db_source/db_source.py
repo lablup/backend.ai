@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -102,7 +102,6 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.compute_cluster import ComputeClusterNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.errors.network import NetworkNotFound
@@ -1805,37 +1804,77 @@ class ScheduleDBSource:
 
         return force_terminated_sessions
 
-    async def get_compute_cluster_of_resource_group(
-        self, resource_group: str
-    ) -> ResourceGroupComputeCluster | None:
-        """The compute cluster a `kubernetes` resource group runs its sessions in, if any."""
+    async def get_compute_clusters_of_resource_groups(
+        self, resource_groups: Collection[str]
+    ) -> dict[str, ResourceGroupComputeCluster]:
+        """The compute cluster of each `kubernetes` resource group among the given ones.
+
+        A resource group of another driver is absent; one naming an unregistered cluster
+        maps to an entry whose `cluster` is None.
+        """
+        if not resource_groups:
+            return {}
         async with self._db.begin_readonly_session_read_committed() as session:
-            group = (
+            rows = (
                 await session.execute(
-                    sa.select(ResourceGroupRow.driver, ResourceGroupRow.driver_opts).where(
-                        ResourceGroupRow.name == resource_group
+                    self._compute_cluster_query().where(
+                        ResourceGroupRow.name.in_(list(resource_groups))
                     )
                 )
-            ).first()
-            if group is None or group.driver != KUBERNETES_RESOURCE_GROUP_DRIVER:
-                return None
-            opts = group.driver_opts or {}
-            cluster_name = opts.get("compute_cluster")
-            row = await session.scalar(
-                sa.select(ComputeClusterRow).where(ComputeClusterRow.name == cluster_name)
-            )
-            if row is None:
-                raise ComputeClusterNotFound(
-                    f"resource group {resource_group} names compute cluster {cluster_name!r},"
-                    " which is not registered"
+            ).all()
+            return {row.name: self._to_resource_group_compute_cluster(row) for row in rows}
+
+    async def get_compute_clusters_of_agents(
+        self, agent_ids: Collection[AgentId]
+    ) -> dict[AgentId, ResourceGroupComputeCluster]:
+        """The compute cluster of each given agent whose resource group is `kubernetes`.
+
+        One query for the whole batch; an agent of another driver is absent.
+        """
+        if not agent_ids:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as session:
+            rows = (
+                await session.execute(
+                    self._compute_cluster_query()
+                    .add_columns(AgentRow.id.label("agent_id"))
+                    .join(AgentRow, AgentRow.scaling_group == ResourceGroupRow.name)
+                    .where(AgentRow.id.in_(list(agent_ids)))
                 )
-            return ResourceGroupComputeCluster(
-                cluster=ComputeClusterSearchableFields.own.to_data(row),
-                scheduler=str(opts.get("scheduler") or DEFAULT_CLUSTER_SCHEDULER),
-                system_namespace=str(
-                    opts.get("system_namespace") or DEFAULT_KUBERNETES_SYSTEM_NAMESPACE
-                ),
+            ).all()
+            return {
+                AgentId(row.agent_id): self._to_resource_group_compute_cluster(row) for row in rows
+            }
+
+    @staticmethod
+    def _compute_cluster_query() -> sa.Select[Any]:
+        return (
+            sa.select(ResourceGroupRow.name, ResourceGroupRow.driver_opts, ComputeClusterRow)
+            .select_from(ResourceGroupRow)
+            .outerjoin(
+                ComputeClusterRow,
+                ComputeClusterRow.name == ResourceGroupRow.driver_opts["compute_cluster"].astext,
             )
+            .where(ResourceGroupRow.driver == KUBERNETES_RESOURCE_GROUP_DRIVER)
+        )
+
+    @staticmethod
+    def _to_resource_group_compute_cluster(row: sa.Row[Any]) -> ResourceGroupComputeCluster:
+        opts = row.driver_opts or {}
+        cluster_row: ComputeClusterRow | None = row.ComputeClusterRow
+        return ResourceGroupComputeCluster(
+            resource_group=row.name,
+            cluster_name=str(opts.get("compute_cluster") or ""),
+            cluster=(
+                ComputeClusterSearchableFields.own.to_data(cluster_row)
+                if cluster_row is not None
+                else None
+            ),
+            scheduler=str(opts.get("scheduler") or DEFAULT_CLUSTER_SCHEDULER),
+            system_namespace=str(
+                opts.get("system_namespace") or DEFAULT_KUBERNETES_SYSTEM_NAMESPACE
+            ),
+        )
 
     async def get_project_queue_data(
         self, project_id: UUID, resource_group: str
@@ -1856,13 +1895,6 @@ class ScheduleDBSource:
             total_resource_slots={str(k): str(v) for k, v in (slots or {}).items()},
             fair_share_factor=factor,
         )
-
-    async def get_resource_group_of_agent(self, agent_id: AgentId) -> str | None:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            resource_group: str | None = await session.scalar(
-                sa.select(AgentRow.scaling_group).where(AgentRow.id == agent_id)
-            )
-            return resource_group
 
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
         """Get ids of all defined resource groups."""

@@ -67,6 +67,9 @@ class ResourceGroupComputeCluster:
     there (`driver_opts.scheduler`: sokovan, kueue or kube), and the namespace of the
     cluster's Backend.AI components (`driver_opts.system_namespace`)."""
 
-    cluster: ComputeClusterData
+    resource_group: str
+    cluster_name: str
+    cluster: ComputeClusterData | None
+    """None when `driver_opts.compute_cluster` names no registered cluster."""
     scheduler: str
     system_namespace: str

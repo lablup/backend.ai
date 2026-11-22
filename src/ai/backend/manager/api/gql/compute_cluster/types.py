@@ -240,7 +240,11 @@ class CreateComputeClusterInputGQL(PydanticInputMixin[CreateComputeClusterInputD
     )
     description: str | None = gql_field(default=None, description="Optional description.")
     namespace_prefix: str = gql_field(
-        default="bai-", description="Prefix of the namespaces created in the cluster."
+        default="bai-",
+        description=(
+            "Prefix of the namespaces created in the cluster: lowercase alphanumerics and '-',"
+            " at most 26 characters."
+        ),
     )
     gateway_addr: str | None = gql_field(
         default=None, description="Address of the cluster's network gateway."

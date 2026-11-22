@@ -187,6 +187,7 @@ def create_default_scheduler_components(
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
         network_plugin_ctx=network_plugin_ctx,
+        compute_clusters=compute_clusters,
     )
 
 

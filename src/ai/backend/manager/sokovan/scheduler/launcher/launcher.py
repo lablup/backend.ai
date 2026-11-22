@@ -36,6 +36,7 @@ from ai.backend.manager.clients.compute_cluster.mapping import (
     build_session_objects,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.compute_cluster.types import ResourceGroupComputeCluster
 from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
@@ -230,6 +231,10 @@ class SessionLauncher:
         """
         if not sessions:
             return
+        # One lookup for the batch; a resource group of another driver is absent.
+        compute_clusters = await self._compute_clusters.of_resource_groups({
+            session.kernels[0].resource_group for session in sessions if session.kernels
+        })
         system_session_environ_by_session = await self._system_session_environ_repository.resolve(
             sessions,
             SystemSessionEnvironSearcher(
@@ -245,6 +250,9 @@ class SessionLauncher:
                         session,
                         image_configs,
                         system_session_environ_by_session[session.session_id],
+                        compute_clusters.get(session.kernels[0].resource_group)
+                        if session.kernels
+                        else None,
                     )
 
         results = await asyncio.gather(
@@ -264,6 +272,7 @@ class SessionLauncher:
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
         system_session_environ: Mapping[str, str],
+        compute_cluster: ResourceGroupComputeCluster | None = None,
     ) -> None:
         """
         Start a single session by creating kernels on agents.
@@ -271,6 +280,8 @@ class SessionLauncher:
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
         :param system_session_environ: The system session environ the session receives
+        :param compute_cluster: The compute cluster of the session's `kubernetes` resource
+            group, None for agents
         """
         log.debug(
             "session start attempted",
@@ -289,11 +300,13 @@ class SessionLauncher:
             # In production, this would come from database lookups
             idle_timeout = 600  # Default timeout in seconds
 
-            # Setup network configuration
-            compute_cluster = await self._compute_clusters.for_resource_group(
-                session.kernels[0].resource_group
+            cluster = (
+                self._compute_clusters.check_launchable(compute_cluster)
+                if compute_cluster is not None
+                else None
             )
-            if compute_cluster is None:
+            # Setup network configuration
+            if cluster is None:
                 network_setup = await self._setup_network_configuration(session)
             else:
                 # The cluster connects the session's Pods itself (headless Service, NetworkPolicy).
@@ -332,13 +345,19 @@ class SessionLauncher:
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
-            # Create kernels on each agent
-            async def create_kernels_on_agent(
-                agent_id: AgentId,
+            # Create cluster info with network and SSH configuration
+            cluster_info: ClusterInfo = {
+                "mode": session.cluster_mode,
+                "size": len(session.kernels),
+                "replicas": replicas,
+                "network_config": network_setup.network_config,
+                "ssh_keypair": ssh_keypair,
+                "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
+            }
+
+            def build_kernel_configs(
                 agent_kernels: list[KernelBindingData],
-            ) -> None:
-                # Prepare kernel creation configs
-                kernel_ids = [k.kernel_id for k in agent_kernels]
+            ) -> tuple[list[KernelCreationConfig], dict[KernelId, ImageRef]]:
                 kernel_configs: list[KernelCreationConfig] = []
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
@@ -430,21 +449,26 @@ class SessionLauncher:
                         is_local=kernel_image_config["is_local"],
                     )
 
-                # Create cluster info with network and SSH configuration
-                cluster_info: ClusterInfo = {
-                    "mode": session.cluster_mode,
-                    "size": len(session.kernels),
-                    "replicas": replicas,
-                    "network_config": network_setup.network_config,
-                    "ssh_keypair": ssh_keypair,
-                    "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
-                }
+                return kernel_configs, kernel_image_refs
 
-                if compute_cluster is not None:
+            if compute_cluster is not None and cluster is not None:
+                # One workload carries every kernel of the session, whichever agent row
+                # each kernel was bound to.
+                all_configs, _ = build_kernel_configs(list(session.kernels))
+                async with self._compute_clusters.connect(compute_cluster, cluster) as target:
                     await self._create_in_compute_cluster(
-                        compute_cluster, session, kernel_configs, cluster_info
+                        target, session, all_configs, cluster_info
                     )
-                    return
+                log.trace("session started", session_type=session.session_type)
+                return
+
+            # Create kernels on each agent
+            async def create_kernels_on_agent(
+                agent_id: AgentId,
+                agent_kernels: list[KernelBindingData],
+            ) -> None:
+                kernel_ids = [k.kernel_id for k in agent_kernels]
+                kernel_configs, kernel_image_refs = build_kernel_configs(agent_kernels)
                 # Create the kernels using connection pool
                 async with self._agent_client_pool.acquire(agent_id) as client:
                     await client.create_kernels(
