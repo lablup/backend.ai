@@ -19,6 +19,7 @@ from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.controller.naming import HOSTNAME_LABEL, SOKOVAN_GATE
 from ai.backend.kube.crd.base import CRD_VERSION
+from ai.backend.kube.crd.device import DeviceProfile
 from ai.backend.kube.crd.scheduling import (
     BindRequest,
     BindRequestPhase,
@@ -28,6 +29,7 @@ from ai.backend.kube.crd.scheduling import (
     SokovanBindMode,
 )
 from ai.backend.kube.scheduler.cycle import (
+    GpuAllocationPolicy,
     Placement,
     PlacementStrategy,
     Skip,
@@ -36,10 +38,16 @@ from ai.backend.kube.scheduler.cycle import (
 )
 from ai.backend.kube.scheduler.snapshot import (
     PodKey,
+    bind_requested,
     build_nodes,
     build_pending_groups,
     build_queues,
     in_flight_binds,
+    is_dedicated,
+    is_gated,
+    pod_group_of,
+    reserved_claims,
+    slot_profiles,
 )
 from ai.backend.logging.structured import StructuredLogger
 
@@ -50,10 +58,73 @@ _JSON_PATCH: Final = "application/json-patch+json"
 _PG = PodGroup.crd
 _Q = Queue.crd
 _BR = BindRequest.crd
+_DP = DeviceProfile.crd
 _BIND_BACKOFF_LIMIT: Final = 3
 BIND_TIMEOUT: Final = 60.0  # seconds a BindRequest may stay pending
+# Seconds a released Pod may stay unschedulable for kube-scheduler (gate mode).
+RELEASE_TIMEOUT: Final = 120.0
+# Seconds a gang may stay partly placed while its missing members do not fit.
+STALE_GANG_TIMEOUT: Final = 300.0
 _DRA_GROUP: Final = "resource.k8s.io"
 _DRA_VERSION: Final = "v1"
+
+type GroupKey = tuple[str, str]  # namespace, PodGroup name
+
+
+def _devices_of(allocation: Mapping[str, Any]) -> list[tuple[str, str, str, str]]:
+    results = (allocation.get("devices") or {}).get("results") or []
+    return sorted(
+        (r["driver"], r["pool"], r["device"], str(r.get("shareID") or "")) for r in results
+    )
+
+
+def rolled_back(
+    br: Mapping[str, Any],
+    pods: Mapping[PodKey, Mapping[str, Any]],
+    claims: Mapping[tuple[str, str], Mapping[str, Any]],
+) -> bool:
+    """Whether a failed BindRequest left nothing behind: its Pod is bound as asked, or none
+    of its claims still holds its allocation for the Pod."""
+    ns, spec = br["metadata"]["namespace"], br["spec"]
+    pod = pods.get((ns, spec["podName"]))
+    if (
+        pod is not None
+        and pod["metadata"].get("uid") == spec["podUid"]
+        and pod.get("spec", {}).get("nodeName") == spec["selectedNode"]
+    ):
+        return True
+    for ca in spec.get("resourceClaimAllocations") or []:
+        claim = claims.get((ns, ca["name"]))
+        if claim is None:
+            continue
+        status = claim.get("status") or {}
+        allocation = status.get("allocation")
+        reserved = {r.get("uid") for r in status.get("reservedFor") or []}
+        if (
+            allocation
+            and _devices_of(allocation) == _devices_of(ca["allocation"])
+            and (spec["podUid"] in reserved or not reserved)
+        ):
+            return False
+    return True
+
+
+def unplaceable_since(pod: Mapping[str, Any]) -> datetime | None:
+    """When kube-scheduler found no node for a Pod sokovan released, if it has not placed it."""
+    spec, meta = pod.get("spec", {}), pod["metadata"]
+    if spec.get("nodeName") or is_gated(pod) or meta.get("deletionTimestamp"):
+        return None
+    if HOSTNAME_LABEL not in (spec.get("nodeSelector") or {}):
+        return None
+    for cond in (pod.get("status") or {}).get("conditions") or []:
+        if (
+            cond.get("type") == "PodScheduled"
+            and cond.get("status") == "False"
+            and cond.get("reason") == "Unschedulable"
+            and cond.get("lastTransitionTime")
+        ):
+            return datetime.fromisoformat(cond["lastTransitionTime"])
+    return None
 
 
 class SokovanScheduler:
@@ -63,7 +134,9 @@ class SokovanScheduler:
     _interval: float
     _strategy: PlacementStrategy
     _bind_mode: SokovanBindMode
+    _policy: GpuAllocationPolicy
     _allocator_url: str
+    _stuck_since: dict[GroupKey, datetime]  # partly placed gangs whose rest does not fit
 
     def __init__(
         self,
@@ -72,6 +145,7 @@ class SokovanScheduler:
         interval: float = 2.0,
         strategy: PlacementStrategy = PlacementStrategy.CONCENTRATED,
         bind_mode: SokovanBindMode = SokovanBindMode.GATE,
+        policy: GpuAllocationPolicy = GpuAllocationPolicy.DRA,
         allocator_url: str = "http://127.0.0.1:8786",
     ) -> None:
         self._api = api
@@ -80,7 +154,9 @@ class SokovanScheduler:
         self._interval = interval
         self._strategy = strategy
         self._bind_mode = bind_mode
+        self._policy = policy
         self._allocator_url = allocator_url
+        self._stuck_since = {}
 
     async def run(self) -> None:
         while True:
@@ -99,6 +175,7 @@ class SokovanScheduler:
             slices_raw,
             claims_raw,
             binds_raw,
+            profiles_raw,
         ) = await asyncio.gather(
             self._core.list_node(),
             self._core.list_pod_for_all_namespaces(),
@@ -107,78 +184,201 @@ class SokovanScheduler:
             self._custom.list_cluster_custom_object(_DRA_GROUP, _DRA_VERSION, "resourceslices"),
             self._custom.list_cluster_custom_object(_DRA_GROUP, _DRA_VERSION, "resourceclaims"),
             self._custom.list_cluster_custom_object(_BR.group, CRD_VERSION, _BR.plural),
+            self._custom.list_cluster_custom_object(_DP.group, CRD_VERSION, _DP.plural),
         )
-        await self._drop_failed_binds(binds_raw["items"])
-        in_flight = in_flight_binds(binds_raw["items"])
-        nodes = [self._api.sanitize_for_serialization(n) for n in nodes_raw.items]
+        now = datetime.now(UTC)
         pods = [self._api.sanitize_for_serialization(p) for p in pods_raw.items]
-        pending = build_pending_groups(groups_raw["items"], pods, in_flight)
+        claims: list[dict[str, Any]] = claims_raw["items"]
+        binds: list[dict[str, Any]] = binds_raw["items"]
+        await self._settle_failed_binds(binds, pods, claims, now)
+        if self._bind_mode == SokovanBindMode.GATE:
+            await self._recover_unplaceable(pods, now)
+        profiles = slot_profiles(profiles_raw["items"])
+        in_flight = in_flight_binds(binds)
+        reserved = reserved_claims(binds)
+        pending = build_pending_groups(
+            groups_raw["items"], pods, in_flight, bind_requested(binds), claims, profiles
+        )
         if not pending:
+            self._stuck_since.clear()
             return
-        results = schedule(
-            build_nodes(nodes, pods, slices_raw["items"], claims_raw["items"], in_flight),
-            build_queues(queues_raw["items"], pods, in_flight),
-            pending,
-            self._strategy,
+        nodes = build_nodes(
+            [self._api.sanitize_for_serialization(n) for n in nodes_raw.items],
+            pods,
+            slices_raw["items"],
+            claims,
+            in_flight,
+            profiles,
+            reserved,
         )
         if self._bind_mode == SokovanBindMode.BINDER:
-            results = await self._bind(results, pods, binds_raw["items"])
+            # The binder bypasses kube-scheduler: sokovan owns only its dedicated nodes.
+            nodes = [n for n in nodes if is_dedicated(n)]
+        results = schedule(
+            nodes,
+            build_queues(queues_raw["items"], pods, in_flight, claims, profiles),
+            pending,
+            self._strategy,
+            self._policy,
+        )
+        if self._bind_mode == SokovanBindMode.BINDER:
+            results = await self._bind(results, pods, reserved)
+        else:
+            results = await self._release_all(results)
         placed = sum(isinstance(r, Placement) for r in results)
         log.debug("scheduling cycle done", pending_groups=len(pending), placed_groups=placed)
+        await self._tear_down_stale_gangs(results, pods, now)
         current = {
             (g["metadata"]["namespace"], g["metadata"]["name"]): g for g in groups_raw["items"]
         }
         for result in results:
-            key = (result.group.namespace, result.group.name)
-            if isinstance(result, Placement) and self._bind_mode == SokovanBindMode.GATE:
-                await self._release(result)
-            await self._report(result, current.get(key))
+            await self._report(result, current.get((result.group.namespace, result.group.name)))
 
-    async def _drop_failed_binds(self, bind_requests: Sequence[Mapping[str, Any]]) -> None:
-        """Requests the binder gave up on, or left pending too long (the binder is down);
-        deleting them puts their Pods back in the queue."""
-        now = datetime.now(UTC)
+    async def _settle_failed_binds(
+        self,
+        bind_requests: Sequence[Mapping[str, Any]],
+        pods: Sequence[Mapping[str, Any]],
+        claims: Sequence[Mapping[str, Any]],
+        now: datetime,
+    ) -> None:
+        """Fail requests left pending too long (the binder is down); delete failed ones once
+        the binder rolled their claims back. A gang with no member bound gives up all its
+        binds then, so it is placed again as a whole."""
+        by_pod = {(p["metadata"]["namespace"], p["metadata"]["name"]): p for p in pods}
+        by_claim = {(c["metadata"]["namespace"], c["metadata"]["name"]): c for c in claims}
+        bound_groups = {
+            (p["metadata"]["namespace"], group)
+            for p in pods
+            if p.get("spec", {}).get("nodeName") and (group := pod_group_of(p)) is not None
+        }
+        failed_groups: set[GroupKey] = set()
         for br in bind_requests:
+            meta, spec = br["metadata"], br["spec"]
             phase = (br.get("status") or {}).get("phase") or BindRequestPhase.PENDING
-            meta = br["metadata"]
             created = datetime.fromisoformat(meta["creationTimestamp"])
-            stale = (
-                phase == BindRequestPhase.PENDING and (now - created).total_seconds() > BIND_TIMEOUT
-            )
-            if phase != BindRequestPhase.FAILED and not stale:
+            if phase == BindRequestPhase.PENDING and (now - created).total_seconds() > BIND_TIMEOUT:
+                await self._fail_bind(br, "bind timeout")
+                phase = BindRequestPhase.FAILED
+            if phase != BindRequestPhase.FAILED:
                 continue
+            if spec.get("podGroup"):
+                failed_groups.add((meta["namespace"], spec["podGroup"]))
+            if not rolled_back(br, by_pod, by_claim):
+                continue  # the binder still has to free its claims
             log.trace(
                 "bind request dropped",
                 k8s_namespace=meta["namespace"],
-                pod_name=br["spec"]["podName"],
+                pod_name=spec["podName"],
                 reason=(br.get("status") or {}).get("reason") or "bind timeout",
             )
+            await self._delete_bind(br)
+        for br in bind_requests:
+            meta, spec = br["metadata"], br["spec"]
+            key = (meta["namespace"], spec.get("podGroup") or "")
+            phase = (br.get("status") or {}).get("phase") or BindRequestPhase.PENDING
+            if (
+                key in failed_groups
+                and key not in bound_groups
+                and phase == BindRequestPhase.PENDING
+            ):
+                await self._fail_bind(br, "another member of the gang failed to bind")
+
+    async def _fail_bind(self, br: Mapping[str, Any], reason: str) -> None:
+        """Mark a pending request failed unless the binder wrote its status meanwhile."""
+        meta = br["metadata"]
+        body = {
+            "metadata": {"resourceVersion": meta["resourceVersion"]},
+            "status": {"phase": BindRequestPhase.FAILED, "reason": reason},
+        }
+        try:
+            await self._custom.patch_namespaced_custom_object_status(
+                _BR.group,
+                CRD_VERSION,
+                meta["namespace"],
+                _BR.plural,
+                meta["name"],
+                body,
+                _content_type=_MERGE_PATCH,
+            )
+        except ApiException as e:
+            if e.status not in (404, 409):
+                raise
+
+    async def _delete_bind(self, br: Mapping[str, Any]) -> None:
+        meta = br["metadata"]
+        try:
+            await self._custom.delete_namespaced_custom_object(
+                _BR.group, CRD_VERSION, meta["namespace"], _BR.plural, meta["name"]
+            )
+        except ApiException as e:
+            if e.status != 404:
+                raise
+
+    async def _recover_unplaceable(self, pods: Sequence[Mapping[str, Any]], now: datetime) -> None:
+        """A Pod sokovan released that kube-scheduler cannot place holds its gang forever: the
+        gang is torn down. A gate cannot be put back on a Pod."""
+        stuck: set[GroupKey] = set()
+        for pod in pods:
+            group = pod_group_of(pod)
+            since = unplaceable_since(pod)
+            if group is None or since is None:
+                continue
+            if (now - since).total_seconds() > RELEASE_TIMEOUT:
+                stuck.add((pod["metadata"]["namespace"], group))
+        for namespace, group in sorted(stuck):
+            await self._tear_down(namespace, group, pods, "kube-scheduler cannot place a member")
+
+    async def _tear_down_stale_gangs(
+        self, results: Sequence[Placement | Skip], pods: Sequence[Mapping[str, Any]], now: datetime
+    ) -> None:
+        stuck: set[GroupKey] = set()
+        for result in results:
+            group = result.group
+            key = (group.namespace, group.name)
+            if (
+                isinstance(result, Skip)
+                and result.reason in (SkipReason.UNSCHEDULABLE, SkipReason.RESERVED)
+                and group.placed_members > 0
+            ):
+                stuck.add(key)
+                since = self._stuck_since.setdefault(key, now)
+                if (now - since).total_seconds() > STALE_GANG_TIMEOUT:
+                    await self._tear_down(
+                        group.namespace, group.name, pods, "missing members do not fit"
+                    )
+        self._stuck_since = {k: v for k, v in self._stuck_since.items() if k in stuck}
+
+    async def _tear_down(
+        self, namespace: str, group: str, pods: Sequence[Mapping[str, Any]], reason: str
+    ) -> None:
+        """Delete every Pod of the gang; their claims and BindRequests go with them."""
+        members = [
+            p
+            for p in pods
+            if p["metadata"]["namespace"] == namespace
+            and pod_group_of(p) == group
+            and not p["metadata"].get("deletionTimestamp")
+        ]
+        for pod in members:
             try:
-                await self._custom.delete_namespaced_custom_object(
-                    _BR.group, CRD_VERSION, meta["namespace"], _BR.plural, meta["name"]
-                )
+                await self._core.delete_namespaced_pod(pod["metadata"]["name"], namespace)
             except ApiException as e:
                 if e.status != 404:
                     raise
+        self._stuck_since.pop((namespace, group), None)
+        log.trace("pod group torn down", k8s_namespace=namespace, pod_group=group, reason=reason)
 
     async def _bind(
         self,
         results: Sequence[Placement | Skip],
         pods: Sequence[Mapping[str, Any]],
-        bind_requests: Sequence[Mapping[str, Any]],
+        reserved: list[dict[str, Any]],
     ) -> list[Placement | Skip]:
         """Allocate each placed group's claims and write its BindRequests; a group whose
         devices do not fit after all is skipped."""
         by_key: dict[PodKey, Mapping[str, Any]] = {
             (p["metadata"]["namespace"], p["metadata"]["name"]): p for p in pods
         }
-        reserved = [
-            r
-            for br in bind_requests
-            if (br.get("status") or {}).get("phase") in (None, BindRequestPhase.PENDING)
-            for ca in br["spec"].get("resourceClaimAllocations") or []
-            for r in ca["allocation"]["devices"]["results"]
-        ]
         out: list[Placement | Skip] = []
         async with aiohttp.ClientSession() as http:
             for result in results:
@@ -231,7 +431,8 @@ class SokovanScheduler:
                         pod, result.nodes[pod_alloc["name"]], result.group.name, allocations
                     )
                     reserved += [
-                        r for ca in allocations for r in ca["allocation"]["devices"]["results"]
+                        {"namespace": ns, "name": ca["name"], "allocation": ca["allocation"]}
+                        for ca in allocations
                     ]
                 out.append(result)
         return out
@@ -268,42 +469,66 @@ class SokovanScheduler:
             _BR.group, CRD_VERSION, meta["namespace"], _BR.plural, body
         )
 
-    async def _release(self, placement: Placement) -> None:
+    async def _release_all(self, results: Sequence[Placement | Skip]) -> list[Placement | Skip]:
+        out: list[Placement | Skip] = []
+        for result in results:
+            if isinstance(result, Placement):
+                out.append(await self._release(result))
+            else:
+                out.append(result)
+        return out
+
+    async def _release(self, placement: Placement) -> Placement | Skip:
+        """Pin and ungate every Pod of the placement; nothing is patched unless every Pod
+        still waits for sokovan."""
+        ns = placement.group.namespace
+        patches = []
         for pod_name, node in placement.nodes.items():
-            pod = await self._core.read_namespaced_pod(pod_name, placement.group.namespace)
-            gates = [
-                {"name": g.name} for g in pod.spec.scheduling_gates or [] if g.name != SOKOVAN_GATE
-            ]
-            patch = [
-                {
+            try:
+                pod = await self._core.read_namespaced_pod(pod_name, ns)
+            except ApiException as e:
+                if e.status != 404:
+                    raise
+                return Skip(placement.group, SkipReason.WAITING_FOR_PODS, f"pod {pod_name} is gone")
+            gates = pod.spec.scheduling_gates or []
+            if (
+                pod.metadata.deletion_timestamp is not None
+                or pod.spec.node_name
+                or not any(g.name == SOKOVAN_GATE for g in gates)
+            ):
+                return Skip(
+                    placement.group,
+                    SkipReason.WAITING_FOR_PODS,
+                    f"pod {pod_name} changed before its release",
+                )
+            selector = {"op": "add", "path": "/spec/nodeSelector", "value": {HOSTNAME_LABEL: node}}
+            if pod.spec.node_selector is not None:
+                selector = {
                     "op": "add",
                     "path": f"/spec/nodeSelector/{HOSTNAME_LABEL.replace('/', '~1')}",
                     "value": node,
-                },
-                {"op": "replace", "path": "/spec/schedulingGates", "value": gates},
-            ]
-            if pod.spec.node_selector is None:
-                patch[0] = {
-                    "op": "add",
-                    "path": "/spec/nodeSelector",
-                    "value": {HOSTNAME_LABEL: node},
                 }
-            await self._core.patch_namespaced_pod(
-                pod_name, placement.group.namespace, patch, _content_type=_JSON_PATCH
-            )
+            remaining = [{"name": g.name} for g in gates if g.name != SOKOVAN_GATE]
+            patches.append((
+                pod_name,
+                [selector, {"op": "replace", "path": "/spec/schedulingGates", "value": remaining}],
+            ))
+        for pod_name, patch in patches:
+            await self._core.patch_namespaced_pod(pod_name, ns, patch, _content_type=_JSON_PATCH)
         log.trace(
             "pod group released",
-            k8s_namespace=placement.group.namespace,
+            k8s_namespace=ns,
             pod_group=placement.group.name,
             nodes=",".join(sorted(set(placement.nodes.values()))),
         )
+        return placement
 
     async def _report(self, result: Placement | Skip, current: dict[str, Any] | None) -> None:
         now = datetime.now(UTC).isoformat()
         if isinstance(result, Placement):
             status: dict[str, Any] = {
                 "phase": PodGroupPhase.SCHEDULED,
-                "scheduled": len(result.nodes),
+                "scheduled": len(result.nodes) + result.group.placed_members,
                 "lastSchedulingAttempt": now,
                 "conditions": [
                     {
