@@ -7,17 +7,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
+from ai.backend.kube.crd.device import GPUAllocationPolicy
+
 
 class PlacementStrategy(enum.StrEnum):
     CONCENTRATED = "concentrated"  # fill the busiest node that fits first (binpack)
     DISPERSED = "dispersed"  # use the least busy node first (spread)
-
-
-class GpuAllocationPolicy(enum.StrEnum):
-    """Who holds the NVIDIA GPUs of the cluster (suggestion 4.11)."""
-
-    DRA = "dra"  # devices only through ResourceClaims
-    DEVICE_PLUGIN = "device-plugin"  # whole GPUs as an extended resource; no shares
 
 
 class SkipReason(enum.StrEnum):
@@ -391,7 +386,7 @@ def schedule(
     queues: Mapping[str, QueueState],
     groups: Sequence[PendingGroup],
     strategy: PlacementStrategy = PlacementStrategy.CONCENTRATED,
-    policy: GpuAllocationPolicy = GpuAllocationPolicy.DRA,
+    policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
 ) -> list[Placement | Skip]:
     """Decide which pending groups start now: higher priority, then the queue with the higher
     fair share factor, then the oldest.
@@ -417,7 +412,7 @@ def schedule(
                 )
             )
             continue
-        if policy == GpuAllocationPolicy.DEVICE_PLUGIN and any(p.share_claims for p in group.pods):
+        if policy == GPUAllocationPolicy.DEVICE_PLUGIN and any(p.share_claims for p in group.pods):
             results.append(
                 Skip(
                     group,

@@ -1,4 +1,37 @@
 {{- if .Values.nodeHelper.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-helper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+# The helper checks that a container to commit belongs to a kernel Pod on its node.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-node-helper
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-node-helper
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-node-helper
+subjects:
+  - {kind: ServiceAccount, name: node-helper, namespace: {{ .Release.Namespace }}}
+---
 # node helper (suggestion-1122 9.2): session commit and push with the node's containerd.
 # Its token comes from an existing Secret that the gateway reads too (nodeHelper.tokenSecret).
 apiVersion: apps/v1
@@ -18,7 +51,7 @@ spec:
       labels:
         app.kubernetes.io/name: node-helper
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: node-helper
       {{- with .Values.nodeHelper.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
@@ -36,6 +69,9 @@ spec:
           args: ["ai.backend.kube.nodehelper"]
           env:
             - {name: HOME, value: /tmp}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef: {fieldPath: spec.nodeName}
             - {name: BACKENDAI_NODE_HELPER_PORT, value: {{ .Values.nodeHelper.port | quote }}}
             - name: BACKENDAI_NODE_HELPER_TOKEN
               valueFrom:

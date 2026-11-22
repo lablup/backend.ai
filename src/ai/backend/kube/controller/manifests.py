@@ -253,7 +253,10 @@ def build_kernel_pod(
     settings: ControllerSettings,
     mounts: Sequence[ResolvedMount] = (),
     devices: Sequence[DeviceClaim] = (),
+    *,
+    sudo_session: bool = False,
 ) -> dict[str, Any]:
+    """`sudo_session` lets the kernel user gain root through sudo, as the Agent allows."""
     if len(mounts) != len(kernel.mounts):
         raise InvalidSessionWorkloadError(f"kernel {kernel.kernel_id}: unresolved vfolder mounts")
     device_parts = pod_device_parts(workload, kernel, devices)
@@ -329,7 +332,7 @@ def build_kernel_pod(
                 "ports": _container_ports(kernel),
                 "resources": _resources(kernel, device_parts),
                 "securityContext": {
-                    "allowPrivilegeEscalation": False,
+                    "allowPrivilegeEscalation": sudo_session,
                     "capabilities": {"drop": ["ALL"], "add": list(KERNEL_CAPABILITIES)},
                     "seccompProfile": _SECCOMP_DEFAULT,
                 },

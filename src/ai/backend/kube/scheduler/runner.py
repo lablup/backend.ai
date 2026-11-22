@@ -19,7 +19,7 @@ from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.controller.naming import HOSTNAME_LABEL, SOKOVAN_GATE
 from ai.backend.kube.crd.base import CRD_VERSION
-from ai.backend.kube.crd.device import DeviceProfile
+from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import (
     BindRequest,
     BindRequestPhase,
@@ -30,7 +30,6 @@ from ai.backend.kube.crd.scheduling import (
 )
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.scheduler.cycle import (
-    GpuAllocationPolicy,
     Placement,
     PlacementStrategy,
     Skip,
@@ -153,7 +152,7 @@ class SokovanScheduler:
     _interval: float
     _strategy: PlacementStrategy
     _bind_mode: SokovanBindMode
-    _policy: GpuAllocationPolicy
+    _policy: GPUAllocationPolicy
     _allocator_url: str
     _stuck_since: dict[GroupKey, datetime]  # partly placed gangs whose rest does not fit
     _requeued: dict[GroupKey, datetime]  # gangs the controller was asked to recreate
@@ -165,7 +164,7 @@ class SokovanScheduler:
         interval: float = 2.0,
         strategy: PlacementStrategy = PlacementStrategy.CONCENTRATED,
         bind_mode: SokovanBindMode = SokovanBindMode.GATE,
-        policy: GpuAllocationPolicy = GpuAllocationPolicy.DRA,
+        policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
         allocator_url: str = "http://127.0.0.1:8786",
     ) -> None:
         self._api = api

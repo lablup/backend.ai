@@ -22,6 +22,7 @@ from ai.backend.common.dotfile import (
 from ai.backend.kube.errors import InvalidSessionWorkloadError
 
 MANIFEST_KEY: Final = "manifest"
+SUDO_SESSION_FILE: Final = "sudo_session"
 AREAS: Final = frozenset({"config", "work"})
 _RX_MODE: Final = re.compile(r"0?[0-7]{3}")
 _RX_CONTROL: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
@@ -85,6 +86,10 @@ def render_resource_txt(slots: Mapping[str, str], mounts: list[str]) -> str:
     )
 
 
+def is_sudo_session(internal_data: Mapping[str, Any]) -> bool:
+    return bool(internal_data.get("sudo_session_enabled", False))
+
+
 def build_kernel_files(
     *,
     environ: Mapping[str, str],
@@ -114,6 +119,9 @@ def build_kernel_files(
         kf.add("work", "id_container", keypair["private_key"], "0600")
     if bootstrap_script:
         kf.add("work", "bootstrap.sh", bootstrap_script, "0755")
+    if is_sudo_session(internal_data):
+        # The entrypoint grants the kernel user sudo when this file is in /home/config.
+        kf.add("config", SUDO_SESSION_FILE, "1\n", "0444")
     # Later dotfiles overwrite earlier ones, as on the Agent.
     for dotfile in internal_data.get("dotfiles", []):
         try:

@@ -264,3 +264,19 @@ class TestSecurityContext:
         ctx = init["securityContext"]
         assert set(ctx["capabilities"]["add"]) == {"CHOWN", "SETUID", "SETGID"}
         assert ctx["readOnlyRootFilesystem"] is True
+
+
+class TestSudoSessionSecurityContext:
+    def test_privilege_escalation_off_by_default(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        container = build_kernel_pod(workload, main_kernel, settings)["spec"]["containers"][0]
+        assert container["securityContext"]["allowPrivilegeEscalation"] is False
+
+    def test_sudo_session_allows_privilege_escalation(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        container = build_kernel_pod(workload, main_kernel, settings, sudo_session=True)["spec"][
+            "containers"
+        ][0]
+        assert container["securityContext"]["allowPrivilegeEscalation"] is True

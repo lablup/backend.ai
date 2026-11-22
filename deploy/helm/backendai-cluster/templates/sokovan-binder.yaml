@@ -17,7 +17,7 @@ metadata:
 rules:
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["bindrequests"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "delete"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["bindrequests/status"]
     verbs: ["get", "patch"]
@@ -29,7 +29,7 @@ rules:
     verbs: ["create"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceclaims"]
-    verbs: ["get"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceclaims/status"]
     verbs: ["update"]

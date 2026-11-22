@@ -67,3 +67,25 @@ class TestManifest:
     def test_add_rejects_unsafe_files(self, area: str, path: str, mode: str) -> None:
         with pytest.raises(InvalidSessionWorkloadError):
             KernelFiles().add(area, path, "x", mode)
+
+
+class TestSudoSession:
+    def _build(self, internal_data: dict[str, Any]) -> dict[str, list[str]]:
+        return _entries(
+            build_kernel_files(
+                environ={},
+                slots={},
+                mounts=[],
+                session_name="s",
+                internal_data=internal_data,
+                cluster_ssh_keypair=None,
+                bootstrap_script=None,
+            ).to_secret_data()
+        )
+
+    def test_sudo_session_writes_the_marker_in_config(self) -> None:
+        entries = self._build({"sudo_session_enabled": True})
+        assert entries["sudo_session"][0] == "config"
+
+    def test_no_marker_without_sudo_session(self) -> None:
+        assert "sudo_session" not in self._build({})

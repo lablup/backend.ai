@@ -4,8 +4,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
 
+from ai.backend.kube.crd.device import GPUAllocationPolicy
 from ai.backend.kube.scheduler.cycle import (
-    GpuAllocationPolicy,
     NodeState,
     PendingGroup,
     PendingPod,
@@ -407,7 +407,7 @@ class TestShares:
             [_share_node("n")],
             {},
             [_share_group((part,))],
-            policy=GpuAllocationPolicy.DEVICE_PLUGIN,
+            policy=GPUAllocationPolicy.DEVICE_PLUGIN,
         )
         assert isinstance(result, Skip) and result.reason == SkipReason.UNSUPPORTED
 

@@ -93,7 +93,7 @@ def cluster_slots(
             continue
         # A fraction slot counts shares (a device holds its own share capacity); the others
         # count devices: a whole GPU, a MIG instance, or a device plugin's extended resource.
-        extended_name: str | None = getattr(profile, "extended_resource_name", None)
+        extended_name = profile.extended_resource_name
         if profile.sharing_mode == SharingMode.FRACTION:
             quantity = str((Decimal(shares.get(profile.driver_name, 0)) / 100).normalize())
         elif extended_name:

@@ -223,6 +223,14 @@ else
     done
   fi
 
+  # A sudo session on the Kubernetes path: the session controller writes this file (the Agent
+  # writes the same sudoers entry with an exec after start).
+  if [ -f /home/config/sudo_session ]; then
+    mkdir -p /etc/sudoers.d
+    echo "$USER_NAME ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work
+    chmod 0440 /etc/sudoers.d/01-bai-work
+  fi
+
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
   echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42\" \"$@\"..."

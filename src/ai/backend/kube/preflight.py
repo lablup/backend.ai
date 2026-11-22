@@ -19,7 +19,7 @@ from kubernetes_asyncio import client
 from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.crd.base import CRD_VERSION, CustomResource
-from ai.backend.kube.crd.device import DeviceProfile
+from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import BindRequest, PodGroup, Queue
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.crd.storage import StorageBinding
@@ -36,13 +36,6 @@ _CRDS: Final[Sequence[type[CustomResource]]] = (
     BindRequest,
     DeviceProfile,
 )
-
-
-class GPUAllocationPolicy(enum.StrEnum):
-    """Who allocates the cluster's NVIDIA GPUs (suggestion-1122 4.11)."""
-
-    DRA = "dra"
-    DEVICE_PLUGIN = "device-plugin"
 
 
 class Outcome(enum.StrEnum):

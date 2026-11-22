@@ -90,7 +90,7 @@ rules:
     verbs: ["get", "list", "create", "patch"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceclaims"]
-    verbs: ["get", "list", "watch", "create", "delete"]
+    verbs: ["get", "list", "watch", "create", "delete", "deletecollection"]
   # Sessions on the kueue scheduler adapter get a LocalQueue in their namespace.
   - apiGroups: ["kueue.x-k8s.io"]
     resources: ["localqueues"]
@@ -191,6 +191,8 @@ spec:
             - {name: BACKENDAI_KRUNNER_IMAGE, value: {{ include "backendai-cluster.image" .Values.krunner | quote }}}
             - {name: BACKENDAI_SYSTEM_NAMESPACE, value: {{ .Release.Namespace | quote }}}
             - {name: BACKENDAI_KERNEL_UID, value: {{ .Values.sessionController.kernelUid | quote }}}
+            - {name: BACKENDAI_KUBELET_INSECURE_TLS, value: {{ .Values.sessionController.kubeletInsecureTls | default false | quote }}}
+            {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             - {name: BACKENDAI_KERNEL_GID, value: {{ .Values.sessionController.kernelGid | quote }}}
             - {name: BACKENDAI_CONTROLLER_WORKERS, value: {{ .Values.sessionController.workers | quote }}}
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sessionController.logLevel | quote }}}

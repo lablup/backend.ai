@@ -16,7 +16,7 @@ metadata:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
 rules:
   - apiGroups: [""]
-    resources: ["pods", "nodes"]
+    resources: ["pods", "nodes", "namespaces"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceslices"]
@@ -35,6 +35,10 @@ rules:
   - apiGroups: [""]
     resources: ["pods/exec"]
     verbs: ["create", "get"]
+  # The node that holds a committed image is recorded on the kernel Pod.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "patch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]

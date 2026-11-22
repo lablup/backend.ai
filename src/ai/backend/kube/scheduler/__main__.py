@@ -8,10 +8,11 @@ import socket
 import click
 from kubernetes_asyncio import client
 
+from ai.backend.kube.crd.device import GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import SokovanBindMode
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
 from ai.backend.kube.leader import run_maybe_as_leader
-from ai.backend.kube.scheduler.cycle import GpuAllocationPolicy, PlacementStrategy
+from ai.backend.kube.scheduler.cycle import PlacementStrategy
 from ai.backend.kube.scheduler.runner import SokovanScheduler
 from ai.backend.logging.logger import LocalLogger
 from ai.backend.logging.structured import StructuredLogger
@@ -25,7 +26,7 @@ async def _serve(
     interval: float,
     strategy: PlacementStrategy,
     bind_mode: SokovanBindMode,
-    policy: GpuAllocationPolicy,
+    policy: GPUAllocationPolicy,
     allocator_url: str,
     lease: tuple[str, str, str] | None,
 ) -> None:
@@ -73,8 +74,8 @@ async def _serve(
 @click.option(
     "--gpu-allocation-policy",
     envvar="BACKENDAI_GPU_ALLOCATION_POLICY",
-    type=click.Choice([p.value for p in GpuAllocationPolicy]),
-    default=GpuAllocationPolicy.DRA.value,
+    type=click.Choice([p.value for p in GPUAllocationPolicy]),
+    default=GPUAllocationPolicy.DRA.value,
     help="Who holds the NVIDIA GPUs: DRA drivers, or the device plugin (whole GPUs only).",
 )
 @click.option(
@@ -116,7 +117,7 @@ def main(
                 interval,
                 PlacementStrategy(strategy),
                 SokovanBindMode(bind_mode),
-                GpuAllocationPolicy(gpu_allocation_policy),
+                GPUAllocationPolicy(gpu_allocation_policy),
                 allocator_url,
                 lease,
             )

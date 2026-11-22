@@ -30,7 +30,14 @@ rules:
     resources: ["bindrequests"]
     verbs: ["get", "list", "watch", "create", "delete"]
   - apiGroups: ["scheduling.backend.ai"]
-    resources: ["podgroups/status"]
+    resources: ["podgroups/status", "bindrequests/status"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["deviceprofiles"]
+    verbs: ["get", "list", "watch"]
+  # A gang that cannot be placed is requeued through the session controller (annotation only).
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads"]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -85,6 +92,7 @@ spec:
             - {name: BACKENDAI_SCHEDULER_INTERVAL, value: {{ .Values.sokovanScheduler.intervalSeconds | quote }}}
             - {name: BACKENDAI_SCHEDULER_STRATEGY, value: {{ .Values.sokovanScheduler.strategy | quote }}}
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sokovanScheduler.logLevel | quote }}}
+            {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
             {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             {{- if .Values.leaderElection.enabled }}

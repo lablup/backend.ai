@@ -27,6 +27,7 @@ from ai.backend.kube.controller.devices import (
     share_pools,
     translate,
 )
+from ai.backend.kube.controller.kernel_files import is_sudo_session
 from ai.backend.kube.controller.manifests import (
     ControllerSettings,
     SessionSecrets,
@@ -329,6 +330,7 @@ class SessionReconciler:
                     self._settings,
                     mounts[kernel.kernel_id],
                     devices[kernel.kernel_id],
+                    sudo_session=is_sudo_session(secrets.internal_data.get(kernel.kernel_id, {})),
                 ),
                 [
                     build_resource_claim(workload, kernel, c, owner_reference(workload))

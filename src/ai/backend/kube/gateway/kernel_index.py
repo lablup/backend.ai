@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from ai.backend.kube.controller.naming import (
+    ANNOTATION_KERNEL_GID,
+    ANNOTATION_KERNEL_UID,
     KERNEL_CONTAINER,
     LABEL_KERNEL_ID,
     LABEL_SESSION_ID,
@@ -15,9 +17,6 @@ from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
-# Written by the session controller on every kernel Pod (decimal strings).
-ANNOTATION_KERNEL_UID: Final = "backend.ai/kernel-uid"
-ANNOTATION_KERNEL_GID: Final = "backend.ai/kernel-gid"
 # Session namespaces carry this label, set by the Manager when it creates them.
 LABEL_NAMESPACE_MANAGED_BY: Final = "app.kubernetes.io/managed-by"
 NAMESPACE_MANAGED_BY: Final = "backendai-manager"
