@@ -18,39 +18,37 @@ from ai.backend.kube.controller.naming import (
     ANNOTATION_SHARED_DEVICES,
     HOSTNAME_LABEL,
     LABEL_MANAGED_BY,
-    LABEL_QUEUE,
     MANAGED_BY,
     SOKOVAN_GATE,
     SOKOVAN_SCHEDULER,
 )
 from ai.backend.kube.crd.scheduling import BindRequestPhase, PodGroupPhase
+from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.scheduler.cycle import (
     NodeState,
     PendingGroup,
     PendingPod,
-    QueueState,
     Resources,
     ShareClaim,
     ShareOption,
     ShareRequest,
     Taint,
     Toleration,
-    add_slots,
-    queue_chain,
 )
 
-_UNLIMITED: Final = 2**62
 _ENDED_POD_PHASES: Final = frozenset({"Succeeded", "Failed"})
 _NATIVE_RESOURCES: Final = frozenset({"cpu", "memory", "ephemeral-storage", "pods"})
-_INTRINSIC_SLOTS: Final = frozenset({"cpu", "mem"})
 # The capacity of a device in 0.01-share units: the bare key of bai-dra, or qualified.
 SHARES_CAPACITIES: Final = ("shares", "dra.backend.ai/shares")
 _FRACTION: Final = "fraction"
 # In binder mode, sokovan owns only the nodes carrying this taint (NoSchedule).
 DEDICATED_TAINT_KEY: Final = "sokovan.backend.ai/dedicated"
 DEDICATED_TAINT_VALUE: Final = "true"
+# NVKE marks a node that is to be recycled; nothing new goes there.
+NEEDS_RECYCLE_CONDITION: Final = "nvke.nvidia.com/NeedsRecycle"
 
 type PodKey = tuple[str, str]  # namespace, name
+type PodUid = str
 type ClaimKey = tuple[str, str]  # namespace, name
 
 
@@ -214,32 +212,6 @@ def _fraction_classes(profiles: Sequence[SlotProfile]) -> dict[str, str]:
     return {p.device_class: p.driver for p in profiles if p.sharing_mode == _FRACTION}
 
 
-def pod_slots(
-    pod: Mapping[str, Any],
-    claims: Mapping[ClaimKey, Mapping[str, Any]],
-    profiles: Sequence[SlotProfile],
-) -> dict[str, Decimal]:
-    """Device slot amounts of the Pod, for queue limits."""
-    slots: dict[str, Decimal] = defaultdict(Decimal)
-    for key, count in pod_devices(pod).items():
-        slots[key.rpartition("/")[2]] += count
-    by_class = {p.device_class: p for p in profiles if p.sharing_mode == _FRACTION}
-    for claim in _pod_claims(pod, claims):
-        for request in ((claim.get("spec") or {}).get("devices") or {}).get("requests") or []:
-            first: Mapping[str, Any] = request.get("exactly") or next(
-                iter(request.get("firstAvailable") or []), {}
-            )
-            profile = by_class.get(first.get("deviceClassName", ""))
-            shares = _shares_of(first)
-            if profile is not None and shares is not None:
-                slots[profile.slot_name] += Decimal(shares) * int(first.get("count") or 1) / 100
-    extended = pod_extended(pod)
-    for p in profiles:
-        if p.extended_resource and p.extended_resource in extended:
-            slots[p.slot_name] += extended[p.extended_resource]
-    return {k: v for k, v in slots.items() if v}
-
-
 def is_gated(pod: Mapping[str, Any]) -> bool:
     gates = pod.get("spec", {}).get("schedulingGates") or []
     return any(g.get("name") == SOKOVAN_GATE for g in gates)
@@ -249,28 +221,47 @@ def _phase(br: Mapping[str, Any]) -> str:
     return (br.get("status") or {}).get("phase") or BindRequestPhase.PENDING
 
 
-def in_flight_binds(bind_requests: Iterable[Mapping[str, Any]]) -> dict[PodKey, str]:
-    """Pods with a BindRequest the binder has not failed → the node chosen for them."""
+def _live(br: Mapping[str, Any], live_uids: Mapping[PodKey, PodUid] | None) -> bool:
+    """Whether a BindRequest is for the Pod that exists now under its name; a request of a
+    replaced Pod (the controller recreated it) counts for nothing."""
+    if live_uids is None:
+        return True
+    pod = (br["metadata"]["namespace"], br["spec"]["podName"])
+    return live_uids.get(pod) == str(br["spec"].get("podUid"))
+
+
+def live_pod_uids(pods: Iterable[Mapping[str, Any]]) -> dict[PodKey, PodUid]:
+    return {_key(p): str(p["metadata"].get("uid", "")) for p in pods}
+
+
+def in_flight_binds(
+    bind_requests: Iterable[Mapping[str, Any]],
+    live_uids: Mapping[PodKey, PodUid] | None = None,
+) -> dict[PodUid, str]:
+    """Pod uids with a BindRequest the binder has not failed → the node chosen for them."""
     binds = {}
     for br in bind_requests:
-        if _phase(br) == BindRequestPhase.FAILED:
+        if _phase(br) == BindRequestPhase.FAILED or not _live(br, live_uids):
             continue
         spec = br["spec"]
-        binds[br["metadata"]["namespace"], spec["podName"]] = str(spec["selectedNode"])
+        binds[str(spec["podUid"])] = str(spec["selectedNode"])
     return binds
 
 
-def bind_requested(bind_requests: Iterable[Mapping[str, Any]]) -> set[PodKey]:
-    """Pods with any BindRequest: a failed one is placed again only once it is gone."""
-    return {(br["metadata"]["namespace"], br["spec"]["podName"]) for br in bind_requests}
+def bind_requested(bind_requests: Iterable[Mapping[str, Any]]) -> set[PodUid]:
+    """Pod uids with any BindRequest: a failed one is placed again only once it is gone."""
+    return {str(br["spec"]["podUid"]) for br in bind_requests}
 
 
-def reserved_claims(bind_requests: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Claim allocations of BindRequests that are pending or done: the allocator counts them
-    until its informer shows them on the claims."""
+def reserved_claims(
+    bind_requests: Iterable[Mapping[str, Any]],
+    live_uids: Mapping[PodKey, PodUid] | None = None,
+) -> list[dict[str, Any]]:
+    """Claim allocations of BindRequests that are pending or done for a live Pod: the
+    allocator counts them until its informer shows them on the claims."""
     out = []
     for br in bind_requests:
-        if _phase(br) == BindRequestPhase.FAILED:
+        if _phase(br) == BindRequestPhase.FAILED or not _live(br, live_uids):
             continue
         ns = br["metadata"]["namespace"]
         for ca in br["spec"].get("resourceClaimAllocations") or []:
@@ -289,13 +280,13 @@ def _awaits_sokovan(pod: Mapping[str, Any]) -> bool:
     )
 
 
-def target_node(pod: Mapping[str, Any], in_flight: Mapping[PodKey, str]) -> str | None:
+def target_node(pod: Mapping[str, Any], in_flight: Mapping[PodUid, str]) -> str | None:
     """The node a pod holds resources on: bound, chosen in a BindRequest, or released by
     sokovan and pinned."""
     spec = pod.get("spec", {})
     if spec.get("nodeName"):
         return str(spec["nodeName"])
-    if (node := in_flight.get(_key(pod))) is not None:
+    if (node := in_flight.get(str(pod["metadata"].get("uid", "")))) is not None:
         return node
     if _awaits_sokovan(pod):
         return None
@@ -342,7 +333,7 @@ def build_nodes(
     pods: Iterable[Mapping[str, Any]],
     resource_slices: Iterable[Mapping[str, Any]] = (),
     resource_claims: Iterable[Mapping[str, Any]] = (),
-    in_flight: Mapping[PodKey, str] | None = None,
+    in_flight: Mapping[PodUid, str] | None = None,
     profiles: Sequence[SlotProfile] = (),
     reserved: Iterable[Mapping[str, Any]] = (),
 ) -> list[NodeState]:
@@ -413,9 +404,11 @@ def build_nodes(
     for node in nodes:
         meta, spec, status = node["metadata"], node.get("spec", {}), node.get("status", {})
         alloc = status.get("allocatable", {})
-        ready = any(
-            c.get("type") == "Ready" and c.get("status") == "True"
-            for c in status.get("conditions") or []
+        conditions = status.get("conditions") or []
+        ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in conditions)
+        recycling = any(
+            c.get("type") == NEEDS_RECYCLE_CONDITION and c.get("status") == "True"
+            for c in conditions
         )
         name = meta["name"]
         states.append(
@@ -431,7 +424,7 @@ def build_nodes(
                 taints=[
                     Taint(t["key"], t.get("value"), t["effect"]) for t in spec.get("taints") or []
                 ],
-                schedulable=ready and not spec.get("unschedulable", False),
+                schedulable=ready and not recycling and not spec.get("unschedulable", False),
                 devices=dict(devices[name]),
                 devices_used=dict(devices_used[name]),
                 extended={k: int(parse_quantity(v)) for k, v in alloc.items() if _is_extended(k)},
@@ -462,63 +455,6 @@ def _slot_name(driver: str, device: Mapping[str, Any]) -> str:
     return str(attribute.get("string") or driver)
 
 
-def _slot_limits(
-    resources: Mapping[str, Any],
-) -> tuple[Resources | None, dict[str, Decimal]]:
-    if not resources:
-        return None, {}
-    cpu = (resources.get("cpu") or {}).get("limit")
-    mem = (resources.get("mem") or {}).get("limit")
-    slots = {
-        slot: Decimal(str(spec["limit"]))
-        for slot, spec in resources.items()
-        if slot not in _INTRINSIC_SLOTS and (spec or {}).get("limit") is not None
-    }
-    if cpu is None and mem is None:
-        return None, slots
-    return (
-        Resources(
-            math.ceil(Decimal(cpu) * 1000) if cpu is not None else _UNLIMITED,
-            math.ceil(Decimal(mem)) if mem is not None else _UNLIMITED,
-            _UNLIMITED,
-        ),
-        slots,
-    )
-
-
-def build_queues(
-    queues: Iterable[Mapping[str, Any]],
-    pods: Iterable[Mapping[str, Any]],
-    in_flight: Mapping[PodKey, str] | None = None,
-    resource_claims: Iterable[Mapping[str, Any]] = (),
-    profiles: Sequence[SlotProfile] = (),
-) -> dict[str, QueueState]:
-    claims = {
-        (c["metadata"].get("namespace", ""), c["metadata"]["name"]): c for c in resource_claims
-    }
-    states = {}
-    for q in queues:
-        limit, slot_limits = _slot_limits(q.get("spec", {}).get("resources") or {})
-        states[q["metadata"]["name"]] = QueueState(
-            name=q["metadata"]["name"],
-            limit=limit,
-            parent=q.get("spec", {}).get("parentQueue"),
-            fair_share_factor=float((q.get("status") or {}).get("fairShareFactor") or 0.0),
-            slot_limits=slot_limits,
-        )
-    for pod in pods:
-        queue = (pod["metadata"].get("labels") or {}).get(LABEL_QUEUE)
-        if queue is None or target_node(pod, in_flight or {}) is None:
-            continue
-        if not holds_resources(pod):
-            continue
-        slots = pod_slots(pod, claims, profiles)
-        for state in queue_chain(states, queue):
-            state.used = state.used + pod_requests(pod)
-            state.slot_used = add_slots(state.slot_used, slots)
-    return states
-
-
 def pod_group_of(pod: Mapping[str, Any]) -> str | None:
     return (pod["metadata"].get("annotations") or {}).get(ANNOTATION_POD_GROUP)
 
@@ -526,12 +462,17 @@ def pod_group_of(pod: Mapping[str, Any]) -> str | None:
 def build_pending_groups(
     pod_groups: Iterable[Mapping[str, Any]],
     pods: Iterable[Mapping[str, Any]],
-    in_flight: Mapping[PodKey, str] | None = None,
-    has_bind_request: Collection[PodKey] = (),
+    in_flight: Mapping[PodUid, str] | None = None,
+    has_bind_request: Collection[PodUid] = (),
     resource_claims: Iterable[Mapping[str, Any]] = (),
     profiles: Sequence[SlotProfile] = (),
+    workloads: Iterable[Mapping[str, Any]] = (),
 ) -> list[PendingGroup]:
     in_flight = in_flight or {}
+    workload_created = {
+        str(w["metadata"].get("uid")): str(w["metadata"].get("creationTimestamp", ""))
+        for w in workloads
+    }
     claims = {
         (c["metadata"].get("namespace", ""), c["metadata"]["name"]): c for c in resource_claims
     }
@@ -546,7 +487,7 @@ def build_pending_groups(
         if (node := target_node(pod, in_flight)) is not None:
             placed[key].append(node)
             continue
-        if not _awaits_sokovan(pod) or _key(pod) in has_bind_request:
+        if not _awaits_sokovan(pod) or str(meta.get("uid", "")) in has_bind_request:
             continue
         spec = pod.get("spec", {})
         gated[key].append(
@@ -565,7 +506,6 @@ def build_pending_groups(
                 shared_devices=pod_devices(pod, ANNOTATION_SHARED_DEVICES),
                 extended=pod_extended(pod),
                 share_claims=pod_share_claims(pod, claims, profiles),
-                slots=pod_slots(pod, claims, profiles),
             )
         )
     groups = []
@@ -587,14 +527,24 @@ def build_pending_groups(
             PendingGroup(
                 namespace=meta["namespace"],
                 name=meta["name"],
-                queue=spec["queue"],
                 priority=spec.get("priority", 0),
-                created_at=meta.get("creationTimestamp", ""),
+                created_at=_workload_created(meta, workload_created),
                 min_member=spec["minMember"],
                 pods=gated[key],
                 required_levels=(spec.get("topology") or {}).get("requiredLevels") or [],
                 placed_members=len(placed[key]),
                 placed_nodes=sorted(set(placed[key])),
+                session_id=spec.get("sessionId"),
             )
         )
     return groups
+
+
+def _workload_created(meta: Mapping[str, Any], created: Mapping[str, str]) -> str:
+    """The creation time of the SessionWorkload owning a PodGroup: it stays the same when the
+    session controller recreates the PodGroup and its Pods."""
+    crd = SessionWorkload.crd
+    for ref in meta.get("ownerReferences") or []:
+        if ref.get("kind") == crd.kind and (at := created.get(str(ref.get("uid")))):
+            return at
+    return str(meta.get("creationTimestamp", ""))
