@@ -6,10 +6,13 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,6 +20,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
+
+	"github.com/lablup/backend.ai/go/bai-dra-driver/nvmig"
 )
 
 func main() {
@@ -27,6 +32,9 @@ func main() {
 		cdiRoot    = flag.String("cdi-root", envOr("BAI_DRA_CDI_ROOT", "/var/run/cdi"), "CDI spec directory")
 		healthAddr = flag.String("health-addr", envOr("BAI_DRA_HEALTH_ADDR", ":8081"), "address of /healthz and /readyz")
 		resync     = flag.Duration("resync-interval", 30*time.Second, "how often to check the plugin host's devices")
+		dynamicMig = flag.Bool("dynamic-mig", envOr("BAI_DRA_DYNAMIC_MIG", "false") == "true", "create NVIDIA MIG devices on demand (needs NVML)")
+		driverRoot = flag.String("nvidia-driver-root", envOr("BAI_DRA_NVIDIA_DRIVER_ROOT", "/driver-root"), "the node's NVIDIA driver root, for libnvidia-ml (dynamic MIG)")
+		procRoot   = flag.String("proc-root", envOr("BAI_DRA_PROC_ROOT", "/proc"), "procfs with /proc/driver/nvidia (dynamic MIG)")
 	)
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -44,6 +52,12 @@ func main() {
 	}
 	client := kubernetes.NewForConfigOrDie(cfg)
 	d := newDriver(*driverName, *nodeName, newBridge(*socket), &cdiWriter{root: *cdiRoot})
+	pluginDir := filepath.Join("/var/lib/kubelet/plugins", *driverName)
+	if *dynamicMig {
+		if err := setupDynamicMig(ctx, d, client, *driverRoot, *procRoot, pluginDir); err != nil {
+			klog.Fatal(err)
+		}
+	}
 	go serveHealth(ctx, *healthAddr, d)
 	// The plugin host starts beside this container; wait until it answers.
 	for {
@@ -57,7 +71,7 @@ func main() {
 		}
 	}
 	// The kubelet does not create the plugin's socket directory.
-	if err := os.MkdirAll(filepath.Join("/var/lib/kubelet/plugins", *driverName), 0o750); err != nil {
+	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
 		klog.Fatal(err)
 	}
 	helper, err := kubeletplugin.Start(ctx, d,
@@ -78,6 +92,43 @@ func main() {
 	<-ctx.Done()
 	helper.Stop()
 	logger.Info("bai-dra driver stopped")
+}
+
+// setupDynamicMig loads NVML, inspects the GPUs and destroys the MIG devices no prepared claim
+// holds (a restart after a crash).
+func setupDynamicMig(ctx context.Context, d *driver, client kubernetes.Interface, driverRoot, procRoot, pluginDir string) error {
+	lib, err := nvmig.Open(driverRoot)
+	if err != nil {
+		return err
+	}
+	m, err := nvmig.NewManager(lib, filepath.Join(pluginDir, "dynamic-mig.json"), procRoot)
+	if err != nil {
+		return err
+	}
+	if err := m.Reconcile(); err != nil {
+		klog.FromContext(ctx).Error(err, "dynamic MIG cleanup left devices behind")
+	}
+	version, err := client.Discovery().ServerVersion()
+	if err != nil {
+		return fmt.Errorf("API server version: %w", err)
+	}
+	d.mig = m
+	d.splitCounters = splitCounterSlices(version.Major, version.Minor)
+	klog.FromContext(ctx).Info("dynamic MIG on", "splitCounterSlices", d.splitCounters)
+	return nil
+}
+
+// splitCounterSlices: Kubernetes 1.35 and later reject counter sets next to devices.
+func splitCounterSlices(major, minor string) bool {
+	maj, err := strconv.Atoi(strings.TrimSuffix(major, "+"))
+	if err != nil {
+		return true
+	}
+	mnr, err := strconv.Atoi(strings.TrimRight(minor, "+-abcdefghijklmnopqrstuvwxyz"))
+	if err != nil {
+		return true
+	}
+	return maj > 1 || (maj == 1 && mnr >= 35)
 }
 
 func envOr(key, fallback string) string {

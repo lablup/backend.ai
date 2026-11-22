@@ -33,9 +33,16 @@ async def _serve(
     local_config: dict[str, object],
     shared: bool,
     isolation: IsolationProvider | None,
+    dynamic_mig: bool,
 ) -> None:
     host = await PluginHost.start(
-        plugin, plugin_config, local_config, mount_root, shared=shared, isolation=isolation
+        plugin,
+        plugin_config,
+        local_config,
+        mount_root,
+        shared=shared,
+        isolation=isolation,
+        dynamic_mig=dynamic_mig,
     )
     runner = await serve(host, socket_path)
     stop = asyncio.Event()
@@ -111,6 +118,12 @@ async def _serve(
     help="Node directory, mounted at the same path, for the plugin's `agent.var-base-path` files (hook cache).",
 )
 @click.option(
+    "--dynamic-mig/--no-dynamic-mig",
+    envvar="BAI_DRA_DYNAMIC_MIG",
+    default=False,
+    help="The Go driver creates and publishes MIG devices; list whole GPUs only.",
+)
+@click.option(
     "--log-level",
     envvar="BACKENDAI_LOG_LEVEL",
     type=click.Choice([lv.name for lv in LogLevel]),
@@ -126,6 +139,7 @@ def main(
     hami_lib_dir: Path | None,
     hook_distro: str,
     var_base_path: Path,
+    dynamic_mig: bool,
     log_level: str,
 ) -> None:
     provider = isolation_provider(
@@ -144,6 +158,7 @@ def main(
                 local_config,
                 shared,
                 provider,
+                dynamic_mig,
             )
         )
 

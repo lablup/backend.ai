@@ -16,6 +16,8 @@ import (
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+
+	"github.com/lablup/backend.ai/go/bai-dra-driver/nvmig"
 )
 
 // driver turns the plugin host's devices into a ResourceSlice and its prepare answers into CDI.
@@ -35,6 +37,16 @@ type driver struct {
 	publishedHost       string
 	publishedGeneration int64
 	published           atomic.Bool
+
+	// Dynamic MIG, nil when off: MIG devices are created at prepare (dynmig.go).
+	mig *nvmig.Manager
+	// Kubernetes 1.35 and later take shared counters in ResourceSlices without devices.
+	splitCounters bool
+	// The last listed device of each dynamic-MIG GPU, by UUID (publish only): the plugin host
+	// may not list a GPU while it is in MIG mode.
+	migParents map[string]DeviceInfo
+	// Whole-GPU device name → UUID of the dynamic-MIG GPUs last published; under mu.
+	wholeGPUs map[string]string
 }
 
 type claimLock struct {
@@ -50,6 +62,8 @@ func newDriver(name, nodeName string, b *bridge, cdi *cdiWriter) *driver {
 		cdi:        cdi,
 		prepared:   map[types.UID][]kubeletplugin.Device{},
 		claimLocks: map[types.UID]*claimLock{},
+		migParents: map[string]DeviceInfo{},
+		wholeGPUs:  map[string]string{},
 	}
 }
 
@@ -93,15 +107,20 @@ func (d *driver) syncDevices(ctx context.Context) error {
 }
 
 func (d *driver) publish(ctx context.Context, resp *DevicesResponse) error {
-	devices, err := toDevices(resp)
+	slices, wholeGPUs, err := d.slices(resp)
 	if err != nil {
 		return err
 	}
-	klog.FromContext(ctx).Info("publishing devices", "count", len(devices), "slot", resp.SlotName, "generation", resp.Generation)
+	count := 0
+	for _, s := range slices {
+		count += len(s.Devices)
+	}
+	d.mu.Lock()
+	d.wholeGPUs = wholeGPUs
+	d.mu.Unlock()
+	klog.FromContext(ctx).Info("publishing devices", "count", count, "slices", len(slices), "slot", resp.SlotName, "generation", resp.Generation)
 	return d.helper.PublishResources(ctx, resourceslice.DriverResources{
-		Pools: map[string]resourceslice.Pool{
-			d.nodeName: {Slices: []resourceslice.Slice{{Devices: devices}}},
-		},
+		Pools: map[string]resourceslice.Pool{d.nodeName: {Slices: slices}},
 	})
 }
 
@@ -210,15 +229,19 @@ func (d *driver) prepare(ctx context.Context, claim *resourceapi.ResourceClaim) 
 	if claim.Status.Allocation == nil {
 		return kubeletplugin.PrepareResult{Err: fmt.Errorf("claim %s is not allocated", claim.Name)}
 	}
-	var names []string
+	var names, migNames []string
 	var ours []resourceapi.DeviceRequestAllocationResult
 	consumed := map[string]map[string]string{}
 	for _, r := range claim.Status.Allocation.Devices.Results {
 		if r.Driver != d.name {
 			continue
 		}
-		names = append(names, r.Device)
 		ours = append(ours, r)
+		if d.mig != nil && d.mig.IsPartition(r.Device) {
+			migNames = append(migNames, r.Device)
+			continue
+		}
+		names = append(names, r.Device)
 		if len(r.ConsumedCapacity) > 0 {
 			consumed[r.Device] = map[string]string{}
 			for k, q := range r.ConsumedCapacity {
@@ -227,22 +250,38 @@ func (d *driver) prepare(ctx context.Context, claim *resourceapi.ResourceClaim) 
 		}
 	}
 	start := time.Now()
-	resp, err := d.bridge.Prepare(ctx, string(claim.UID), names, consumed)
+	migIDs, err := d.prepareMig(string(claim.UID), names, migNames)
 	if err != nil {
 		return kubeletplugin.PrepareResult{Err: err}
 	}
+	resp := &PrepareResponse{}
+	if len(names) > 0 {
+		if resp, err = d.bridge.Prepare(ctx, string(claim.UID), names, consumed); err != nil {
+			return kubeletplugin.PrepareResult{Err: d.rollbackMig(string(claim.UID), err)}
+		}
+	}
 	// The claim's own spec and the CDI devices no single device owns go to the first device.
 	claimIDs := append([]string{}, resp.Edits.CDIDevices...)
-	if !resp.Edits.Empty() {
-		cdiID, err := d.cdi.Write(string(claim.UID), &resp.Edits)
-		if err != nil {
-			return kubeletplugin.PrepareResult{Err: err}
+	if !resp.Edits.Empty() || len(migIDs.nodes) > 0 {
+		var edits *ContainerEdits
+		if !resp.Edits.Empty() {
+			edits = &resp.Edits
 		}
-		claimIDs = append(claimIDs, cdiID)
+		cdiID, deviceIDs, err := d.cdi.WriteSpec(string(claim.UID), edits, migIDs.nodes)
+		if err != nil {
+			return kubeletplugin.PrepareResult{Err: d.rollbackMig(string(claim.UID), err)}
+		}
+		if cdiID != "" {
+			claimIDs = append(claimIDs, cdiID)
+		}
+		for name, id := range deviceIDs {
+			migIDs.ids[name] = append(migIDs.ids[name], id)
+		}
 	}
 	devices = make([]kubeletplugin.Device, 0, len(ours))
 	for i, r := range ours {
 		ids := append([]string{}, resp.DeviceCDIDevices[r.Device]...)
+		ids = append(ids, migIDs.ids[r.Device]...)
 		if i == 0 {
 			ids = append(ids, claimIDs...)
 		}
@@ -277,6 +316,9 @@ func (d *driver) unprepare(ctx context.Context, claim kubeletplugin.NamespacedOb
 	unlock := d.lockClaim(claim.UID)
 	defer unlock()
 	err := d.bridge.Unprepare(ctx, string(claim.UID))
+	if err == nil && d.mig != nil {
+		err = d.mig.Unprepare(string(claim.UID))
+	}
 	if err == nil {
 		err = d.cdi.Remove(string(claim.UID))
 	}

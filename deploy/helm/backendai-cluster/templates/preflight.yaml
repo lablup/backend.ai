@@ -27,7 +27,12 @@ rules:
     verbs: ["list"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceslices"]
+    {{- if include "backendai-cluster.baiDraDynamicMigDrivers" . }}
+    # create: the dry-run probe of shared counters (dynamic MIG); nothing is stored.
+    verbs: ["list", "create"]
+    {{- else }}
     verbs: ["list"]
+    {{- end }}
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["deviceprofiles"]
     verbs: ["list"]
@@ -72,5 +77,6 @@ spec:
             - {name: HOME, value: /tmp}
             {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             - {name: BACKENDAI_PREFLIGHT_BAI_GPU_DRIVERS, value: {{ include "backendai-cluster.baiDraGpuDrivers" . | quote }}}
+            - {name: BACKENDAI_PREFLIGHT_DYNAMIC_MIG_DRIVERS, value: {{ include "backendai-cluster.baiDraDynamicMigDrivers" . | quote }}}
             - {name: BACKENDAI_PREFLIGHT_WAIT_SECONDS, value: {{ .Values.preflight.waitSeconds | quote }}}
 {{- end }}

@@ -30,6 +30,7 @@ from ai.backend.common.types import ResourceSlotEntry, SlotTypes
 from ai.backend.kube.controller.devices import device_key
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.device import DeviceProfile, DeviceProfileSpec, SharingMode
+from ai.backend.kube.scheduler.counters import without_counter_blocked_devices
 from ai.backend.kube.scheduler.cycle import NodeState
 from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, build_nodes
 from ai.backend.logging.structured import StructuredLogger
@@ -108,8 +109,12 @@ def cluster_capacity(
     nodes: Sequence[Mapping[str, Any]],
     resource_slices: Sequence[Mapping[str, Any]] = (),
     profiles: Sequence[DeviceProfileSpec] = (),
+    resource_claims: Sequence[Mapping[str, Any]] = (),
 ) -> ClusterCapacity:
-    """The slots of the nodes a session Pod can land on, in total and per distinct node."""
+    """The slots of the nodes a session Pod can land on, in total and per distinct node.
+    A device whose shared counters are taken by others counts as absent (a MIG slot: the held
+    placements plus those that still fit, each alone); admission is optimistic."""
+    resource_slices = without_counter_blocked_devices(resource_slices, resource_claims)
     totals: dict[str, Decimal] = {"cpu": Decimal(0), "mem": Decimal(0)}
     for profile in profiles:
         if profile.sharing_mode in _REPORTED_MODES:
@@ -162,14 +167,15 @@ class GatewayHeartbeat:
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
     async def beat(self) -> None:
-        nodes, slices, listed_profiles = await asyncio.gather(
+        nodes, slices, listed_profiles, claims = await asyncio.gather(
             self._core.list_node(),
             self._custom.list_cluster_custom_object("resource.k8s.io", "v1", "resourceslices"),
             self._custom.list_cluster_custom_object(_DP.group, CRD_VERSION, _DP.plural),
+            self._custom.list_cluster_custom_object("resource.k8s.io", "v1", "resourceclaims"),
         )
         raw_nodes = [self._api.sanitize_for_serialization(n) for n in nodes.items]
         profiles = [DeviceProfile.model_validate(p).spec for p in listed_profiles["items"]]
-        capacity = cluster_capacity(raw_nodes, slices["items"], profiles)
+        capacity = cluster_capacity(raw_nodes, slices["items"], profiles, claims["items"])
         extra: dict[str, Any] = {}
         if _NODE_SHAPES_FIELD in AgentInfo.model_fields:
             extra[_NODE_SHAPES_FIELD] = capacity.node_shapes

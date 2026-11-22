@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 const cdiKind = "dra.backend.ai/claim"
@@ -32,6 +33,11 @@ type cdiDeviceNode struct {
 	Path        string `json:"path"`
 	HostPath    string `json:"hostPath,omitempty"`
 	Permissions string `json:"permissions,omitempty"`
+	// A character device the runtime creates in the container (a MIG capability).
+	Type     string  `json:"type,omitempty"`
+	Major    int64   `json:"major,omitempty"`
+	Minor    int64   `json:"minor,omitempty"`
+	FileMode *uint32 `json:"fileMode,omitempty"`
 }
 
 type cdiMount struct {
@@ -50,6 +56,50 @@ func (w *cdiWriter) path(claimUID string) string {
 
 // Write the spec atomically and return the CDI device id the kubelet hands to the runtime.
 func (w *cdiWriter) Write(claimUID string, edits *ContainerEdits) (string, error) {
+	id, _, err := w.WriteSpec(claimUID, edits, nil)
+	return id, err
+}
+
+// WriteSpec writes the claim's edits (nil: none) and one CDI device per entry of `devices`
+// (device name → its device nodes). It returns the claim's CDI id ("" without edits) and the
+// devices' ids.
+func (w *cdiWriter) WriteSpec(claimUID string, edits *ContainerEdits, devices map[string][]cdiDeviceNode) (string, map[string]string, error) {
+	var specDevices []cdiDevice
+	claimID := ""
+	if edits != nil {
+		specDevices = append(specDevices, cdiDevice{Name: claimUID, ContainerEdits: claimFields(edits)})
+		claimID = fmt.Sprintf("%s=%s", cdiKind, claimUID)
+	}
+	ids := make(map[string]string, len(devices))
+	names := make([]string, 0, len(devices))
+	for name := range devices {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		specName := claimUID + "-" + name
+		specDevices = append(specDevices, cdiDevice{Name: specName, ContainerEdits: cdiEditsFields{DeviceNodes: devices[name]}})
+		ids[name] = fmt.Sprintf("%s=%s", cdiKind, specName)
+	}
+	spec := cdiSpec{Version: "0.6.0", Kind: cdiKind, Devices: specDevices}
+	data, err := json.MarshalIndent(spec, "", "  ")
+	if err != nil {
+		return "", nil, err
+	}
+	if err := os.MkdirAll(w.root, 0o755); err != nil {
+		return "", nil, err
+	}
+	tmp := w.path(claimUID) + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return "", nil, err
+	}
+	if err := os.Rename(tmp, w.path(claimUID)); err != nil {
+		return "", nil, err
+	}
+	return claimID, ids, nil
+}
+
+func claimFields(edits *ContainerEdits) cdiEditsFields {
 	fields := cdiEditsFields{Env: edits.Env}
 	for _, n := range edits.DeviceNodes {
 		node := cdiDeviceNode{Path: n.Path}
@@ -64,22 +114,7 @@ func (w *cdiWriter) Write(claimUID string, edits *ContainerEdits) (string, error
 	for _, m := range edits.Mounts {
 		fields.Mounts = append(fields.Mounts, cdiMount{HostPath: m.HostPath, ContainerPath: m.ContainerPath, Options: m.Options})
 	}
-	spec := cdiSpec{Version: "0.6.0", Kind: cdiKind, Devices: []cdiDevice{{Name: claimUID, ContainerEdits: fields}}}
-	data, err := json.MarshalIndent(spec, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(w.root, 0o755); err != nil {
-		return "", err
-	}
-	tmp := w.path(claimUID) + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp, w.path(claimUID)); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s=%s", cdiKind, claimUID), nil
+	return fields
 }
 
 func (w *cdiWriter) Remove(claimUID string) error {

@@ -19,7 +19,8 @@ rules:
     resources: ["pods", "nodes", "namespaces"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["resource.k8s.io"]
-    resources: ["resourceslices"]
+    # Claims: the heartbeat leaves out devices whose shared counters others hold (dynamic MIG).
+    resources: ["resourceslices", "resourceclaims"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["deviceprofiles"]
