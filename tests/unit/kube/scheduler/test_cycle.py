@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 
+import pytest
+
 from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.kube.crd.device import GPUAllocationPolicy
 from ai.backend.kube.scheduler.cycle import (
@@ -312,13 +314,12 @@ class TestShares:
         [result] = _schedule([node], [_share_group((part,))])
         assert isinstance(result, Skip)
 
-    def test_the_device_plugin_policy_refuses_shares(self) -> None:
+    @pytest.mark.parametrize(
+        "policy", [GPUAllocationPolicy.DEVICE_PLUGIN, GPUAllocationPolicy.NVIDIA_DRA]
+    )
+    def test_other_policies_refuse_shares(self, policy: GPUAllocationPolicy) -> None:
         part = ShareRequest("gpu.x", (ShareOption(100),))
-        [result] = _schedule(
-            [_share_node("n")],
-            [_share_group((part,))],
-            policy=GPUAllocationPolicy.DEVICE_PLUGIN,
-        )
+        [result] = _schedule([_share_node("n")], [_share_group((part,))], policy=policy)
         assert isinstance(result, Skip) and result.reason == SkipReason.UNSUPPORTED
 
 

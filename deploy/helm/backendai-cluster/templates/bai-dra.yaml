@@ -121,6 +121,9 @@ spec:
 {{- if and .shared (eq $policy "device-plugin") }}
 {{- fail (printf "baiDra.drivers %s: gpuAllocationPolicy device-plugin has no fraction (shared) pool" $name) }}
 {{- end }}
+{{- if and (ne $policy "bai") (include "backendai-cluster.baiDraGpu" .) }}
+{{- fail (printf "baiDra.drivers %s: under gpuAllocationPolicy %s bai-dra publishes no NVIDIA GPUs (an NPU entry sets gpu: false)" $name $policy) }}
+{{- end }}
 {{- if not (hasKey $classes .driverName) }}
 {{- $_ := set $classes .driverName true }}
 ---

@@ -212,9 +212,9 @@ def _check_shared_slot(
     """A `sharedSlot` profile is exclusive and matches the driver and DeviceClass of the fraction
     profile of that slot."""
     prefix = f"kernel {kernel.kernel_id}: {profile.slot_name} (sharedSlot {profile.shared_slot})"
-    if policy == GPUAllocationPolicy.DEVICE_PLUGIN:
+    if policy != GPUAllocationPolicy.BAI:
         raise InvalidSessionWorkloadError(
-            f"{prefix}: the device-plugin GPU allocation policy has no shared devices"
+            f"{prefix}: the {policy} GPU allocation policy has no shared devices"
         )
     if profile.sharing_mode != SharingMode.EXCLUSIVE:
         raise InvalidSessionWorkloadError(
@@ -242,12 +242,12 @@ def _claim(
 ) -> DeviceClaim:
     name = claim_name(slot)
     whole = amount == amount.to_integral_value()
+    if policy != GPUAllocationPolicy.BAI and profile.sharing_mode == SharingMode.FRACTION:
+        raise InvalidSessionWorkloadError(
+            f"kernel {kernel.kernel_id}: {slot} is a fraction of a device, which the"
+            f" {policy} GPU allocation policy does not support"
+        )
     if policy == GPUAllocationPolicy.DEVICE_PLUGIN:
-        if profile.sharing_mode == SharingMode.FRACTION:
-            raise InvalidSessionWorkloadError(
-                f"kernel {kernel.kernel_id}: {slot} is a fraction of a device, which the"
-                " device-plugin GPU allocation policy does not support"
-            )
         if profile.extended_resource_name:
             if profile.sharing_mode != SharingMode.EXCLUSIVE:
                 raise InvalidSessionWorkloadError(

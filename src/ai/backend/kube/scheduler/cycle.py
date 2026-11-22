@@ -31,7 +31,7 @@ class SkipReason(enum.StrEnum):
     GROUP_DOES_NOT_FIT = "GroupDoesNotFit"
 
 
-_SHARES_UNSUPPORTED: Final = "device shares need the bai or nvidia-dra GPU allocation policy"
+_SHARES_UNSUPPORTED: Final = "device shares need the bai GPU allocation policy"
 
 
 @dataclass(frozen=True)
@@ -472,7 +472,7 @@ class _Cycle:
         return [n for n in self.nodes if n.name not in kept]
 
     def unsupported(self, unit: Sequence[PendingGroup]) -> bool:
-        return self.policy == GPUAllocationPolicy.DEVICE_PLUGIN and any(
+        return self.policy != GPUAllocationPolicy.BAI and any(
             p.share_claims for g in unit for p in g.pods
         )
 

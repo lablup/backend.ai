@@ -352,14 +352,20 @@ class TestDevicePluginPolicy:
         [claim] = translate(gpu_kernel, {"cuda.device": plugin_profile}, policy)
         assert claim.extended_resource is None
 
+    @pytest.mark.parametrize(
+        "policy", [GPUAllocationPolicy.DEVICE_PLUGIN, GPUAllocationPolicy.NVIDIA_DRA]
+    )
     def test_fraction_profiles_are_rejected(
-        self, main_kernel: KernelSpec, shares_profile: DeviceProfileSpec
+        self,
+        main_kernel: KernelSpec,
+        shares_profile: DeviceProfileSpec,
+        policy: GPUAllocationPolicy,
     ) -> None:
-        with pytest.raises(InvalidSessionWorkloadError):
+        with pytest.raises(InvalidSessionWorkloadError, match=str(policy)):
             translate(
                 _shares_kernel(main_kernel, "0.5"),
                 {"cuda.shares": shares_profile},
-                GPUAllocationPolicy.DEVICE_PLUGIN,
+                policy,
             )
 
     def test_extended_resource_needs_an_exclusive_profile(
@@ -635,11 +641,17 @@ class TestSharedSlot:
         with pytest.raises(InvalidSessionWorkloadError):
             translate(gpu_kernel, {**shared_profiles, "cuda.shares": shares})
 
-    def test_the_device_plugin_policy_rejects_it(
-        self, gpu_kernel: KernelSpec, shared_profiles: dict[str, DeviceProfileSpec]
+    @pytest.mark.parametrize(
+        "policy", [GPUAllocationPolicy.DEVICE_PLUGIN, GPUAllocationPolicy.NVIDIA_DRA]
+    )
+    def test_other_policies_reject_it(
+        self,
+        gpu_kernel: KernelSpec,
+        shared_profiles: dict[str, DeviceProfileSpec],
+        policy: GPUAllocationPolicy,
     ) -> None:
-        with pytest.raises(InvalidSessionWorkloadError):
-            translate(gpu_kernel, shared_profiles, GPUAllocationPolicy.DEVICE_PLUGIN)
+        with pytest.raises(InvalidSessionWorkloadError, match="no shared devices"):
+            translate(gpu_kernel, shared_profiles, policy)
 
 
 class TestComputeDomainOnBaiDevices:

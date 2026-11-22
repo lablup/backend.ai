@@ -198,6 +198,42 @@ def _other_allocators(node: Mapping[str, Any], nvidia_dra: Mapping[str, int]) ->
     return others
 
 
+def _bai_gpu_devices(
+    slices: Sequence[Mapping[str, Any]], gpu_drivers: Collection[str] | None
+) -> dict[str, int]:
+    """bai-dra GPU driver → devices it publishes (an empty slice is a withdrawn driver)."""
+    counts: dict[str, int] = {}
+    for rs in slices:
+        spec = rs.get("spec", {})
+        driver = spec.get("driver")
+        if gpu_drivers is not None and driver in gpu_drivers and spec.get("devices"):
+            counts[driver] = counts.get(driver, 0) + len(spec["devices"])
+    return counts
+
+
+def _fraction_profiles(profiles: Sequence[Mapping[str, Any]]) -> list[str]:
+    return sorted(
+        p["metadata"]["name"]
+        for p in profiles
+        if p.get("spec", {}).get("sharingMode") == "fraction"
+    )
+
+
+def _other_policy_conflict(
+    slices: Sequence[Mapping[str, Any]],
+    profiles: Sequence[Mapping[str, Any]],
+    gpu_drivers: Collection[str] | None,
+) -> str | None:
+    """Under nvidia-dra and device-plugin, bai-dra publishes no NVIDIA GPUs and no fraction
+    DeviceProfile exists."""
+    if fractions := _fraction_profiles(profiles):
+        return f"fraction DeviceProfiles are not allowed: {', '.join(fractions)}"
+    if published := _bai_gpu_devices(slices, gpu_drivers):
+        drivers = ", ".join(f"{d} ({n} devices)" for d, n in sorted(published.items()))
+        return f"bai-dra publishes NVIDIA GPUs of another allocator: {drivers}"
+    return None
+
+
 def check_bai_node_ownership(
     nodes: Sequence[Mapping[str, Any]],
     slices: Sequence[Mapping[str, Any]],
@@ -249,6 +285,8 @@ def check_gpu_policy(
                 return Check(name, Outcome.FAIL, f"bai: {detail}; {BAI_POLICY_HINT}")
             return Check(name, Outcome.PASS, f"bai: {len(owned)} bai-dra GPU nodes")
         case GPUAllocationPolicy.NVIDIA_DRA:
+            if (conflict := _other_policy_conflict(slices, profiles, gpu_drivers)) is not None:
+                return Check(name, Outcome.FAIL, f"nvidia-dra: {conflict}")
             wants_nvidia = any(
                 p.get("spec", {}).get("driverName") == NVIDIA_DRA_DRIVER for p in profiles
             )
@@ -261,14 +299,8 @@ def check_gpu_policy(
             detail = f"{nvidia_dra} {NVIDIA_DRA_DRIVER} devices"
             return Check(name, Outcome.PASS, f"nvidia-dra: {detail}")
         case GPUAllocationPolicy.DEVICE_PLUGIN:
-            fractions = sorted(
-                p["metadata"]["name"]
-                for p in profiles
-                if p.get("spec", {}).get("sharingMode") == "fraction"
-            )
-            if fractions:
-                detail = f"fraction DeviceProfiles are not allowed: {', '.join(fractions)}"
-                return Check(name, Outcome.FAIL, f"device-plugin: {detail}")
+            if (conflict := _other_policy_conflict(slices, profiles, gpu_drivers)) is not None:
+                return Check(name, Outcome.FAIL, f"device-plugin: {conflict}")
             if nvidia_dra > 0:
                 detail = f"{NVIDIA_DRA_DRIVER} also publishes {nvidia_dra} devices"
                 return Check(name, Outcome.FAIL, f"device-plugin: {detail}")

@@ -34,12 +34,12 @@ krunner:
 #                  devices of its MIG slots (static MIG).
 #   nvidia-dra     NVIDIA GPUs through ResourceClaims of the NVIDIA DRA driver (gpu.nvidia.com,
 #                  AICR `dra-resource-claim` overlay: devicePlugin.enabled=false; dynamic MIG).
-#                  Fractions (cuda.shares) only on a bai-dra fGPU node pool taken out of the NVIDIA
-#                  DRA driver's kubelet plugin.
+#                  Exclusive devices only: no fraction DeviceProfile.
 #   device-plugin  NVIDIA GPUs only as the device plugin's extended resource (nvidia.com/gpu,
-#                  AICR's default): exclusive whole GPUs, no fraction DeviceProfile, no fGPU pool.
-# NPUs go through bai-dra under every policy. Passed to the session controller, the sokovan
-# scheduler and the pre-flight checks.
+#                  AICR's default): exclusive whole GPUs, no fraction DeviceProfile.
+# Under nvidia-dra and device-plugin, bai-dra publishes no NVIDIA GPUs: the chart fails on a GPU
+# entry of baiDra.drivers. NPUs go through bai-dra under every policy. Passed to the session
+# controller, the sokovan scheduler and the pre-flight checks.
 gpuAllocationPolicy: bai
 
 sessionController:
@@ -131,10 +131,8 @@ storageBindings: []
 # default: a shared entry or a CUDA plugin) never run on nodes carrying a label of
 # excludeNodeLabels, and the pre-flight checks fail when a node with their devices has
 # `nvidia.com/gpu` allocatable or `gpu.nvidia.com` devices. NPU entries may share a node with
-# GPUs of another allocator. Under gpuAllocationPolicy bai, the NVIDIA DRA driver runs with
-# gpus.enabled=false (ComputeDomain only) and the device plugin is off. Under nvidia-dra, take the
-# nodes of an fGPU pool out of the NVIDIA DRA driver's kubelet plugin (its chart value
-# `kubeletPlugin.affinity`, an AICR overlay) and set `nvidia.com/gpu.deploy.device-plugin=false`.
+# GPUs of another allocator. GPU entries need gpuAllocationPolicy bai, under which the NVIDIA DRA
+# driver runs with gpus.enabled=false (ComputeDomain only) and the device plugin is off.
 #
 # isolation (per entry) limits a shared allocation (suggestion-1122 4.6); `shared: true` needs
 # hami-core or bai-hook and the chart fails otherwise:
@@ -213,28 +211,23 @@ baiDra:
 #    isolation: hami-core
 #    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
 #    dynamicMig: true                         # static MIG publishing is off for this entry
-#  # gpuAllocationPolicy nvidia-dra: an fGPU pool next to the NVIDIA DRA driver's GPU nodes.
-#  - name: fgpu
-#    driverName: cuda-shares.dra.backend.ai
-#    plugin: ai.backend.accelerator.cuda_open.plugin:CUDAPlugin
-#    pluginConfig: {device_injector: cdi}     # required for cuda_open
-#    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/sharing-mode: fraction}
-#    runtimeClassName: nvidia                 # a plugin that reads the driver library (NVML)
-#    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
-#    shared: true                             # needs DRAConsumableCapacity
-#    isolation: hami-core
-#    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
-#    gpu: true                                # default for shared entries and CUDA plugins
+#  # Per-entry options, shown on an NPU entry.
+#  - name: atom-tuned
+#    driverName: atom.dra.backend.ai
+#    plugin: ai.backend.accelerator.rebellions.atom.plugin:ATOMPlugin
+#    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/accelerator: atom-tuned}
+#    gpu: false                               # default: true for shared entries and CUDA plugins
 #    priorityClassName: system-node-critical  # per entry, overrides baiDra.priorityClassName
 #    driverResources: {}                      # per entry, overrides baiDra.resources.driver
 #    pluginHostResources: {}                  # per entry, overrides baiDra.resources.pluginHost
-#  # Shared GPUs with the enterprise CUDA plugin and its hook (in place of `cuda` or `fgpu`).
-#  - name: fgpu-enterprise
-#    driverName: cuda-shares.dra.backend.ai
+#  # gpuAllocationPolicy bai: shared GPUs with the enterprise CUDA plugin and its hook (in place
+#  # of `cuda`).
+#  - name: cuda-enterprise
+#    driverName: cuda.dra.backend.ai
 #    plugin: ai.backend.accelerator.cuda.plugin:CUDAPlugin
 #    pluginHostImage: {repository: <the kube image with the enterprise CUDA plugin>, tag: ""}
 #    pluginConfig: {allocation_mode: fractional}
-#    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/sharing-mode: fraction}
+#    nodeSelector: {dra.backend.ai/driver-mode: bai}
 #    runtimeClassName: nvidia
 #    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
 #    shared: true
@@ -251,8 +244,8 @@ baiDra:
 
 # DeviceProfiles: Backend.AI slot name → DeviceClass (suggestion-1122 4.8). The session controller
 # turns a kernel's device slots into ResourceClaims (or extended resources) with them; the gateway
-# reports the slots. The chart fails on a fraction profile under gpuAllocationPolicy device-plugin,
-# and on a `sharedSlot` profile without a fraction profile of that slot with the same driverName
+# reports the slots. The chart fails on a fraction profile under gpuAllocationPolicy nvidia-dra or
+# device-plugin, and on a `sharedSlot` profile without a fraction profile of that slot with the same driverName
 # and deviceClassName.
 deviceProfiles: []
 #  # gpuAllocationPolicy bai: fractions of the bai-dra GPUs (baiDra.drivers `cuda` above).
@@ -297,13 +290,6 @@ deviceProfiles: []
 #    deviceClassName: gpu.nvidia.com
 #    attributeMap: {model: productName}   # schema name → the driver's attribute
 #    computeDomain: true
-#  # gpuAllocationPolicy nvidia-dra: the bai-dra fGPU pool (baiDra.drivers `fgpu` above).
-#  - name: cuda-shares
-#    slotName: cuda.shares
-#    sharingMode: fraction
-#    driverName: cuda-shares.dra.backend.ai
-#    deviceClassName: cuda-shares.dra.backend.ai
-#    isolationProvider: hami-core
 #  # gpuAllocationPolicy device-plugin: NVIDIA GPUs as the device plugin's extended resource.
 #  # The kernel container gets resources.limits[nvidia.com/gpu]; no ResourceClaim.
 #  - name: cuda-device

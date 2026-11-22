@@ -1,16 +1,16 @@
 {{- $policy := include "backendai-cluster.gpuAllocationPolicy" . }}
 {{- $profiles := .Values.deviceProfiles }}
 {{- range $profiles }}
-{{- if and (eq $policy "device-plugin") (eq .sharingMode "fraction") }}
-{{- fail (printf "deviceProfiles %s: gpuAllocationPolicy device-plugin allows no fraction profile" .name) }}
+{{- if and (ne $policy "bai") (eq .sharingMode "fraction") }}
+{{- fail (printf "deviceProfiles %s: gpuAllocationPolicy %s allows no fraction profile" .name $policy) }}
 {{- end }}
 {{- if and .extendedResourceName (ne .sharingMode "exclusive") }}
 {{- fail (printf "deviceProfiles %s: extendedResourceName needs sharingMode exclusive" .name) }}
 {{- end }}
 {{- if .sharedSlot }}
 {{- $name := .name }}
-{{- if eq $policy "device-plugin" }}
-{{- fail (printf "deviceProfiles %s: gpuAllocationPolicy device-plugin has no shared devices for sharedSlot" $name) }}
+{{- if ne $policy "bai" }}
+{{- fail (printf "deviceProfiles %s: gpuAllocationPolicy %s has no shared devices for sharedSlot" $name $policy) }}
 {{- end }}
 {{- if ne .sharingMode "exclusive" }}
 {{- fail (printf "deviceProfiles %s: sharedSlot needs sharingMode exclusive" $name) }}

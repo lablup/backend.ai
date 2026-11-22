@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from ai.backend.kube.crd.schema import build_crd
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.preflight import (
@@ -156,6 +158,32 @@ class TestGPUPolicy:
             "nvidia-dra", [_gpu_node("a", None, 8)], [_slice("b", "gpu.nvidia.com")], []
         )
         assert check.outcome == Outcome.FAIL
+
+    @pytest.mark.parametrize("policy", ["nvidia-dra", "device-plugin"])
+    def test_other_policies_fail_when_a_bai_dra_gpu_driver_publishes_devices(
+        self, policy: str
+    ) -> None:
+        slices = [_slice("a", "gpu.nvidia.com"), _slice("b", "cuda.dra.backend.ai")]
+        check = check_gpu_policy(policy, [], slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.FAIL
+        assert "cuda.dra.backend.ai (1 devices)" in check.detail
+
+    def test_nvidia_dra_passes_a_withdrawn_bai_dra_gpu_driver(self) -> None:
+        withdrawn = {"spec": {"nodeName": "a", "driver": "cuda.dra.backend.ai", "devices": []}}
+        slices = [_slice("a", "gpu.nvidia.com"), withdrawn]
+        check = check_gpu_policy("nvidia-dra", [], slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.PASS
+
+    def test_nvidia_dra_allows_bai_dra_npus(self) -> None:
+        slices = [_slice("a", "gpu.nvidia.com"), _slice("a", "atom.dra.backend.ai")]
+        check = check_gpu_policy("nvidia-dra", [], slices, [], [])
+        assert check.outcome == Outcome.PASS
+
+    def test_nvidia_dra_rejects_fraction_profiles(self) -> None:
+        profiles = [_named_profile("fgpu", "fraction", "cuda.dra.backend.ai")]
+        check = check_gpu_policy("nvidia-dra", [], [_slice("a", "gpu.nvidia.com")], profiles)
+        assert check.outcome == Outcome.FAIL
+        assert "fgpu" in check.detail
 
     def test_the_dra_policy_is_gone(self) -> None:
         assert check_gpu_policy("dra", [], [], []).outcome == Outcome.FAIL

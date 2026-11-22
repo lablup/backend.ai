@@ -34,7 +34,7 @@ class GPUAllocationPolicy(enum.StrEnum):
     """Who allocates NVIDIA GPUs in the cluster (suggestion 4.11)."""
 
     BAI = "bai"  # bai-dra: whole and fractional requests on one device
-    NVIDIA_DRA = "nvidia-dra"  # the NVIDIA DRA driver; fractions only on a bai-dra pool
+    NVIDIA_DRA = "nvidia-dra"  # the NVIDIA DRA driver; exclusive devices only
     DEVICE_PLUGIN = "device-plugin"  # the extended resource of the device plugin
 
 
