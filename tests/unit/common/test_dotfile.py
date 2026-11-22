@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from ai.backend.common.dotfile import DotfilePath, InvalidDotfilePath
+from ai.backend.common.dotfile import DotfilePath, InvalidDotfilePath, validate_dotfile_perm
 
 
 @pytest.mark.parametrize(
@@ -88,3 +88,35 @@ def test_rejects_paths_outside_work_dir(raw: str) -> None:
 def test_rejects_reserved_names(raw: str) -> None:
     with pytest.raises(InvalidDotfilePath):
         DotfilePath(raw)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        ".bashrc\n",
+        ".a\nwork f0 0755 .bashrc",
+        ".a\rb",
+        ".a\tb",
+        ".a\x1bb",
+        ".a\x7fb",
+        ".a\x85b",
+        " .bashrc",
+        ".bashrc ",
+    ],
+)
+def test_rejects_control_characters_and_outer_whitespace(raw: str) -> None:
+    with pytest.raises(InvalidDotfilePath):
+        DotfilePath(raw)
+
+
+@pytest.mark.parametrize("raw", ["644", "0644", "0755", "000", "0777", "600"])
+def test_accepts_octal_modes(raw: str) -> None:
+    assert validate_dotfile_perm(raw) == raw
+
+
+@pytest.mark.parametrize(
+    "raw", ["", "64", "1777", "04755", "0o644", "0844", "rwx", "0644\n", " 644", "-1"]
+)
+def test_rejects_other_modes(raw: str) -> None:
+    with pytest.raises(InvalidDotfilePath):
+        validate_dotfile_perm(raw)

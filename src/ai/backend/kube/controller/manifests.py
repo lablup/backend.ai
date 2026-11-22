@@ -40,6 +40,26 @@ REPL_PORTS: Final = (2000, 2001)
 INTRINSIC_PORTS: Final = {"sshd": 2200, "ttyd": 7681, "etty": 7682}
 DEFAULT_SHMEM: Final = 64 * 1024 * 1024
 _ARCH_TO_K8S: Final = {"x86_64": "amd64", "aarch64": "arm64"}
+_SECCOMP_DEFAULT: Final = {"type": "RuntimeDefault"}
+# The container runtime's default set without NET_RAW, MKNOD, SETFCAP and SETPCAP, plus what
+# the Docker agent adds (IPC_LOCK, SYS_NICE). The entrypoint starts as root and drops to
+# LOCAL_USER_ID with su-exec: that takes SETUID and SETGID, not privilege escalation.
+KERNEL_CAPABILITIES: Final = (
+    "AUDIT_WRITE",
+    "CHOWN",
+    "DAC_OVERRIDE",
+    "FOWNER",
+    "FSETID",
+    "IPC_LOCK",
+    "KILL",
+    "NET_BIND_SERVICE",
+    "SETGID",
+    "SETUID",
+    "SYS_CHROOT",
+    "SYS_NICE",
+)
+# install.sh chowns the two area roots, then places the files as the kernel user.
+KRUNNER_CAPABILITIES: Final = ("CHOWN", "SETGID", "SETUID")
 
 
 @dataclass(frozen=True)
@@ -241,6 +261,7 @@ def build_kernel_pod(
         **scheduling.spec,
         "enableServiceLinks": False,
         "automountServiceAccountToken": False,
+        "securityContext": {"seccompProfile": _SECCOMP_DEFAULT},
         "terminationGracePeriodSeconds": settings.termination_grace_seconds,
         "nodeSelector": {
             "kubernetes.io/arch": _ARCH_TO_K8S.get(
@@ -271,6 +292,13 @@ def build_kernel_pod(
                     "requests": {"cpu": "100m", "memory": "64Mi"},
                     "limits": {"cpu": "1", "memory": "256Mi"},
                 },
+                "securityContext": {
+                    "runAsUser": 0,
+                    "allowPrivilegeEscalation": False,
+                    "readOnlyRootFilesystem": True,
+                    "capabilities": {"drop": ["ALL"], "add": list(KRUNNER_CAPABILITIES)},
+                    "seccompProfile": _SECCOMP_DEFAULT,
+                },
             }
         ],
         "containers": [
@@ -286,6 +314,11 @@ def build_kernel_pod(
                 "env": env,
                 "ports": _container_ports(kernel),
                 "resources": _resources(kernel, container_claims),
+                "securityContext": {
+                    "allowPrivilegeEscalation": False,
+                    "capabilities": {"drop": ["ALL"], "add": list(KERNEL_CAPABILITIES)},
+                    "seccompProfile": _SECCOMP_DEFAULT,
+                },
                 "readinessProbe": {
                     "tcpSocket": {"port": REPL_PORTS[0]},
                     "periodSeconds": 2,
@@ -329,7 +362,8 @@ def build_kernel_pod(
                 "name": "kernel-files",
                 "secret": {
                     "secretName": kernel_secret_name(workload, kernel),
-                    "defaultMode": 0o400,
+                    # Only the init container mounts it; it reads them as the kernel user.
+                    "defaultMode": 0o444,
                 },
             },
             {"name": "config", "emptyDir": {"medium": "Memory", "sizeLimit": "16Mi"}},
