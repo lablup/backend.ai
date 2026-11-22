@@ -7,15 +7,20 @@ the cluster's only agent is its session gateway.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
+from typing import Final
+
+import aiohttp
 
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     DEFAULT_KUBERNETES_SYSTEM_NAMESPACE,
 )
 from ai.backend.common.types import AgentId
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.compute_cluster.client import ComputeClusterClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.compute_cluster.types import (
@@ -25,15 +30,36 @@ from ai.backend.manager.data.compute_cluster.types import (
     ResourceGroupComputeCluster,
 )
 from ai.backend.manager.errors.compute_cluster import (
+    ComputeClusterKubeconfigInvalid,
     ComputeClusterLost,
     ComputeClusterNotFound,
+    InvalidKubeconfig,
     KubernetesResourceGroupDisabled,
 )
 from ai.backend.manager.models.compute_cluster.row import COMPUTE_CLUSTER_KUBECONFIG_CONTEXT
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
 type ClientFactory = Callable[[str], Awaitable[ComputeClusterClient]]
+
+CONNECTION_FAILURES_BEFORE_LOST: Final = 5
+"""Consecutive API connection failures after which a compute cluster is marked LOST."""
+
+
+def is_connection_failure(error: BaseException) -> bool:
+    """Whether the API server could not be reached, as opposed to answering with an error."""
+    return isinstance(error, (aiohttp.ClientError, TimeoutError, OSError))
+
+
+@dataclass(frozen=True)
+class ComputeClusterLookup[K]:
+    """The compute clusters found for a batch, and the keys whose lookup failed; a key
+    that is in neither is not on a `kubernetes` resource group."""
+
+    found: Mapping[K, ResourceGroupComputeCluster]
+    unresolved: frozenset[K] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -66,6 +92,7 @@ class ComputeClusterResolver:
     _client_factory: ClientFactory
     _clients: dict[str, _CachedClient]
     _lock: asyncio.Lock
+    _connection_failures: dict[str, int]
 
     def __init__(
         self,
@@ -80,6 +107,7 @@ class ComputeClusterResolver:
         self._client_factory = client_factory
         self._clients = {}
         self._lock = asyncio.Lock()
+        self._connection_failures = {}
 
     async def of_resource_groups(
         self, resource_groups: Collection[str]
@@ -92,6 +120,78 @@ class ComputeClusterResolver:
     ) -> Mapping[AgentId, ResourceGroupComputeCluster]:
         """The agents among the given ones that are the gateway of a compute cluster."""
         return await self._repository.get_compute_clusters_of_agents(agent_ids)
+
+    async def lookup_resource_groups(
+        self, resource_groups: Collection[str]
+    ) -> ComputeClusterLookup[str]:
+        """`of_resource_groups`, isolating a failing lookup: when the batch query fails each
+        resource group is looked up alone, and the ones that still fail are `unresolved`."""
+        if not resource_groups:
+            return ComputeClusterLookup(found={})
+        try:
+            return ComputeClusterLookup(found=await self.of_resource_groups(resource_groups))
+        except Exception as e:
+            log.warning(
+                "compute cluster lookup of resource groups failed",
+                resource_group_count=len(resource_groups),
+                exc_info=e,
+            )
+        found: dict[str, ResourceGroupComputeCluster] = {}
+        unresolved: set[str] = set()
+        for resource_group in resource_groups:
+            try:
+                found.update(await self.of_resource_groups([resource_group]))
+            except Exception:
+                unresolved.add(resource_group)
+        return ComputeClusterLookup(found=found, unresolved=frozenset(unresolved))
+
+    async def lookup_agents(self, agent_ids: Collection[AgentId]) -> ComputeClusterLookup[AgentId]:
+        """`of_agents`, isolating a failing lookup as `lookup_resource_groups` does."""
+        if not agent_ids:
+            return ComputeClusterLookup(found={})
+        try:
+            return ComputeClusterLookup(found=await self.of_agents(agent_ids))
+        except Exception as e:
+            log.warning(
+                "compute cluster lookup of agents failed",
+                agent_count=len(agent_ids),
+                exc_info=e,
+            )
+        found: dict[AgentId, ResourceGroupComputeCluster] = {}
+        unresolved: set[AgentId] = set()
+        for agent_id in agent_ids:
+            try:
+                found.update(await self.of_agents([agent_id]))
+            except Exception:
+                unresolved.add(agent_id)
+        return ComputeClusterLookup(found=found, unresolved=frozenset(unresolved))
+
+    async def revive_if_reachable(
+        self, found: ResourceGroupComputeCluster
+    ) -> ResourceGroupComputeCluster:
+        """Probe a LOST cluster once; when its API server answers it is ALIVE again.
+
+        A LOST cluster gets no new sessions, so without this nothing would reach it to
+        notice that it is back.
+        """
+        cluster = found.cluster
+        if (
+            cluster is None
+            or cluster.status != ComputeClusterStatus.LOST
+            or not self._config_provider.config.kubernetes.enabled
+        ):
+            return found
+        try:
+            async with self.connect(found, cluster) as target:
+                await target.client.probe()
+        except Exception as e:
+            log.debug("lost compute cluster still unreachable", compute_cluster=cluster.name)
+            if not is_connection_failure(e):
+                log.warning(
+                    "lost compute cluster probe failed", compute_cluster=cluster.name, exc_info=e
+                )
+            return found
+        return replace(found, cluster=replace(cluster, status=ComputeClusterStatus.ALIVE))
 
     def check_launchable(self, found: ResourceGroupComputeCluster) -> ComputeClusterData:
         """The cluster a new session may be placed in, or the reason it may not."""
@@ -116,8 +216,19 @@ class ComputeClusterResolver:
     async def connect(
         self, found: ResourceGroupComputeCluster, cluster: ComputeClusterData
     ) -> AsyncIterator[ComputeClusterTarget]:
-        """Lend the cluster's client for the duration of the block."""
-        cached = await self._acquire(cluster)
+        """Lend the cluster's client for the duration of the block.
+
+        Raises ComputeClusterKubeconfigInvalid when the stored kubeconfig no longer
+        validates. A connection failure in the block counts toward marking the cluster
+        LOST; a block that completes marks it ALIVE.
+        """
+        try:
+            cached = await self._acquire(cluster)
+        except InvalidKubeconfig as e:
+            raise ComputeClusterKubeconfigInvalid(
+                f"the stored kubeconfig of compute cluster {cluster.name!r} no longer"
+                f" validates: {e}"
+            ) from e
         try:
             yield ComputeClusterTarget(
                 name=cluster.name,
@@ -126,8 +237,51 @@ class ComputeClusterResolver:
                 scheduler=found.scheduler,
                 system_namespace=found.system_namespace,
             )
+        except Exception as e:
+            if is_connection_failure(e):
+                await self._record_connection_failure(cluster)
+            raise
+        else:
+            await self._record_reachable(cluster)
         finally:
             await self._release(cached)
+
+    async def _record_connection_failure(self, cluster: ComputeClusterData) -> None:
+        failures = self._connection_failures.get(cluster.name, 0) + 1
+        self._connection_failures[cluster.name] = failures
+        if (
+            failures < CONNECTION_FAILURES_BEFORE_LOST
+            or cluster.status == ComputeClusterStatus.LOST
+        ):
+            return
+        if await self._update_status(cluster, ComputeClusterStatus.LOST):
+            log.warning(
+                "compute cluster marked lost",
+                compute_cluster=cluster.name,
+                failure_count=failures,
+            )
+
+    async def _record_reachable(self, cluster: ComputeClusterData) -> None:
+        self._connection_failures.pop(cluster.name, None)
+        if cluster.status == ComputeClusterStatus.ALIVE:
+            return
+        if await self._update_status(cluster, ComputeClusterStatus.ALIVE):
+            log.info("compute cluster alive", compute_cluster=cluster.name)
+
+    async def _update_status(
+        self, cluster: ComputeClusterData, status: ComputeClusterStatus
+    ) -> bool:
+        """Write the status; a failed write is retried by the next call through the cluster."""
+        try:
+            return await self._repository.update_compute_cluster_status(cluster.id, status)
+        except Exception as e:
+            log.warning(
+                "compute cluster status update failed",
+                compute_cluster=cluster.name,
+                status=status,
+                exc_info=e,
+            )
+            return False
 
     async def close(self) -> None:
         """Close every idle client; a lent one is closed when it comes back."""

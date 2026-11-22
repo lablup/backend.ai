@@ -18,6 +18,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleH
 from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
+from ai.backend.manager.views.sokovan.session import PLACEMENT_TIMEOUT_MAX_ATTEMPTS
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -105,20 +106,32 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
         awaiting_teardown: list[SessionId] = []
         ready_to_requeue: list[SessionId] = []
+        placement_timed_out: list[SessionId] = []
+        placement_exhausted: list[SessionId] = []
         for session in sessions:
             session_id = session.session_info.identity.id
-            if all(
+            if not all(
                 kernel.lifecycle.status in KernelStatus.terminal_statuses()
                 for kernel in session.kernel_infos
             ):
-                ready_to_requeue.append(session_id)
-            else:
                 awaiting_teardown.append(session_id)
+                continue
+            match _placement_timeout_attempts(session):
+                case None:
+                    ready_to_requeue.append(session_id)
+                case attempts if attempts >= PLACEMENT_TIMEOUT_MAX_ATTEMPTS:
+                    placement_exhausted.append(session_id)
+                case _:
+                    placement_timed_out.append(session_id)
 
         if awaiting_teardown:
             await self._tear_down(awaiting_teardown)
         if ready_to_requeue:
-            await self._requeue(ready_to_requeue)
+            await self._requeue(ready_to_requeue, KernelLifecycleEventReason.RESCHEDULED)
+        if placement_timed_out:
+            await self._requeue(placement_timed_out, KernelLifecycleEventReason.PLACEMENT_TIMEOUT)
+        if placement_exhausted:
+            await self._cancel(placement_exhausted, KernelLifecycleEventReason.PLACEMENT_TIMEOUT)
         return result
 
     async def _tear_down(self, session_ids: list[SessionId]) -> None:
@@ -133,17 +146,40 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             await self._terminator.terminate_sessions_for_handler(terminating_sessions)
         log.debug("rescheduling session kernels tearing down", session_count=len(session_ids))
 
-    async def _requeue(self, session_ids: list[SessionId]) -> None:
+    async def _requeue(
+        self, session_ids: list[SessionId], reason: KernelLifecycleEventReason
+    ) -> None:
         """Put the sessions back in the queue now that their kernels are gone:
         the kernels drop their placement first, then the sessions become PENDING
         so the scheduling pass can pick them up."""
-        await self._repository.reset_kernels_to_pending_for_sessions(
-            session_ids, KernelLifecycleEventReason.RESCHEDULED
-        )
+        await self._repository.reset_kernels_to_pending_for_sessions(session_ids, reason)
         requeued = await self._scheduling_controller.mark_sessions_status(
             session_ids,
             SessionStatus.PENDING,
-            reason=KernelLifecycleEventReason.RESCHEDULED,
+            reason=reason,
         )
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
-        log.debug("rescheduling sessions requeued", session_count=len(requeued))
+        log.debug("rescheduling sessions requeued", session_count=len(requeued), reason=reason)
+
+    async def _cancel(
+        self, session_ids: list[SessionId], reason: KernelLifecycleEventReason
+    ) -> None:
+        """Cancel the sessions instead of requeueing them; their kernels release what
+        they still hold first."""
+        await self._repository.reset_kernels_to_pending_for_sessions(session_ids, reason)
+        cancelled = await self._scheduling_controller.cancel_rescheduling_sessions(
+            session_ids, reason
+        )
+        log.debug("rescheduling sessions cancelled", session_count=len(cancelled), reason=reason)
+
+
+def _placement_timeout_attempts(session: SessionWithKernels) -> int | None:
+    """The placement timeouts counted on a session sent here by one, or None."""
+    lifecycle = session.session_info.lifecycle
+    if lifecycle.status_info != KernelLifecycleEventReason.PLACEMENT_TIMEOUT:
+        return None
+    recorded = (lifecycle.status_data or {}).get("placement_timeout") or {}
+    try:
+        return int(recorded.get("attempts") or 1)
+    except (TypeError, ValueError):
+        return 1

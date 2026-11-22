@@ -24,7 +24,6 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.compute_cluster.row import ComputeClusterRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
@@ -62,13 +61,6 @@ class ResourceGroupDBSource:
         db: ExtendedAsyncSAEngine,
     ) -> None:
         self._db = db
-
-    async def compute_cluster_exists(self, name: str) -> bool:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            found = await db_sess.scalar(
-                sa.select(ComputeClusterRow.id).where(ComputeClusterRow.name == name)
-            )
-            return found is not None
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:

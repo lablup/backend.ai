@@ -24,10 +24,15 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    KUBERNETES_RESOURCE_GROUP_DRIVER,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.specs.creator import FieldCreator, FieldToCreate
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
@@ -74,6 +79,21 @@ class BatchReconcileTransition[
 
 class ReconcileWriteOps(V2WriteOps):
     """The general v2 write ops plus the status-with-history transition."""
+
+    async def share_lock_kubernetes_resource_group(
+        self, resource_group_id: ResourceGroupID
+    ) -> None:
+        """Hold a `kubernetes` resource group row shared until commit, so a driver or
+        compute cluster change waits for the session written here; any other group is
+        left unlocked."""
+        await self._sess.execute(
+            sa.select(ResourceGroupRow.id)
+            .where(
+                ResourceGroupRow.id == resource_group_id,
+                ResourceGroupRow.driver == KUBERNETES_RESOURCE_GROUP_DRIVER,
+            )
+            .with_for_update(read=True)
+        )
 
     async def apply_transitions(
         self, transitions: Sequence[ReconcileTransition[Any, Any, Any, Any, Any]]

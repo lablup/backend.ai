@@ -15,15 +15,19 @@ from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
+import aiohttp
 import pytest
 
 from ai.backend.common.types import AutoPullBehavior
+from ai.backend.manager.clients.compute_cluster.client import ComputeClusterClient
 from ai.backend.manager.data.compute_cluster.types import (
     ComputeClusterData,
     ComputeClusterStatus,
     ResourceGroupComputeCluster,
 )
+from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -594,6 +598,7 @@ class TestSessionLauncherComputeCluster:
         session_for_start_multi_kernel: SessionDataForStart,
         image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
+        cluster_client.probe.side_effect = aiohttp.ClientConnectionError("unreachable")
         lost = replace(compute_cluster_data, status=ComputeClusterStatus.LOST)
         cluster_repository.get_compute_clusters_of_resource_groups.side_effect = None
         cluster_repository.get_compute_clusters_of_resource_groups.return_value = {
@@ -626,3 +631,74 @@ class TestSessionLauncherComputeCluster:
             await launcher_on_cluster.start_sessions_for_handler(sessions, image_config_default)
 
         cluster_repository.get_compute_clusters_of_resource_groups.assert_awaited_once()
+
+    async def test_a_lost_cluster_that_answers_is_revived(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        cluster_client: AsyncMock,
+        compute_cluster_data: ComputeClusterData,
+        cluster_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        lost = replace(compute_cluster_data, status=ComputeClusterStatus.LOST)
+        cluster_repository.get_compute_clusters_of_resource_groups.side_effect = None
+        cluster_repository.get_compute_clusters_of_resource_groups.return_value = {
+            "default": ResourceGroupComputeCluster(
+                resource_group="default",
+                cluster_name=lost.name,
+                cluster=lost,
+                scheduler="sokovan",
+                system_namespace="bai-system",
+            )
+        }
+        session = session_for_start_single_kernel
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher_on_cluster.start_sessions_for_handler([session], image_config_default)
+
+        cluster_client.probe.assert_awaited_once()
+        cluster_client.create_session.assert_awaited_once()
+        cluster_repository.update_compute_cluster_status.assert_awaited_with(
+            lost.id, ComputeClusterStatus.ALIVE
+        )
+
+    async def test_an_invalid_stored_kubeconfig_fails_the_start_clearly(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        compute_cluster_resolver: ComputeClusterResolver,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        async def refuse(_kubeconfig: str) -> ComputeClusterClient:
+            raise InvalidKubeconfig("`users[u].user.token` must be a non-empty string")
+
+        compute_cluster_resolver._client_factory = refuse
+        session = session_for_start_single_kernel
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher_on_cluster.start_sessions_for_handler([session], image_config_default)
+
+        error_info = mock_repository.update_session_error_info.await_args.args[1]
+        assert "no longer validates" in str(error_info)
+
+    async def test_a_failed_batch_lookup_still_starts_docker_sessions(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        failing_batch_lookup: AsyncMock,
+        cluster_client: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        docker_session: SessionDataForStart,
+        unresolvable_session: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        sessions = [docker_session, unresolvable_session]
+        with RecorderContext.scope("test", entity_ids=[s.session_id for s in sessions]):
+            await launcher_on_cluster.start_sessions_for_handler(sessions, image_config_default)
+
+        create_kernels = mock_agent_client_pool._mock_client.create_kernels
+        create_kernels.assert_awaited_once()
+        assert create_kernels.await_args.args[0] == docker_session.session_id
+        cluster_client.create_session.assert_not_awaited()
+        # The unresolved session is left as it is for the next cycle.
+        mock_repository.update_session_error_info.assert_not_awaited()

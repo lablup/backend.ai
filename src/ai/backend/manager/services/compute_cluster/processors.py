@@ -58,4 +58,4 @@ class ComputeClusterProcessors:
         self.global_search = group.global_searcher_ops(GlobalSearchComputeClustersAction)
         self.create = group.global_scope(CreateComputeClusterAction, service.create)
         self.update = group.single_entity(UpdateComputeClusterAction, service.update)
-        self.purge = group.entity_purge_ops(PurgeComputeClusterAction)
+        self.purge = group.single_entity(PurgeComputeClusterAction, service.purge)

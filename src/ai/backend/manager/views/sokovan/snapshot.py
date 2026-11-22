@@ -268,6 +268,9 @@ class ResourceGroupScopeSnapshot:
     preemption_candidates: PreemptionCandidateSnapshot = field(
         default_factory=PreemptionCandidateSnapshot.empty
     )
+    # Allocatable shapes of the nodes of the group's compute cluster; None for a group
+    # that is not `kubernetes` or whose cluster has reported none
+    node_shapes: tuple[Mapping[ResourceSlotName, Decimal], ...] | None = None
 
 
 @dataclass

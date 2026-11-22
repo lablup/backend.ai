@@ -18,6 +18,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
+    SessionPlacementTimeoutAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -143,6 +144,18 @@ class SessionEventHandler:
             [event.session_id],
             reason=reason,
             forced=False,
+        )
+
+    async def handle_session_placement_timeout(
+        self,
+        _context: None,
+        _source: AgentId,
+        event: SessionPlacementTimeoutAnycastEvent,
+    ) -> None:
+        """Requeue (or, after the last attempt, cancel) a session its compute cluster
+        could not place."""
+        await self._scheduling_controller.handle_placement_timeout(
+            event.session_id, event.reason, event.message
         )
 
     async def handle_execution_started(

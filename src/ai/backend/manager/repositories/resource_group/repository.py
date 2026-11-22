@@ -19,6 +19,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.manager.data.compute_cluster.types import ComputeClusterData
 from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
@@ -27,6 +28,7 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.compute_cluster import ComputeClusterNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
+from ai.backend.manager.models.compute_cluster.purgers import ComputeClusterPurger
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
 from ai.backend.manager.models.resource_group.scopes import ResourceGroupTarget
@@ -36,6 +38,9 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.ops.v2.compute_cluster.provider import (
+    ComputeClusterOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.db_source.db_source import ResourceGroupDBSource
 from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
@@ -67,6 +72,7 @@ class ResourceGroupRepository:
 
     _db_source: ResourceGroupDBSource
     _v2_ops: V2DBOpsProvider
+    _cluster_ops: ComputeClusterOpsProvider
 
     def __init__(
         self,
@@ -75,6 +81,8 @@ class ResourceGroupRepository:
     ) -> None:
         self._db_source = ResourceGroupDBSource(db)
         self._v2_ops = v2_ops_provider
+        # Resource group writes naming a compute cluster lock it against its purge.
+        self._cluster_ops = ComputeClusterOpsProvider(db)
 
     @resource_group_repository_resilience.apply()
     async def create_resource_group(
@@ -86,14 +94,28 @@ class ResourceGroupRepository:
         Raises ResourceGroupConflict if a resource group with the same name already exists,
         and ComputeClusterNotFound if a `kubernetes` one names an unregistered cluster.
         """
-        if creator.driver == KUBERNETES_RESOURCE_GROUP_DRIVER:
-            cluster = creator.driver_opts.get("compute_cluster")
-            if not isinstance(cluster, str) or not await self._db_source.compute_cluster_exists(
-                cluster
-            ):
-                raise ComputeClusterNotFound(f"compute cluster {cluster!r} is not registered")
-        async with self._v2_ops.write_ops() as w:
+        async with self._cluster_ops.write_ops() as w:
+            if creator.driver == KUBERNETES_RESOURCE_GROUP_DRIVER:
+                cluster = creator.driver_opts.get("compute_cluster")
+                if not isinstance(cluster, str) or not await w.share_lock_compute_cluster(cluster):
+                    raise ComputeClusterNotFound(f"compute cluster {cluster!r} is not registered")
             return await w.create_role_managed_entity(creator)
+
+    @resource_group_repository_resilience.apply()
+    async def purge_compute_cluster(self, purger: ComputeClusterPurger) -> ComputeClusterData:
+        """Remove a compute cluster no resource group names, ordered against a concurrent
+        resource group write naming it.
+
+        Raises ComputeClusterInUse if a resource group names it and ComputeClusterNotFound
+        if it does not exist.
+        """
+        async with self._cluster_ops.write_ops() as w:
+            data = await w.purge_compute_cluster(purger)
+            if data is None:
+                raise ComputeClusterNotFound(
+                    f"compute cluster {purger.compute_cluster_id} is not registered"
+                )
+            return data
 
     @resource_group_repository_resilience.apply()
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
@@ -152,7 +174,19 @@ class ResourceGroupRepository:
 
         Raises ResourceGroupNotFound if the resource group does not exist.
         """
-        async with self._v2_ops.write_ops() as w:
+        async with self._cluster_ops.write_ops() as w:
+            new_opts = updater.driver_opts.optional_value()
+            if updater.driver.optional_value() is not None or new_opts is not None:
+                # Lock order: the named cluster, then the group (see V2ComputeClusterWriteOps).
+                named = new_opts.get("compute_cluster") if new_opts is not None else None
+                cluster = (
+                    named
+                    if isinstance(named, str)
+                    else await w.stored_compute_cluster(updater.resource_group_id)
+                )
+                if cluster is not None:
+                    await w.share_lock_compute_cluster(cluster)
+                await w.lock_resource_group(updater.resource_group_id)
             data = await w.update_data(updater)
             if data is None:
                 raise ResourceGroupNotFound(

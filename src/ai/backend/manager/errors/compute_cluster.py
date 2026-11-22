@@ -13,6 +13,7 @@ from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 __all__ = (
     "ComputeClusterConflict",
     "ComputeClusterInUse",
+    "ComputeClusterKubeconfigInvalid",
     "ComputeClusterLost",
     "ComputeClusterNotFound",
     "InvalidKubeconfig",
@@ -58,6 +59,20 @@ class ComputeClusterInUse(EntityError, web.HTTPConflict):
 class ComputeClusterLost(EntityError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/compute-cluster-lost"
     error_title = "The compute cluster is LOST; no new sessions are placed in it."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ComputeClusterEntityType(), ActionOperationType.GET, ErrorDetail.UNAVAILABLE
+        )
+
+
+class ComputeClusterKubeconfigInvalid(EntityError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/compute-cluster-kubeconfig-invalid"
+    error_title = (
+        "The stored kubeconfig of the compute cluster no longer validates;"
+        " update the cluster's kubeconfig."
+    )
 
     @override
     def entity_error_code(self) -> EntityErrorCode:

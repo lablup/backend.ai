@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Final
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
@@ -45,3 +46,5 @@ class ComputeClusterRow(LifecycleTimestampsMixin, Base):
     status_changed_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )
+    node_shapes: Mapped[list[dict[str, str]] | None] = mapped_column(pgsql.JSONB(), nullable=True)
+    """The distinct allocatable node shapes the cluster's gateway last reported."""

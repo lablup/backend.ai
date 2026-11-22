@@ -18,6 +18,9 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.compute_cluster.actions.create import (
     CreateComputeClusterAction,
 )
+from ai.backend.manager.services.compute_cluster.actions.purge import (
+    PurgeComputeClusterAction,
+)
 from ai.backend.manager.services.compute_cluster.actions.update import (
     UpdateComputeClusterAction,
 )
@@ -86,8 +89,19 @@ def key_provider_pool() -> MagicMock:
 
 
 @pytest.fixture
-def service(ops_repository: MagicMock, key_provider_pool: MagicMock) -> ComputeClusterService:
-    return ComputeClusterService(ops_repository, key_provider_pool)
+def resource_group_repository(cluster_data: ComputeClusterData) -> MagicMock:
+    repository = MagicMock()
+    repository.purge_compute_cluster = AsyncMock(return_value=cluster_data)
+    return repository
+
+
+@pytest.fixture
+def service(
+    ops_repository: MagicMock,
+    resource_group_repository: MagicMock,
+    key_provider_pool: MagicMock,
+) -> ComputeClusterService:
+    return ComputeClusterService(ops_repository, resource_group_repository, key_provider_pool)
 
 
 class TestCreate:
@@ -254,3 +268,18 @@ class TestKubeconfigValidation:
                 )
             )
         ops_repository.update.assert_not_awaited()
+
+
+class TestPurge:
+    async def test_purges_through_the_locking_path(
+        self,
+        service: ComputeClusterService,
+        resource_group_repository: MagicMock,
+        cluster_id: ComputeClusterID,
+        cluster_data: ComputeClusterData,
+    ) -> None:
+        result = await service.purge(PurgeComputeClusterAction(id=cluster_id))
+
+        assert result.data == cluster_data
+        purger = resource_group_repository.purge_compute_cluster.call_args.args[0]
+        assert purger.compute_cluster_id == cluster_id

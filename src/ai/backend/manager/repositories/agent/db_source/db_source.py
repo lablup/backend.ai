@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Collection, Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    KUBERNETES_RESOURCE_GROUP_DRIVER,
+)
 from ai.backend.common.types import AgentId, ImageID, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import (
@@ -27,6 +32,7 @@ from ai.backend.manager.models.agent.scopes import ResourceGroupAgentTarget
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
+from ai.backend.manager.models.compute_cluster.row import ComputeClusterRow
 from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
@@ -127,6 +133,31 @@ class AgentDBSource:
             public_key=row.public_key,
             auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
         )
+
+    async def store_compute_cluster_node_shapes(
+        self, agent_id: AgentId, node_shapes: list[dict[str, str]]
+    ) -> bool:
+        """Store the node shapes on the compute cluster whose `kubernetes` resource group the
+        agent belongs to. Returns whether a stored value changed; an agent of another
+        driver changes nothing."""
+        async with self._db.begin_session_read_committed() as session:
+            result = await session.execute(
+                sa.update(ComputeClusterRow)
+                .where(
+                    ComputeClusterRow.name
+                    == ResourceGroupRow.driver_opts["compute_cluster"].astext,
+                    ResourceGroupRow.driver == KUBERNETES_RESOURCE_GROUP_DRIVER,
+                    ResourceGroupRow.name == AgentRow.scaling_group,
+                    AgentRow.id == agent_id,
+                    ComputeClusterRow.node_shapes.is_distinct_from(
+                        sa.cast(node_shapes, pgsql.JSONB)
+                    ),
+                )
+                # Shapes are not part of the registration the cached client is built from.
+                .values(node_shapes=node_shapes, updated_at=ComputeClusterRow.updated_at)
+                .execution_options(synchronize_session=False)
+            )
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:

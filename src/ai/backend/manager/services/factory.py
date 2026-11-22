@@ -619,7 +619,9 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             SSHKeyRepository(repositories.v2_ops_provider), args.ssh_key_validator
         ),
         compute_cluster=ComputeClusterService(
-            OpsRepository(repositories.v2_ops_provider), args.key_provider_pool
+            OpsRepository(repositories.v2_ops_provider),
+            repositories.resource_group.repository,
+            args.key_provider_pool,
         ),
     )
 

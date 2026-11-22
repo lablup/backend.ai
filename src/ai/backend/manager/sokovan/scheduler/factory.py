@@ -82,6 +82,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIF
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
     DependenciesValidator,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.node_shape import (
+    NodeShapeValidator,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.reserved_batch import (
     ReservedBatchSessionValidator,
 )
@@ -137,6 +140,7 @@ def create_default_scheduler_components(
         DependenciesValidator(),
         ReservedBatchSessionValidator(),
         ResourcePolicyValidator(),
+        NodeShapeValidator(),
     ])
 
     # Create provisioner

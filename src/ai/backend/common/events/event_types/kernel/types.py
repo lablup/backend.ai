@@ -34,6 +34,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     SERVICE_SCALED_DOWN = "service-scaled-down"
     NEW_CONTAINER_STARTED = "new-container-started"
     PENDING_TIMEOUT = "pending-timeout"
+    PLACEMENT_TIMEOUT = "placement-timeout"
     RESTARTING = "restarting"
     RESTART_TIMEOUT = "restart-timeout"
     RESUMING_AGENT_OPERATION = "resuming-agent-operation"

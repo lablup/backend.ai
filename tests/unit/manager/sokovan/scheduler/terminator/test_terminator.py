@@ -11,15 +11,21 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
+
 from ai.backend.common.types import AgentId, KernelId
 from ai.backend.manager.data.compute_cluster.types import (
     ComputeClusterData,
+    ComputeClusterStatus,
     ResourceGroupComputeCluster,
 )
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.compute_cluster import CONNECTION_FAILURES_BEFORE_LOST
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     COMPUTE_CLUSTER_GONE_REASON,
+    COMPUTE_CLUSTER_INVALID_REASON,
     SessionTerminator,
 )
 from ai.backend.manager.views.sokovan.session import TerminatingSessionData
@@ -454,3 +460,84 @@ class TestSessionTerminatorComputeCluster:
             [str(kernel.kernel_id) for kernel in session.kernels], COMPUTE_CLUSTER_GONE_REASON
         )
         cluster_client.destroy_session.assert_not_awaited()
+
+    async def test_kernels_are_marked_terminated_when_the_kubeconfig_no_longer_validates(
+        self,
+        terminator_on_cluster: SessionTerminator,
+        cluster_lookup: dict[AgentId, ResourceGroupComputeCluster],
+        compute_cluster_data: ComputeClusterData,
+        cluster_repository: AsyncMock,
+        cluster_client_factory: AsyncMock,
+        terminating_session_multi_kernel: TerminatingSessionData,
+    ) -> None:
+        cluster_client_factory.side_effect = InvalidKubeconfig("`server` must be an https URL")
+        session = terminating_session_multi_kernel
+        cluster_lookup.update(self._on_cluster(session, compute_cluster_data))
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await terminator_on_cluster.terminate_sessions_for_handler([session])
+
+        cluster_repository.update_kernels_to_terminated.assert_awaited_once_with(
+            [str(kernel.kernel_id) for kernel in session.kernels], COMPUTE_CLUSTER_INVALID_REASON
+        )
+
+    async def test_a_failed_batch_lookup_still_terminates_docker_kernels(
+        self,
+        terminator_on_cluster: SessionTerminator,
+        failing_batch_lookup: AsyncMock,
+        cluster_client: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        docker_and_unresolvable_sessions: list[TerminatingSessionData],
+    ) -> None:
+        sessions = docker_and_unresolvable_sessions
+        with RecorderContext.scope("test", entity_ids=[s.session_id for s in sessions]):
+            await terminator_on_cluster.terminate_sessions_for_handler(sessions)
+
+        destroy_kernel = mock_agent_client_pool._mock_client.destroy_kernel
+        destroy_kernel.assert_awaited_once()
+        assert destroy_kernel.await_args.args[0] == sessions[0].kernels[0].kernel_id
+        cluster_client.destroy_session.assert_not_awaited()
+
+    async def test_repeated_connection_failures_mark_the_cluster_lost(
+        self,
+        terminator_on_cluster: SessionTerminator,
+        cluster_lookup: dict[AgentId, ResourceGroupComputeCluster],
+        compute_cluster_data: ComputeClusterData,
+        cluster_repository: AsyncMock,
+        cluster_client: AsyncMock,
+        terminating_session_multi_kernel: TerminatingSessionData,
+    ) -> None:
+        cluster_client.destroy_session.side_effect = aiohttp.ClientConnectionError("refused")
+        session = terminating_session_multi_kernel
+        cluster_lookup.update(self._on_cluster(session, compute_cluster_data))
+
+        for attempt in range(1, CONNECTION_FAILURES_BEFORE_LOST + 1):
+            if attempt == CONNECTION_FAILURES_BEFORE_LOST:
+                cluster_repository.update_compute_cluster_status.assert_not_awaited()
+            with RecorderContext.scope("test", entity_ids=[session.session_id]):
+                await terminator_on_cluster.terminate_sessions_for_handler([session])
+
+        cluster_repository.update_compute_cluster_status.assert_awaited_once_with(
+            compute_cluster_data.id, ComputeClusterStatus.LOST
+        )
+
+    async def test_a_success_resets_the_failure_count(
+        self,
+        terminator_on_cluster: SessionTerminator,
+        cluster_lookup: dict[AgentId, ResourceGroupComputeCluster],
+        compute_cluster_data: ComputeClusterData,
+        cluster_repository: AsyncMock,
+        cluster_client: AsyncMock,
+        terminating_session_multi_kernel: TerminatingSessionData,
+    ) -> None:
+        session = terminating_session_multi_kernel
+        cluster_lookup.update(self._on_cluster(session, compute_cluster_data))
+        failure = aiohttp.ClientConnectionError("refused")
+        outcomes: list[Exception | None] = [failure] * (CONNECTION_FAILURES_BEFORE_LOST - 1)
+        outcomes += [None] + [failure] * (CONNECTION_FAILURES_BEFORE_LOST - 1)
+        cluster_client.destroy_session.side_effect = outcomes
+
+        for _ in outcomes:
+            with RecorderContext.scope("test", entity_ids=[session.session_id]):
+                await terminator_on_cluster.terminate_sessions_for_handler([session])
+
+        cluster_repository.update_compute_cluster_status.assert_not_awaited()

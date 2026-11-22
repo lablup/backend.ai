@@ -89,6 +89,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
+    SessionPlacementTimeoutAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -516,6 +517,12 @@ class Dispatchers:
             None,
             self._session_event_handler.handle_session_cancelled,
             name="api.session.scancel",
+        )
+        evd.consume(
+            SessionPlacementTimeoutAnycastEvent,
+            None,
+            self._session_event_handler.handle_session_placement_timeout,
+            name="api.session.placement_timeout",
         )
         evd.consume(
             SessionTerminatingAnycastEvent,

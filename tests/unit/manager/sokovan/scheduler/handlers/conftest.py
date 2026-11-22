@@ -528,6 +528,28 @@ def rescheduling_session_terminated_kernels() -> SessionWithKernels:
     )
 
 
+def _placement_timed_out(attempts: int) -> SessionWithKernels:
+    session = _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATED,
+    )
+    session.session_info.lifecycle.status_info = KernelLifecycleEventReason.PLACEMENT_TIMEOUT
+    session.session_info.lifecycle.status_data = {"placement_timeout": {"attempts": attempts}}
+    return session
+
+
+@pytest.fixture
+def placement_timed_out_session() -> SessionWithKernels:
+    """RESCHEDULING session sent there by its first placement timeout, kernels gone."""
+    return _placement_timed_out(1)
+
+
+@pytest.fixture
+def placement_exhausted_session() -> SessionWithKernels:
+    """RESCHEDULING session sent there by its last allowed placement timeout, kernels gone."""
+    return _placement_timed_out(3)
+
+
 # =============================================================================
 # Pre-created Kernel Fixtures for SweepStaleKernelsKernelHandler
 # =============================================================================

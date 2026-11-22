@@ -17,6 +17,7 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.compute_cluster.types import ResourceGroupComputeCluster
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.errors.compute_cluster import ComputeClusterKubeconfigInvalid
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
@@ -42,6 +43,9 @@ class SessionTerminatorArgs:
 
 COMPUTE_CLUSTER_GONE_REASON: Final = "compute-cluster-not-found"
 """The status reason of a kernel whose compute cluster was unregistered while it ended."""
+
+COMPUTE_CLUSTER_INVALID_REASON: Final = "compute-cluster-invalid"
+"""The status reason of a kernel whose compute cluster's stored kubeconfig no longer validates."""
 
 
 async def _as_list[T](awaitable: Awaitable[T]) -> list[T]:
@@ -102,7 +106,9 @@ class SessionTerminator:
             for kernel in session.kernels
             if kernel.agent_id
         }
-        compute_clusters = await self._compute_clusters.of_agents(agent_ids) if agent_ids else {}
+        # The kernels of an agent whose lookup failed are retried in the next cycle.
+        lookup = await self._compute_clusters.lookup_agents(agent_ids)
+        compute_clusters = lookup.found
 
         # Collect all termination tasks from all sessions
         all_tasks: list[Awaitable[list[KernelTerminationResult]]] = []
@@ -113,8 +119,8 @@ class SessionTerminator:
             found: ResourceGroupComputeCluster | None = None
             for kernel in session.kernels:
                 # Only process kernels with assigned agents
-                if not kernel.agent_id:
-                    # Kernel has no agent assigned - needs sweep
+                if not kernel.agent_id or kernel.agent_id in lookup.unresolved:
+                    # No agent assigned (needs sweep), or its compute cluster is not known yet
                     skipped_kernels += 1
                     continue
                 if (in_cluster := compute_clusters.get(kernel.agent_id)) is not None:
@@ -216,6 +222,20 @@ class SessionTerminator:
                 else:
                     async with self._compute_clusters.connect(found, found.cluster) as target:
                         await target.client.destroy_session(session.session_id, session.status_info)
+                error = None
+            except ComputeClusterKubeconfigInvalid as e:
+                # Nothing can reach the cluster to end the kernels, as when it is gone.
+                await self._repository.update_kernels_to_terminated(
+                    [str(kernel.kernel_id) for kernel in kernels],
+                    COMPUTE_CLUSTER_INVALID_REASON,
+                )
+                log.warning(
+                    "kernels marked terminated with an invalid compute cluster kubeconfig",
+                    resource_group=found.resource_group,
+                    compute_cluster=found.cluster_name,
+                    kernel_count=len(kernels),
+                    exc_info=e,
+                )
                 error = None
             except Exception as e:
                 log.warning(

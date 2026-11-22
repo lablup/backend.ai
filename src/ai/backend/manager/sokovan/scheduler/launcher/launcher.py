@@ -231,10 +231,20 @@ class SessionLauncher:
         """
         if not sessions:
             return
-        # One lookup for the batch; a resource group of another driver is absent.
-        compute_clusters = await self._compute_clusters.of_resource_groups({
+        # One lookup for the batch; a resource group of another driver is absent. The
+        # sessions of a resource group whose lookup failed wait for the next cycle.
+        lookup = await self._compute_clusters.lookup_resource_groups({
             session.kernels[0].resource_group for session in sessions if session.kernels
         })
+        compute_clusters = lookup.found
+        if lookup.unresolved:
+            sessions = [
+                session
+                for session in sessions
+                if not session.kernels or session.kernels[0].resource_group not in lookup.unresolved
+            ]
+            if not sessions:
+                return
         system_session_environ_by_session = await self._system_session_environ_repository.resolve(
             sessions,
             SystemSessionEnvironSearcher(
@@ -300,11 +310,10 @@ class SessionLauncher:
             # In production, this would come from database lookups
             idle_timeout = 600  # Default timeout in seconds
 
-            cluster = (
-                self._compute_clusters.check_launchable(compute_cluster)
-                if compute_cluster is not None
-                else None
-            )
+            cluster = None
+            if compute_cluster is not None:
+                compute_cluster = await self._compute_clusters.revive_if_reachable(compute_cluster)
+                cluster = self._compute_clusters.check_launchable(compute_cluster)
             # Setup network configuration
             if cluster is None:
                 network_setup = await self._setup_network_configuration(session)

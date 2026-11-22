@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.reschedule_sessions import (
     RescheduleSessionsLifecycleHandler,
@@ -120,4 +121,61 @@ class TestRescheduleSessionsLifecycleHandler:
 
         assert result.successes == []
         mock_terminator.terminate_sessions_for_handler.assert_not_awaited()
+        mock_scheduling_controller.mark_sessions_status.assert_not_awaited()
+
+
+class TestPlacementTimeoutRequeue:
+    """A session a compute cluster could not place comes back through RESCHEDULING."""
+
+    @pytest.fixture
+    def handler(
+        self,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+    ) -> RescheduleSessionsLifecycleHandler:
+        return RescheduleSessionsLifecycleHandler(
+            terminator=mock_terminator,
+            repository=mock_repository,
+            scheduling_controller=mock_scheduling_controller,
+        )
+
+    async def test_requeued_with_the_placement_timeout_reason(
+        self,
+        handler: RescheduleSessionsLifecycleHandler,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        placement_timed_out_session: SessionWithKernels,
+    ) -> None:
+        session_id = placement_timed_out_session.session_info.identity.id
+        mock_scheduling_controller.mark_sessions_status.return_value = [session_id]
+
+        await handler.execute(ResourceGroupID(uuid.uuid4()), [placement_timed_out_session])
+
+        mock_repository.reset_kernels_to_pending_for_sessions.assert_awaited_once_with(
+            [session_id], KernelLifecycleEventReason.PLACEMENT_TIMEOUT
+        )
+        mock_scheduling_controller.mark_sessions_status.assert_awaited_once_with(
+            [session_id], SessionStatus.PENDING, reason=KernelLifecycleEventReason.PLACEMENT_TIMEOUT
+        )
+        mock_scheduling_controller.cancel_rescheduling_sessions.assert_not_awaited()
+
+    async def test_cancelled_after_the_last_attempt(
+        self,
+        handler: RescheduleSessionsLifecycleHandler,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        placement_exhausted_session: SessionWithKernels,
+    ) -> None:
+        session_id = placement_exhausted_session.session_info.identity.id
+        mock_scheduling_controller.cancel_rescheduling_sessions.return_value = [session_id]
+
+        await handler.execute(ResourceGroupID(uuid.uuid4()), [placement_exhausted_session])
+
+        mock_repository.reset_kernels_to_pending_for_sessions.assert_awaited_once_with(
+            [session_id], KernelLifecycleEventReason.PLACEMENT_TIMEOUT
+        )
+        mock_scheduling_controller.cancel_rescheduling_sessions.assert_awaited_once_with(
+            [session_id], KernelLifecycleEventReason.PLACEMENT_TIMEOUT
+        )
         mock_scheduling_controller.mark_sessions_status.assert_not_awaited()

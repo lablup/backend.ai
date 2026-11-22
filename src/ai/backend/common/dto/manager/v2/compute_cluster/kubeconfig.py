@@ -38,6 +38,7 @@ _CLUSTER_KEYS: Final = frozenset({
     "tls-server-name",
     "insecure-skip-tls-verify",
 })
+_CLUSTER_STRING_KEYS: Final = frozenset({"certificate-authority-data", "tls-server-name"})
 _USER_KEYS: Final = frozenset({"client-certificate-data", "client-key-data", "token"})
 _CONTEXT_KEYS: Final = frozenset({"cluster", "user", "namespace"})
 
@@ -82,6 +83,13 @@ def _check_keys(where: str, body: Mapping[str, Any], allowed: frozenset[str]) ->
         )
 
 
+def _check_strings(where: str, body: Mapping[str, Any], keys: frozenset[str]) -> None:
+    """Each of `keys` present in `body` must be a non-empty string."""
+    for key in sorted(keys):
+        if key in body and (not isinstance(body[key], str) or not body[key]):
+            raise InvalidKubeconfigError(f"`{where}.{key}` must be a non-empty string")
+
+
 def _check_server(where: str, server: Any) -> str:
     if not isinstance(server, str):
         raise InvalidKubeconfigError(f"`{where}.server` must be a string")
@@ -106,20 +114,26 @@ def parse_kubeconfig(text: str) -> ParsedKubeconfig:
     users = _named_entries(doc, "users", "user")
     contexts = _named_entries(doc, "contexts", "context")
     for name, cluster in clusters.items():
-        _check_keys(f"clusters[{name}].cluster", cluster, _CLUSTER_KEYS)
-        _check_server(f"clusters[{name}].cluster", cluster.get("server"))
+        where = f"clusters[{name}].cluster"
+        _check_keys(where, cluster, _CLUSTER_KEYS)
+        _check_server(where, cluster.get("server"))
+        _check_strings(where, cluster, _CLUSTER_STRING_KEYS)
+        skip_verify = cluster.get("insecure-skip-tls-verify")
+        if skip_verify is not None and not isinstance(skip_verify, bool):
+            raise InvalidKubeconfigError(f"`{where}.insecure-skip-tls-verify` must be a boolean")
     for name, user in users.items():
-        _check_keys(f"users[{name}].user", user, _USER_KEYS)
-        if not any(key in user for key in _USER_KEYS):
+        where = f"users[{name}].user"
+        _check_keys(where, user, _USER_KEYS)
+        _check_strings(where, user, _USER_KEYS)
+        has_cert, has_key = "client-certificate-data" in user, "client-key-data" in user
+        if has_cert != has_key or not (has_cert or "token" in user):
             raise InvalidKubeconfigError(
-                f"`users[{name}].user` needs `token` or `client-certificate-data`"
-                " with `client-key-data`"
+                f"`{where}` needs `token` or `client-certificate-data` with `client-key-data`"
             )
-        for key in _USER_KEYS:
-            if key in user and (not isinstance(user[key], str) or not user[key]):
-                raise InvalidKubeconfigError(f"`users[{name}].user.{key}` must be a string")
     for name, context in contexts.items():
-        _check_keys(f"contexts[{name}].context", context, _CONTEXT_KEYS)
+        where = f"contexts[{name}].context"
+        _check_keys(where, context, _CONTEXT_KEYS)
+        _check_strings(where, context, _CONTEXT_KEYS)
     current = doc.get("current-context")
     if not isinstance(current, str) or current not in contexts:
         raise InvalidKubeconfigError("`current-context` must name one of `contexts`")

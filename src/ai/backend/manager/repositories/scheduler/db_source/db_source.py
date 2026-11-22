@@ -7,7 +7,7 @@ from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from itertools import groupby
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
@@ -24,6 +24,7 @@ from sqlalchemy.orm import aliased, load_only, selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
@@ -69,6 +70,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.compute_cluster.types import (
     DEFAULT_CLUSTER_SCHEDULER,
+    ComputeClusterStatus,
     ProjectQueueData,
     ResourceGroupComputeCluster,
 )
@@ -224,7 +226,9 @@ from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsSearchResult,
 )
 from ai.backend.manager.views.sokovan.session import (
+    PLACEMENT_PENDING_STATUSES,
     MarkTerminatingResult,
+    PlacementTimeoutRecord,
     SweptSessionInfo,
     TerminatingKernelData,
     TerminatingSessionData,
@@ -327,6 +331,21 @@ class _PreemptionScopeMatch:
     group_wide_key: PreemptionScopeKey | None
 
 
+def _parse_node_shapes(
+    stored: list[dict[str, str]] | None,
+) -> tuple[Mapping[ResourceSlotName, Decimal], ...] | None:
+    """The stored node shapes as quantities; None when none is stored or none parses."""
+    if not stored:
+        return None
+    shapes: list[Mapping[ResourceSlotName, Decimal]] = []
+    for shape in stored:
+        try:
+            shapes.append({ResourceSlotName(k): Decimal(v) for k, v in shape.items()})
+        except (InvalidOperation, TypeError, AttributeError):
+            continue
+    return tuple(shapes) or None
+
+
 class ScheduleDBSource:
     """
     Database source for schedule-related operations.
@@ -396,6 +415,7 @@ class ScheduleDBSource:
                 observed_at=observed_at,
                 preemption_candidates=preemption_candidates,
                 session_group_members=session_group_members,
+                node_shapes=resource_group.node_shapes,
             )
 
     async def _fetch_resource_group_with_slot_inventory(
@@ -468,7 +488,18 @@ class ScheduleDBSource:
                 ResourceGroupRow.name,
                 ResourceGroupRow.scheduler,
                 ResourceGroupRow.scheduler_opts,
-            ).where(ResourceGroupRow.id == resource_group_id)
+                ComputeClusterRow.node_shapes,
+            )
+            .select_from(ResourceGroupRow)
+            .outerjoin(
+                ComputeClusterRow,
+                sa.and_(
+                    ResourceGroupRow.driver == KUBERNETES_RESOURCE_GROUP_DRIVER,
+                    ComputeClusterRow.name
+                    == ResourceGroupRow.driver_opts["compute_cluster"].astext,
+                ),
+            )
+            .where(ResourceGroupRow.id == resource_group_id)
         )
         rg_row = rg_result.one_or_none()
         if not rg_row:
@@ -485,6 +516,7 @@ class ScheduleDBSource:
                 preemption_order=rg_row.scheduler_opts.preemption.order,
             ),
             preemption=rg_row.scheduler_opts.preemption,
+            node_shapes=_parse_node_shapes(rg_row.node_shapes),
         )
 
     async def _fetch_pending_sessions(
@@ -1384,6 +1416,80 @@ class ScheduleDBSource:
             )
             return marked_sessions
 
+    async def record_placement_timeout(
+        self, session_id: SessionId, reason: str, message: str | None
+    ) -> PlacementTimeoutRecord | None:
+        """Send a session a compute cluster could not place to RESCHEDULING and count the timeout.
+
+        Only a session of a `kubernetes` resource group that has left the queue but is not
+        RUNNING yet is affected; for any other session (or a repeated event) None is returned.
+        The count lives in `status_data.placement_timeout.attempts`.
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            row = (
+                await db_sess.execute(
+                    sa.select(SessionRow.status, SessionRow.status_data)
+                    .select_from(SessionRow)
+                    .join(ResourceGroupRow, ResourceGroupRow.name == SessionRow.scaling_group_name)
+                    .where(
+                        SessionRow.id == session_id,
+                        ResourceGroupRow.driver == KUBERNETES_RESOURCE_GROUP_DRIVER,
+                    )
+                    .with_for_update(of=SessionRow)
+                )
+            ).one_or_none()
+            if row is None or SessionStatus(row.status) not in PLACEMENT_PENDING_STATUSES:
+                return None
+            previous = (row.status_data or {}).get("placement_timeout") or {}
+            attempts = int(previous.get("attempts") or 0) + 1
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(
+                    status=SessionStatus.RESCHEDULING,
+                    status_info=KernelLifecycleEventReason.PLACEMENT_TIMEOUT,
+                    status_data=sql_json_merge(
+                        SessionRow.__table__.c.status_data,
+                        ("placement_timeout",),
+                        obj={"attempts": attempts, "reason": reason, "message": message},
+                    ),
+                    status_history=sql_json_merge(
+                        SessionRow.__table__.c.status_history,
+                        (),
+                        {SessionStatus.RESCHEDULING.name: now.isoformat()},
+                    ),
+                )
+            )
+            await self._record_scheduling_history(
+                db_sess,
+                [
+                    SessionHistoryToCreate(
+                        session_id=SessionID(session_id),
+                        creator=SessionSchedulingHistoryCreator(
+                            phase="placement_timeout",
+                            result=SchedulingResult.NEED_RETRY,
+                            message=message or reason,
+                            from_status=SessionStatus(row.status),
+                            to_status=SessionStatus.RESCHEDULING,
+                        ),
+                    )
+                ],
+            )
+        return PlacementTimeoutRecord(session_id=session_id, attempts=attempts)
+
+    async def cancel_rescheduling_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> list[SessionId]:
+        """Cancel RESCHEDULING sessions whose kernels are gone instead of requeueing them."""
+        if not session_ids:
+            return []
+        async with self._db.begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            return await self._cancel_pending_sessions(
+                db_sess, session_ids, reason, now, from_status=SessionStatus.RESCHEDULING
+            )
+
     async def get_resource_group_preemption_mode(
         self, resource_group_id: ResourceGroupID
     ) -> PreemptionMode:
@@ -1549,14 +1655,19 @@ class ScheduleDBSource:
         )
 
     async def _cancel_pending_sessions(
-        self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+        reason: str,
+        now: datetime,
+        from_status: SessionStatus = SessionStatus.PENDING,
     ) -> list[SessionId]:
-        """Cancel PENDING sessions and their kernels, and free the kernels'
-        ``resource_allocations`` rows in the same transaction.
+        """Cancel the sessions in `from_status` (PENDING by default) and their kernels, and
+        free the kernels' ``resource_allocations`` rows in the same transaction.
         """
         # Capture from_statuses before update for history recording
         status_query = sa.select(SessionRow.id, SessionRow.status).where(
-            sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
+            sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == from_status)
         )
         status_result = await db_sess.execute(status_query)
         from_statuses: dict[SessionId, SessionStatus] = {
@@ -1575,9 +1686,7 @@ class ScheduleDBSource:
                     {SessionStatus.CANCELLED.name: now.isoformat()},
                 ),
             )
-            .where(
-                sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
-            )
+            .where(sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == from_status))
             .returning(SessionRow.id)
         )
         cancelled_result = await db_sess.execute(cancel_stmt)
@@ -1876,6 +1985,28 @@ class ScheduleDBSource:
             ),
         )
 
+    async def update_compute_cluster_status(
+        self, cluster_id: ComputeClusterID, status: ComputeClusterStatus
+    ) -> bool:
+        """Set a compute cluster's status when it differs; returns whether it changed.
+
+        The registration the cached client is built from (`updated_at`) is left alone.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            result = await session.execute(
+                sa.update(ComputeClusterRow)
+                .where(
+                    ComputeClusterRow.id == cluster_id,
+                    ComputeClusterRow.status != status,
+                )
+                .values(
+                    status=status,
+                    status_changed_at=sa.func.now(),
+                    updated_at=ComputeClusterRow.updated_at,
+                )
+            )
+            return cast(CursorResult[Any], result).rowcount > 0
+
     async def get_project_queue_data(
         self, project_id: UUID, resource_group: str
     ) -> ProjectQueueData:
@@ -2156,6 +2287,7 @@ class ScheduleDBSource:
                 )
 
         async with self._reconcile_ops.write_ops() as w:
+            await w.share_lock_kubernetes_resource_group(spec.scope.resource_group_id)
             await w.create_entity(
                 SessionCreator(
                     spec=spec,

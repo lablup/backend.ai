@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.network import NetworkID
@@ -47,6 +48,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.compute_cluster.types import (
+    ComputeClusterStatus,
     ProjectQueueData,
     ResourceGroupComputeCluster,
 )
@@ -85,6 +87,7 @@ from ai.backend.manager.views.sokovan.search import (
 )
 from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
+    PlacementTimeoutRecord,
     SweptSessionInfo,
     TerminatingSessionData,
 )
@@ -177,6 +180,7 @@ class SchedulerRepository:
                 session_dependencies=fetch.session_dependencies,
                 policy=fetch.policy,
                 preemption_candidates=fetch.preemption_candidates,
+                node_shapes=fetch.node_shapes,
             ),
             global_scope=GlobalScopeSnapshot(
                 occupancy=fetch.occupancy,
@@ -331,6 +335,13 @@ class SchedulerRepository:
     ) -> dict[AgentId, ResourceGroupComputeCluster]:
         """The compute cluster of each given agent whose resource group is `kubernetes`."""
         return await self._db_source.get_compute_clusters_of_agents(agent_ids)
+
+    @scheduler_repository_resilience.apply()
+    async def update_compute_cluster_status(
+        self, cluster_id: ComputeClusterID, status: ComputeClusterStatus
+    ) -> bool:
+        """Set a compute cluster's status when it differs; returns whether it changed."""
+        return await self._db_source.update_compute_cluster_status(cluster_id, status)
 
     @scheduler_repository_resilience.apply()
     async def get_project_queue_data(
@@ -676,6 +687,20 @@ class SchedulerRepository:
     ) -> dict[SessionId, list[AgentId]]:
         """Get agent IDs assigned to kernels for the given sessions."""
         return await self._db_source.get_agent_ids_for_sessions(session_ids)
+
+    @scheduler_repository_resilience.apply()
+    async def record_placement_timeout(
+        self, session_id: SessionId, reason: str, message: str | None
+    ) -> PlacementTimeoutRecord | None:
+        """Send an unplaced session of a compute cluster to RESCHEDULING and count the timeout."""
+        return await self._db_source.record_placement_timeout(session_id, reason, message)
+
+    @scheduler_repository_resilience.apply()
+    async def cancel_rescheduling_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> list[SessionId]:
+        """Cancel RESCHEDULING sessions whose kernels are gone instead of requeueing them."""
+        return await self._db_source.cancel_rescheduling_sessions(session_ids, reason)
 
     @scheduler_repository_resilience.apply()
     async def reset_kernels_to_pending_for_sessions(

@@ -42,6 +42,8 @@ class ComputeClusterData(EntityData):
     status_changed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    node_shapes: tuple[Mapping[str, str], ...] | None = None
+    """The distinct allocatable node shapes the gateway last reported; None until it does."""
 
     @override
     def entity_id(self) -> EntityIdentifier:

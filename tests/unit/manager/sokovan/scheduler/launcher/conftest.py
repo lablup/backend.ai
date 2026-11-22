@@ -35,7 +35,10 @@ from ai.backend.manager.data.compute_cluster.types import (
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
+from ai.backend.manager.sokovan.scheduler.compute_cluster import (
+    ComputeClusterLookup,
+    ComputeClusterResolver,
+)
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -185,6 +188,7 @@ def _create_kernel_binding_data(
     image_id: UUID | None = _DEFAULT_IMAGE_ID,
     cluster_role: str = "main",
     cluster_idx: int = 0,
+    resource_group: str = "default",
 ) -> KernelBindingData:
     """Create KernelBindingData for tests."""
     return KernelBindingData(
@@ -208,7 +212,7 @@ def _create_kernel_binding_data(
         startup_command=None,
         internal_data={},
         preopen_ports=[],
-        resource_group="default",
+        resource_group=resource_group,
     )
 
 
@@ -393,6 +397,8 @@ def _no_compute_cluster() -> AsyncMock:
     resolver = AsyncMock()
     resolver.of_resource_groups.return_value = {}
     resolver.of_agents.return_value = {}
+    resolver.lookup_resource_groups.return_value = ComputeClusterLookup(found={})
+    resolver.lookup_agents.return_value = ComputeClusterLookup(found={})
     return resolver
 
 
@@ -502,3 +508,32 @@ def session_for_start_on_two_agents() -> SessionDataForStart:
         ],
         cluster_mode=ClusterMode.MULTI_NODE,
     )
+
+
+@pytest.fixture
+def docker_session() -> SessionDataForStart:
+    """A session of a Docker resource group."""
+    return _create_session_for_start(
+        kernels=[_create_kernel_binding_data(resource_group="docker-rg")]
+    )
+
+
+@pytest.fixture
+def unresolvable_session() -> SessionDataForStart:
+    """A session of a resource group whose compute cluster lookup keeps failing."""
+    return _create_session_for_start(
+        kernels=[_create_kernel_binding_data(resource_group="broken-rg")]
+    )
+
+
+@pytest.fixture
+def failing_batch_lookup(cluster_repository: AsyncMock) -> AsyncMock:
+    """The batch lookup fails; alone, `docker-rg` is not kubernetes and `broken-rg` fails."""
+
+    async def of_resource_groups(names: Collection[str]) -> dict[str, ResourceGroupComputeCluster]:
+        if len(names) > 1 or "broken-rg" in names:
+            raise ConnectionError("database unavailable")
+        return {}
+
+    cluster_repository.get_compute_clusters_of_resource_groups.side_effect = of_resource_groups
+    return cluster_repository
