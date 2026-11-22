@@ -103,7 +103,7 @@ func (b *bridge) call(ctx context.Context, method, path string, in, out any) err
 	if err != nil {
 		return fmt.Errorf("plugin host %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		var e struct {
 			Error string `json:"error"`

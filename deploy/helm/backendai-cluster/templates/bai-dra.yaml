@@ -22,9 +22,17 @@ rules:
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceclaims"]
     verbs: ["get", "list", "watch"]
+  # GPU entries watch their node for another GPU allocator and report it as the node condition
+  # BaiDraGPUConflict and an Event; backendai-bai-dra-node-status limits the writes to their node.
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["get"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -92,6 +100,57 @@ metadata:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
 spec:
   policyName: backendai-bai-dra-slices
+  validationActions: [Deny]
+---
+# bai-dra changes only the BaiDraGPUConflict condition of its own node.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-bai-dra-node-status
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["*"]
+        operations: ["UPDATE"]
+        resources: ["nodes/status"]
+  matchConditions:
+    - name: bai-dra
+      expression: request.userInfo.username == "system:serviceaccount:{{ .Release.Namespace }}:bai-dra"
+  variables:
+    - name: node
+      expression: >-
+        "authentication.kubernetes.io/node-name" in request.userInfo.extra &&
+        size(request.userInfo.extra["authentication.kubernetes.io/node-name"]) == 1 ?
+        request.userInfo.extra["authentication.kubernetes.io/node-name"][0] : ""
+    - name: others
+      expression: >-
+        object.status.?conditions.orValue([]).filter(c, c.type != "BaiDraGPUConflict")
+    - name: oldOthers
+      expression: >-
+        oldObject.status.?conditions.orValue([]).filter(c, c.type != "BaiDraGPUConflict")
+  validations:
+    - expression: variables.node != "" && object.metadata.name == variables.node
+      messageExpression: '"bai-dra may write only the status of its own node"'
+    - expression: >-
+        variables.others == variables.oldOthers &&
+        object.status.?allocatable.orValue({}) == oldObject.status.?allocatable.orValue({}) &&
+        object.status.?capacity.orValue({}) == oldObject.status.?capacity.orValue({}) &&
+        object.metadata.?labels.orValue({}) == oldObject.metadata.?labels.orValue({}) &&
+        object.metadata.?annotations.orValue({}) == oldObject.metadata.?annotations.orValue({})
+      message: bai-dra may change only the BaiDraGPUConflict condition of a node.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-bai-dra-node-status
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-bai-dra-node-status
   validationActions: [Deny]
 {{- $classes := dict }}
 {{- range .Values.baiDra.drivers }}
@@ -207,6 +266,10 @@ spec:
           env:
             - {name: BAI_DRA_DRIVER_NAME, value: {{ .driverName | quote }}}
             - {name: BAI_DRA_HEALTH_ADDR, value: ":8081"}
+            {{- if include "backendai-cluster.baiDraGpu" . }}
+            # Withdraw the GPUs while the node has another GPU allocator.
+            - {name: BAI_DRA_GPU, value: "true"}
+            {{- end }}
             {{- if .dynamicMig }}
             - {name: BAI_DRA_DYNAMIC_MIG, value: "true"}
             - {name: BAI_DRA_NVIDIA_DRIVER_ROOT, value: /driver-root}

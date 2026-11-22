@@ -35,6 +35,7 @@ func main() {
 		dynamicMig = flag.Bool("dynamic-mig", envOr("BAI_DRA_DYNAMIC_MIG", "false") == "true", "create NVIDIA MIG devices on demand (needs NVML)")
 		driverRoot = flag.String("nvidia-driver-root", envOr("BAI_DRA_NVIDIA_DRIVER_ROOT", "/driver-root"), "the node's NVIDIA driver root, for libnvidia-ml (dynamic MIG)")
 		procRoot   = flag.String("proc-root", envOr("BAI_DRA_PROC_ROOT", "/proc"), "procfs with /proc/driver/nvidia (dynamic MIG)")
+		gpu        = flag.Bool("gpu", envOr("BAI_DRA_GPU", "false") == "true", "publishes NVIDIA GPUs: withdraw them while another GPU allocator is on the node")
 	)
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -52,6 +53,7 @@ func main() {
 	}
 	client := kubernetes.NewForConfigOrDie(cfg)
 	d := newDriver(*driverName, *nodeName, newBridge(*socket), &cdiWriter{root: *cdiRoot})
+	d.gpu = *gpu
 	pluginDir := filepath.Join("/var/lib/kubelet/plugins", *driverName)
 	if *dynamicMig {
 		if err := setupDynamicMig(ctx, d, client, *driverRoot, *procRoot, pluginDir); err != nil {
@@ -70,6 +72,15 @@ func main() {
 		case <-time.After(2 * time.Second):
 		}
 	}
+	if d.gpu {
+		// Before the first publish: GPUs another allocator holds are never published.
+		w, start := newConflictWatch(client, d, *nodeName)
+		start(ctx.Done())
+		if err := w.sync(ctx); err != nil {
+			klog.Fatal(err)
+		}
+		go w.run(ctx, conflictRecheck)
+	}
 	// The kubelet does not create the plugin's socket directory.
 	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
 		klog.Fatal(err)
@@ -82,7 +93,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	d.helper = helper
+	d.publisher = helper
 	if err := d.syncDevices(ctx); err != nil {
 		klog.Fatal(err)
 	}

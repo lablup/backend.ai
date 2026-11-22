@@ -63,7 +63,7 @@ func parseCapFile(path string, major int64) (CapNode, error) {
 	if err != nil {
 		return CapNode{}, fmt.Errorf("MIG capability %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	node := CapNode{Major: major, Minor: -1}
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

@@ -130,7 +130,9 @@ storageBindings: []
 # `dra.backend.ai/driver-mode: bai`); the chart fails without one. GPU entries (`gpu: true`;
 # default: a shared entry or a CUDA plugin) never run on nodes carrying a label of
 # excludeNodeLabels, and the pre-flight checks fail when a node with their devices has
-# `nvidia.com/gpu` allocatable or `gpu.nvidia.com` devices. NPU entries may share a node with
+# `nvidia.com/gpu` allocatable or `gpu.nvidia.com` devices. At run time, the driver of a GPU entry
+# withdraws its devices (an empty ResourceSlice) while its node has one of those, and sets the
+# node condition BaiDraGPUConflict=True with a Warning Event. NPU entries may share a node with
 # GPUs of another allocator. GPU entries need gpuAllocationPolicy bai, under which the NVIDIA DRA
 # driver runs with gpus.enabled=false (ComputeDomain only) and the device plugin is off.
 #

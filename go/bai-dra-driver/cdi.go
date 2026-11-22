@@ -112,7 +112,7 @@ func claimFields(edits *ContainerEdits) cdiEditsFields {
 		fields.DeviceNodes = append(fields.DeviceNodes, node)
 	}
 	for _, m := range edits.Mounts {
-		fields.Mounts = append(fields.Mounts, cdiMount{HostPath: m.HostPath, ContainerPath: m.ContainerPath, Options: m.Options})
+		fields.Mounts = append(fields.Mounts, cdiMount(m))
 	}
 	return fields
 }

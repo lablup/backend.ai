@@ -20,13 +20,26 @@ import (
 	"github.com/lablup/backend.ai/go/bai-dra-driver/nvmig"
 )
 
+// publisher publishes the node's ResourceSlices: the kubelet plugin helper.
+type publisher interface {
+	PublishResources(ctx context.Context, resources resourceslice.DriverResources) error
+}
+
 // driver turns the plugin host's devices into a ResourceSlice and its prepare answers into CDI.
 type driver struct {
-	name     string
-	nodeName string
-	bridge   *bridge
-	cdi      *cdiWriter
-	helper   *kubeletplugin.Helper
+	name      string
+	nodeName  string
+	bridge    *bridge
+	cdi       *cdiWriter
+	publisher publisher
+	// gpu: the driver publishes NVIDIA GPUs and withdraws them while another allocator has some.
+	gpu bool
+
+	// publishMu serializes publishing; it guards lastDevices, withdrawn and migParents.
+	publishMu   sync.Mutex
+	lastDevices *DevicesResponse
+	// withdrawn: another GPU allocator is on the node, so the slices list no devices.
+	withdrawn bool
 
 	// mu guards prepared and claimLocks only; bridge calls run under the claim's own lock.
 	mu         sync.Mutex
@@ -91,6 +104,8 @@ func (d *driver) lockClaim(uid types.UID) func() {
 
 // syncDevices publishes the plugin host's devices when the host or its device list changed.
 func (d *driver) syncDevices(ctx context.Context) error {
+	d.publishMu.Lock()
+	defer d.publishMu.Unlock()
 	resp, err := d.bridge.Devices(ctx)
 	if err != nil {
 		return err
@@ -101,15 +116,38 @@ func (d *driver) syncDevices(ctx context.Context) error {
 	if err := d.publish(ctx, resp); err != nil {
 		return err
 	}
+	d.lastDevices = resp
 	d.publishedHost, d.publishedGeneration = resp.HostID, resp.Generation
 	d.published.Store(true)
 	return nil
 }
 
+// withdraw takes the GPUs out of the slices while another allocator is on the node
+// (conflict.go) and publishes them again once it is gone. It reports whether the state changed.
+func (d *driver) withdraw(ctx context.Context, conflict bool) (bool, error) {
+	d.publishMu.Lock()
+	defer d.publishMu.Unlock()
+	if conflict == d.withdrawn {
+		return false, nil
+	}
+	d.withdrawn = conflict
+	if d.lastDevices != nil {
+		if err := d.publish(ctx, d.lastDevices); err != nil {
+			d.withdrawn = !conflict
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// publish runs under publishMu.
 func (d *driver) publish(ctx context.Context, resp *DevicesResponse) error {
 	slices, wholeGPUs, err := d.slices(resp)
 	if err != nil {
 		return err
+	}
+	if d.withdrawn {
+		slices = withoutDevices(slices)
 	}
 	count := 0
 	for _, s := range slices {
@@ -118,10 +156,21 @@ func (d *driver) publish(ctx context.Context, resp *DevicesResponse) error {
 	d.mu.Lock()
 	d.wholeGPUs = wholeGPUs
 	d.mu.Unlock()
-	klog.FromContext(ctx).Info("publishing devices", "count", count, "slices", len(slices), "slot", resp.SlotName, "generation", resp.Generation)
-	return d.helper.PublishResources(ctx, resourceslice.DriverResources{
+	klog.FromContext(ctx).Info("publishing devices", "count", count, "slices", len(slices), "slot", resp.SlotName, "generation", resp.Generation, "withdrawn", d.withdrawn)
+	return d.publisher.PublishResources(ctx, resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{d.nodeName: {Slices: slices}},
 	})
+}
+
+// withoutDevices keeps the slices and their shared counters but lists no device: no new claim
+// is allocated, and the claims allocated before stay prepared.
+func withoutDevices(slices []resourceslice.Slice) []resourceslice.Slice {
+	out := make([]resourceslice.Slice, 0, len(slices))
+	for _, s := range slices {
+		s.Devices = nil
+		out = append(out, s)
+	}
+	return out
 }
 
 func toDevices(resp *DevicesResponse) ([]resourceapi.Device, error) {
