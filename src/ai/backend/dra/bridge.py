@@ -6,13 +6,54 @@ models in `go/bai-dra-driver/bridge.go`; change both together.
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Final
 
 from pydantic import BaseModel, Field
 
+from ai.backend.dra.errors import InvalidQuantityError
+
 BRIDGE_VERSION: Final = "v1"
-SHARES_CAPACITY: Final = "shares"  # a shared device's capacity; one device is SHARES_PER_DEVICE
-SHARES_PER_DEVICE: Final = 100
+# A shared device's capacity in 0.01-share units (suggestion-1122 5.3). Consumers name it with
+# or without the domain.
+SHARES_CAPACITY: Final = "shares"
+SHARES_CAPACITY_QUALIFIED: Final = "dra.backend.ai/shares"
+SHARE_SCALE: Final = 100
+
+_QUANTITY_SUFFIXES: Final[dict[str, Decimal]] = {
+    "": Decimal(1),
+    "m": Decimal("0.001"),
+    "k": Decimal(10) ** 3,
+    "M": Decimal(10) ** 6,
+    "G": Decimal(10) ** 9,
+    "T": Decimal(10) ** 12,
+    "P": Decimal(10) ** 15,
+    "E": Decimal(10) ** 18,
+    "Ki": Decimal(2) ** 10,
+    "Mi": Decimal(2) ** 20,
+    "Gi": Decimal(2) ** 30,
+    "Ti": Decimal(2) ** 40,
+    "Pi": Decimal(2) ** 50,
+    "Ei": Decimal(2) ** 60,
+}
+
+
+def parse_quantity(value: str) -> Decimal:
+    """A Kubernetes quantity (`150`, `1.5k`, `2Gi`, `1e3`) as a number."""
+    text = value.strip()
+    for suffix in sorted(_QUANTITY_SUFFIXES, key=len, reverse=True):
+        if suffix and text.endswith(suffix):
+            number, multiplier = text[: -len(suffix)], _QUANTITY_SUFFIXES[suffix]
+            break
+    else:
+        number, multiplier = text, Decimal(1)
+    try:
+        parsed = Decimal(number) * multiplier
+    except InvalidOperation as e:
+        raise InvalidQuantityError(f"not a quantity: {value!r}") from e
+    if not parsed.is_finite():
+        raise InvalidQuantityError(f"not a quantity: {value!r}")
+    return parsed
 
 
 class CapacityPolicy(BaseModel):
@@ -36,6 +77,8 @@ class DeviceInfo(BaseModel):
 
 class DevicesResponse(BaseModel):
     slot_name: str = Field(description="Backend.AI device name, e.g. `cuda`")
+    host_id: str = Field(description="Changes when the plugin host restarts")
+    generation: int = Field(description="Changes when the device list changes")
     devices: list[DeviceInfo]
 
 
@@ -71,7 +114,12 @@ class ContainerEdits(BaseModel):
 
 
 class PrepareResponse(BaseModel):
-    edits: ContainerEdits
+    edits: ContainerEdits = Field(
+        description="Edits of the whole claim; `cdi_devices` not per device"
+    )
+    device_cdi_devices: dict[str, list[str]] = Field(
+        default_factory=dict, description="Device name → CDI devices of other specs for it alone"
+    )
 
 
 class UnprepareRequest(BaseModel):

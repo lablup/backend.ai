@@ -2,7 +2,7 @@
 # Secret: create it from the component's sample config before installing.
 image:
   repository: lablup/backend.ai-kube
-  tag: ""
+  tag: ""  # required unless digest is set: no floating tag
   digest: ""
   pullPolicy: IfNotPresent
 

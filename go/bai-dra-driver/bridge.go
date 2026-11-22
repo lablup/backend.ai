@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+// bridgeTimeout bounds one plugin host call. It stays below the kubelet's deadline for
+// NodePrepareResources (45 s) so that a stuck host fails the claim instead of the kubelet call.
+const bridgeTimeout = 30 * time.Second
+
 type CapacityPolicy struct {
 	Default string `json:"default"`
 	Min     string `json:"min"`
@@ -20,7 +24,8 @@ type CapacityPolicy struct {
 }
 
 type DeviceInfo struct {
-	Name                     string                    `json:"name"`
+	Name string `json:"name"`
+	// Decoded with UseNumber: whole numbers stay ints, anything else becomes a string.
 	Attributes               map[string]any            `json:"attributes"`
 	Capacity                 map[string]string         `json:"capacity"`
 	AllowMultipleAllocations bool                      `json:"allow_multiple_allocations"`
@@ -28,8 +33,10 @@ type DeviceInfo struct {
 }
 
 type DevicesResponse struct {
-	SlotName string       `json:"slot_name"`
-	Devices  []DeviceInfo `json:"devices"`
+	SlotName   string       `json:"slot_name"`
+	HostID     string       `json:"host_id"`
+	Generation int64        `json:"generation"`
+	Devices    []DeviceInfo `json:"devices"`
 }
 
 type DeviceNode struct {
@@ -51,13 +58,20 @@ type ContainerEdits struct {
 	CDIDevices  []string     `json:"cdi_devices"`
 }
 
+type PrepareResponse struct {
+	Edits ContainerEdits `json:"edits"`
+	// Device name → CDI devices of other specs (e.g. nvidia.com/gpu=...) for that device alone.
+	DeviceCDIDevices map[string][]string `json:"device_cdi_devices"`
+}
+
 // Empty reports whether the edits need no spec of our own.
 func (e *ContainerEdits) Empty() bool {
 	return len(e.Env) == 0 && len(e.DeviceNodes) == 0 && len(e.Mounts) == 0
 }
 
 type bridge struct {
-	client *http.Client
+	client  *http.Client
+	timeout time.Duration
 }
 
 func newBridge(socket string) *bridge {
@@ -67,10 +81,12 @@ func newBridge(socket string) *bridge {
 			return d.DialContext(ctx, "unix", socket)
 		},
 	}
-	return &bridge{client: &http.Client{Transport: transport, Timeout: 60 * time.Second}}
+	return &bridge{client: &http.Client{Transport: transport}, timeout: bridgeTimeout}
 }
 
 func (b *bridge) call(ctx context.Context, method, path string, in, out any) error {
+	ctx, cancel := context.WithTimeout(ctx, b.timeout)
+	defer cancel()
 	var body bytes.Buffer
 	if in != nil {
 		if err := json.NewEncoder(&body).Encode(in); err != nil {
@@ -96,7 +112,13 @@ func (b *bridge) call(ctx context.Context, method, path string, in, out any) err
 	if out == nil {
 		return nil
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	dec := json.NewDecoder(resp.Body)
+	dec.UseNumber()
+	return dec.Decode(out)
+}
+
+func (b *bridge) Health(ctx context.Context) error {
+	return b.call(ctx, http.MethodGet, "health", nil, nil)
 }
 
 func (b *bridge) Devices(ctx context.Context) (*DevicesResponse, error) {
@@ -104,12 +126,10 @@ func (b *bridge) Devices(ctx context.Context) (*DevicesResponse, error) {
 	return &out, b.call(ctx, http.MethodGet, "devices", nil, &out)
 }
 
-func (b *bridge) Prepare(ctx context.Context, claimUID string, devices []string, consumed map[string]map[string]string) (*ContainerEdits, error) {
-	var out struct {
-		Edits ContainerEdits `json:"edits"`
-	}
+func (b *bridge) Prepare(ctx context.Context, claimUID string, devices []string, consumed map[string]map[string]string) (*PrepareResponse, error) {
+	var out PrepareResponse
 	in := map[string]any{"claim_uid": claimUID, "devices": devices, "consumed": consumed}
-	return &out.Edits, b.call(ctx, http.MethodPost, "prepare", in, &out)
+	return &out, b.call(ctx, http.MethodPost, "prepare", in, &out)
 }
 
 func (b *bridge) Unprepare(ctx context.Context, claimUID string) error {

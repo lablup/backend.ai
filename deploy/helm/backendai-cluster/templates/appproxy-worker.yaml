@@ -1,20 +1,23 @@
 {{- if .Values.appproxyWorker.enabled }}
 {{- $w := .Values.appproxyWorker }}
+{{- $valkey := .Values.controlPlane.valkey }}
+{{- $secretName := required "appproxyWorker.secrets.name (an existing Secret) is required" $w.secrets.name }}
 # appproxy worker in the cluster (suggestion-1122 9.2): it reaches session Pods by Pod IP and
-# registers with the control plane's coordinator.
+# registers with the control plane's coordinator. The config holds no secret: an init container
+# fills the @@NAME@@ placeholders from existing Secrets.
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
   name: appproxy-worker
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
-stringData:
+data:
   app-proxy-worker.toml: |
     [redis]
-    addr = { host = {{ (splitList ":" .Values.controlPlane.valkey.addr) | first | quote }}, port = {{ (splitList ":" .Values.controlPlane.valkey.addr) | last }} }
-    {{- with .Values.controlPlane.valkey.password }}
-    password = {{ . | quote }}
+    addr = { host = {{ (splitList ":" $valkey.addr) | first | quote }}, port = {{ (splitList ":" $valkey.addr) | last }} }
+    {{- if $valkey.passwordSecret.name }}
+    password = @@VALKEY_PASSWORD@@
     {{- end }}
 
     [proxy_worker]
@@ -34,11 +37,11 @@ stringData:
     bind_port_range = [{{ index $w.portRange 0 }}, {{ index $w.portRange 1 }}]
 
     [secrets]
-    api_secret = {{ $w.secrets.apiSecret | quote }}
-    jwt_secret = {{ $w.secrets.jwtSecret | quote }}
+    api_secret = @@API_SECRET@@
+    jwt_secret = @@JWT_SECRET@@
 
     [permit_hash]
-    secret = {{ $w.secrets.permitHashSecret | quote }}
+    secret = @@PERMIT_HASH_SECRET@@
 
     [logging]
     level = {{ $w.logLevel | quote }}
@@ -73,6 +76,34 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: config
+          image: {{ include "backendai-cluster.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # A JSON string is a valid TOML basic string.
+          command:
+            - python
+            - -c
+            - |
+              import json, os, re
+              text = open("/etc/appproxy-template/app-proxy-worker.toml").read()
+              text = re.sub(r"@@(\w+)@@", lambda m: json.dumps(os.environ[m.group(1)]), text)
+              with open("/etc/backend.ai/app-proxy-worker.toml", "w") as f:
+                  f.write(text)
+          env:
+            {{- if $valkey.passwordSecret.name }}
+            - name: VALKEY_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ $valkey.passwordSecret.name }}, key: {{ $valkey.passwordSecret.key }}}}
+            {{- end }}
+            - name: API_SECRET
+              valueFrom: {secretKeyRef: {name: {{ $secretName }}, key: {{ $w.secrets.apiSecretKey }}}}
+            - name: JWT_SECRET
+              valueFrom: {secretKeyRef: {name: {{ $secretName }}, key: {{ $w.secrets.jwtSecretKey }}}}
+            - name: PERMIT_HASH_SECRET
+              valueFrom: {secretKeyRef: {name: {{ $secretName }}, key: {{ $w.secrets.permitHashSecretKey }}}}
+          volumeMounts:
+            - {name: template, mountPath: /etc/appproxy-template, readOnly: true}
+            - {name: config, mountPath: /etc/backend.ai}
       containers:
         - name: worker
           image: {{ include "backendai-cluster.image" .Values.image }}
@@ -82,8 +113,11 @@ spec:
           env:
             - {name: HOME, value: /tmp}
           volumeMounts:
-            - {name: config, mountPath: /etc/backend.ai}
+            - {name: config, mountPath: /etc/backend.ai, readOnly: true}
       volumes:
+        - name: template
+          configMap: {name: appproxy-worker}
+        # The rendered config with the secrets: memory only.
         - name: config
-          secret: {secretName: appproxy-worker}
+          emptyDir: {medium: Memory}
 {{- end }}

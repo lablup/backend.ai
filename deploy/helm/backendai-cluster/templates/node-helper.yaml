@@ -1,17 +1,6 @@
 {{- if .Values.nodeHelper.enabled }}
-{{- $secret := lookup "v1" "Secret" .Release.Namespace "node-helper-token" }}
 # node helper (suggestion-1122 9.2): session commit and push with the node's containerd.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: node-helper-token
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "backendai-cluster.labels" . | nindent 4 }}
-data:
-  # Kept across upgrades: the gateway and the helpers share it.
-  token: {{ if $secret }}{{ index $secret.data "token" }}{{ else }}{{ randAlphaNum 40 | b64enc }}{{ end }}
----
+# Its token comes from an existing Secret that the gateway reads too (nodeHelper.tokenSecret).
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -30,6 +19,9 @@ spec:
         app.kubernetes.io/name: node-helper
     spec:
       automountServiceAccountToken: false
+      {{- with .Values.nodeHelper.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- with .Values.nodeHelper.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -44,13 +36,19 @@ spec:
           args: ["ai.backend.kube.nodehelper"]
           env:
             - {name: HOME, value: /tmp}
+            - {name: BACKENDAI_NODE_HELPER_PORT, value: {{ .Values.nodeHelper.port | quote }}}
             - name: BACKENDAI_NODE_HELPER_TOKEN
-              valueFrom: {secretKeyRef: {name: node-helper-token, key: token}}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "nodeHelper.tokenSecret.name is required" .Values.nodeHelper.tokenSecret.name }}
+                  key: {{ .Values.nodeHelper.tokenSecret.key }}
           ports:
-            - {name: api, containerPort: 6090}
+            - {name: api, containerPort: {{ .Values.nodeHelper.port }}}
           securityContext:
             # containerd's socket and snapshotter are root's.
             runAsUser: 0
+          resources:
+            {{- toYaml .Values.nodeHelper.resources | nindent 12 }}
           volumeMounts:
             - {name: containerd, mountPath: /run/containerd/containerd.sock}
             - {name: nerdctl, mountPath: /var/lib/nerdctl}
@@ -60,4 +58,25 @@ spec:
           hostPath: {path: /run/containerd/containerd.sock, type: Socket}
         - {name: nerdctl, emptyDir: {}}
         - {name: tmp, emptyDir: {}}
+---
+# Only the session gateway reaches the helper's API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-helper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: node-helper
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: session-gateway
+      ports:
+        - {protocol: TCP, port: {{ .Values.nodeHelper.port }}}
 {{- end }}

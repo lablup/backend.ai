@@ -4,9 +4,11 @@ from typing import Any
 
 from ai.backend.kube.preflight import (
     Outcome,
+    check_bai_node_ownership,
     check_consumable_capacity,
     check_crds,
     check_dra_drivers,
+    check_gpu_policy,
 )
 
 
@@ -61,3 +63,60 @@ class TestConsumableCapacity:
 
     def test_no_fraction_profile_needs_nothing(self) -> None:
         assert check_consumable_capacity([_profile("exclusive")], []) == []
+
+
+def _gpu_node(name: str, mode: str | None, gpus: int) -> dict[str, Any]:
+    node = _node(name, mode)
+    node["status"] = {"allocatable": {"nvidia.com/gpu": str(gpus)}}
+    return node
+
+
+def _named_profile(name: str, mode: str, driver: str) -> dict[str, Any]:
+    return {"metadata": {"name": name}, "spec": {"sharingMode": mode, "driverName": driver}}
+
+
+class TestBaiNodeOwnership:
+    def test_bai_node_with_device_plugin_gpus_fails(self) -> None:
+        [check] = check_bai_node_ownership([_gpu_node("a", "bai", 8)], [])
+        assert check.outcome == Outcome.FAIL
+
+    def test_bai_node_with_nvidia_dra_devices_fails(self) -> None:
+        [check] = check_bai_node_ownership([_node("a", "bai")], [_slice("a", "gpu.nvidia.com")])
+        assert check.outcome == Outcome.FAIL
+
+    def test_bai_node_owned_by_bai_dra_passes(self) -> None:
+        nodes = [_node("a", "bai"), _gpu_node("b", None, 8)]
+        checks = check_bai_node_ownership(nodes, [_slice("b", "gpu.nvidia.com")])
+        assert [(c.name, c.outcome) for c in checks] == [("single allocator on a", Outcome.PASS)]
+
+
+class TestGPUPolicy:
+    def test_dra_with_nvidia_profile_needs_nvidia_slices(self) -> None:
+        profiles = [_named_profile("gpu", "exclusive", "gpu.nvidia.com")]
+        assert check_gpu_policy("dra", [], [], profiles).outcome == Outcome.FAIL
+        slices = [_slice("a", "gpu.nvidia.com")]
+        assert check_gpu_policy("dra", [], slices, profiles).outcome == Outcome.PASS
+
+    def test_dra_without_nvidia_profile_needs_no_nvidia_slices(self) -> None:
+        profiles = [_named_profile("npu", "exclusive", "atom.dra.backend.ai")]
+        assert check_gpu_policy("dra", [], [], profiles).outcome == Outcome.PASS
+
+    def test_dra_with_device_plugin_gpus_too_fails(self) -> None:
+        check = check_gpu_policy(
+            "dra", [_gpu_node("a", None, 8)], [_slice("b", "gpu.nvidia.com")], []
+        )
+        assert check.outcome == Outcome.FAIL
+
+    def test_device_plugin_rejects_fraction_profiles(self) -> None:
+        profiles = [_named_profile("fgpu", "fraction", "cuda.dra.backend.ai")]
+        check = check_gpu_policy("device-plugin", [_gpu_node("a", None, 8)], [], profiles)
+        assert check.outcome == Outcome.FAIL
+        assert "fgpu" in check.detail
+
+    def test_device_plugin_with_exclusive_profiles_passes(self) -> None:
+        profiles = [_named_profile("gpu", "exclusive", "")]
+        check = check_gpu_policy("device-plugin", [_gpu_node("a", None, 8)], [], profiles)
+        assert check.outcome == Outcome.PASS
+
+    def test_unknown_policy_fails(self) -> None:
+        assert check_gpu_policy("mixed", [], [], []).outcome == Outcome.FAIL

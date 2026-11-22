@@ -1,0 +1,23 @@
+Backend.AI workload cluster components are installed in {{ .Release.Namespace }}.
+
+GPU allocation policy: {{ include "backendai-cluster.gpuAllocationPolicy" . }}
+  Pre-flight report: kubectl -n {{ .Release.Namespace }} logs job/backendai-preflight
+{{- if .Values.managerAccess.tokenSecret }}
+
+Manager access: register a kubeconfig with the token of Secret backendai-manager-token.
+  kubectl -n {{ .Release.Namespace }} get secret backendai-manager-token -o jsonpath='{.data.token}' | base64 -d
+
+  The token does not expire. Rotate it periodically and when someone who held it leaves:
+    1. kubectl -n {{ .Release.Namespace }} delete secret backendai-manager-token
+       (the old token stops working at once)
+    2. helm upgrade {{ .Release.Name }} ... (creates the Secret again with a new token)
+    3. Put the new token in the Manager's kubeconfig of this compute cluster.
+  Or set managerAccess.tokenSecret=false and give the Manager a bound token:
+    kubectl -n {{ .Release.Namespace }} create token backendai-manager --duration=720h
+{{- end }}
+{{- if .Values.nodeHelper.enabled }}
+
+Node helper: Secret {{ .Values.nodeHelper.tokenSecret.name }} holds the token the helpers and the
+session gateway share. To rotate it, update the Secret and restart both:
+  kubectl -n {{ .Release.Namespace }} rollout restart daemonset/node-helper deployment/session-gateway
+{{- end }}

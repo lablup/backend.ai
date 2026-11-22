@@ -1,23 +1,29 @@
 # The identity the Manager uses in this cluster (the kubeconfig registered as its compute
-# cluster). It writes SessionWorkloads and their Secrets, and creates the session namespaces.
+# cluster). It creates the session namespaces, binds the components' -namespaced roles in them,
+# and writes SessionWorkloads and their Secrets there.
+{{- $ns := .Release.Namespace }}
+{{- $roles := list "backendai-session-controller-namespaced" "backendai-session-gateway-namespaced" "backendai-manager-namespaced" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: backendai-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ $ns }}
   labels:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
+{{- if .Values.managerAccess.tokenSecret }}
 ---
+# A long-lived token for the Manager's kubeconfig. Rotate it as NOTES.txt describes.
 apiVersion: v1
 kind: Secret
 type: kubernetes.io/service-account-token
 metadata:
   name: backendai-manager-token
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ $ns }}
   annotations:
     kubernetes.io/service-account.name: backendai-manager
   labels:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -26,15 +32,20 @@ metadata:
   labels:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
 rules:
+  # Session namespaces only: ValidatingAdmissionPolicy backendai-manager-scope.
   - apiGroups: [""]
     resources: ["namespaces"]
-    verbs: ["get", "create"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "create", "patch", "delete"]
+    verbs: ["get", "list", "create", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "create", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames: {{ toJson $roles }}
   - apiGroups: ["backend.ai"]
     resources: ["sessionworkloads"]
-    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["queues", "deviceprofiles"]
     verbs: ["get", "list", "create", "patch", "delete"]
@@ -55,4 +66,86 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: backendai-manager
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ $ns }}
+---
+# Bound only per session namespace (RoleBinding backendai-manager, created by the Manager).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-manager-namespaced
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads"]
+    verbs: ["get", "create", "patch", "delete"]
+---
+# The Manager may label and bind only its own namespaces: it cannot adopt another namespace by
+# labeling it, and its RoleBindings bind only the three -namespaced roles to the three
+# component ServiceAccounts of this namespace.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-manager-scope
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["namespaces"]
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["rolebindings"]
+  matchConditions:
+    - name: manager
+      expression: request.userInfo.username == "system:serviceaccount:{{ $ns }}:backendai-manager"
+  # Variables are evaluated lazily: each is read only where it applies.
+  variables:
+    - name: pairs
+      expression: >-
+        {"backendai-session-controller-namespaced": "session-controller",
+         "backendai-session-gateway-namespaced": "session-gateway",
+         "backendai-manager-namespaced": "backendai-manager"}
+    - name: newManaged
+      expression: >-
+        has(object.metadata.labels) && "app.kubernetes.io/managed-by" in object.metadata.labels &&
+        object.metadata.labels["app.kubernetes.io/managed-by"] == "backendai-manager"
+    - name: oldManaged
+      expression: >-
+        has(oldObject.metadata.labels) && "app.kubernetes.io/managed-by" in oldObject.metadata.labels &&
+        oldObject.metadata.labels["app.kubernetes.io/managed-by"] == "backendai-manager"
+    - name: namespaceManaged
+      expression: >-
+        has(namespaceObject.metadata.labels) && "app.kubernetes.io/managed-by" in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels["app.kubernetes.io/managed-by"] == "backendai-manager"
+  validations:
+    - expression: >-
+        request.resource.resource != "namespaces" ||
+        (variables.newManaged && (request.operation == "CREATE" || variables.oldManaged))
+      message: The Manager may create and change only namespaces labeled app.kubernetes.io/managed-by=backendai-manager.
+    - expression: >-
+        request.resource.resource != "rolebindings" || (
+        variables.namespaceManaged &&
+        object.roleRef.kind == "ClusterRole" && object.roleRef.name in variables.pairs &&
+        has(object.subjects) && object.subjects.all(s,
+          s.kind == "ServiceAccount" && s.namespace == "{{ $ns }}" &&
+          s.name == variables.pairs[object.roleRef.name]))
+      message: The Manager may bind only the -namespaced roles to their component in a session namespace.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-manager-scope
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-manager-scope
+  validationActions: [Deny]

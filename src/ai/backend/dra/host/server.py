@@ -24,21 +24,32 @@ def build_app(host: PluginHost) -> web.Application:
     async def devices(_request: web.Request) -> web.Response:
         return web.json_response((await host.list_devices()).model_dump(mode="json"))
 
+    async def health(_request: web.Request) -> web.Response:
+        return web.json_response({"status": "ok"})
+
     async def prepare(request: web.Request) -> web.Response:
         body = PrepareRequest.model_validate(await request.json())
         try:
-            edits = await host.prepare(body.claim_uid, body.devices, body.consumed)
+            edits, per_device = await host.prepare(body.claim_uid, body.devices, body.consumed)
         except BackendAIError as e:
-            log.warning("claim prepare failed", claim_uid=body.claim_uid, exc_info=e)
+            if e.status_code >= 500:
+                log.exception("claim prepare failed", claim_uid=body.claim_uid)
+            else:
+                log.trace("claim prepare refused", claim_uid=body.claim_uid, error=str(e.extra_msg))
             return web.json_response({"error": str(e.extra_msg)}, status=e.status_code)
-        return web.json_response(PrepareResponse(edits=edits).model_dump(mode="json"))
+        response = PrepareResponse(edits=edits, device_cdi_devices=per_device)
+        return web.json_response(response.model_dump(mode="json"))
 
     async def unprepare(request: web.Request) -> web.Response:
         body = UnprepareRequest.model_validate(await request.json())
-        await host.unprepare(body.claim_uid)
+        try:
+            await host.unprepare(body.claim_uid)
+        except BackendAIError as e:
+            return web.json_response({"error": str(e.extra_msg)}, status=e.status_code)
         return web.json_response({})
 
     app = web.Application()
+    app.router.add_get(f"/{BRIDGE_VERSION}/health", health)
     app.router.add_get(f"/{BRIDGE_VERSION}/devices", devices)
     app.router.add_post(f"/{BRIDGE_VERSION}/prepare", prepare)
     app.router.add_post(f"/{BRIDGE_VERSION}/unprepare", unprepare)

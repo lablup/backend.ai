@@ -1,3 +1,4 @@
+{{- $replicas := include "backendai-cluster.replicas" (dict "root" . "replicas" .Values.sessionController.replicas) }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -6,6 +7,8 @@ metadata:
   labels:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
 ---
+# Cluster-wide: reads for the watches, cluster-scoped objects and CSI PersistentVolumes
+# (admission below). Everything inside a session namespace is in the -namespaced role.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -15,46 +18,33 @@ metadata:
 rules:
   - apiGroups: ["backend.ai"]
     resources: ["sessionworkloads"]
-    verbs: ["get", "list", "watch", "patch", "update"]
-  - apiGroups: ["backend.ai"]
-    resources: ["sessionworkloads/status", "sessionworkloads/finalizers"]
-    verbs: ["get", "patch", "update"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["podgroups"]
-    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["pods", "services", "secrets"]
-    verbs: ["get", "list", "watch", "create", "patch", "delete", "deletecollection"]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["get", "list", "watch", "create", "patch"]
-  - apiGroups: ["resource.k8s.io"]
-    resources: ["resourceclaims"]
-    verbs: ["get", "list", "watch", "create", "delete"]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  # stat bridge: the kubelet's /stats/summary at the node's address, without the API server proxy
+  - apiGroups: [""]
+    resources: ["nodes/stats"]
+    verbs: ["get"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["deviceprofiles"]
     verbs: ["get", "list", "watch"]
-  # Sessions on the kueue scheduler adapter get a LocalQueue in their namespace.
-  - apiGroups: ["kueue.x-k8s.io"]
-    resources: ["localqueues"]
-    verbs: ["get", "create"]
-  # A finished kernel's log goes to the Manager as the Agent sends it.
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get"]
-  # stat bridge: the kubelet's resource metrics
-  - apiGroups: [""]
-    resources: ["nodes/proxy"]
-    verbs: ["get"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["networkpolicies"]
-    verbs: ["get", "list", "watch", "create", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["persistentvolumes", "persistentvolumeclaims"]
-    verbs: ["get", "list", "create"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceslices", "deviceclasses"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["backend.ai"]
     resources: ["storagebindings"]
     verbs: ["get", "list", "watch"]
+  # Only CSI volumes of the allowed drivers: ValidatingAdmissionPolicy backendai-session-controller-pv.
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -71,6 +61,99 @@ subjects:
     name: session-controller
     namespace: {{ .Release.Namespace }}
 ---
+# Bound only per session namespace: the Manager creates the RoleBinding with the namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-session-controller-namespaced
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads/status", "sessionworkloads/finalizers"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["podgroups"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "secrets"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete", "deletecollection"]
+  # A finished kernel's log goes to the Manager as the Agent sends it.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["", "events.k8s.io"]
+    resources: ["events"]
+    verbs: ["get", "list", "create", "patch"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  # Sessions on the kueue scheduler adapter get a LocalQueue in their namespace.
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["localqueues"]
+    verbs: ["get", "create"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "create", "delete"]
+---
+# The controller creates the PVs of StorageBindings: CSI volumes of the listed drivers only, and
+# CSI secrets only from this namespace. No hostPath, local or other in-tree volume.
+{{- $drivers := .Values.sessionController.allowedCsiDrivers | default list }}
+{{- range .Values.storageBindings }}
+{{- with (.pv).csi }}
+{{- $drivers = append $drivers .driver }}
+{{- end }}
+{{- end }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-session-controller-pv
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["persistentvolumes"]
+  matchConditions:
+    - name: session-controller
+      expression: request.userInfo.username == "system:serviceaccount:{{ .Release.Namespace }}:session-controller"
+  variables:
+    - name: drivers
+      expression: {{ toJson (uniq $drivers) | squote }}
+    - name: ns
+      expression: '"{{ .Release.Namespace }}"'
+  validations:
+    - expression: has(object.spec.csi) && object.spec.csi.driver in variables.drivers
+      messageExpression: '"session-controller may only create CSI PersistentVolumes of drivers " + variables.drivers.join(", ")'
+    - expression: >-
+        !has(object.spec.csi) || (
+        (!has(object.spec.csi.controllerPublishSecretRef) || object.spec.csi.controllerPublishSecretRef.namespace == variables.ns) &&
+        (!has(object.spec.csi.nodeStageSecretRef) || object.spec.csi.nodeStageSecretRef.namespace == variables.ns) &&
+        (!has(object.spec.csi.nodePublishSecretRef) || object.spec.csi.nodePublishSecretRef.namespace == variables.ns) &&
+        (!has(object.spec.csi.controllerExpandSecretRef) || object.spec.csi.controllerExpandSecretRef.namespace == variables.ns) &&
+        (!has(object.spec.csi.nodeExpandSecretRef) || object.spec.csi.nodeExpandSecretRef.namespace == variables.ns))
+      message: CSI secret references must point to the Backend.AI system namespace.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-session-controller-pv
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-session-controller-pv
+  validationActions: [Deny]
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -80,10 +163,9 @@ metadata:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
     app.kubernetes.io/name: session-controller
 spec:
-  replicas: {{ if .Values.leaderElection.enabled }}{{ .Values.leaderElection.replicas }}{{ else }}1{{ end }}
-  # One controller at a time until leader election exists.
+  replicas: {{ $replicas }}
   strategy:
-    type: Recreate
+    {{- include "backendai-cluster.strategy" . | nindent 4 }}
   selector:
     matchLabels:
       app.kubernetes.io/name: session-controller
@@ -93,6 +175,9 @@ spec:
         app.kubernetes.io/name: session-controller
     spec:
       serviceAccountName: session-controller
+      {{- with .Values.sessionController.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -111,6 +196,7 @@ spec:
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sessionController.logLevel | quote }}}
             - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
             - {name: BACKENDAI_KUEUE_CLUSTER_QUEUE, value: {{ .Values.kueue.clusterQueue | quote }}}
+            {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             {{- include "backendai-cluster.eventEnv" . | nindent 12 }}
             {{- if .Values.leaderElection.enabled }}
             - {name: BACKENDAI_LEADER_ELECTION, value: "true"}
@@ -121,7 +207,6 @@ spec:
             {{- end }}
           ports:
             - {name: metrics, containerPort: 9100}
-
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -136,6 +221,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- include "backendai-cluster.pdb" (dict "root" . "name" "session-controller" "replicas" $replicas) }}
 ---
 # The kernels' utilization (backendai_container_utilization) for Prometheus. Headless: Prometheus
 # scrapes every replica (DNS SD); only the leader has values.

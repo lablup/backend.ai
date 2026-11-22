@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    Final,
     Self,
     TextIO,
     cast,
@@ -307,6 +308,10 @@ class KernelResourceSpec:
         return core_schema.no_info_plain_validator_function(validate)
 
 
+DEFAULT_SHARE_UNIT_MEM: Final = 2 * (2**30)  # 2 GiB
+DEFAULT_SHARE_UNIT_PROC: Final = 8  # SMs
+
+
 class AbstractComputeDevice:
     device_id: DeviceId
     hw_location: str  # either PCI bus ID or arbitrary string
@@ -507,6 +512,10 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         Agent will then read this `MountInfo`s and mount files/directories.
         """
         return []
+
+    def share_units(self) -> tuple[int, int]:
+        """Memory bytes and processing units of one fractional share (suggestion-1122 5.3)."""
+        return DEFAULT_SHARE_UNIT_MEM, DEFAULT_SHARE_UNIT_PROC
 
     def get_additional_gids(self) -> list[int]:
         """

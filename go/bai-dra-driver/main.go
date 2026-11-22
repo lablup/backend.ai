@@ -4,14 +4,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
@@ -24,6 +25,8 @@ func main() {
 		nodeName   = flag.String("node-name", os.Getenv("NODE_NAME"), "this node")
 		socket     = flag.String("bridge-socket", envOr("BAI_DRA_BRIDGE_SOCKET", "/run/bai-dra/bridge.sock"), "plugin host socket")
 		cdiRoot    = flag.String("cdi-root", envOr("BAI_DRA_CDI_ROOT", "/var/run/cdi"), "CDI spec directory")
+		healthAddr = flag.String("health-addr", envOr("BAI_DRA_HEALTH_ADDR", ":8081"), "address of /healthz and /readyz")
+		resync     = flag.Duration("resync-interval", 30*time.Second, "how often to check the plugin host's devices")
 	)
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -40,16 +43,11 @@ func main() {
 		klog.Fatal(err)
 	}
 	client := kubernetes.NewForConfigOrDie(cfg)
-	d := &driver{
-		name:     *driverName,
-		nodeName: *nodeName,
-		bridge:   newBridge(*socket),
-		cdi:      &cdiWriter{root: *cdiRoot},
-		prepared: map[types.UID][]kubeletplugin.Device{},
-	}
+	d := newDriver(*driverName, *nodeName, newBridge(*socket), &cdiWriter{root: *cdiRoot})
+	go serveHealth(ctx, *healthAddr, d)
 	// The plugin host starts beside this container; wait until it answers.
 	for {
-		if _, err := d.bridge.Devices(ctx); err == nil {
+		if err := d.bridge.Health(ctx); err == nil {
 			break
 		}
 		select {
@@ -71,11 +69,12 @@ func main() {
 		klog.Fatal(err)
 	}
 	d.helper = helper
-	if err := d.publish(ctx); err != nil {
+	if err := d.syncDevices(ctx); err != nil {
 		klog.Fatal(err)
 	}
 	logger.Info("bai-dra driver started")
 	go watchRegistration(ctx, helper)
+	go resyncDevices(ctx, d, *resync)
 	<-ctx.Done()
 	helper.Stop()
 	logger.Info("bai-dra driver stopped")
@@ -86,6 +85,53 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// resyncDevices republishes when the plugin host restarted or its devices changed (hot-plug,
+// failure). The resourceslice controller of the helper repairs slices changed by others.
+func resyncDevices(ctx context.Context, d *driver, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := d.syncDevices(ctx); err != nil {
+				klog.FromContext(ctx).Error(err, "device resync failed")
+			}
+		}
+	}
+}
+
+// serveHealth answers the kubelet's probes: /healthz when the plugin host answers, /readyz
+// once the devices are published.
+func serveHealth(ctx context.Context, addr string, d *driver) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		hctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		if err := d.bridge.Health(hctx); err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if !d.published.Load() {
+			http.Error(w, "devices not published", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	})
+	server := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		<-ctx.Done()
+		_ = server.Close()
+	}()
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		klog.FromContext(ctx).Error(err, "health server stopped")
+	}
 }
 
 // watchRegistration reports whether the kubelet confirmed the registration. A kubelet whose

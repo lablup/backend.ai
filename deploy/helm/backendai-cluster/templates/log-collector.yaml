@@ -87,6 +87,9 @@ spec:
         app.kubernetes.io/name: log-collector
     spec:
       serviceAccountName: log-collector
+      {{- with .Values.logCollector.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- with .Values.logCollector.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
@@ -98,6 +101,8 @@ spec:
           env:
             - name: HOSTNAME
               valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          resources:
+            {{- toYaml .Values.logCollector.resources | nindent 12 }}
           volumeMounts:
             - {name: config, mountPath: /etc/promtail}
             - {name: pods, mountPath: /var/log/pods, readOnly: true}

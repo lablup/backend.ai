@@ -6,6 +6,8 @@ metadata:
   labels:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
 ---
+# Cluster-wide: reads for the kernel index and the heartbeat. Exec and logs are in the -namespaced
+# role, bound per session namespace by the Manager.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -16,18 +18,26 @@ rules:
   - apiGroups: [""]
     resources: ["pods", "nodes"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create", "get"]
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get"]
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceslices"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["deviceprofiles"]
     verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-session-gateway-namespaced
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
   - apiGroups: ["backend.ai"]
     resources: ["sessionworkloads"]
     verbs: ["get"]
@@ -86,6 +96,9 @@ spec:
         app.kubernetes.io/name: session-gateway
     spec:
       serviceAccountName: session-gateway
+      {{- with .Values.sessionGateway.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -97,8 +110,12 @@ spec:
           args: ["ai.backend.kube.gateway"]
           env:
             {{- if .Values.nodeHelper.enabled }}
+            - {name: BACKENDAI_NODE_HELPER_PORT, value: {{ .Values.nodeHelper.port | quote }}}
             - name: BACKENDAI_NODE_HELPER_TOKEN
-              valueFrom: {secretKeyRef: {name: node-helper-token, key: token}}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "nodeHelper.tokenSecret.name is required" .Values.nodeHelper.tokenSecret.name }}
+                  key: {{ .Values.nodeHelper.tokenSecret.key }}
             - name: POD_NAMESPACE
               valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
             {{- end }}
@@ -135,3 +152,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- include "backendai-cluster.pdb" (dict "root" . "name" "session-gateway" "replicas" .Values.sessionGateway.replicas) }}

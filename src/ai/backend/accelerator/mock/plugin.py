@@ -15,6 +15,7 @@ from pprint import pformat
 from typing import (
     Any,
     cast,
+    override,
 )
 
 import aiodocker
@@ -616,6 +617,10 @@ class MockPlugin(AbstractComputePlugin):
                         f"Unsupported nvidia-docker version: {self.nvdocker_version}"
                     )
         return docker_config
+
+    @override
+    def share_units(self) -> tuple[int, int]:
+        return self._unit_mem, self._unit_proc
 
     def _get_share(self, device: MockDevice) -> Decimal:
         if isinstance(device, CUDADevice) and device.is_mig_device:
