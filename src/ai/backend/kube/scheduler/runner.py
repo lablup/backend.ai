@@ -28,6 +28,7 @@ from ai.backend.kube.crd.scheduling import (
     Queue,
     SokovanBindMode,
 )
+from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.scheduler.cycle import (
     GpuAllocationPolicy,
     Placement,
@@ -59,6 +60,11 @@ _PG = PodGroup.crd
 _Q = Queue.crd
 _BR = BindRequest.crd
 _DP = DeviceProfile.crd
+_SW = SessionWorkload.crd
+# On a SessionWorkload: the scheduler asks the session controller to recreate its Pods.
+ANNOTATION_REQUEUE: Final = "sokovan.backend.ai/requeue"
+# Seconds before the scheduler asks again for the same gang.
+REQUEUE_COOLDOWN: Final = 120.0
 _BIND_BACKOFF_LIMIT: Final = 3
 BIND_TIMEOUT: Final = 60.0  # seconds a BindRequest may stay pending
 # Seconds a released Pod may stay unschedulable for kube-scheduler (gate mode).
@@ -127,6 +133,19 @@ def unplaceable_since(pod: Mapping[str, Any]) -> datetime | None:
     return None
 
 
+def _rfc3339(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _workload_owners(pod: Mapping[str, Any]) -> list[str]:
+    return [
+        str(ref["name"])
+        for ref in pod["metadata"].get("ownerReferences") or []
+        if ref.get("kind") == _SW.kind
+        and str(ref.get("apiVersion", "")).startswith(f"{_SW.group}/")
+    ]
+
+
 class SokovanScheduler:
     _api: client.ApiClient
     _core: client.CoreV1Api
@@ -137,6 +156,7 @@ class SokovanScheduler:
     _policy: GpuAllocationPolicy
     _allocator_url: str
     _stuck_since: dict[GroupKey, datetime]  # partly placed gangs whose rest does not fit
+    _requeued: dict[GroupKey, datetime]  # gangs the controller was asked to recreate
 
     def __init__(
         self,
@@ -157,6 +177,7 @@ class SokovanScheduler:
         self._policy = policy
         self._allocator_url = allocator_url
         self._stuck_since = {}
+        self._requeued = {}
 
     async def run(self) -> None:
         while True:
@@ -316,7 +337,7 @@ class SokovanScheduler:
 
     async def _recover_unplaceable(self, pods: Sequence[Mapping[str, Any]], now: datetime) -> None:
         """A Pod sokovan released that kube-scheduler cannot place holds its gang forever: the
-        gang is torn down. A gate cannot be put back on a Pod."""
+        gang is requeued: a gate cannot be put back on a Pod, so the controller recreates them."""
         stuck: set[GroupKey] = set()
         for pod in pods:
             group = pod_group_of(pod)
@@ -326,7 +347,9 @@ class SokovanScheduler:
             if (now - since).total_seconds() > RELEASE_TIMEOUT:
                 stuck.add((pod["metadata"]["namespace"], group))
         for namespace, group in sorted(stuck):
-            await self._tear_down(namespace, group, pods, "kube-scheduler cannot place a member")
+            await self._tear_down(
+                namespace, group, pods, "kube-scheduler cannot place a member", now
+            )
 
     async def _tear_down_stale_gangs(
         self, results: Sequence[Placement | Skip], pods: Sequence[Mapping[str, Any]], now: datetime
@@ -344,29 +367,63 @@ class SokovanScheduler:
                 since = self._stuck_since.setdefault(key, now)
                 if (now - since).total_seconds() > STALE_GANG_TIMEOUT:
                     await self._tear_down(
-                        group.namespace, group.name, pods, "missing members do not fit"
+                        group.namespace, group.name, pods, "missing members do not fit", now
                     )
         self._stuck_since = {k: v for k, v in self._stuck_since.items() if k in stuck}
 
     async def _tear_down(
-        self, namespace: str, group: str, pods: Sequence[Mapping[str, Any]], reason: str
+        self,
+        namespace: str,
+        group: str,
+        pods: Sequence[Mapping[str, Any]],
+        reason: str,
+        now: datetime,
     ) -> None:
-        """Delete every Pod of the gang; their claims and BindRequests go with them."""
-        members = [
-            p
-            for p in pods
-            if p["metadata"]["namespace"] == namespace
-            and pod_group_of(p) == group
-            and not p["metadata"].get("deletionTimestamp")
-        ]
-        for pod in members:
-            try:
-                await self._core.delete_namespaced_pod(pod["metadata"]["name"], namespace)
-            except ApiException as e:
-                if e.status != 404:
-                    raise
-        self._stuck_since.pop((namespace, group), None)
-        log.trace("pod group torn down", k8s_namespace=namespace, pod_group=group, reason=reason)
+        """Ask the session controller to recreate the gang: it deletes the remaining Pods and
+        creates every kernel Pod and claim again, up to its retry limit."""
+        key = (namespace, group)
+        self._requeued = {
+            k: at
+            for k, at in self._requeued.items()
+            if (now - at).total_seconds() < REQUEUE_COOLDOWN
+        }
+        last = self._requeued.get(key)
+        if last is not None and (now - last).total_seconds() < REQUEUE_COOLDOWN:
+            return  # requested already; the controller has not acted yet
+        workload = next(
+            (
+                owner
+                for p in pods
+                if p["metadata"]["namespace"] == namespace and pod_group_of(p) == group
+                for owner in _workload_owners(p)
+            ),
+            None,
+        )
+        if workload is None:
+            log.warning(
+                "pod group has no session workload to requeue",
+                k8s_namespace=namespace,
+                pod_group=group,
+            )
+            return
+        body = {"metadata": {"annotations": {ANNOTATION_REQUEUE: _rfc3339(now)}}}
+        try:
+            await self._custom.patch_namespaced_custom_object(
+                _SW.group,
+                CRD_VERSION,
+                namespace,
+                _SW.plural,
+                workload,
+                body,
+                _content_type=_MERGE_PATCH,
+            )
+        except ApiException as e:
+            if e.status != 404:
+                raise
+            return
+        self._requeued[key] = now
+        self._stuck_since.pop(key, None)
+        log.trace("pod group requeued", k8s_namespace=namespace, pod_group=group, reason=reason)
 
     async def _bind(
         self,

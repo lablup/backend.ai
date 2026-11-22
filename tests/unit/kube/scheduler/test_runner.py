@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -59,6 +60,9 @@ def _pod(name: str, *, node: str | None = None) -> dict[str, Any]:
             "namespace": "ns",
             "uid": f"uid-{name}",
             "annotations": {"scheduling.backend.ai/pod-group": "g"},
+            "ownerReferences": [
+                {"apiVersion": "backend.ai/v1alpha1", "kind": "SessionWorkload", "name": "s-1"}
+            ],
         },
         "spec": {"nodeName": node} if node else {},
     }
@@ -70,6 +74,7 @@ def scheduler() -> SokovanScheduler:
     scheduler._custom = MagicMock()
     scheduler._custom.patch_namespaced_custom_object_status = AsyncMock()
     scheduler._custom.delete_namespaced_custom_object = AsyncMock()
+    scheduler._custom.patch_namespaced_custom_object = AsyncMock()
     scheduler._core = MagicMock()
     scheduler._core.patch_namespaced_pod = AsyncMock()
     scheduler._core.delete_namespaced_pod = AsyncMock()
@@ -146,7 +151,9 @@ class TestUnplaceable:
         pod["spec"]["schedulingGates"] = [{"name": "scheduling.backend.ai/sokovan"}]
         assert unplaceable_since(pod) is None
 
-    async def test_a_stuck_release_tears_the_gang_down(self, scheduler: SokovanScheduler) -> None:
+    async def test_a_stuck_release_requeues_the_gang_once(
+        self, scheduler: SokovanScheduler
+    ) -> None:
         pod = _pod("a")
         pod["spec"] = {"nodeSelector": {"kubernetes.io/hostname": "n1"}}
         pod["status"] = {
@@ -160,8 +167,13 @@ class TestUnplaceable:
             ]
         }
         await scheduler._recover_unplaceable([pod, _pod("b", node="n2")], NOW)
-        deleted = [c.args[0] for c in scheduler._core.delete_namespaced_pod.await_args_list]
-        assert deleted == ["a", "b"]
+        await scheduler._recover_unplaceable([pod], NOW + timedelta(seconds=10))
+        scheduler._core.delete_namespaced_pod.assert_not_awaited()
+        [call] = scheduler._custom.patch_namespaced_custom_object.await_args_list
+        assert call.args[:5] == ("backend.ai", "v1alpha1", "ns", "sessionworkloads", "s-1")
+        assert call.args[5] == {
+            "metadata": {"annotations": {"sokovan.backend.ai/requeue": "2026-01-01T00:00:00Z"}}
+        }
 
 
 def _placement() -> Placement:
@@ -195,3 +207,17 @@ class TestRelease:
         result = await scheduler._release(_placement())
         assert isinstance(result, Placement)
         assert scheduler._core.patch_namespaced_pod.await_count == 2
+
+
+class TestStaleGang:
+    async def test_a_partly_placed_gang_is_requeued_after_the_timeout(
+        self, scheduler: SokovanScheduler
+    ) -> None:
+        group = replace(_placement().group, placed_members=1)
+        skip = Skip(group, SkipReason.UNSCHEDULABLE, "no fit")
+        pods = [_pod("a", node="n1"), _pod("b")]
+        await scheduler._tear_down_stale_gangs([skip], pods, NOW)
+        scheduler._custom.patch_namespaced_custom_object.assert_not_awaited()
+        await scheduler._tear_down_stale_gangs([skip], pods, NOW + timedelta(seconds=301))
+        scheduler._custom.patch_namespaced_custom_object.assert_awaited_once()
+        scheduler._core.delete_namespaced_pod.assert_not_awaited()
