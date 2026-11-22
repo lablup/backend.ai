@@ -25,6 +25,7 @@ from ai.backend.kube.controller.naming import (
 )
 from ai.backend.kube.crd.device import (
     DeviceProfileSpec,
+    DriverKind,
     FractionStrategy,
     GPUAllocationPolicy,
     SharingMode,
@@ -312,7 +313,10 @@ def capacity_selector(profile: DeviceProfileSpec, capacity_name: str, value: int
 
 
 def device_key(profile: DeviceProfileSpec) -> str:
-    """How sokovan counts the devices of a profile: `<driver>/<slot>`."""
+    """How sokovan counts the devices of a profile: `<driver>/<slot>`. An external driver's
+    devices carry no slotName, so their slot is the driver name."""
+    if profile.driver_kind == DriverKind.EXTERNAL:
+        return f"{profile.driver_name}/{profile.driver_name}"
     return f"{profile.driver_name}/{profile.slot_name}"
 
 
@@ -329,8 +333,12 @@ def _request_body(
         "count": request.count,
     }
     selectors = []
-    if claim.profile.sharing_mode in (SharingMode.EXCLUSIVE, SharingMode.PARTITION):
-        # A whole GPU and a MIG instance of one driver differ by the slot they serve.
+    if claim.profile.driver_kind == DriverKind.BAI and claim.profile.sharing_mode in (
+        SharingMode.EXCLUSIVE,
+        SharingMode.PARTITION,
+    ):
+        # A whole GPU and a MIG instance of one bai-dra driver differ by the slot they serve;
+        # an external driver's devices carry no slotName and its DeviceClass selects them.
         selectors.append({"cel": {"expression": slot_selector(claim.profile)}})
     if request.shares is not None:
         body["capacity"] = {"requests": {claim.shares_capacity: str(request.shares)}}

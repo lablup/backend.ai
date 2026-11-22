@@ -457,7 +457,8 @@ def build_nodes(
 
 
 def _slot_name(driver: str, device: Mapping[str, Any]) -> str:
-    """bai-dra devices carry the Backend.AI slot they serve; others go by driver."""
+    """bai-dra devices carry the Backend.AI slot they serve; others go by driver
+    (`device_key` of an external profile)."""
     attribute = (device.get("attributes") or {}).get("slotName") or {}
     return str(attribute.get("string") or driver)
 

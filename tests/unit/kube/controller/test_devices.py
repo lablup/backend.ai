@@ -21,6 +21,7 @@ from ai.backend.kube.controller.manifests import (
 from ai.backend.kube.controller.naming import ANNOTATION_DEVICES, ANNOTATION_SHARED_DEVICES
 from ai.backend.kube.crd.device import (
     DeviceProfileSpec,
+    DriverKind,
     FractionStrategy,
     GPUAllocationPolicy,
     SharingMode,
@@ -397,3 +398,36 @@ class TestPartition:
         assert selector["cel"]["expression"] == (
             'device.attributes["cuda.dra.backend.ai"].slotName == "cuda.device:10g-mig"'
         )
+
+
+class TestExternalDriver:
+    @pytest.fixture
+    def nvidia_profile(self) -> DeviceProfileSpec:
+        return DeviceProfileSpec(
+            slot_name="cuda.device",
+            sharing_mode=SharingMode.EXCLUSIVE,
+            driver_kind=DriverKind.EXTERNAL,
+            driver_name="gpu.nvidia.com",
+            device_class_name="gpu.nvidia.com",
+        )
+
+    def test_the_claim_selects_by_device_class_only(
+        self, workload: SessionWorkload, gpu_kernel: KernelSpec, nvidia_profile: DeviceProfileSpec
+    ) -> None:
+        [claim] = translate(gpu_kernel, {"cuda.device": nvidia_profile})
+        manifest = build_resource_claim(workload, gpu_kernel, claim, owner_reference(workload))
+        [request] = manifest["spec"]["devices"]["requests"]
+        assert request["exactly"]["deviceClassName"] == "gpu.nvidia.com"
+        assert "selectors" not in request["exactly"]
+
+    def test_the_demand_is_keyed_by_driver(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        nvidia_profile: DeviceProfileSpec,
+        settings: ControllerSettings,
+    ) -> None:
+        claims = translate(gpu_kernel, {"cuda.device": nvidia_profile})
+        pod = build_kernel_pod(workload, gpu_kernel, settings, devices=claims)
+        annotations = pod["metadata"]["annotations"]
+        assert json.loads(annotations[ANNOTATION_DEVICES]) == {"gpu.nvidia.com/gpu.nvidia.com": 2}

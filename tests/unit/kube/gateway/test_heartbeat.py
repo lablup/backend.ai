@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.kube.crd.device import DeviceProfileSpec, SharingMode
+from ai.backend.kube.crd.device import DeviceProfileSpec, DriverKind, SharingMode
 from ai.backend.kube.gateway.heartbeat import cluster_slots
 
 
@@ -56,3 +56,23 @@ class TestClusterSlots:
             str(e.resource_type): e.quantity for e in cluster_slots(nodes, dedicated_only=True)
         }
         assert slots["cpu"] == "8"
+
+    def test_an_external_driver_reports_its_devices_without_a_slot_name(self) -> None:
+        profile = DeviceProfileSpec(
+            slot_name="cuda.device",
+            sharing_mode=SharingMode.EXCLUSIVE,
+            driver_kind=DriverKind.EXTERNAL,
+            driver_name="gpu.nvidia.com",
+            device_class_name="gpu.nvidia.com",
+        )
+        nvidia_slice = {
+            "spec": {
+                "nodeName": "n1",
+                "driver": "gpu.nvidia.com",
+                "pool": {"name": "n1"},
+                "devices": [{"name": "gpu-0", "attributes": {"type": {"string": "gpu"}}}],
+            }
+        }
+        entries = cluster_slots([_node([])], [nvidia_slice], [profile])
+        slots = {str(e.resource_type): e.quantity for e in entries}
+        assert slots["cuda.device"] == "1"
