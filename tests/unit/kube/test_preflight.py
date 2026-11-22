@@ -116,21 +116,54 @@ class TestRetry:
 
 
 class TestGPUPolicy:
-    def test_dra_with_nvidia_profile_needs_nvidia_slices(self) -> None:
+    def test_nvidia_dra_with_nvidia_profile_needs_nvidia_slices(self) -> None:
         profiles = [_named_profile("gpu", "exclusive", "gpu.nvidia.com")]
-        assert check_gpu_policy("dra", [], [], profiles).outcome == Outcome.FAIL
+        assert check_gpu_policy("nvidia-dra", [], [], profiles).outcome == Outcome.FAIL
         slices = [_slice("a", "gpu.nvidia.com")]
-        assert check_gpu_policy("dra", [], slices, profiles).outcome == Outcome.PASS
+        assert check_gpu_policy("nvidia-dra", [], slices, profiles).outcome == Outcome.PASS
 
-    def test_dra_without_nvidia_profile_needs_no_nvidia_slices(self) -> None:
+    def test_nvidia_dra_without_nvidia_profile_needs_no_nvidia_slices(self) -> None:
         profiles = [_named_profile("npu", "exclusive", "atom.dra.backend.ai")]
-        assert check_gpu_policy("dra", [], [], profiles).outcome == Outcome.PASS
+        assert check_gpu_policy("nvidia-dra", [], [], profiles).outcome == Outcome.PASS
 
-    def test_dra_with_device_plugin_gpus_too_fails(self) -> None:
+    def test_nvidia_dra_with_device_plugin_gpus_too_fails(self) -> None:
         check = check_gpu_policy(
-            "dra", [_gpu_node("a", None, 8)], [_slice("b", "gpu.nvidia.com")], []
+            "nvidia-dra", [_gpu_node("a", None, 8)], [_slice("b", "gpu.nvidia.com")], []
         )
         assert check.outcome == Outcome.FAIL
+
+    def test_the_dra_policy_is_gone(self) -> None:
+        assert check_gpu_policy("dra", [], [], []).outcome == Outcome.FAIL
+
+    def test_bai_with_bai_dra_gpu_nodes_only_passes(self) -> None:
+        slices = [_slice("a", "cuda.dra.backend.ai", shared=True)]
+        check = check_gpu_policy("bai", [_node("a", "bai")], slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.PASS
+
+    def test_bai_ignores_compute_domain_devices(self) -> None:
+        slices = [_slice("a", "cuda.dra.backend.ai"), _slice("a", "compute-domain.nvidia.com")]
+        check = check_gpu_policy("bai", [_node("a", "bai")], slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.PASS
+
+    def test_bai_fails_on_nvidia_dra_gpus_of_a_bai_node_and_names_the_values(self) -> None:
+        slices = [_slice("a", "cuda.dra.backend.ai"), _slice("a", "gpu.nvidia.com")]
+        check = check_gpu_policy("bai", [_node("a", "bai")], slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.FAIL
+        assert "gpus.enabled=false" in check.detail
+        assert "gpuResourcesEnabledOverride=false" in check.detail
+
+    def test_bai_fails_on_device_plugin_gpus_of_a_bai_node(self) -> None:
+        nodes = [_gpu_node("a", "bai", 8)]
+        slices = [_slice("a", "cuda.dra.backend.ai")]
+        check = check_gpu_policy("bai", nodes, slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.FAIL
+        assert "devicePlugin.enabled=false" in check.detail
+
+    def test_bai_leaves_nodes_of_other_allocators_alone(self) -> None:
+        nodes = [_node("a", "bai"), _gpu_node("b", None, 8)]
+        slices = [_slice("a", "cuda.dra.backend.ai"), _slice("c", "gpu.nvidia.com")]
+        check = check_gpu_policy("bai", nodes, slices, [], ["cuda.dra.backend.ai"])
+        assert check.outcome == Outcome.PASS
 
     def test_device_plugin_rejects_fraction_profiles(self) -> None:
         profiles = [_named_profile("fgpu", "fraction", "cuda.dra.backend.ai")]

@@ -33,7 +33,8 @@ class DriverKind(enum.StrEnum):
 class GPUAllocationPolicy(enum.StrEnum):
     """Who allocates NVIDIA GPUs in the cluster (suggestion 4.11)."""
 
-    DRA = "dra"  # ResourceClaims only
+    BAI = "bai"  # bai-dra: whole and fractional requests on one device
+    NVIDIA_DRA = "nvidia-dra"  # the NVIDIA DRA driver; fractions only on a bai-dra pool
     DEVICE_PLUGIN = "device-plugin"  # the extended resource of the device plugin
 
 
@@ -56,6 +57,14 @@ class DeviceProfileSpec(CRDModel):
             "Device plugin resource, e.g. nvidia.com/gpu. Under the device-plugin GPU allocation"
             " policy the kernel container requests it instead of a ResourceClaim. Exclusive"
             " profiles only"
+        ),
+    )
+    shared_slot: str | None = Field(
+        default=None,
+        description=(
+            "An exclusive profile served by the devices published for this fraction slot, e.g."
+            " cuda.shares: each device is requested whole, without a capacity request. The"
+            " profile of that slot must have the same driver and DeviceClass"
         ),
     )
     fraction_strategy: FractionStrategy = Field(
@@ -88,9 +97,9 @@ class DeviceProfileSpec(CRDModel):
     compute_domain: bool = Field(
         default=False,
         description=(
-            "NVIDIA DRA driver: a session of several kernels using this profile gets a"
-            " ComputeDomain (resource.nvidia.com/v1beta1) and its channel claim on every"
-            " kernel Pod"
+            "A session of several kernels using this profile gets a ComputeDomain"
+            " (resource.nvidia.com/v1beta1) and its channel claim on every kernel Pod. Needs"
+            " the NVIDIA DRA driver's ComputeDomain support, whichever driver serves the GPUs"
         ),
     )
 

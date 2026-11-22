@@ -1,7 +1,18 @@
+{{- $policy := include "backendai-cluster.gpuAllocationPolicy" . -}}
 Backend.AI workload cluster components are installed in {{ .Release.Namespace }}.
 
-GPU allocation policy: {{ include "backendai-cluster.gpuAllocationPolicy" . }}
+GPU allocation policy: {{ $policy }}
   Pre-flight report: kubectl -n {{ .Release.Namespace }} logs job/backendai-preflight
+{{- if eq $policy "bai" }}
+  bai-dra allocates every NVIDIA GPU, whole and fractional. On the GPU nodes bai-dra owns:
+    NVIDIA DRA driver: gpus.enabled=false (AICR: gpuResourcesEnabledOverride=false); keep
+      computeDomains enabled for multi-node NVLink sessions.
+    Device plugin: off (gpu-operator devicePlugin.enabled=false, or node label
+      nvidia.com/gpu.deploy.device-plugin=false).
+{{- else if eq $policy "nvidia-dra" }}
+  The NVIDIA DRA driver allocates NVIDIA GPUs; fractions only on a bai-dra fGPU node pool taken
+  out of its kubelet plugin (kubeletPlugin.affinity) with nvidia.com/gpu.deploy.device-plugin=false.
+{{- end }}
 {{- if .Values.managerAccess.tokenSecret }}
 
 Manager access: register a kubeconfig with the token of Secret backendai-manager-token.

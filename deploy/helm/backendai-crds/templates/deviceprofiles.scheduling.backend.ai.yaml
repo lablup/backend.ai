@@ -62,6 +62,13 @@ spec:
                   device-plugin GPU allocation policy the kernel container requests
                   it instead of a ResourceClaim. Exclusive profiles only
                 nullable: true
+              sharedSlot:
+                type: string
+                description: 'An exclusive profile served by the devices published
+                  for this fraction slot, e.g. cuda.shares: each device is requested
+                  whole, without a capacity request. The profile of that slot must
+                  have the same driver and DeviceClass'
+                nullable: true
               fractionStrategy:
                 description: How a fraction request larger than any one device is
                   split
@@ -95,9 +102,10 @@ spec:
                 type: array
               computeDomain:
                 default: false
-                description: 'NVIDIA DRA driver: a session of several kernels using
-                  this profile gets a ComputeDomain (resource.nvidia.com/v1beta1)
-                  and its channel claim on every kernel Pod'
+                description: A session of several kernels using this profile gets
+                  a ComputeDomain (resource.nvidia.com/v1beta1) and its channel claim
+                  on every kernel Pod. Needs the NVIDIA DRA driver's ComputeDomain
+                  support, whichever driver serves the GPUs
                 type: boolean
             required:
             - slotName

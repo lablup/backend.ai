@@ -173,7 +173,7 @@ class SokovanScheduler:
         interval: float = 2.0,
         strategy: AgentSelectionStrategy = AgentSelectionStrategy.CONCENTRATED,
         bind_mode: SokovanBindMode = SokovanBindMode.GATE,
-        policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
+        policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI,
         allocator_url: str = "http://127.0.0.1:8786",
     ) -> None:
         self._api = api

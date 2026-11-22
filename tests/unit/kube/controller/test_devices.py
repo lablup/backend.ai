@@ -12,6 +12,7 @@ from ai.backend.kube.controller.devices import (
     attribute_selector,
     build_compute_domain,
     build_resource_claim,
+    device_key,
     needs_compute_domain,
     plan_shares,
     share_pools,
@@ -341,10 +342,14 @@ class TestDevicePluginPolicy:
         assert "resourceClaims" not in pod["spec"]
         assert ANNOTATION_DEVICES not in pod["metadata"].get("annotations", {})
 
-    def test_dra_policy_ignores_the_extended_resource(
-        self, gpu_kernel: KernelSpec, plugin_profile: DeviceProfileSpec
+    @pytest.mark.parametrize("policy", [GPUAllocationPolicy.BAI, GPUAllocationPolicy.NVIDIA_DRA])
+    def test_dra_policies_ignore_the_extended_resource(
+        self,
+        gpu_kernel: KernelSpec,
+        plugin_profile: DeviceProfileSpec,
+        policy: GPUAllocationPolicy,
     ) -> None:
-        [claim] = translate(gpu_kernel, {"cuda.device": plugin_profile}, GPUAllocationPolicy.DRA)
+        [claim] = translate(gpu_kernel, {"cuda.device": plugin_profile}, policy)
         assert claim.extended_resource is None
 
     def test_fraction_profiles_are_rejected(
@@ -540,3 +545,133 @@ class TestComputeDomain:
             } in pod["spec"]["resourceClaims"]
             [container] = [c for c in pod["spec"]["containers"] if c["name"] == "kernel"]
             assert {"name": COMPUTE_DOMAIN_CLAIM} in container["resources"]["claims"]
+
+
+@pytest.fixture
+def whole_profile(shares_profile: DeviceProfileSpec) -> DeviceProfileSpec:
+    """`cuda.device` served by the devices of `cuda.shares`."""
+    return DeviceProfileSpec(
+        slot_name="cuda.device",
+        sharing_mode=SharingMode.EXCLUSIVE,
+        driver_name=shares_profile.driver_name,
+        device_class_name=shares_profile.device_class_name,
+        shared_slot="cuda.shares",
+        match_attributes=["numaNode"],
+    )
+
+
+@pytest.fixture
+def shared_profiles(
+    whole_profile: DeviceProfileSpec, shares_profile: DeviceProfileSpec
+) -> dict[str, DeviceProfileSpec]:
+    return {"cuda.device": whole_profile, "cuda.shares": shares_profile}
+
+
+class TestSharedSlot:
+    def test_whole_devices_are_requested_from_the_shared_slot_without_capacity(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        shared_profiles: dict[str, DeviceProfileSpec],
+    ) -> None:
+        [claim] = translate(gpu_kernel, shared_profiles)
+        manifest = build_resource_claim(workload, gpu_kernel, claim, owner_reference(workload))
+        [request] = _requests(manifest)
+        exactly = request["exactly"]
+        assert exactly["count"] == 2
+        assert exactly["deviceClassName"] == "cuda-shares.dra.backend.ai"
+        assert "capacity" not in exactly
+        assert [s["cel"]["expression"] for s in exactly["selectors"]] == [
+            'device.attributes["cuda.dra.backend.ai"].slotName == "cuda.shares"'
+        ]
+        assert manifest["spec"]["devices"]["constraints"] == [
+            {"requests": ["cuda-device"], "matchAttribute": "resource.kubernetes.io/numaNode"}
+        ]
+
+    def test_the_pod_records_the_devices_as_shared(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        shared_profiles: dict[str, DeviceProfileSpec],
+        settings: ControllerSettings,
+    ) -> None:
+        claims = translate(gpu_kernel, shared_profiles)
+        pod = build_kernel_pod(workload, gpu_kernel, settings, devices=claims)
+        annotations = pod["metadata"]["annotations"]
+        assert ANNOTATION_DEVICES not in annotations
+        assert json.loads(annotations[ANNOTATION_SHARED_DEVICES]) == {"cuda.dra.backend.ai": 2}
+
+    def test_the_device_key_is_the_shared_slot(self, whole_profile: DeviceProfileSpec) -> None:
+        assert device_key(whole_profile) == "cuda.dra.backend.ai/cuda.shares"
+
+    @pytest.mark.parametrize(
+        "update",
+        [
+            {"sharing_mode": SharingMode.PARTITION},
+            {"driver_name": "other.dra.backend.ai"},
+            {"device_class_name": "other.dra.backend.ai"},
+            {"shared_slot": "rocm.shares"},
+        ],
+    )
+    def test_a_mismatched_profile_is_rejected(
+        self,
+        gpu_kernel: KernelSpec,
+        shared_profiles: dict[str, DeviceProfileSpec],
+        update: dict[str, Any],
+    ) -> None:
+        profiles = {
+            **shared_profiles,
+            "cuda.device": shared_profiles["cuda.device"].model_copy(update=update),
+        }
+        with pytest.raises(InvalidSessionWorkloadError):
+            translate(gpu_kernel, profiles)
+
+    def test_the_shared_slot_must_be_a_fraction_profile(
+        self, gpu_kernel: KernelSpec, shared_profiles: dict[str, DeviceProfileSpec]
+    ) -> None:
+        shares = shared_profiles["cuda.shares"].model_copy(
+            update={"sharing_mode": SharingMode.EXCLUSIVE}
+        )
+        with pytest.raises(InvalidSessionWorkloadError):
+            translate(gpu_kernel, {**shared_profiles, "cuda.shares": shares})
+
+    def test_the_device_plugin_policy_rejects_it(
+        self, gpu_kernel: KernelSpec, shared_profiles: dict[str, DeviceProfileSpec]
+    ) -> None:
+        with pytest.raises(InvalidSessionWorkloadError):
+            translate(gpu_kernel, shared_profiles, GPUAllocationPolicy.DEVICE_PLUGIN)
+
+
+class TestComputeDomainOnBaiDevices:
+    def test_a_bai_profile_gets_the_domain_and_the_channel(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        shared_profiles: dict[str, DeviceProfileSpec],
+        settings: ControllerSettings,
+    ) -> None:
+        sub = gpu_kernel.model_copy(
+            update={
+                "kernel_id": "11111111-0000-0000-0000-000000000002",
+                "cluster_role": "sub",
+                "cluster_hostname": "sub1",
+            }
+        )
+        workload.spec.kernels = [gpu_kernel, sub]
+        profiles = {
+            **shared_profiles,
+            "cuda.device": shared_profiles["cuda.device"].model_copy(
+                update={"compute_domain": True}
+            ),
+        }
+        devices = {k.kernel_id: translate(k, profiles) for k in workload.spec.kernels}
+        assert needs_compute_domain(workload, devices)
+        pod = build_kernel_pod(
+            workload, sub, settings, devices=devices[sub.kernel_id], compute_domain=True
+        )
+        claims = {c["name"]: c for c in pod["spec"]["resourceClaims"]}
+        assert claims[COMPUTE_DOMAIN_CLAIM] == {
+            "name": COMPUTE_DOMAIN_CLAIM,
+            "resourceClaimTemplateName": "s-1-channel",
+        }
+        assert "cuda-device" in claims

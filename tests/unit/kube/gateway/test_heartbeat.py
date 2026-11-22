@@ -63,6 +63,27 @@ class TestClusterSlots:
         slots = {str(e.resource_type): e.quantity for e in entries}
         assert slots["cuda.shares"] == "26.5"
 
+    def test_a_shared_slot_profile_reports_the_shared_devices(self) -> None:
+        shares = DeviceProfileSpec(
+            slot_name="cuda.shares",
+            sharing_mode=SharingMode.FRACTION,
+            driver_name="gpu.x",
+            device_class_name="shares.gpu.x",
+        )
+        whole = shares.model_copy(
+            update={
+                "slot_name": "cuda.device",
+                "sharing_mode": SharingMode.EXCLUSIVE,
+                "shared_slot": "cuda.shares",
+            }
+        )
+        rs = _shares_slice()
+        for device in rs["spec"]["devices"]:
+            device["attributes"] = {"slotName": {"string": "cuda.shares"}}
+        entries = cluster_slots([_node([])], [rs], [shares, whole])
+        slots = {str(e.resource_type): e.quantity for e in entries}
+        assert (slots["cuda.shares"], slots["cuda.device"]) == ("26.5", "2")
+
     @pytest.mark.parametrize(
         "node",
         [

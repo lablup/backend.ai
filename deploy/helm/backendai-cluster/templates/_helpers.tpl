@@ -26,9 +26,9 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 
 {{/* The cluster's GPU allocation policy (suggestion-1122 4.11), validated. */}}
 {{- define "backendai-cluster.gpuAllocationPolicy" -}}
-{{- $policy := .Values.gpuAllocationPolicy | default "dra" -}}
-{{- if not (has $policy (list "dra" "device-plugin")) -}}
-{{- fail (printf "gpuAllocationPolicy must be dra or device-plugin, not %q" $policy) -}}
+{{- $policy := .Values.gpuAllocationPolicy | default "bai" -}}
+{{- if not (has $policy (list "bai" "nvidia-dra" "device-plugin")) -}}
+{{- fail (printf "gpuAllocationPolicy must be bai, nvidia-dra or device-plugin, not %q" $policy) -}}
 {{- end -}}
 {{- $policy -}}
 {{- end -}}
