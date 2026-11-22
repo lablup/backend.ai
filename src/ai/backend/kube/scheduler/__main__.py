@@ -8,12 +8,13 @@ import socket
 import click
 from kubernetes_asyncio import client
 
+from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.kube.crd.device import GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import SokovanBindMode
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
 from ai.backend.kube.leader import run_maybe_as_leader
-from ai.backend.kube.scheduler.cycle import PlacementStrategy
 from ai.backend.kube.scheduler.runner import SokovanScheduler
+from ai.backend.kube.scheduler.selection import SELECTABLE_STRATEGIES
 from ai.backend.logging.logger import LocalLogger
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.types import LogLevel
@@ -24,7 +25,7 @@ log = StructuredLogger(logging.getLogger("ai.backend.kube.scheduler"))
 
 async def _serve(
     interval: float,
-    strategy: PlacementStrategy,
+    strategy: AgentSelectionStrategy,
     bind_mode: SokovanBindMode,
     policy: GPUAllocationPolicy,
     allocator_url: str,
@@ -62,8 +63,9 @@ async def _serve(
 @click.option(
     "--strategy",
     envvar="BACKENDAI_SCHEDULER_STRATEGY",
-    type=click.Choice([s.value for s in PlacementStrategy]),
-    default=PlacementStrategy.CONCENTRATED.value,
+    type=click.Choice([s.value for s in SELECTABLE_STRATEGIES]),
+    default=AgentSelectionStrategy.CONCENTRATED.value,
+    help="Node selection, with the agent selectors of the Manager.",
 )
 @click.option(
     "--bind-mode",
@@ -115,7 +117,7 @@ def main(
         asyncio.run(
             _serve(
                 interval,
-                PlacementStrategy(strategy),
+                AgentSelectionStrategy(strategy),
                 SokovanBindMode(bind_mode),
                 GPUAllocationPolicy(gpu_allocation_policy),
                 allocator_url,

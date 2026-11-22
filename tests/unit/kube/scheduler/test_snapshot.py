@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
 
 from ai.backend.kube.scheduler.cycle import Resources
 from ai.backend.kube.scheduler.snapshot import (
+    bind_requested,
     build_nodes,
     build_pending_groups,
-    build_queues,
     in_flight_binds,
+    live_pod_uids,
     pod_requests,
     reserved_claims,
     slot_profiles,
@@ -25,6 +25,7 @@ def _pod(
     pinned: str | None = None,
     gated: bool = False,
     phase: str = "Running",
+    uid: str | None = None,
 ) -> dict[str, Any]:
     spec: dict[str, Any] = {
         "containers": [
@@ -40,7 +41,8 @@ def _pod(
         "metadata": {
             "name": name,
             "namespace": "ns",
-            "labels": {"scheduling.backend.ai/queue": "q"},
+            "uid": uid or f"uid-{name}",
+            "labels": {},
             "annotations": {"scheduling.backend.ai/pod-group": "g"},
         },
         "spec": spec,
@@ -48,13 +50,13 @@ def _pod(
     }
 
 
-def _node(name: str) -> dict[str, Any]:
+def _node(name: str, *conditions: dict[str, str], unschedulable: bool = False) -> dict[str, Any]:
     return {
         "metadata": {"name": name, "labels": {}},
-        "spec": {},
+        "spec": {"unschedulable": unschedulable},
         "status": {
             "allocatable": {"cpu": "8", "memory": "16Gi", "pods": "110"},
-            "conditions": [{"type": "Ready", "status": "True"}],
+            "conditions": [{"type": "Ready", "status": "True"}, *conditions],
         },
     }
 
@@ -104,44 +106,46 @@ class TestBuildNodes:
         assert node.devices_used == {"gpu.x/g": 3}
 
 
-class TestBuildQueues:
-    def test_limit_from_slots_and_usage_from_running_pods(self) -> None:
-        queue = {"metadata": {"name": "q"}, "spec": {"resources": {"cpu": {"limit": "3"}}}}
-        states = build_queues([queue], [_pod("a", node="n1"), _pod("b", gated=True)])
-        assert states["q"].limit is not None and states["q"].limit.cpu_milli == 3000
-        assert states["q"].used.cpu_milli == 1000
-
-
 class TestBuildPendingGroups:
     def test_only_gated_pods_of_pending_groups(self) -> None:
         group = {
             "metadata": {"name": "g", "namespace": "ns", "creationTimestamp": "t"},
-            "spec": {"minMember": 2, "queue": "q"},
+            "spec": {"minMember": 2},
         }
         [pending] = build_pending_groups([group], [_pod("a", gated=True), _pod("b", node="n1")])
         assert [p.name for p in pending.pods] == ["a"]
 
 
+def _bind(
+    pod: str, uid: str | None = None, claims: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    return {
+        "metadata": {"namespace": "ns", "name": f"{pod}-x"},
+        "spec": {
+            "podName": pod,
+            "podUid": uid or f"uid-{pod}",
+            "selectedNode": "n1",
+            "resourceClaimAllocations": claims or [],
+        },
+    }
+
+
 class TestBindRequests:
     def test_failed_requests_are_not_in_flight(self) -> None:
         binds = [
-            {"metadata": {"namespace": "ns"}, "spec": {"podName": "a", "selectedNode": "n1"}},
-            {
-                "metadata": {"namespace": "ns"},
-                "spec": {"podName": "b", "selectedNode": "n1"},
-                "status": {"phase": "Failed"},
-            },
+            _bind("a"),
+            {**_bind("b"), "status": {"phase": "Failed"}},
         ]
-        assert in_flight_binds(binds) == {("ns", "a"): "n1"}
+        assert in_flight_binds(binds) == {"uid-a": "n1"}
 
     def test_a_pod_with_a_bind_request_holds_its_node_and_is_not_pending(self) -> None:
         pod = _pod("waiting", gated=True)
-        in_flight = {("ns", "waiting"): "n1"}
+        in_flight = {"uid-waiting": "n1"}
         [node] = build_nodes([_node("n1")], [pod], in_flight=in_flight)
         assert node.used.cpu_milli == 1000
         group = {
             "metadata": {"namespace": "ns", "name": "g"},
-            "spec": {"queue": "q", "minMember": 1},
+            "spec": {"minMember": 1},
         }
         assert build_pending_groups([group], [pod], in_flight) == []
 
@@ -150,7 +154,7 @@ class TestBindRequests:
         pod["spec"]["schedulerName"] = "sokovan"
         group = {
             "metadata": {"namespace": "ns", "name": "g"},
-            "spec": {"queue": "q", "minMember": 1},
+            "spec": {"minMember": 1},
         }
         [pending] = build_pending_groups([group], [pod])
         assert [p.name for p in pending.pods] == ["released"]
@@ -159,7 +163,7 @@ class TestBindRequests:
         pod = _pod("waiting", gated=True)
         group = {
             "metadata": {"namespace": "ns", "name": "g"},
-            "spec": {"queue": "q", "minMember": 1},
+            "spec": {"minMember": 1},
             "status": {"phase": "Scheduled"},
         }
         [pending] = build_pending_groups([group], [pod], {})
@@ -169,7 +173,7 @@ class TestBindRequests:
 def _group_obj(min_member: int = 2) -> dict[str, Any]:
     return {
         "metadata": {"name": "g", "namespace": "ns", "creationTimestamp": "t"},
-        "spec": {"minMember": min_member, "queue": "q"},
+        "spec": {"minMember": min_member},
     }
 
 
@@ -189,14 +193,14 @@ def _foreign_claim(result: dict[str, Any]) -> dict[str, Any]:
 class TestGangMembers:
     def test_bound_and_in_flight_members_count_toward_min_member(self) -> None:
         pods = [_pod("a", node="n1"), _pod("b", gated=True), _pod("c", gated=True)]
-        [pending] = build_pending_groups([_group_obj(3)], pods, {("ns", "b"): "n1"})
+        [pending] = build_pending_groups([_group_obj(3)], pods, {"uid-b": "n1"})
         assert [p.name for p in pending.pods] == ["c"]
         assert pending.placed_members == 2
         assert pending.placed_nodes == ["n1"]
 
     def test_a_pod_with_a_failed_bind_request_waits_for_its_removal(self) -> None:
         pods = [_pod("a", gated=True), _pod("b", gated=True)]
-        [pending] = build_pending_groups([_group_obj()], pods, {}, has_bind_request={("ns", "a")})
+        [pending] = build_pending_groups([_group_obj()], pods, {}, has_bind_request={"uid-a"})
         assert [p.name for p in pending.pods] == ["b"]
 
 
@@ -260,17 +264,6 @@ class TestDeviceAccounting:
         )
         [share_request] = pending.pods[0].share_claims[0]
         assert share_request.driver == "gpu.x" and share_request.options[0].shares == 150
-        assert pending.pods[0].slots == {"cuda.shares": Decimal("1.5")}
-
-
-class TestQueueSlots:
-    def test_device_slot_limits_and_usage(self) -> None:
-        queue = {"metadata": {"name": "q"}, "spec": {"resources": {"cuda.device": {"limit": "4"}}}}
-        pod = _pod("a", node="n1")
-        pod["metadata"]["annotations"]["scheduling.backend.ai/devices"] = '{"gpu.x/cuda.device": 2}'
-        states = build_queues([queue], [pod])
-        assert states["q"].slot_limits == {"cuda.device": Decimal(4)}
-        assert states["q"].slot_used == {"cuda.device": Decimal(2)}
 
 
 class TestReservedClaims:
@@ -278,14 +271,71 @@ class TestReservedClaims:
         allocation: dict[str, Any] = {"devices": {"results": []}}
         binds = [
             {
-                "metadata": {"namespace": "ns"},
-                "spec": {
-                    "podName": "a",
-                    "resourceClaimAllocations": [{"name": "c", "allocation": allocation}],
-                },
+                **_bind("a", claims=[{"name": "c", "allocation": allocation}]),
                 "status": {"phase": phase},
             }
             for phase in ("Pending", "Succeeded", "Failed")
         ]
         expected = {"namespace": "ns", "name": "c", "allocation": allocation}
         assert reserved_claims(binds) == [expected, expected]
+
+
+class TestRecreatedPod:
+    """The controller recreated a Pod under the same name while the BindRequest of the Pod
+    before it still exists (not yet collected, or Succeeded and kept)."""
+
+    def _timeline(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        allocation: dict[str, Any] = {"devices": {"results": []}}
+        old = _bind("a", uid="old", claims=[{"name": "c", "allocation": allocation}])
+        return [_pod("a", gated=True, uid="new")], [old]
+
+    def test_the_old_request_neither_holds_a_node_nor_reserves_claims(self) -> None:
+        pods, binds = self._timeline()
+        live = live_pod_uids(pods)
+        in_flight = in_flight_binds(binds, live)
+        assert in_flight == {}
+        assert reserved_claims(binds, live) == []
+        [node] = build_nodes([_node("n1")], pods, in_flight=in_flight)
+        assert node.used.cpu_milli == 0
+
+    def test_the_new_pod_is_placed_again(self) -> None:
+        pods, binds = self._timeline()
+        in_flight = in_flight_binds(binds, live_pod_uids(pods))
+        [pending] = build_pending_groups([_group_obj(1)], pods, in_flight, bind_requested(binds))
+        assert [p.name for p in pending.pods] == ["a"]
+
+    def test_a_request_of_the_new_pod_holds_it(self) -> None:
+        pods, binds = self._timeline()
+        binds.append(_bind("a", uid="new"))
+        in_flight = in_flight_binds(binds, live_pod_uids(pods))
+        assert in_flight == {"new": "n1"}
+        assert build_pending_groups([_group_obj(1)], pods, in_flight, bind_requested(binds)) == []
+
+
+class TestNodeLifecycle:
+    def test_a_node_to_be_recycled_takes_nothing(self) -> None:
+        recycle = {"type": "nvke.nvidia.com/NeedsRecycle", "status": "True"}
+        [node] = build_nodes([_node("n1", recycle)], [])
+        assert not node.schedulable
+
+    def test_a_cordoned_node_takes_nothing(self) -> None:
+        [node] = build_nodes([_node("n1", unschedulable=True)], [])
+        assert not node.schedulable
+
+    def test_a_ready_node_takes_pods(self) -> None:
+        recycle = {"type": "nvke.nvidia.com/NeedsRecycle", "status": "False"}
+        [node] = build_nodes([_node("n1", recycle)], [])
+        assert node.schedulable
+
+
+class TestGroupOrderKey:
+    def test_the_session_workload_creation_time_orders_a_group(self) -> None:
+        group = _group_obj(1)
+        group["metadata"]["creationTimestamp"] = "2026-11-22T10:00:00Z"
+        group["metadata"]["ownerReferences"] = [{"kind": "SessionWorkload", "uid": "sw"}]
+        workload = {"metadata": {"uid": "sw", "creationTimestamp": "2026-11-22T09:00:00Z"}}
+        pods = [_pod("a", gated=True)]
+        [pending] = build_pending_groups([group], pods, workloads=[workload])
+        assert pending.created_at == "2026-11-22T09:00:00Z"
+        [fallback] = build_pending_groups([group], pods)
+        assert fallback.created_at == "2026-11-22T10:00:00Z"

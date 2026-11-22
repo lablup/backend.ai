@@ -17,6 +17,7 @@ import aiohttp
 from kubernetes_asyncio import client
 from kubernetes_asyncio.client.exceptions import ApiException
 
+from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.kube.controller.naming import HOSTNAME_LABEL, SOKOVAN_GATE
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
@@ -25,26 +26,25 @@ from ai.backend.kube.crd.scheduling import (
     BindRequestPhase,
     PodGroup,
     PodGroupPhase,
-    Queue,
     SokovanBindMode,
 )
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.scheduler.cycle import (
     Placement,
-    PlacementStrategy,
     Skip,
     SkipReason,
     schedule,
 )
+from ai.backend.kube.scheduler.selection import NodeSelector
 from ai.backend.kube.scheduler.snapshot import (
     PodKey,
     bind_requested,
     build_nodes,
     build_pending_groups,
-    build_queues,
     in_flight_binds,
     is_dedicated,
     is_gated,
+    live_pod_uids,
     pod_group_of,
     reserved_claims,
     slot_profiles,
@@ -56,7 +56,6 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 _MERGE_PATCH: Final = "application/merge-patch+json"
 _JSON_PATCH: Final = "application/json-patch+json"
 _PG = PodGroup.crd
-_Q = Queue.crd
 _BR = BindRequest.crd
 _DP = DeviceProfile.crd
 _SW = SessionWorkload.crd
@@ -72,6 +71,7 @@ RELEASE_TIMEOUT: Final = 120.0
 STALE_GANG_TIMEOUT: Final = 300.0
 _DRA_GROUP: Final = "resource.k8s.io"
 _DRA_VERSION: Final = "v1"
+_MAX_NAME: Final = 253
 
 type GroupKey = tuple[str, str]  # namespace, PodGroup name
 
@@ -132,6 +132,14 @@ def unplaceable_since(pod: Mapping[str, Any]) -> datetime | None:
     return None
 
 
+def bind_request_name(pod: Mapping[str, Any]) -> str:
+    """One BindRequest name per Pod uid: a Pod recreated under the same name while the request
+    of its predecessor still exists gets its own."""
+    meta = pod["metadata"]
+    suffix = "-" + str(meta["uid"])[:8]
+    return str(meta["name"])[: _MAX_NAME - len(suffix)] + suffix
+
+
 def _rfc3339(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -150,19 +158,20 @@ class SokovanScheduler:
     _core: client.CoreV1Api
     _custom: client.CustomObjectsApi
     _interval: float
-    _strategy: PlacementStrategy
+    _selector: NodeSelector
     _bind_mode: SokovanBindMode
     _policy: GPUAllocationPolicy
     _allocator_url: str
     _stuck_since: dict[GroupKey, datetime]  # partly placed gangs whose rest does not fit
     _requeued: dict[GroupKey, datetime]  # gangs the controller was asked to recreate
+    _workloads_denied: bool  # logged once that SessionWorkloads cannot be listed
 
     def __init__(
         self,
         api: client.ApiClient,
         *,
         interval: float = 2.0,
-        strategy: PlacementStrategy = PlacementStrategy.CONCENTRATED,
+        strategy: AgentSelectionStrategy = AgentSelectionStrategy.CONCENTRATED,
         bind_mode: SokovanBindMode = SokovanBindMode.GATE,
         policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
         allocator_url: str = "http://127.0.0.1:8786",
@@ -171,12 +180,13 @@ class SokovanScheduler:
         self._core = client.CoreV1Api(api)
         self._custom = client.CustomObjectsApi(api)
         self._interval = interval
-        self._strategy = strategy
+        self._selector = NodeSelector(strategy)
         self._bind_mode = bind_mode
         self._policy = policy
         self._allocator_url = allocator_url
         self._stuck_since = {}
         self._requeued = {}
+        self._workloads_denied = False
 
     async def run(self) -> None:
         while True:
@@ -191,7 +201,7 @@ class SokovanScheduler:
             nodes_raw,
             pods_raw,
             groups_raw,
-            queues_raw,
+            workloads,
             slices_raw,
             claims_raw,
             binds_raw,
@@ -200,7 +210,7 @@ class SokovanScheduler:
             self._core.list_node(),
             self._core.list_pod_for_all_namespaces(),
             self._custom.list_cluster_custom_object(_PG.group, CRD_VERSION, _PG.plural),
-            self._custom.list_cluster_custom_object(_Q.group, CRD_VERSION, _Q.plural),
+            self._list_workloads(),
             self._custom.list_cluster_custom_object(_DRA_GROUP, _DRA_VERSION, "resourceslices"),
             self._custom.list_cluster_custom_object(_DRA_GROUP, _DRA_VERSION, "resourceclaims"),
             self._custom.list_cluster_custom_object(_BR.group, CRD_VERSION, _BR.plural),
@@ -214,10 +224,17 @@ class SokovanScheduler:
         if self._bind_mode == SokovanBindMode.GATE:
             await self._recover_unplaceable(pods, now)
         profiles = slot_profiles(profiles_raw["items"])
-        in_flight = in_flight_binds(binds)
-        reserved = reserved_claims(binds)
+        live = live_pod_uids(pods)
+        in_flight = in_flight_binds(binds, live)
+        reserved = reserved_claims(binds, live)
         pending = build_pending_groups(
-            groups_raw["items"], pods, in_flight, bind_requested(binds), claims, profiles
+            groups_raw["items"],
+            pods,
+            in_flight,
+            bind_requested(binds),
+            claims,
+            profiles,
+            workloads,
         )
         if not pending:
             self._stuck_since.clear()
@@ -234,13 +251,7 @@ class SokovanScheduler:
         if self._bind_mode == SokovanBindMode.BINDER:
             # The binder bypasses kube-scheduler: sokovan owns only its dedicated nodes.
             nodes = [n for n in nodes if is_dedicated(n)]
-        results = schedule(
-            nodes,
-            build_queues(queues_raw["items"], pods, in_flight, claims, profiles),
-            pending,
-            self._strategy,
-            self._policy,
-        )
+        results = schedule(nodes, pending, self._selector, self._policy)
         if self._bind_mode == SokovanBindMode.BINDER:
             results = await self._bind(results, pods, reserved)
         else:
@@ -253,6 +264,23 @@ class SokovanScheduler:
         }
         for result in results:
             await self._report(result, current.get((result.group.namespace, result.group.name)))
+
+    async def _list_workloads(self) -> list[dict[str, Any]]:
+        """SessionWorkloads, for their creation time; without the right to list them the
+        PodGroups' creation time orders the groups."""
+        try:
+            listed = await self._custom.list_cluster_custom_object(
+                _SW.group, CRD_VERSION, _SW.plural
+            )
+        except ApiException as e:
+            if e.status != 403:
+                raise
+            if not self._workloads_denied:
+                log.warning("session workloads not listable; ordering by pod group age")
+                self._workloads_denied = True
+            return []
+        items: list[dict[str, Any]] = listed["items"]
+        return items
 
     async def _settle_failed_binds(
         self,
@@ -505,7 +533,7 @@ class SokovanScheduler:
             "apiVersion": _BR.api_version,
             "kind": _BR.kind,
             "metadata": {
-                "name": meta["name"],
+                "name": bind_request_name(pod),
                 "namespace": meta["namespace"],
                 # Gone with its Pod.
                 "ownerReferences": [
@@ -521,9 +549,14 @@ class SokovanScheduler:
                 "backoffLimit": _BIND_BACKOFF_LIMIT,
             },
         }
-        await self._custom.create_namespaced_custom_object(
-            _BR.group, CRD_VERSION, meta["namespace"], _BR.plural, body
-        )
+        try:
+            await self._custom.create_namespaced_custom_object(
+                _BR.group, CRD_VERSION, meta["namespace"], _BR.plural, body
+            )
+        except ApiException as e:
+            if e.status != 409:
+                raise
+            # Written by an earlier cycle whose result this snapshot does not show yet.
 
     async def _release_all(self, results: Sequence[Placement | Skip]) -> list[Placement | Skip]:
         out: list[Placement | Skip] = []

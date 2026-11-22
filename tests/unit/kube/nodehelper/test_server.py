@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import os
+import stat
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -8,6 +12,7 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from ai.backend.kube.errors import NodeHelperCommandError
 from ai.backend.kube.nodehelper.server import (
+    MAX_CONCURRENT_COMMANDS,
     TOKEN_HEADER,
     CommitRequest,
     PushRequest,
@@ -18,6 +23,7 @@ from ai.backend.kube.nodehelper.server import (
     docker_config,
     label_args,
     push_args,
+    run_command,
 )
 
 CONTAINER_ID = "0123456789abcdef"
@@ -133,3 +139,47 @@ class TestCriLabels:
         assert cri_labels([{"Labels": {"io.kubernetes.pod.name": "p"}}]) == {
             "io.kubernetes.pod.name": "p"
         }
+
+
+def _hanging_command(tmp_path: Path) -> str:
+    """A command that records its pid and then never ends."""
+    script = tmp_path / "hang"
+    script.write_text(f"#!/bin/sh\necho $$ >> {tmp_path / 'pids'}\nexec sleep 60\n")
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return str(script)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+class TestCommandTimeout:
+    async def test_a_command_past_its_timeout_is_killed(self, tmp_path: Path) -> None:
+        with pytest.raises(NodeHelperCommandError, match="timed out"):
+            await run_command([_hanging_command(tmp_path)], time_limit=1.0)
+        pid = int((tmp_path / "pids").read_text().split()[0])
+        assert not _alive(pid)
+
+    async def test_a_cancelled_command_is_killed(self, tmp_path: Path) -> None:
+        task = asyncio.create_task(run_command([_hanging_command(tmp_path)], time_limit=60))
+        for _ in range(100):
+            if (tmp_path / "pids").exists():
+                break
+            await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not _alive(int((tmp_path / "pids").read_text().split()[0]))
+
+    async def test_timed_out_commits_release_their_slots(self, tmp_path: Path) -> None:
+        app = build_app(_hanging_command(tmp_path), "secret", _accept, command_timeout=1.0)
+        body = {"container_id": CONTAINER_ID, "image": "i"}
+        async with TestClient(TestServer(app)) as cli:
+            for _ in range(MAX_CONCURRENT_COMMANDS + 1):
+                resp = await cli.post("/v1/commit", json=body, headers={TOKEN_HEADER: "secret"})
+                assert resp.status == 500
+                assert "timed out" in (await resp.json())["error"]

@@ -1,25 +1,26 @@
-"""One scheduling cycle over a snapshot: queue limits, ordering, gang placement. No API calls."""
+"""One scheduling cycle over a snapshot: ordering and gang placement. No API calls.
+
+The Manager admits sessions (queues, fair share, resource policies); the cluster only places
+the admitted groups, in order of priority, then of SessionWorkload creation.
+"""
 
 from __future__ import annotations
 
 import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from ai.backend.kube.crd.device import GPUAllocationPolicy
 
-
-class PlacementStrategy(enum.StrEnum):
-    CONCENTRATED = "concentrated"  # fill the busiest node that fits first (binpack)
-    DISPERSED = "dispersed"  # use the least busy node first (spread)
+if TYPE_CHECKING:
+    from ai.backend.kube.scheduler.selection import NodeSelector
 
 
 class SkipReason(enum.StrEnum):
     WAITING_FOR_PODS = "WaitingForPods"
-    QUEUE_LIMIT = "QueueLimit"
     UNSCHEDULABLE = "Unschedulable"
-    RESERVED = "WaitingForQueueHead"
+    RESERVED = "WaitingForEarlierGroup"
     UNSUPPORTED = "Unsupported"
 
 
@@ -204,49 +205,20 @@ class PendingPod:
     shared_devices: Mapping[str, int] = field(default_factory=dict)  # DRA driver → devices shared
     extended: Mapping[str, int] = field(default_factory=dict)  # extended resource → count
     share_claims: Sequence[ShareClaim] = ()
-    slots: Mapping[str, Decimal] = field(default_factory=dict)  # device slot → amount
 
 
 @dataclass(frozen=True)
 class PendingGroup:
     namespace: str
     name: str
-    queue: str
     priority: int
-    created_at: str
+    created_at: str  # of the SessionWorkload (of the PodGroup when it is not known)
     min_member: int
     pods: Sequence[PendingPod]  # the members still to place
     required_levels: Sequence[str] = ()  # node labels every pod of the group shares a value of
     placed_members: int = 0  # members bound or with a bind in flight
     placed_nodes: Sequence[str] = ()  # nodes of those members
-
-
-@dataclass
-class QueueState:
-    name: str
-    limit: Resources | None  # None: no limit
-    used: Resources = field(default_factory=Resources)
-    parent: str | None = None
-    fair_share_factor: float = 0.0  # higher goes first, as in the Manager's fair share
-    slot_limits: Mapping[str, Decimal] = field(default_factory=dict)  # device slot → limit
-    slot_used: Mapping[str, Decimal] = field(default_factory=dict)
-
-
-def queue_chain(queues: Mapping[str, QueueState], name: str) -> list[QueueState]:
-    """The queue and its ancestors; a cycle or a missing parent ends the chain."""
-    chain: list[QueueState] = []
-    current = queues.get(name)
-    while current is not None and current not in chain:
-        chain.append(current)
-        current = queues.get(current.parent) if current.parent else None
-    return chain
-
-
-def add_slots(a: Mapping[str, Decimal], b: Mapping[str, Decimal]) -> dict[str, Decimal]:
-    total = dict(a)
-    for slot, amount in b.items():
-        total[slot] = total.get(slot, Decimal(0)) + amount
-    return total
+    session_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -282,19 +254,10 @@ def _fits(node: NodeState, pod: PendingPod) -> bool:
 
 
 def _choose(
-    nodes: Sequence[NodeState], pod: PendingPod, strategy: PlacementStrategy
+    nodes: Sequence[NodeState], pod: PendingPod, selector: NodeSelector, session_id: str | None
 ) -> NodeState | None:
-    candidates = [n for n in nodes if _fits(n, pod)]
-    if not candidates:
-        return None
-
-    def busy(n: NodeState) -> tuple[float, str]:
-        share = n.used.cpu_milli / n.allocatable.cpu_milli if n.allocatable.cpu_milli else 1.0
-        return share, n.name
-
-    if strategy == PlacementStrategy.CONCENTRATED:
-        return max(candidates, key=busy)
-    return min(candidates, key=busy)
+    """The node the sokovan_core strategy picks among those the Pod fits on."""
+    return selector.choose([n for n in nodes if _fits(n, pod)], pod, session_id)
 
 
 def _domains(nodes: Sequence[NodeState], levels: Sequence[str]) -> list[list[NodeState]]:
@@ -310,7 +273,7 @@ def _domains(nodes: Sequence[NodeState], levels: Sequence[str]) -> list[list[Nod
 
 
 def _place_gang(
-    nodes: Sequence[NodeState], group: PendingGroup, strategy: PlacementStrategy
+    nodes: Sequence[NodeState], group: PendingGroup, selector: NodeSelector
 ) -> dict[str, str] | None:
     """The first topology domain that takes every pod of the group; members already placed
     fix the domain."""
@@ -324,14 +287,14 @@ def _place_gang(
     for domain in _domains(nodes, levels):
         if levels and joined and {tuple(domain[0].labels[lv] for lv in levels)} != joined:
             continue
-        placed = _place_in(domain, group, strategy)
+        placed = _place_in(domain, group, selector)
         if placed is not None:
             return placed
     return None
 
 
 def _place_in(
-    nodes: Sequence[NodeState], group: PendingGroup, strategy: PlacementStrategy
+    nodes: Sequence[NodeState], group: PendingGroup, selector: NodeSelector
 ) -> dict[str, str] | None:
     """Place every pod of the group on a tentative copy; nothing changes unless all fit."""
     trial = [replace(n) for n in nodes]
@@ -341,7 +304,7 @@ def _place_in(
         return (-sum(p.devices.values()), -p.requests.cpu_milli, -p.requests.memory)
 
     for pod in sorted(group.pods, key=size):
-        node = _choose(trial, pod, strategy)
+        node = _choose(trial, pod, selector, group.session_id)
         if node is None:
             return None
         node.used = node.used + pod.requests
@@ -363,43 +326,28 @@ def _empty(node: NodeState) -> NodeState:
 
 
 def _would_fit_when_idle(
-    nodes: Sequence[NodeState], group: PendingGroup, strategy: PlacementStrategy
+    nodes: Sequence[NodeState], group: PendingGroup, selector: NodeSelector
 ) -> bool:
-    return _place_gang([_empty(n) for n in nodes], group, strategy) is not None
-
-
-def _over_limit(
-    chain: Sequence[QueueState], demand: Resources, slots: Mapping[str, Decimal]
-) -> QueueState | None:
-    for q in chain:
-        if q.limit is not None and not (q.used + demand).fits_in(q.limit):
-            return q
-        for slot, limit in q.slot_limits.items():
-            wanted = slots.get(slot, Decimal(0))
-            if wanted > 0 and q.slot_used.get(slot, Decimal(0)) + wanted > limit:
-                return q
-    return None
+    return _place_gang([_empty(n) for n in nodes], group, selector) is not None
 
 
 def schedule(
     nodes: Sequence[NodeState],
-    queues: Mapping[str, QueueState],
     groups: Sequence[PendingGroup],
-    strategy: PlacementStrategy = PlacementStrategy.CONCENTRATED,
+    selector: NodeSelector,
     policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
 ) -> list[Placement | Skip]:
-    """Decide which pending groups start now: higher priority, then the queue with the higher
-    fair share factor, then the oldest.
+    """Place the pending groups in order: higher priority, then the older SessionWorkload,
+    then the name.
 
-    The first group of a queue that does not fit now, but would on idle nodes, keeps the nodes
-    it can use: later groups of that queue may only use other nodes, so it is not starved.
+    The first group that does not fit now, but would on idle nodes, keeps the nodes it can
+    use: later groups may only use other nodes, so it is not starved.
     """
 
-    def order(g: PendingGroup) -> tuple[int, float, str, str]:
-        queue = queues.get(g.queue)
-        return (-g.priority, -(queue.fair_share_factor if queue else 0.0), g.created_at, g.name)
+    def order(g: PendingGroup) -> tuple[int, str, str, str]:
+        return (-g.priority, g.created_at, g.namespace, g.name)
 
-    heads: dict[str, tuple[PendingGroup, frozenset[str]]] = {}
+    head: tuple[PendingGroup, frozenset[str]] | None = None
     results: list[Placement | Skip] = []
     for group in sorted(groups, key=order):
         present = len(group.pods) + group.placed_members
@@ -421,40 +369,24 @@ def schedule(
                 )
             )
             continue
-        demand = Resources()
-        slots: dict[str, Decimal] = {}
-        for pod in group.pods:
-            demand = demand + pod.requests
-            slots = add_slots(slots, pod.slots)
-        chain = queue_chain(queues, group.queue)
-        full = _over_limit(chain, demand, slots)
-        if full is not None:
-            results.append(
-                Skip(group, SkipReason.QUEUE_LIMIT, f"queue {full.name} is at its limit")
-            )
-            continue
-        head = heads.get(group.queue)
         usable = nodes if head is None else [n for n in nodes if n.name not in head[1]]
-        placed = _place_gang(usable, group, strategy)
+        placed = _place_gang(usable, group, selector)
         if placed is None:
-            if head is not None and _place_gang([replace(n) for n in nodes], group, strategy):
+            if head is not None and _place_gang([replace(n) for n in nodes], group, selector):
                 results.append(
                     Skip(
                         group,
                         SkipReason.RESERVED,
-                        f"waiting behind {head[0].name}, which is first in queue {group.queue}",
+                        f"waiting behind {head[0].namespace}/{head[0].name}, which goes first",
                     )
                 )
                 continue
-            if head is None and _would_fit_when_idle(nodes, group, strategy):
+            if head is None and _would_fit_when_idle(nodes, group, selector):
                 keeps = frozenset(n.name for n in nodes if any(_eligible(n, p) for p in group.pods))
-                heads[group.queue] = (group, keeps)
+                head = (group, keeps)
             results.append(
                 Skip(group, SkipReason.UNSCHEDULABLE, "not every pod of the group fits now")
             )
             continue
-        for q in chain:
-            q.used = q.used + demand
-            q.slot_used = add_slots(q.slot_used, slots)
         results.append(Placement(group, placed))
     return results

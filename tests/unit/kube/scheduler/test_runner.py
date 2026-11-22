@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.scheduler.cycle import (
     PendingGroup,
@@ -16,7 +17,12 @@ from ai.backend.kube.scheduler.cycle import (
     Skip,
     SkipReason,
 )
-from ai.backend.kube.scheduler.runner import SokovanScheduler, rolled_back, unplaceable_since
+from ai.backend.kube.scheduler.runner import (
+    SokovanScheduler,
+    bind_request_name,
+    rolled_back,
+    unplaceable_since,
+)
 
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
 ALLOCATION = {"devices": {"results": [{"driver": "d", "pool": "p", "device": "dev-0"}]}}
@@ -178,7 +184,7 @@ class TestUnplaceable:
 
 def _placement() -> Placement:
     pods = [PendingPod("ns", name, Resources(1000, 1, 1)) for name in ("a", "b")]
-    group = PendingGroup("ns", "g", "q", 0, "1", 2, pods)
+    group = PendingGroup("ns", "g", 0, "1", 2, pods)
     return Placement(group, {"a": "n1", "b": "n1"})
 
 
@@ -221,3 +227,24 @@ class TestStaleGang:
         await scheduler._tear_down_stale_gangs([skip], pods, NOW + timedelta(seconds=301))
         scheduler._custom.patch_namespaced_custom_object.assert_awaited_once()
         scheduler._core.delete_namespaced_pod.assert_not_awaited()
+
+
+class TestBindRequestName:
+    def test_a_recreated_pod_gets_its_own_request(self) -> None:
+        old, new = _pod("a"), _pod("a")
+        new["metadata"]["uid"] = "uid-b"
+        assert bind_request_name(old) != bind_request_name(new)
+
+    def test_a_long_pod_name_stays_a_valid_name(self) -> None:
+        pod = _pod("p" * 253)
+        assert len(bind_request_name(pod)) == 253
+
+    async def test_a_request_written_already_is_not_an_error(
+        self, scheduler: SokovanScheduler
+    ) -> None:
+        scheduler._custom.create_namespaced_custom_object = AsyncMock(
+            side_effect=ApiException(status=409)
+        )
+        await scheduler._create_bind_request(_pod("a"), "n1", "g", [])
+        [call] = scheduler._custom.create_namespaced_custom_object.await_args_list
+        assert call.args[4]["spec"]["podUid"] == "uid-a"

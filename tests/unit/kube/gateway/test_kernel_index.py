@@ -13,20 +13,36 @@ def _pod(
     *,
     namespace: str = "bai-p",
     name: str = "s-1-main1",
+    kernel_id: str = "k1",
+    owner_uid: str = "sw-uid-1",
 ) -> dict[str, Any]:
     return {
         "metadata": {
             "name": name,
             "namespace": namespace,
             "uid": uid,
-            "labels": {"backend.ai/kernel-id": "k1", "backend.ai/session-id": "s1"},
+            "labels": {"backend.ai/kernel-id": kernel_id, "backend.ai/session-id": "s1"},
             "annotations": {"backend.ai/kernel-uid": "1000", "backend.ai/kernel-gid": "1001"},
             "ownerReferences": [
-                {"apiVersion": "backend.ai/v1alpha1", "kind": "SessionWorkload", "name": "s-1"}
+                {
+                    "apiVersion": "backend.ai/v1alpha1",
+                    "kind": "SessionWorkload",
+                    "name": "s-1",
+                    "uid": owner_uid,
+                }
             ],
         },
         "spec": {"containers": [{"name": "kernel", "env": []}], "nodeName": "n1"},
         "status": {"podIP": ip, "phase": "Running"},
+    }
+
+
+def _workload(
+    uid: str = "sw-uid-1", namespace: str = "bai-p", kernel_ids: tuple[str, ...] = ("k1",)
+) -> dict[str, Any]:
+    return {
+        "metadata": {"name": "s-1", "namespace": namespace, "uid": uid},
+        "spec": {"sessionId": "s1", "kernels": [{"kernelId": k} for k in kernel_ids]},
     }
 
 
@@ -54,6 +70,7 @@ def removed() -> _Removed:
 def index(removed: _Removed) -> KernelIndex:
     index = KernelIndex(on_removed=removed)
     index.replace_namespaces([_namespace("bai-p")])
+    index.replace_workloads([_workload()])
     return index
 
 
@@ -76,6 +93,7 @@ class TestEndpointFromPod:
             "s1",
             "s-1",
         )
+        assert endpoint.workload_uid == "sw-uid-1"
         assert (endpoint.uid, endpoint.gid, endpoint.pod_ip) == (1000, 1001, "10.0.0.5")
         assert endpoint.node_name == "n1"
 
@@ -139,3 +157,69 @@ class TestKernelIndex:
     def test_a_malformed_event_does_not_raise(self, index: KernelIndex) -> None:
         index.apply("ADDED", {"metadata": {}})
         assert index.get("k1") is None
+
+    def test_an_owner_reference_to_another_workload_is_not_indexed(
+        self, index: KernelIndex
+    ) -> None:
+        index.apply("ADDED", _pod(owner_uid="forged"))
+        assert index.get("k1") is None
+
+    def test_a_kernel_id_the_workload_does_not_declare_is_not_indexed(
+        self, index: KernelIndex
+    ) -> None:
+        index.apply("ADDED", _pod(kernel_id="k9"))
+        assert index.get("k9") is None
+
+    def test_a_workload_in_another_namespace_does_not_vouch(self, index: KernelIndex) -> None:
+        index.replace_namespaces([_namespace("bai-p"), _namespace("bai-q")])
+        index.apply("ADDED", _pod(namespace="bai-q"))
+        assert index.get("k1") is None
+
+    def test_a_pod_seen_before_its_workload_is_indexed_once_it_arrives(self) -> None:
+        index = KernelIndex()
+        index.replace_namespaces([_namespace("bai-p")])
+        index.apply("ADDED", _pod())
+        assert index.get("k1") is None
+        index.apply_workload("ADDED", _workload())
+        assert index.get("k1") is not None
+
+    def test_a_deleted_workload_drops_its_kernels(
+        self, index: KernelIndex, removed: _Removed
+    ) -> None:
+        index.apply("ADDED", _pod())
+        index.apply_workload("DELETED", _workload())
+        assert index.get("k1") is None
+        assert removed.kernel_ids == ["k1"]
+
+    def test_the_next_pod_takes_over_when_the_first_is_deleted(self, index: KernelIndex) -> None:
+        index.apply("ADDED", _pod(uid="first"))
+        index.apply("ADDED", _pod(uid="second", name="other"))
+        index.apply("DELETED", _pod(uid="first"))
+        endpoint = index.get("k1")
+        assert endpoint is not None and endpoint.pod_uid == "second"
+
+
+class TestKernelIndexCost:
+    def test_a_relist_and_its_added_events_resolve_each_kernel_a_bounded_number_of_times(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        count = 2000
+        kernel_ids = tuple(f"k{i}" for i in range(count))
+        pods = [_pod(uid=f"p{i}", name=f"p{i}", kernel_id=k) for i, k in enumerate(kernel_ids)]
+        index = KernelIndex()
+        index.replace_namespaces([_namespace("bai-p")])
+        index.replace_workloads([_workload(kernel_ids=kernel_ids)])
+        checks = 0
+        valid = KernelIndex._valid
+
+        def counting(self: KernelIndex, endpoint: Any) -> bool:
+            nonlocal checks
+            checks += 1
+            return valid(self, endpoint)
+
+        monkeypatch.setattr(KernelIndex, "_valid", counting)
+        index.replace_pods(pods)
+        for pod in pods:
+            index.apply("ADDED", pod)
+        assert all(index.get(k) is not None for k in kernel_ids)
+        assert checks <= 4 * count
