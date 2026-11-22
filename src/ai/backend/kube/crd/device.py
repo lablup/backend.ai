@@ -62,10 +62,37 @@ class DeviceProfileSpec(CRDModel):
         default=FractionStrategy.FILL,
         description="How a fraction request larger than any one device is split",
     )
-    attribute_map: dict[str, str] = Field(default_factory=dict)
-    isolation_provider: str | None = None
+    attribute_map: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Backend.AI attribute name (slotName, model, ...) → the driver's attribute, e.g."
+            " model: gpu.nvidia.com/productName. A name without a domain is in the driver's"
+            " domain. Unmapped names are used as they are"
+        ),
+    )
+    isolation_provider: str | None = Field(
+        default=None,
+        description=(
+            "Informational: the isolation the driver applies (hami-core, bai-hook, none). The"
+            " bai-dra driver entry selects it; the controller does not read it"
+        ),
+    )
     opaque_config: dict[str, Any] = Field(default_factory=dict)
-    match_attributes: list[str] = Field(default_factory=list)
+    match_attributes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Attributes (Backend.AI names, mapped by attributeMap) every device of a"
+            " multi-device claim shares"
+        ),
+    )
+    compute_domain: bool = Field(
+        default=False,
+        description=(
+            "NVIDIA DRA driver: a session of several kernels using this profile gets a"
+            " ComputeDomain (resource.nvidia.com/v1beta1) and its channel claim on every"
+            " kernel Pod"
+        ),
+    )
 
 
 class DeviceProfileStatus(CRDModel):

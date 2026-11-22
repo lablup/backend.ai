@@ -6,9 +6,13 @@ from typing import Any
 import pytest
 
 from ai.backend.kube.controller.devices import (
+    COMPUTE_DOMAIN_CLAIM,
     DeviceClaim,
     SharePool,
+    attribute_selector,
+    build_compute_domain,
     build_resource_claim,
+    needs_compute_domain,
     plan_shares,
     share_pools,
     translate,
@@ -21,6 +25,7 @@ from ai.backend.kube.controller.manifests import (
 from ai.backend.kube.controller.naming import ANNOTATION_DEVICES, ANNOTATION_SHARED_DEVICES
 from ai.backend.kube.crd.device import (
     DeviceProfileSpec,
+    DriverKind,
     FractionStrategy,
     GPUAllocationPolicy,
     SharingMode,
@@ -84,7 +89,7 @@ class TestResourceClaim:
         assert request["exactly"]["deviceClassName"] == "gpu.nvidia.com"
         assert request["exactly"]["count"] == 2
         assert claim["spec"]["devices"]["constraints"] == [
-            {"requests": ["cuda-device"], "matchAttribute": "numaNode"}
+            {"requests": ["cuda-device"], "matchAttribute": "resource.kubernetes.io/numaNode"}
         ]
 
 
@@ -397,3 +402,141 @@ class TestPartition:
         assert selector["cel"]["expression"] == (
             'device.attributes["cuda.dra.backend.ai"].slotName == "cuda.device:10g-mig"'
         )
+
+
+@pytest.fixture
+def nvidia_profile() -> DeviceProfileSpec:
+    """A profile for the NVIDIA DRA driver, which publishes no slot attribute."""
+    return DeviceProfileSpec(
+        slot_name="cuda.device",
+        sharing_mode=SharingMode.EXCLUSIVE,
+        driver_kind=DriverKind.EXTERNAL,
+        driver_name="gpu.nvidia.com",
+        device_class_name="gpu.nvidia.com",
+        attribute_map={"model": "productName", "nvlinkDomain": "gpu.nvidia.com/partition0"},
+        match_attributes=["nvlinkDomain", "numaNode"],
+    )
+
+
+class TestAttributeMap:
+    def test_model_selection_uses_the_driver_attribute(
+        self, nvidia_profile: DeviceProfileSpec
+    ) -> None:
+        assert attribute_selector(nvidia_profile, "model", "NVIDIA H100 80GB HBM3") == (
+            'device.attributes["gpu.nvidia.com"].productName == "NVIDIA H100 80GB HBM3"'
+        )
+
+    def test_match_attributes_are_mapped_and_qualified(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        nvidia_profile: DeviceProfileSpec,
+    ) -> None:
+        [claim] = translate(gpu_kernel, {"cuda.device": nvidia_profile})
+        manifest = build_resource_claim(workload, gpu_kernel, claim, owner_reference(workload))
+        assert manifest["spec"]["devices"]["constraints"] == [
+            {"requests": ["cuda-device"], "matchAttribute": "gpu.nvidia.com/partition0"},
+            {"requests": ["cuda-device"], "matchAttribute": "resource.kubernetes.io/numaNode"},
+        ]
+
+    def test_an_external_driver_without_a_slot_attribute_has_no_slot_selector(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        nvidia_profile: DeviceProfileSpec,
+    ) -> None:
+        [claim] = translate(gpu_kernel, {"cuda.device": nvidia_profile})
+        manifest = build_resource_claim(workload, gpu_kernel, claim, owner_reference(workload))
+        assert "selectors" not in manifest["spec"]["devices"]["requests"][0]["exactly"]
+
+    def test_a_mapped_slot_attribute_selects_the_slot(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        nvidia_profile: DeviceProfileSpec,
+    ) -> None:
+        profile = nvidia_profile.model_copy(
+            update={"attribute_map": {"slotName": "dra.backend.ai/slotName"}}
+        )
+        [claim] = translate(gpu_kernel, {"cuda.device": profile})
+        manifest = build_resource_claim(workload, gpu_kernel, claim, owner_reference(workload))
+        [selector] = manifest["spec"]["devices"]["requests"][0]["exactly"]["selectors"]
+        assert selector["cel"]["expression"] == (
+            'device.attributes["dra.backend.ai"].slotName == "cuda.device"'
+        )
+
+
+class TestComputeDomain:
+    @pytest.fixture
+    def domain_profile(self, nvidia_profile: DeviceProfileSpec) -> DeviceProfileSpec:
+        return nvidia_profile.model_copy(update={"compute_domain": True})
+
+    @pytest.fixture
+    def two_kernel_workload(
+        self, workload: SessionWorkload, gpu_kernel: KernelSpec
+    ) -> SessionWorkload:
+        sub = gpu_kernel.model_copy(
+            update={
+                "kernel_id": "11111111-0000-0000-0000-000000000002",
+                "cluster_role": "sub",
+                "cluster_hostname": "sub1",
+            }
+        )
+        workload.spec.kernels = [gpu_kernel, sub]
+        return workload
+
+    def test_a_multi_kernel_session_with_such_a_profile_needs_one(
+        self, two_kernel_workload: SessionWorkload, domain_profile: DeviceProfileSpec
+    ) -> None:
+        devices = {
+            k.kernel_id: translate(k, {"cuda.device": domain_profile})
+            for k in two_kernel_workload.spec.kernels
+        }
+        assert needs_compute_domain(two_kernel_workload, devices)
+
+    def test_a_single_kernel_session_needs_none(
+        self, workload: SessionWorkload, gpu_kernel: KernelSpec, domain_profile: DeviceProfileSpec
+    ) -> None:
+        devices = {gpu_kernel.kernel_id: translate(gpu_kernel, {"cuda.device": domain_profile})}
+        assert not needs_compute_domain(workload, devices)
+
+    def test_a_profile_without_the_flag_needs_none(
+        self, two_kernel_workload: SessionWorkload, nvidia_profile: DeviceProfileSpec
+    ) -> None:
+        devices = {
+            k.kernel_id: translate(k, {"cuda.device": nvidia_profile})
+            for k in two_kernel_workload.spec.kernels
+        }
+        assert not needs_compute_domain(two_kernel_workload, devices)
+
+    def test_the_domain_is_owned_by_the_session_and_sized_by_its_kernels(
+        self, two_kernel_workload: SessionWorkload
+    ) -> None:
+        owner = owner_reference(two_kernel_workload)
+        domain = build_compute_domain(two_kernel_workload, owner)
+        assert domain["apiVersion"] == "resource.nvidia.com/v1beta1"
+        assert domain["metadata"]["name"] == "s-1"
+        assert domain["metadata"]["namespace"] == "bai-p"
+        assert domain["metadata"]["ownerReferences"] == [owner]
+        assert domain["spec"] == {
+            "numNodes": 2,
+            "channel": {"resourceClaimTemplate": {"name": "s-1-channel"}},
+        }
+
+    def test_every_kernel_pod_claims_the_channel(
+        self,
+        two_kernel_workload: SessionWorkload,
+        domain_profile: DeviceProfileSpec,
+        settings: ControllerSettings,
+    ) -> None:
+        for kernel in two_kernel_workload.spec.kernels:
+            devices = translate(kernel, {"cuda.device": domain_profile})
+            pod = build_kernel_pod(
+                two_kernel_workload, kernel, settings, devices=devices, compute_domain=True
+            )
+            assert {
+                "name": COMPUTE_DOMAIN_CLAIM,
+                "resourceClaimTemplateName": "s-1-channel",
+            } in pod["spec"]["resourceClaims"]
+            [container] = [c for c in pod["spec"]["containers"] if c["name"] == "kernel"]
+            assert {"name": COMPUTE_DOMAIN_CLAIM} in container["resources"]["claims"]
