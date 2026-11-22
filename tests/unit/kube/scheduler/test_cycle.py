@@ -413,3 +413,52 @@ class TestSokovanCoreSelection:
         pod = replace(group.pods[0], node_selector={"kubernetes.io/arch": "arm64"})
         [result] = _schedule(nodes, [replace(group, pods=[pod])])
         assert isinstance(result, Placement) and result.nodes == {"g-0": "arm"}
+
+
+def _gpu_node(name: str, conflict: str | None = None) -> NodeState:
+    node = _node(name, 8)
+    node.devices = {"cuda.dra.backend.ai": 1, "cuda.dra.backend.ai/cuda.device": 1}
+    node.gpu_conflict = conflict
+    return node
+
+
+def _gpu_group(name: str, *, gpu: bool = True) -> PendingGroup:
+    devices = {"cuda.dra.backend.ai/cuda.device": 1} if gpu else {}
+    pod = PendingPod("ns", f"{name}-0", Resources(1000, GIB, 1), devices=devices, gpu=gpu)
+    return PendingGroup("ns", name, 0, "1", 1, [pod])
+
+
+class TestGPUAllocatorConflict:
+    def test_a_gpu_pod_skips_a_conflicted_node(self) -> None:
+        nodes = [_gpu_node("a", "also allocated by gpu.nvidia.com"), _gpu_node("b")]
+        [result] = _schedule(nodes, [_gpu_group("g")])
+        assert isinstance(result, Placement) and result.nodes == {"g-0": "b"}
+
+    def test_a_gpu_pod_that_fits_only_on_conflicted_nodes_says_so(self) -> None:
+        nodes = [_gpu_node("a", "also allocated by gpu.nvidia.com")]
+        [result] = _schedule(nodes, [_gpu_group("g")])
+        assert isinstance(result, Skip) and result.reason == SkipReason.GPU_ALLOCATOR_CONFLICT
+        assert "a: also allocated by gpu.nvidia.com" in result.message
+        assert nodes[0].devices_used == {}
+
+    def test_a_pod_without_gpus_still_uses_a_conflicted_node(self) -> None:
+        nodes = [_gpu_node("a", "also allocated by gpu.nvidia.com")]
+        [result] = _schedule(nodes, [_gpu_group("g", gpu=False)])
+        assert isinstance(result, Placement) and result.nodes == {"g-0": "a"}
+
+    def test_a_gpu_pod_too_big_for_any_node_is_unschedulable(self) -> None:
+        nodes = [_gpu_node("a", "conflict")]
+        group = _gpu_group("g")
+        big = replace(group.pods[0], devices={"cuda.dra.backend.ai/cuda.device": 2})
+        [result] = _schedule(nodes, [replace(group, pods=[big])])
+        assert isinstance(result, Skip) and result.reason == SkipReason.UNSCHEDULABLE
+
+    def test_a_busy_clean_node_is_not_a_conflict(self) -> None:
+        clean = _gpu_node("b")
+        clean.devices_used = {"cuda.dra.backend.ai/cuda.device": 1}
+        [first, second] = _schedule(
+            [_gpu_node("a", "conflict"), clean], [_gpu_group("g1"), _gpu_group("g2")]
+        )
+        # Fits on the idle clean node: it waits for it, the conflicted node is not the reason.
+        assert isinstance(first, Skip) and first.reason == SkipReason.UNSCHEDULABLE
+        assert isinstance(second, Skip) and second.reason == SkipReason.UNSCHEDULABLE

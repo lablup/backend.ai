@@ -29,6 +29,7 @@ class SkipReason(enum.StrEnum):
     UNSUPPORTED = "Unsupported"
     WAITING_FOR_GROUP_MEMBERS = "WaitingForGroupMembers"
     GROUP_DOES_NOT_FIT = "GroupDoesNotFit"
+    GPU_ALLOCATOR_CONFLICT = "GPUAllocatorConflict"
 
 
 _SHARES_UNSUPPORTED: Final = "device shares need the bai GPU allocation policy"
@@ -138,6 +139,8 @@ class NodeState:
     share_used: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
     # SessionGroup id → sessions of the group with a kernel on the node
     group_members: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    # Why the node takes no GPU pod: bai-dra and another GPU allocator are on it
+    gpu_conflict: str | None = None
 
     @property
     def free(self) -> Resources:
@@ -241,6 +244,7 @@ class PendingPod:
     shared_devices: Mapping[str, int] = field(default_factory=dict)  # DRA driver → devices shared
     extended: Mapping[str, int] = field(default_factory=dict)  # extended resource → count
     share_claims: Sequence[ShareClaim] = ()
+    gpu: bool = False  # asks for NVIDIA GPUs (of bai-dra or of another allocator)
 
 
 @dataclass(frozen=True)
@@ -298,6 +302,7 @@ def _eligible(node: NodeState, pod: PendingPod) -> bool:
 def _fits(node: NodeState, pod: PendingPod) -> bool:
     return (
         _eligible(node, pod)
+        and not (pod.gpu and node.gpu_conflict is not None)
         and pod.requests.fits_in(node.free)
         and node.has_devices(pod.devices, pod.shared_devices)
         and node.has_extended(pod.extended)
@@ -476,6 +481,21 @@ class _Cycle:
             p.share_claims for g in unit for p in g.pods
         )
 
+    def conflict(self, unit: Sequence[PendingGroup]) -> str | None:
+        """The nodes with another GPU allocator, when the unit would fit on idle nodes only with
+        them; otherwise None."""
+        conflicted = [n for n in self.nodes if n.gpu_conflict is not None]
+        if not conflicted or not any(p.gpu for g in unit for p in g.pods):
+            return None
+        idle = [_empty(n) for n in self.nodes]
+        if _place_unit(idle, idle, unit, self.selector) is not None:
+            return None
+        ignored = [replace(n, gpu_conflict=None) for n in idle]
+        if _place_unit(ignored, ignored, unit, self.selector) is None:
+            return None
+        nodes = "; ".join(f"{n.name}: {n.gpu_conflict}" for n in conflicted)
+        return f"GPUs of nodes with another GPU allocator are not used ({nodes})"
+
     def blocked(self, unit: Sequence[PendingGroup]) -> str | None:
         """Why a unit that does not fit now waits behind the head; otherwise it becomes the
         head if it would fit on idle nodes, and None is returned."""
@@ -504,6 +524,8 @@ class _Cycle:
         placed = _place_gang(self.usable(), group, self.selector, self.nodes)
         if placed is not None:
             return Placement(group, placed)
+        if (message := self.conflict([group])) is not None:
+            return Skip(group, SkipReason.GPU_ALLOCATOR_CONFLICT, message)
         if (message := self.blocked([group])) is not None:
             return Skip(group, SkipReason.RESERVED, message)
         return Skip(group, SkipReason.UNSCHEDULABLE, "not every pod of the group fits now")
@@ -529,6 +551,8 @@ class _Cycle:
         placements = _place_unit(self.usable(), self.nodes, unit, self.selector)
         if placements is not None:
             return [Placement(g, p) for g, p in zip(unit, placements, strict=True)]
+        if (message := self.conflict(unit)) is not None:
+            return skip(SkipReason.GPU_ALLOCATOR_CONFLICT, message)
         if (message := self.blocked(unit)) is not None:
             return skip(SkipReason.RESERVED, message)
         return skip(

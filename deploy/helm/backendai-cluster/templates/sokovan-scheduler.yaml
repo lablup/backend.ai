@@ -97,6 +97,7 @@ spec:
             - {name: BACKENDAI_SCHEDULER_STRATEGY, value: {{ .Values.sokovanScheduler.strategy | quote }}}
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sokovanScheduler.logLevel | quote }}}
             {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
+            - {name: BACKENDAI_SCHEDULER_BAI_GPU_DRIVERS, value: {{ include "backendai-cluster.baiDraGpuDrivers" . | quote }}}
             - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
             {{- if .Values.leaderElection.enabled }}
             - {name: BACKENDAI_LEADER_ELECTION, value: "true"}

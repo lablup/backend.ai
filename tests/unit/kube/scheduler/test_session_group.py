@@ -227,6 +227,26 @@ class TestAllOrNone:
         later_result = by_name["later"]
         assert isinstance(later_result, Skip) and later_result.reason == SkipReason.RESERVED
 
+    def test_a_group_that_fits_only_with_conflicted_gpu_nodes_says_so(self) -> None:
+        policy = _policy(SessionGroupDirection.NONE, all_or_none=True, member_count=2)
+        gpu = {"cuda.dra.backend.ai/cuda.device": 1}
+        nodes = [
+            replace(_node(name, 8), devices=gpu, gpu_conflict=conflict)
+            for name, conflict in (("a", None), ("b", "also allocated by gpu.nvidia.com"))
+        ]
+        members = [
+            replace(
+                _session(f"m{i}", policy, ready=2),
+                pods=[PendingPod("ns", f"m{i}-0", Resources(1000, GIB, 1), devices=gpu, gpu=True)],
+            )
+            for i in range(2)
+        ]
+        results = _schedule(nodes, members)
+        assert {r.reason for r in results if isinstance(r, Skip)} == {
+            SkipReason.GPU_ALLOCATOR_CONFLICT
+        }
+        assert len(results) == 2 and all(n.devices_used == {} for n in nodes)
+
     def test_needs_a_member_count(self) -> None:
         policy = _policy(SessionGroupDirection.SPREAD, all_or_none=True)
         [result] = _schedule([_node("a", 8)], [_session("s", policy, ready=1)])

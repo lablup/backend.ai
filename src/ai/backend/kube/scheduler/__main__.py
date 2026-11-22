@@ -29,6 +29,7 @@ async def _serve(
     bind_mode: SokovanBindMode,
     policy: GPUAllocationPolicy,
     allocator_url: str,
+    gpu_drivers: list[str],
     lease: tuple[str, str, str] | None,
 ) -> None:
     await load_kube_config()
@@ -40,6 +41,7 @@ async def _serve(
             bind_mode=bind_mode,
             policy=policy,
             allocator_url=allocator_url,
+            gpu_drivers=gpu_drivers,
         )
         log.info(
             "sokovan scheduler started",
@@ -82,6 +84,13 @@ async def _serve(
     " device plugin (device-plugin, whole GPUs only).",
 )
 @click.option(
+    "--bai-gpu-drivers",
+    envvar="BACKENDAI_SCHEDULER_BAI_GPU_DRIVERS",
+    default="",
+    help="Comma-separated bai-dra drivers of NVIDIA GPUs: GPU pods skip a node where they and"
+    " another GPU allocator coexist.",
+)
+@click.option(
     "--allocator-url",
     envvar="BACKENDAI_DRA_ALLOCATOR_URL",
     default="http://127.0.0.1:8786",
@@ -106,6 +115,7 @@ def main(
     strategy: str,
     bind_mode: str,
     gpu_allocation_policy: str,
+    bai_gpu_drivers: str,
     allocator_url: str,
     leader_election: bool,
     lease_namespace: str,
@@ -122,6 +132,7 @@ def main(
                 SokovanBindMode(bind_mode),
                 GPUAllocationPolicy(gpu_allocation_policy),
                 allocator_url,
+                [d.strip() for d in bai_gpu_drivers.split(",") if d.strip()],
                 lease,
             )
         )

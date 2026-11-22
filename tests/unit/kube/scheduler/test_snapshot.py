@@ -512,3 +512,86 @@ class TestSessionGroup:
         workloads = [_group_workload(1, {"id": GROUP_ID, "direction": "sideways"})]
         [pending] = build_pending_groups(workloads, [_member_pod(1, gated=True)])
         assert pending.session_group is None
+
+
+def _driver_slice(node: str, driver: str, devices: int) -> dict[str, Any]:
+    return {
+        "spec": {
+            "nodeName": node,
+            "driver": driver,
+            "pool": {"name": node},
+            "devices": [{"name": f"d{i}"} for i in range(devices)],
+        }
+    }
+
+
+BAI_GPU = "cuda.dra.backend.ai"
+
+
+class TestGPUAllocatorConflict:
+    def test_bai_dra_gpus_next_to_nvidia_dra_gpus_are_a_conflict(self) -> None:
+        slices = [_driver_slice("n1", BAI_GPU, 2), _driver_slice("n1", "gpu.nvidia.com", 8)]
+        [node] = build_nodes([_node("n1")], [], slices, gpu_drivers=[BAI_GPU])
+        assert node.gpu_conflict is not None
+        assert "gpu.nvidia.com (8 devices)" in node.gpu_conflict
+
+    def test_bai_dra_gpus_next_to_device_plugin_gpus_are_a_conflict(self) -> None:
+        raw = _node("n1")
+        raw["status"]["allocatable"]["nvidia.com/gpu"] = "4"
+        slices = [_driver_slice("n1", BAI_GPU, 2)]
+        [node] = build_nodes([raw], [], slices, gpu_drivers=[BAI_GPU])
+        assert node.gpu_conflict is not None and "nvidia.com/gpu: 4" in node.gpu_conflict
+
+    def test_the_node_condition_is_a_conflict(self) -> None:
+        cond = {"type": "BaiDraGPUConflict", "status": "True", "message": "withdrawn"}
+        [node] = build_nodes([_node("n1", cond)], [], gpu_drivers=[BAI_GPU])
+        assert node.gpu_conflict == "withdrawn"
+
+    def test_a_false_condition_is_no_conflict(self) -> None:
+        cond = {"type": "BaiDraGPUConflict", "status": "False"}
+        [node] = build_nodes([_node("n1", cond)], [], gpu_drivers=[BAI_GPU])
+        assert node.gpu_conflict is None
+
+    def test_one_allocator_per_node_is_no_conflict(self) -> None:
+        raw = _node("n2")
+        raw["status"]["allocatable"]["nvidia.com/gpu"] = "4"
+        slices = [
+            _driver_slice("n1", BAI_GPU, 2),
+            _driver_slice("n1", "compute-domain.nvidia.com", 2),
+            _driver_slice("n1", "atom.dra.backend.ai", 2),
+            _driver_slice("n2", "gpu.nvidia.com", 8),
+        ]
+        nodes = build_nodes([_node("n1"), raw], [], slices, gpu_drivers=[BAI_GPU])
+        assert [n.gpu_conflict for n in nodes] == [None, None]
+
+    def test_an_npu_driver_next_to_nvidia_gpus_is_no_conflict(self) -> None:
+        slices = [
+            _driver_slice("n1", "atom.dra.backend.ai", 2),
+            _driver_slice("n1", "gpu.nvidia.com", 8),
+        ]
+        [node] = build_nodes([_node("n1")], [], slices, gpu_drivers=[BAI_GPU])
+        assert node.gpu_conflict is None
+
+    def test_pending_pods_know_whether_they_ask_for_gpus(self) -> None:
+        cases = {
+            "bai": {"scheduling.backend.ai/devices": f'{{"{BAI_GPU}/cuda.shares": 1}}'},
+            "nvidia": {"scheduling.backend.ai/devices": '{"gpu.nvidia.com": 1}'},
+            "npu": {"scheduling.backend.ai/devices": '{"atom.dra.backend.ai/atom.device": 1}'},
+            "cpu": {},
+        }
+        pods = []
+        for name, pod_annotations in cases.items():
+            pod = _pod(name, gated=True)
+            pod["metadata"]["annotations"] = pod_annotations
+            pods.append(pod)
+        plugin = _pod("plugin", gated=True)
+        plugin["spec"]["containers"][0]["resources"]["limits"] = {"nvidia.com/gpu": "1"}
+        pods.append(plugin)
+        [pending] = build_pending_groups([_workload(5)], pods, gpu_drivers=[BAI_GPU])
+        assert {p.name: p.gpu for p in pending.pods} == {
+            "bai": True,
+            "nvidia": True,
+            "npu": False,
+            "cpu": False,
+            "plugin": True,
+        }

@@ -299,6 +299,7 @@ class TestPlacementStatus:
             (SkipReason.UNSUPPORTED, "Unschedulable"),
             (SkipReason.RESERVED, "Pending"),
             (SkipReason.WAITING_FOR_PODS, "Pending"),
+            (SkipReason.GPU_ALLOCATOR_CONFLICT, "Pending"),
         ],
     )
     async def test_a_skip_records_its_reason(

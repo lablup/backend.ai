@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Final
 
@@ -83,6 +83,7 @@ _STUCK: Final = frozenset({
     SkipReason.UNSCHEDULABLE,
     SkipReason.RESERVED,
     SkipReason.GROUP_DOES_NOT_FIT,
+    SkipReason.GPU_ALLOCATOR_CONFLICT,
 })
 
 
@@ -189,6 +190,7 @@ class SokovanScheduler:
     _selector: NodeSelector
     _bind_mode: SokovanBindMode
     _policy: GPUAllocationPolicy
+    _gpu_drivers: frozenset[str]  # bai-dra drivers of NVIDIA GPUs
     _allocator_url: str
     _stuck_since: dict[SessionKey, datetime]  # partly placed gangs whose rest does not fit
     _requeued: dict[SessionKey, datetime]  # gangs the controller was asked to recreate
@@ -202,6 +204,7 @@ class SokovanScheduler:
         bind_mode: SokovanBindMode = SokovanBindMode.GATE,
         policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI,
         allocator_url: str = "http://127.0.0.1:8786",
+        gpu_drivers: Collection[str] = (),
     ) -> None:
         self._api = api
         self._core = client.CoreV1Api(api)
@@ -210,6 +213,7 @@ class SokovanScheduler:
         self._selector = NodeSelector(strategy)
         self._bind_mode = bind_mode
         self._policy = policy
+        self._gpu_drivers = frozenset(gpu_drivers)
         self._allocator_url = allocator_url
         self._stuck_since = {}
         self._requeued = {}
@@ -256,7 +260,7 @@ class SokovanScheduler:
         in_flight = in_flight_binds(binds, live)
         reserved = reserved_claims(binds, live)
         pending = build_pending_groups(
-            workloads, pods, in_flight, bind_requested(binds), claims, profiles
+            workloads, pods, in_flight, bind_requested(binds), claims, profiles, self._gpu_drivers
         )
         if not pending:
             self._stuck_since.clear()
@@ -269,6 +273,7 @@ class SokovanScheduler:
             in_flight,
             profiles,
             reserved,
+            self._gpu_drivers,
         )
         if self._bind_mode == SokovanBindMode.BINDER:
             # The binder bypasses kube-scheduler: sokovan owns only its dedicated nodes.

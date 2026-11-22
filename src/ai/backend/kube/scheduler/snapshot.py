@@ -49,6 +49,11 @@ DEDICATED_TAINT_KEY: Final = "sokovan.backend.ai/dedicated"
 DEDICATED_TAINT_VALUE: Final = "true"
 # NVKE marks a node that is to be recycled; nothing new goes there.
 NEEDS_RECYCLE_CONDITION: Final = "nvke.nvidia.com/NeedsRecycle"
+# bai-dra withdrew its GPUs: another GPU allocator is on the node.
+GPU_CONFLICT_CONDITION: Final = "BaiDraGPUConflict"
+# The other NVIDIA GPU allocators: the NVIDIA DRA driver and the device plugin.
+NVIDIA_DRA_DRIVER: Final = "gpu.nvidia.com"
+NVIDIA_GPU_RESOURCE: Final = "nvidia.com/gpu"
 
 type PodKey = tuple[str, str]  # namespace, name
 type PodUid = str
@@ -218,6 +223,50 @@ def pod_share_claims(
     return tuple(out)
 
 
+def _driver_of(device_key: str) -> str:
+    """The DRA driver of a device key ("<driver>" or "<driver>/<slot>")."""
+    return device_key.split("/", 1)[0]
+
+
+def wants_gpu(
+    devices: Mapping[str, int],
+    shared_devices: Mapping[str, int],
+    extended: Mapping[str, int],
+    share_claims: Sequence[ShareClaim],
+    gpu_drivers: Collection[str],
+) -> bool:
+    """Whether a Pod asks for NVIDIA GPUs: of the bai-dra GPU drivers or of another allocator."""
+    drivers = {*gpu_drivers, NVIDIA_DRA_DRIVER}
+    return (
+        any(_driver_of(k) in drivers for k in (*devices, *shared_devices))
+        or extended.get(NVIDIA_GPU_RESOURCE, 0) > 0
+        or any(r.driver in drivers for claim in share_claims for r in claim)
+    )
+
+
+def gpu_conflict(
+    node: Mapping[str, Any], devices: Mapping[str, int], gpu_drivers: Collection[str]
+) -> str | None:
+    """Why a node takes no GPU pod, or None: its BaiDraGPUConflict condition, or bai-dra GPU
+    devices next to `gpu.nvidia.com` devices or `nvidia.com/gpu` allocatable."""
+    status = node.get("status") or {}
+    for cond in status.get("conditions") or []:
+        if cond.get("type") == GPU_CONFLICT_CONDITION and cond.get("status") == "True":
+            return str(cond.get("message") or GPU_CONFLICT_CONDITION)
+    bai = sum(devices.get(d, 0) for d in gpu_drivers)
+    if not bai:
+        return None
+    others = []
+    if (count := devices.get(NVIDIA_DRA_DRIVER, 0)) > 0:
+        others.append(f"{NVIDIA_DRA_DRIVER} ({count} devices)")
+    allocatable = (status.get("allocatable") or {}).get(NVIDIA_GPU_RESOURCE, "0")
+    if (plugin := int(parse_quantity(allocatable))) > 0:
+        others.append(f"device plugin ({NVIDIA_GPU_RESOURCE}: {plugin})")
+    if not others:
+        return None
+    return f"bai-dra GPUs ({bai} devices) also allocated by {', '.join(others)}"
+
+
 def _fraction_classes(profiles: Sequence[SlotProfile]) -> dict[str, str]:
     return {p.device_class: p.driver for p in profiles if p.sharing_mode == _FRACTION}
 
@@ -346,7 +395,9 @@ def build_nodes(
     in_flight: Mapping[PodUid, str] | None = None,
     profiles: Sequence[SlotProfile] = (),
     reserved: Iterable[Mapping[str, Any]] = (),
+    gpu_drivers: Collection[str] = (),
 ) -> list[NodeState]:
+    """`gpu_drivers`: the bai-dra drivers of NVIDIA GPUs, to find nodes with another allocator."""
     in_flight = in_flight or {}
     pods = list(pods)
     claims = {
@@ -445,6 +496,7 @@ def build_nodes(
                 share_capacity={d: dict(v) for d, v in share_capacity[name].items()},
                 share_used={d: dict(v) for d, v in share_used[name].items()},
                 group_members={g: frozenset(v) for g, v in group_members[name].items()},
+                gpu_conflict=gpu_conflict(node, devices[name], gpu_drivers),
             )
         )
     # Shares of session claims not allocated yet land where the allocator would put them.
@@ -539,6 +591,7 @@ def build_pending_groups(
     has_bind_request: Collection[PodUid] = (),
     resource_claims: Iterable[Mapping[str, Any]] = (),
     profiles: Sequence[SlotProfile] = (),
+    gpu_drivers: Collection[str] = (),
 ) -> list[PendingGroup]:
     """One gang per sokovan SessionWorkload with kernel Pods waiting: its members are the
     session's kernels, its order and topology come from the SessionWorkload."""
@@ -564,6 +617,10 @@ def build_pending_groups(
         if not _awaits_sokovan(pod) or str(meta.get("uid", "")) in has_bind_request:
             continue
         spec = pod.get("spec", {})
+        devices = pod_devices(pod)
+        shared_devices = pod_devices(pod, ANNOTATION_SHARED_DEVICES)
+        extended = pod_extended(pod)
+        share_claims = pod_share_claims(pod, claims, profiles)
         gated[key].append(
             PendingPod(
                 namespace=meta["namespace"],
@@ -576,10 +633,11 @@ def build_pending_groups(
                     )
                     for t in spec.get("tolerations") or []
                 ],
-                devices=pod_devices(pod),
-                shared_devices=pod_devices(pod, ANNOTATION_SHARED_DEVICES),
-                extended=pod_extended(pod),
-                share_claims=pod_share_claims(pod, claims, profiles),
+                devices=devices,
+                shared_devices=shared_devices,
+                extended=extended,
+                share_claims=share_claims,
+                gpu=wants_gpu(devices, shared_devices, extended, share_claims, gpu_drivers),
             )
         )
     # Per all_or_none SessionGroup: its sessions whose every kernel Pod exists
