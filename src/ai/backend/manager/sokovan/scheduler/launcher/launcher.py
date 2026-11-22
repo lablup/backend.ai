@@ -32,6 +32,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.compute_cluster.mapping import (
+    SessionGroupSpec,
     SessionPlacement,
     build_session_objects,
 )
@@ -670,6 +671,17 @@ class SessionLauncher:
             # Only a persistent network joins sessions; a volatile one is the session itself.
             network_id=(
                 session.network_id if session.network_type == NetworkType.PERSISTENT else None
+            ),
+            session_group=(
+                SessionGroupSpec(
+                    id=str(session.session_group.id),
+                    direction=str(session.session_group.placement_direction),
+                    enforcement=str(session.session_group.placement_enforcement),
+                    admission=str(session.session_group.admission),
+                    member_count=session.session_group.member_count,
+                )
+                if session.session_group is not None
+                else None
             ),
         )
         await target.client.create_session(

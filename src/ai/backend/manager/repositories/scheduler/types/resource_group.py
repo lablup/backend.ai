@@ -17,5 +17,7 @@ class ResourceGroupFetch:
     meta: ResourceGroupMeta
     policy: ResourceGroupSchedulingPolicy
     preemption: PreemptionConfig
+    # Whether the group's driver is `kubernetes` (the whole cluster is one agent)
+    is_kubernetes: bool = False
     # Node shapes of the compute cluster of a `kubernetes` group; None otherwise
     node_shapes: tuple[Mapping[ResourceSlotName, Decimal], ...] | None = None

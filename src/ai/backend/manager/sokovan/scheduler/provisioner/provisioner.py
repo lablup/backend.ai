@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     SessionId,
@@ -47,6 +48,7 @@ from ai.backend.sokovan_core.selectors.selector import (
 from ai.backend.sokovan_core.selectors.tracker import AgentStateTracker, build_agent_trackers
 from ai.backend.sokovan_core.types.preemption import ScopeVictimCandidates
 
+from .admission import AdmissionUnit, admission_units
 from .selection import selection_criteria_from_workload
 from .sequencers.drf import DRFSequencer
 from .sequencers.fair_share import FairShareSequencer
@@ -189,28 +191,27 @@ class SessionProvisioner:
         scheduling_failures: list[SchedulingFailure] = []
         scheduling_skips: list[SchedulingSkip] = []
 
-        for index, session_workload in enumerate(sequenced_workloads):
-            with with_log_context(session_id=session_workload.meta.session_id):
+        units, held = admission_units(sequenced_workloads)
+        scheduling_skips.extend(
+            SchedulingSkip(
+                session_id=workload.meta.session_id,
+                msg=KernelLifecycleEventReason.WAITING_FOR_GROUP_MEMBERS,
+            )
+            for workload in held
+        )
+        for index, unit in enumerate(units):
+            with with_log_context(**unit.log_context()):
                 try:
-                    # Sequencing phase is automatically included via shared phases
-                    session_allocation = await self._schedule_workload(
-                        state,
-                        session_workload,
-                        claimed_victim_ids,
-                    )
-                    if session_allocation.preempting_session_ids:
-                        reserved_allocations.append(session_allocation)
-                        claimed_victim_ids.update(session_allocation.preempting_session_ids)
-                    else:
-                        session_allocations.append(session_allocation)
+                    allocations = await self._schedule_unit(state, unit, claimed_victim_ids)
                 except (BatchAgentSelectionFailedError, NoAvailableAgentError) as e:
                     # The group ran out of resources. This is the one failure the
                     # sessions behind share: they would take exactly what this one
                     # is waiting for, so they are left unattempted.
-                    self._record_failure(scheduling_failures, session_workload, e)
+                    self._record_unit_failure(scheduling_failures, unit, e)
                     scheduling_skips.extend(
                         self._skips_behind(
-                            sequenced_workloads[index + 1 :], session_workload.meta.session_id
+                            [w for behind in units[index + 1 :] for w in behind.workloads],
+                            unit.workloads[0].meta.session_id,
                         )
                     )
                     break
@@ -218,7 +219,19 @@ class SessionProvisioner:
                     # Specific to the session that hit it (an architecture mismatch,
                     # an unsatisfied dependency, an exceeded quota, a group with no
                     # agents at all), so it must not stall the sessions behind it.
-                    self._record_failure(scheduling_failures, session_workload, e)
+                    self._record_unit_failure(scheduling_failures, unit, e)
+                    continue
+            for session_allocation in allocations:
+                if session_allocation.preempting_session_ids:
+                    reserved_allocations.append(session_allocation)
+                    claimed_victim_ids.update(session_allocation.preempting_session_ids)
+                else:
+                    session_allocations.append(session_allocation)
+        if held:
+            await self._repository.mark_pending_sessions_status_info(
+                [workload.meta.session_id for workload in held],
+                KernelLifecycleEventReason.WAITING_FOR_GROUP_MEMBERS,
+            )
 
         log.debug(
             "resource group scheduled",
@@ -254,22 +267,53 @@ class SessionProvisioner:
             scheduling_skips=scheduling_skips,
         )
 
-    def _record_failure(
+    def _record_unit_failure(
         self,
         scheduling_failures: list[SchedulingFailure],
-        session_workload: SessionWorkload,
+        unit: AdmissionUnit,
         error: Exception,
     ) -> None:
+        """Every member of a failed unit gets the same reason."""
         if self._is_rejection(error):
             log.trace("session scheduling failed: {}", error)
         else:
             log.exception("session scheduling failed")
-        scheduling_failures.append(
-            SchedulingFailure(
-                session_id=session_workload.meta.session_id,
-                msg=str(error),
-            )
+        msg = str(error)
+        if unit.group is not None:
+            msg = f"Session group {unit.group.group_id} was not admitted: {error}"
+        scheduling_failures.extend(
+            SchedulingFailure(session_id=workload.meta.session_id, msg=msg)
+            for workload in unit.workloads
         )
+
+    async def _schedule_unit(
+        self,
+        state: SchedulingState,
+        unit: AdmissionUnit,
+        claimed_victim_ids: set[SessionId],
+    ) -> list[SessionAllocation]:
+        """Place every session of the unit in this pass, or none of them.
+
+        The trackers and the occupancy return to their state before the unit when
+        any member fails, so a partial group never holds resources.
+        """
+        if unit.group is None:
+            return [await self._schedule_workload(state, unit.workloads[0], claimed_victim_ids)]
+        checkpoints = [tracker.checkpoint() for tracker in state.trackers]
+        occupancy = state.snapshot.global_scope.occupancy.copy()
+        allocations: list[SessionAllocation] = []
+        try:
+            for workload in unit.workloads:
+                with with_log_context(session_id=workload.meta.session_id):
+                    allocations.append(
+                        await self._schedule_workload(state, workload, claimed_victim_ids)
+                    )
+        except BaseException:
+            for tracker, checkpoint in zip(state.trackers, checkpoints, strict=True):
+                tracker.restore(checkpoint)
+            state.snapshot.global_scope.occupancy = occupancy
+            raise
+        return allocations
 
     def _is_rejection(self, error: Exception) -> bool:
         if isinstance(error, SchedulingError):
@@ -379,9 +423,11 @@ class SessionProvisioner:
         criteria = selection_criteria_from_workload(
             session_workload,
             plan,
-            victim_candidates=self._victim_candidates_for(
-                state, session_workload, claimed_victim_ids
-            ),
+            # A group admitted all at once does not preempt: a reservation would
+            # admit its members one by one.
+            victim_candidates=None
+            if session_workload.group_admission is not None
+            else self._victim_candidates_for(state, session_workload, claimed_victim_ids),
         )
 
         # Selection commits state changes into the trackers on full success

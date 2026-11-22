@@ -29,6 +29,29 @@ LABEL_SESSION_ID: Final = "backend.ai/session-id"
 
 
 @dataclass(frozen=True)
+class SessionGroupSpec:
+    """The group policy the cluster scheduler applies per node (`spec.sessionGroup`)."""
+
+    id: str
+    direction: str
+    enforcement: str
+    admission: str
+    member_count: int | None
+
+    def to_manifest(self) -> dict[str, Any]:
+        """camelCase, without the member count of an `independent` group."""
+        body: dict[str, Any] = {
+            "id": self.id,
+            "direction": self.direction,
+            "enforcement": self.enforcement,
+            "admission": self.admission,
+        }
+        if self.member_count is not None:
+            body["memberCount"] = self.member_count
+        return body
+
+
+@dataclass(frozen=True)
 class SessionPlacement:
     """Where and as whom the session runs in the cluster."""
 
@@ -45,6 +68,8 @@ class SessionPlacement:
     priority: int
     network_id: str | None
     scheduler_name: str = SCHEDULER_NAME
+    # Absent when the session has no group
+    session_group: SessionGroupSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -186,7 +211,10 @@ def build_session_objects(
             },
             "stringData": {".dockerconfigjson": json.dumps(auth)},
         }
-    return SessionObjects(workload.to_manifest(), secret, pull_secret)
+    manifest = workload.to_manifest()
+    if placement.session_group is not None:
+        manifest["spec"]["sessionGroup"] = placement.session_group.to_manifest()
+    return SessionObjects(manifest, secret, pull_secret)
 
 
 def _jsonable(value: Mapping[str, Any]) -> Mapping[str, Any]:

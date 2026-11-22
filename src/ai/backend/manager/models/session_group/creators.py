@@ -13,15 +13,21 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.session_group.types import SessionGroupData
-from ai.backend.manager.errors.repository import ForeignKeyViolationError, NotNullViolationError
+from ai.backend.manager.errors.repository import (
+    CheckConstraintViolationError,
+    ForeignKeyViolationError,
+    NotNullViolationError,
+)
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.session_group import InvalidSessionGroupAdmission
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.session_group.row import MEMBER_COUNT_CHECK, SessionGroupRow
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -39,6 +45,8 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
     owner_user_id: UserID
     placement_direction: SessionGroupPlacementDirection
     placement_enforcement: SessionGroupPlacementEnforcement
+    admission: SessionGroupAdmission = SessionGroupAdmission.INDEPENDENT
+    member_count: int | None = None
 
     @override
     def entity_id(self, row: SessionGroupRow) -> SessionGroupID:
@@ -59,6 +67,14 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
                 error=missing_project,
                 constraint_name="fk_session_groups_project_id_groups",
             ),
+            IntegrityErrorCheck(
+                violation_type=CheckConstraintViolationError,
+                error=InvalidSessionGroupAdmission(
+                    "An all_or_none group needs a member count of at least 2;"
+                    " an independent group takes none"
+                ),
+                constraint_name=MEMBER_COUNT_CHECK,
+            ),
         )
 
     @override
@@ -72,6 +88,8 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
             owner_user_id=self.owner_user_id,
             placement_direction=self.placement_direction,
             placement_enforcement=self.placement_enforcement,
+            admission=self.admission,
+            member_count=self.member_count,
         )
 
     @override

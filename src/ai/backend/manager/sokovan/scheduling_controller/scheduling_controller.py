@@ -628,6 +628,7 @@ class SchedulingController:
 
         The session becomes RESCHEDULING: its SessionWorkload is deleted and its slots are
         released there, then it is requeued, or cancelled after the last allowed attempt.
+        The admitted members of its `all_or_none` group go the same way.
         """
         record = await self._repository.record_placement_timeout(session_id, reason, message)
         if record is None:
@@ -635,14 +636,20 @@ class SchedulingController:
             return None
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
-                session_id=session_id,
+                session_id=rescheduled_id,
                 creation_id="",
                 status_transition=str(SessionStatus.RESCHEDULING),
                 reason=KernelLifecycleEventReason.PLACEMENT_TIMEOUT,
             )
+            for rescheduled_id in record.session_ids
         ])
         await self.mark_scheduling_needed([ScheduleType.RESCHEDULING])
-        log.trace("placement timeout recorded", session_id=session_id, attempts=record.attempts)
+        log.trace(
+            "placement timeout recorded",
+            session_id=session_id,
+            attempts=record.attempts,
+            session_count=len(record.session_ids),
+        )
         return record
 
     async def cancel_rescheduling_sessions(

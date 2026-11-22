@@ -28,11 +28,13 @@ from ai.backend.common.dto.manager.v2.session_group.response import (
     UpdateSessionGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
+    SessionGroupAdmissionEnum,
     SessionGroupOrderField,
     SessionGroupPlacementDirectionEnum,
     SessionGroupPlacementEnforcementEnum,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -67,8 +69,9 @@ from ai.backend.manager.services.session_group.actions.scoped_search import (
 )
 from ai.backend.manager.services.session_group.actions.update import UpdateSessionGroupAction
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -183,6 +186,8 @@ class SessionGroupAdapter(BaseAdapter):
             owner_user_id=UserID(me.user_id),
             placement_direction=SessionGroupPlacementDirection(input.placement_direction),
             placement_enforcement=SessionGroupPlacementEnforcement(input.placement_enforcement),
+            admission=SessionGroupAdmission(input.admission),
+            member_count=input.member_count,
         )
         result = await self._session_group.create.run(CreateSessionGroupAction(creator=creator))
         return CreateSessionGroupPayload(session_group=self._data_to_node(result.data))
@@ -197,7 +202,12 @@ class SessionGroupAdapter(BaseAdapter):
         return PurgeSessionGroupPayload(entity_id=result.data.id)
 
     async def update(self, input: UpdateSessionGroupInput) -> UpdateSessionGroupPayload:
-        """Change a session group's placement direction and enforcement."""
+        """Change a session group's placement direction, enforcement and admission."""
+        member_count: TriState[int] = TriState.from_unset(input.member_count)
+        if input.admission == SessionGroupAdmissionEnum.INDEPENDENT and isinstance(
+            input.member_count, Unset
+        ):
+            member_count = TriState.nullify()
         updater = SessionGroupUpdater(
             session_group_id=SessionGroupID(input.id),
             placement_direction=OptionalState.from_unset(input.placement_direction).map(
@@ -206,6 +216,8 @@ class SessionGroupAdapter(BaseAdapter):
             placement_enforcement=OptionalState.from_unset(input.placement_enforcement).map(
                 SessionGroupPlacementEnforcement
             ),
+            admission=OptionalState.from_unset(input.admission).map(SessionGroupAdmission),
+            member_count=member_count,
         )
         result = await self._session_group.update.run(UpdateSessionGroupAction(updater=updater))
         return UpdateSessionGroupPayload(session_group=self._data_to_node(result.data))
@@ -292,6 +304,8 @@ class SessionGroupAdapter(BaseAdapter):
             owner_user_id=data.owner_user_id,
             placement_direction=SessionGroupPlacementDirectionEnum(data.placement_direction),
             placement_enforcement=SessionGroupPlacementEnforcementEnum(data.placement_enforcement),
+            admission=SessionGroupAdmissionEnum(data.admission),
+            member_count=data.member_count,
             created_at=data.created_at,
             deleted_at=data.deleted_at,
         )

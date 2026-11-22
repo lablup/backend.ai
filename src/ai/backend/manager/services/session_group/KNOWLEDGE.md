@@ -13,7 +13,7 @@ generated:
   at: 2026-10-15
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-23
+  at: 2026-11-22
 status: draft
 ---
 
@@ -68,11 +68,15 @@ shape, operation, gate and backing.
 
 ## The update runs against ops
 
-- Only `placement_direction` and `placement_enforcement` can change; the scheduler reads
-  them at every placement, so members placed afterwards follow the new policy.
-- The guard rides on the UPDATE statement, so the generic update needs no service method.
+- `placement_direction`, `placement_enforcement`, `admission` and `member_count` can
+  change; the scheduler reads them at every placement, so members placed afterwards
+  follow the new policy.
+- `admission` and `member_count` do not change while a member is PENDING: a second
+  `GuardCheck` rejects it (409). The `ck_session_groups_member_count` check rejects a
+  member count that does not match the admission (400).
+- The guards ride on the UPDATE statement, so the generic update needs no service method.
 - Ops reads the row without its guards when there is nothing to set. The update input
-  therefore rejects a call that names neither field.
+  therefore rejects a call that names no field.
 
 ## The searches run against ops
 

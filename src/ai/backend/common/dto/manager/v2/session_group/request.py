@@ -19,12 +19,17 @@ from ai.backend.common.dto.manager.query import (
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.session_group.types import (
+    SessionGroupAdmissionEnum,
     SessionGroupOrderField,
     SessionGroupPlacementDirectionEnum,
     SessionGroupPlacementEnforcementEnum,
     SessionGroupScope,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
+
+MIN_MEMBER_COUNT = 2
+"""The smallest member count an `all_or_none` group takes."""
 
 __all__ = (
     "AdminSearchSessionGroupsInput",
@@ -128,9 +133,10 @@ class PurgeSessionGroupInput(BaseRequestModel):
 
 
 class UpdateSessionGroupInput(BaseRequestModel):
-    """Input for changing a session group's placement policy.
+    """Input for changing a session group's placement policy and admission.
 
-    At least one of the two fields must be given.
+    At least one field must be given. The admission and the member count do not change
+    while a member is pending.
     """
 
     id: UUID = Field(description="ID of the session group to update.")
@@ -142,14 +148,35 @@ class UpdateSessionGroupInput(BaseRequestModel):
         default=UNSET,
         description="New placement enforcement. Omit to leave unchanged.",
     )
+    admission: SessionGroupAdmissionEnum | None | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. New admission. Omit to leave unchanged;"
+            " `independent` without `member_count` clears the member count."
+        ),
+    )
+    member_count: int | None | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. New member count of an `all_or_none` group,"
+            " at least 2. Null clears it. Omit to leave unchanged."
+        ),
+    )
 
     @model_validator(mode="after")
     def _require_a_change(self) -> Self:
-        if not isinstance(self.placement_direction, SessionGroupPlacementDirectionEnum) and not (
-            isinstance(self.placement_enforcement, SessionGroupPlacementEnforcementEnum)
-        ):
+        given = (
+            isinstance(self.placement_direction, SessionGroupPlacementDirectionEnum),
+            isinstance(self.placement_enforcement, SessionGroupPlacementEnforcementEnum),
+            isinstance(self.admission, SessionGroupAdmissionEnum),
+            not isinstance(self.member_count, Unset),
+        )
+        if isinstance(self.member_count, int) and self.member_count < MIN_MEMBER_COUNT:
+            raise ValueError(f"'member_count' must be at least {MIN_MEMBER_COUNT}")
+        if not any(given):
             raise ValueError(
-                "UpdateSessionGroupInput requires 'placement_direction' or 'placement_enforcement'"
+                "UpdateSessionGroupInput requires 'placement_direction', 'placement_enforcement',"
+                " 'admission' or 'member_count'"
             )
         return self
 
@@ -164,3 +191,29 @@ class CreateSessionGroupInput(BaseRequestModel):
     placement_enforcement: SessionGroupPlacementEnforcementEnum = Field(
         description="How hard the placement direction is enforced.",
     )
+    admission: SessionGroupAdmissionEnum = Field(
+        default=SessionGroupAdmissionEnum.INDEPENDENT,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Whether the members are admitted one by one"
+            " (`independent`) or all at once (`all_or_none`)."
+        ),
+    )
+    member_count: int | None = Field(
+        default=None,
+        ge=MIN_MEMBER_COUNT,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Members an `all_or_none` group admits together;"
+            " required for `all_or_none`, empty for `independent`."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _match_member_count(self) -> Self:
+        if self.admission == SessionGroupAdmissionEnum.ALL_OR_NONE and self.member_count is None:
+            raise ValueError("An all_or_none session group requires 'member_count'")
+        if (
+            self.admission == SessionGroupAdmissionEnum.INDEPENDENT
+            and self.member_count is not None
+        ):
+            raise ValueError("An independent session group takes no 'member_count'")
+        return self

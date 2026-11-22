@@ -63,6 +63,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     PREEMPTION_RESERVATION = "preemption-reservation"
     PREEMPTED_BY_RESERVATION = "preempted-by-reservation"
     KERNEL_HANDLER_FAILURE = "kernel-handler-failure"
+    WAITING_FOR_GROUP_MEMBERS = "waiting-for-group-members"
 
     @classmethod
     def from_value(cls, value: str | None) -> Self | None:

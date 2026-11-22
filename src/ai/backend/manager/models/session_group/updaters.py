@@ -13,16 +13,24 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import SessionGroupData
-from ai.backend.manager.errors.session_group import SessionGroupInUseForUpdate
+from ai.backend.manager.errors.repository import CheckConstraintViolationError
+from ai.backend.manager.errors.session_group import (
+    InvalidSessionGroupAdmission,
+    SessionGroupAdmissionInUse,
+    SessionGroupInUseForUpdate,
+)
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_group.row import MEMBER_COUNT_CHECK, SessionGroupRow
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.sokovan_core.types.policy import (
+    SessionGroupAdmission,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -32,9 +40,10 @@ __all__ = ("SessionGroupRetentionUpdater", "SessionGroupUpdater")
 
 @dataclass
 class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData]):
-    """Changes a session group's placement policy.
+    """Changes a session group's placement policy and admission.
 
-    A group a replica group holds is refused as in use, as the purge does.
+    A group a replica group holds is refused as in use, as the purge does. The admission
+    and the member count do not change while a member is PENDING.
     """
 
     session_group_id: SessionGroupID
@@ -44,6 +53,10 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
     placement_enforcement: OptionalState[SessionGroupPlacementEnforcement] = field(
         default_factory=OptionalState[SessionGroupPlacementEnforcement].nop
     )
+    admission: OptionalState[SessionGroupAdmission] = field(
+        default_factory=OptionalState[SessionGroupAdmission].nop
+    )
+    member_count: TriState[int] = field(default_factory=TriState[int].nop)
 
     @property
     @override
@@ -60,26 +73,65 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
-        return (
+        checks = [
             GuardCheck(
                 condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
                 error=SessionGroupInUseForUpdate(
                     f"Session group {self.session_group_id} cannot be updated while a replica group uses it"
                 ),
             ),
-        )
+        ]
+        if self._changes_admission():
+            checks.append(
+                GuardCheck(
+                    condition=lambda: ~self._pending_member_exists(),
+                    error=SessionGroupAdmissionInUse(
+                        f"Session group {self.session_group_id} has pending members"
+                    ),
+                )
+            )
+        return checks
 
     @property
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=CheckConstraintViolationError,
+                error=InvalidSessionGroupAdmission(
+                    "An all_or_none group needs a member count of at least 2;"
+                    " an independent group takes none"
+                ),
+                constraint_name=MEMBER_COUNT_CHECK,
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.placement_direction.update_dict(to_update, "placement_direction")
         self.placement_enforcement.update_dict(to_update, "placement_enforcement")
+        self.admission.update_dict(to_update, "admission")
+        self.member_count.update_dict(to_update, "member_count")
         return to_update
+
+    def _changes_admission(self) -> bool:
+        values: dict[str, Any] = {}
+        self.admission.update_dict(values, "admission")
+        self.member_count.update_dict(values, "member_count")
+        return bool(values)
+
+    @staticmethod
+    def _pending_member_exists() -> sa.ColumnElement[bool]:
+        return (
+            sa.select(sa.literal(1))
+            .where(
+                SessionRow.session_group_id == SessionGroupRow.id,
+                SessionRow.status == SessionStatus.PENDING,
+            )
+            .correlate(SessionGroupRow)
+            .exists()
+        )
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:

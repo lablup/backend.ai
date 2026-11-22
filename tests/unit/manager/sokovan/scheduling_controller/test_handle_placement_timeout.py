@@ -85,6 +85,24 @@ class TestHandlePlacementTimeout:
             ScheduleType.RESCHEDULING.value
         ])
 
+    async def test_every_rescheduled_group_member_is_broadcast(
+        self,
+        controller: SchedulingController,
+        repository: AsyncMock,
+        event_producer: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        member_id = SessionId(uuid.uuid4())
+        repository.record_placement_timeout.return_value = PlacementTimeoutRecord(
+            session_id=session_id, attempts=1, group_member_ids=(member_id,)
+        )
+
+        await controller.handle_placement_timeout(session_id, "unschedulable", None)
+
+        events = event_producer.broadcast_events_batch.await_args.args[0]
+        assert [event.session_id for event in events] == [session_id, member_id]
+        assert {event.status_transition for event in events} == {str(SessionStatus.RESCHEDULING)}
+
     async def test_ignored_timeout_changes_nothing(
         self,
         controller: SchedulingController,
