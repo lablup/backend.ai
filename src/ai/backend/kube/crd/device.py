@@ -30,9 +30,18 @@ class DriverKind(enum.StrEnum):
     EXTERNAL = "external"
 
 
-class CapacityConversion(CRDModel):
-    capacity: str = Field(description="DRA capacity name, e.g. dra.backend.ai/shares")
-    factor: float = Field(description="DRA quantity per one slot unit")
+class GPUAllocationPolicy(enum.StrEnum):
+    """Who allocates NVIDIA GPUs in the cluster (suggestion 4.11)."""
+
+    DRA = "dra"  # ResourceClaims only
+    DEVICE_PLUGIN = "device-plugin"  # the extended resource of the device plugin
+
+
+class FractionStrategy(enum.StrEnum):
+    """How a fraction request larger than one device is split across devices (suggestion 5.4)."""
+
+    FILL = "fill"  # the largest devices first
+    EVENLY = "evenly"  # equal parts on the fewest devices
 
 
 class DeviceProfileSpec(CRDModel):
@@ -41,7 +50,18 @@ class DeviceProfileSpec(CRDModel):
     driver_kind: DriverKind = DriverKind.BAI
     driver_name: str
     device_class_name: str
-    capacity_conversions: list[CapacityConversion] = Field(default_factory=list)
+    extended_resource_name: str | None = Field(
+        default=None,
+        description=(
+            "Device plugin resource, e.g. nvidia.com/gpu. Under the device-plugin GPU allocation"
+            " policy the kernel container requests it instead of a ResourceClaim. Exclusive"
+            " profiles only"
+        ),
+    )
+    fraction_strategy: FractionStrategy = Field(
+        default=FractionStrategy.FILL,
+        description="How a fraction request larger than any one device is split",
+    )
     attribute_map: dict[str, str] = Field(default_factory=dict)
     isolation_provider: str | None = None
     opaque_config: dict[str, Any] = Field(default_factory=dict)

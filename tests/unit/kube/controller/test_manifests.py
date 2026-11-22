@@ -164,6 +164,48 @@ class TestBindMode:
         assert spec["schedulerName"] == "sokovan"
         assert spec["schedulingGates"] == [{"name": "scheduling.backend.ai/sokovan"}]
 
+    def test_binder_mode_tolerates_the_dedicated_taint(
+        self, workload: SessionWorkload, main_kernel: KernelSpec
+    ) -> None:
+        settings = ControllerSettings(
+            krunner_image="k@sha256:abc", bind_mode=SokovanBindMode.BINDER
+        )
+        spec = build_kernel_pod(workload, main_kernel, settings)["spec"]
+        assert spec["tolerations"] == [
+            {
+                "key": "sokovan.backend.ai/dedicated",
+                "operator": "Equal",
+                "value": "true",
+                "effect": "NoSchedule",
+            }
+        ]
+
+    def test_gate_mode_needs_no_toleration(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        assert "tolerations" not in build_kernel_pod(workload, main_kernel, settings)["spec"]
+
+
+class TestKernelIdAnnotations:
+    def test_pod_carries_the_kernel_uid_and_gid(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        main_kernel.uid = 2000
+        main_kernel.main_gid = 3000
+        annotations = build_kernel_pod(workload, main_kernel, settings)["metadata"]["annotations"]
+        assert annotations["backend.ai/kernel-uid"] == "2000"
+        assert annotations["backend.ai/kernel-gid"] == "3000"
+
+    def test_unknown_ids_are_not_annotated(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        main_kernel.image.labels["ai.backend.features"] = ""
+        annotations = build_kernel_pod(workload, main_kernel, settings)["metadata"].get(
+            "annotations", {}
+        )
+        assert "backend.ai/kernel-uid" not in annotations
+        assert "backend.ai/kernel-gid" not in annotations
+
 
 class TestMultiKernelSessions:
     @pytest.fixture

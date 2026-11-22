@@ -14,6 +14,8 @@ from ai.backend.kube.controller.devices import (
     DeviceClaim,
     build_resource_claim,
     device_slots,
+    needs_share_pools,
+    share_pools,
     translate,
 )
 from ai.backend.kube.controller.manifests import (
@@ -163,6 +165,7 @@ class SessionReconciler:
                 [
                     build_resource_claim(workload, kernel, c, owner_reference(workload))
                     for c in devices[kernel.kernel_id]
+                    if c.extended_resource is None
                 ],
             )
             for kernel in workload.spec.kernels
@@ -230,7 +233,17 @@ class SessionReconciler:
         for item in listed["items"]:
             profile = DeviceProfile.model_validate(item)
             profiles[profile.spec.slot_name] = profile.spec
-        return {kernel.kernel_id: translate(kernel, profiles) for kernel in workload.spec.kernels}
+        pools = {}
+        if needs_share_pools(workload.spec.kernels, profiles):
+            slices = await self._custom.list_cluster_custom_object(
+                _DRA_GROUP, _DRA_VERSION, "resourceslices"
+            )
+            pools = share_pools(slices["items"], profiles.values())
+        policy = self._settings.gpu_allocation_policy
+        return {
+            kernel.kernel_id: translate(kernel, profiles, policy, pools)
+            for kernel in workload.spec.kernels
+        }
 
     async def _load_session_secrets(self, workload: SessionWorkload) -> SessionSecrets:
         if not workload.spec.secret_name:

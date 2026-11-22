@@ -19,6 +19,7 @@ from ai.backend.kube.controller.naming import (
     ANNOTATION_POD_GROUP,
     HOSTNAME_LABEL,
     LABEL_SESSION_ID,
+    SOKOVAN_DEDICATED_TAINT,
     SOKOVAN_GATE,
     SOKOVAN_SCHEDULER,
     session_queue,
@@ -82,11 +83,22 @@ class SokovanAdapter(SchedulerAdapter):
         """sokovan holds each Pod at a scheduling gate until the whole group fits. With the binder
         the Pod names sokovan as its scheduler, so kube-scheduler never takes it."""
         binder = self._bind_mode == SokovanBindMode.BINDER
+        spec: dict[str, Any] = {
+            "schedulerName": SOKOVAN_SCHEDULER if binder else "default-scheduler",
+            "schedulingGates": [{"name": SOKOVAN_GATE}],
+        }
+        if binder:
+            # sokovan owns the nodes carrying the taint; only kernel Pods tolerate it.
+            spec["tolerations"] = [
+                {
+                    "key": SOKOVAN_DEDICATED_TAINT,
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ]
         return PodScheduling(
-            spec={
-                "schedulerName": SOKOVAN_SCHEDULER if binder else "default-scheduler",
-                "schedulingGates": [{"name": SOKOVAN_GATE}],
-            },
+            spec=spec,
             labels={},
             annotations={ANNOTATION_POD_GROUP: workload.metadata["name"]},
         )

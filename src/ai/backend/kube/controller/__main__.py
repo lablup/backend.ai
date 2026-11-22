@@ -20,7 +20,12 @@ from ai.backend.kube.controller.manifests import ControllerSettings
 from ai.backend.kube.controller.reconciler import SessionReconciler
 from ai.backend.kube.controller.reporter import StatusReporter
 from ai.backend.kube.controller.runner import SessionController
-from ai.backend.kube.controller.stats import ContainerMetrics, StatBridge
+from ai.backend.kube.controller.stats import (
+    ContainerMetrics,
+    KubeletStatsClient,
+    StatBridge,
+)
+from ai.backend.kube.crd.device import GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import SokovanBindMode
 from ai.backend.kube.events import make_event_producer
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
@@ -39,6 +44,7 @@ async def _serve(
     events: tuple[str, str, str | None] | None,
     metrics_port: int,
     lease: tuple[str, str, str] | None,
+    kubelet_insecure_tls: bool,
 ) -> None:
     await load_kube_config()
     reporter: StatusReporter | None = None
@@ -72,7 +78,12 @@ async def _serve(
         if events is not None and stat_client is not None:
             metrics = ContainerMetrics(events[0])
             metrics_runner = await metrics.serve(metrics_port)
-            bridge = StatBridge(api, stat_client, metrics)
+            bridge = StatBridge(
+                api,
+                stat_client,
+                metrics,
+                kubelet=KubeletStatsClient(api, verify=not kubelet_insecure_tls),
+            )
 
         async def work() -> None:
             stats_task = asyncio.create_task(bridge.run()) if bridge is not None else None
@@ -93,6 +104,8 @@ async def _serve(
         except asyncio.CancelledError:
             log.info("session controller stopped")
         finally:
+            if bridge is not None:
+                await bridge.close()
             if metrics_runner is not None:
                 await metrics_runner.cleanup()
             if stat_client is not None:
@@ -127,11 +140,24 @@ async def _serve(
     default=SokovanBindMode.GATE.value,
 )
 @click.option(
+    "--gpu-allocation-policy",
+    envvar="BACKENDAI_GPU_ALLOCATION_POLICY",
+    type=click.Choice([p.value for p in GPUAllocationPolicy]),
+    default=GPUAllocationPolicy.DRA.value,
+    help="dra: devices through ResourceClaims; device-plugin: NVIDIA GPUs as extended resources.",
+)
+@click.option(
     "--metrics-port",
     envvar="BACKENDAI_METRICS_PORT",
     type=int,
     default=9100,
     help="Port of /metrics with the kernels' utilization (with --valkey-addr).",
+)
+@click.option(
+    "--kubelet-insecure-tls/--no-kubelet-insecure-tls",
+    envvar="BACKENDAI_KUBELET_INSECURE_TLS",
+    default=False,
+    help="Do not verify the kubelets' serving certificates (self-signed ones) for kernel stats.",
 )
 @click.option(
     "--kueue-cluster-queue",
@@ -163,7 +189,9 @@ def main(
     valkey_addr: str | None,
     valkey_password: str | None,
     bind_mode: str,
+    gpu_allocation_policy: str,
     metrics_port: int,
+    kubelet_insecure_tls: bool,
     kueue_cluster_queue: str,
     leader_election: bool,
     lease_namespace: str,
@@ -180,11 +208,12 @@ def main(
         kernel_uid=kernel_uid,
         kernel_gid=kernel_gid,
         bind_mode=SokovanBindMode(bind_mode),
+        gpu_allocation_policy=GPUAllocationPolicy(gpu_allocation_policy),
         kueue_cluster_queue=kueue_cluster_queue,
     )
     with LocalLogger(log_level=LogLevel[log_level]):
         quiet_client_logs()
-        asyncio.run(_serve(settings, workers, events, metrics_port, lease))
+        asyncio.run(_serve(settings, workers, events, metrics_port, lease, kubelet_insecure_tls))
 
 
 if __name__ == "__main__":
