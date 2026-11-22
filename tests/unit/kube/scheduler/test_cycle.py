@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
+from decimal import Decimal
 
 from ai.backend.kube.scheduler.cycle import (
+    GpuAllocationPolicy,
     NodeState,
     PendingGroup,
     PendingPod,
@@ -10,6 +13,8 @@ from ai.backend.kube.scheduler.cycle import (
     PlacementStrategy,
     QueueState,
     Resources,
+    ShareOption,
+    ShareRequest,
     Skip,
     SkipReason,
     Taint,
@@ -82,6 +87,28 @@ class TestGang:
         [result] = schedule([_node("a", 8)], {}, [partial])
         assert isinstance(result, Skip) and result.reason == SkipReason.WAITING_FOR_PODS
 
+    def test_only_the_missing_members_of_a_partly_placed_gang_are_placed(self) -> None:
+        group = _group("g", 3, 1)
+        partial = replace(group, pods=group.pods[:1], placed_members=2, placed_nodes=["a"])
+        [result] = schedule([_node("a", 8)], {}, [partial])
+        assert isinstance(result, Placement) and result.nodes == {"g-0": "a"}
+
+    def test_missing_members_join_the_domain_of_the_placed_ones(self) -> None:
+        nodes = [
+            _node("a", 8, labels={"rack": "r1"}),
+            _node("b", 8, labels={"rack": "r2"}, used_cpu=7),
+        ]
+        group = _group("g", 2, 2)
+        partial = replace(
+            group,
+            pods=group.pods[:1],
+            placed_members=1,
+            placed_nodes=["b"],
+            required_levels=["rack"],
+        )
+        [result] = schedule(nodes, {}, [partial])
+        assert isinstance(result, Skip) and result.reason == SkipReason.UNSCHEDULABLE
+
 
 class TestQueue:
     def test_limit_holds_a_group_back(self) -> None:
@@ -105,6 +132,39 @@ class TestQueue:
             [_group("big", 1, 20, created="1"), _group("small", 1, 1, created="2")],
         )
         assert [type(r) for r in results] == [Skip, Placement]
+
+    def test_a_blocked_head_keeps_its_nodes_from_later_groups_of_its_queue(self) -> None:
+        nodes = [_node("a", 8, used_cpu=4)]
+        results = schedule(
+            nodes, {}, [_group("big", 1, 6, created="1"), _group("small", 1, 1, created="2")]
+        )
+        assert [r.reason for r in results if isinstance(r, Skip)] == [
+            SkipReason.UNSCHEDULABLE,
+            SkipReason.RESERVED,
+        ]
+
+    def test_a_blocked_head_does_not_hold_other_queues(self) -> None:
+        nodes = [_node("a", 8, used_cpu=4)]
+        results = schedule(
+            nodes,
+            {},
+            [_group("big", 1, 6, created="1"), _group("other", 1, 1, queue="q2", created="2")],
+        )
+        assert [type(r) for r in results] == [Skip, Placement]
+
+    def test_device_slot_limit_holds_a_group_back(self) -> None:
+        queues = {
+            "q": QueueState(
+                "q",
+                None,
+                slot_limits={"cuda.device": Decimal(2)},
+                slot_used={"cuda.device": Decimal(1)},
+            )
+        }
+        group = _group("g", 1, 1)
+        heavy = replace(group, pods=[replace(group.pods[0], slots={"cuda.device": Decimal(2)})])
+        [result] = schedule([_node("a", 8)], queues, [heavy])
+        assert isinstance(result, Skip) and result.reason == SkipReason.QUEUE_LIMIT
 
 
 class TestOrder:
@@ -303,3 +363,69 @@ class TestSharedDevices:
         )
         [result] = schedule(nodes, {}, [group])
         assert isinstance(result, Placement) and result.nodes == {"g-0": "gpu"}
+
+
+def _share_node(name: str, used: Mapping[str, int] | None = None) -> NodeState:
+    return NodeState(
+        name,
+        Resources(8000, 64 * GIB, 110),
+        Resources(),
+        share_capacity={"gpu.x": {"d0": 1650, "d1": 1000}},
+        share_used={"gpu.x": dict(used or {})},
+    )
+
+
+def _share_group(*claims: tuple[ShareRequest, ...]) -> PendingGroup:
+    pod = PendingPod("ns", "g-0", Resources(1000, GIB, 1), share_claims=list(claims))
+    return PendingGroup("ns", "g", "q", 0, "1", 1, [pod])
+
+
+class TestShares:
+    def test_a_split_request_needs_distinct_devices(self) -> None:
+        part = ShareRequest("gpu.x", (ShareOption(900),))
+        [result] = schedule([_share_node("n", {"d1": 500})], {}, [_share_group((part, part))])
+        assert isinstance(result, Skip)
+        [result] = schedule([_share_node("n")], {}, [_share_group((part, part))])
+        assert isinstance(result, Placement)
+
+    def test_first_available_takes_the_first_option_that_fits(self) -> None:
+        pick = ShareRequest("gpu.x", (ShareOption(2000), ShareOption(1600)))
+        node = _share_node("n")
+        [result] = schedule([node], {}, [_share_group((pick,))])
+        assert isinstance(result, Placement)
+        assert node.share_used == {"gpu.x": {"d0": 1600}}
+
+    def test_a_request_without_shares_takes_a_whole_unused_device(self) -> None:
+        whole = ShareRequest("gpu.x", (ShareOption(None),))
+        node = _share_node("n", {"d0": 1, "d1": 1})
+        [result] = schedule([node], {}, [_share_group((whole,))])
+        assert isinstance(result, Skip)
+
+    def test_the_device_plugin_policy_refuses_shares(self) -> None:
+        part = ShareRequest("gpu.x", (ShareOption(100),))
+        [result] = schedule(
+            [_share_node("n")],
+            {},
+            [_share_group((part,))],
+            policy=GpuAllocationPolicy.DEVICE_PLUGIN,
+        )
+        assert isinstance(result, Skip) and result.reason == SkipReason.UNSUPPORTED
+
+
+class TestExtendedResources:
+    def test_a_pod_goes_where_the_extended_resource_is_free(self) -> None:
+        nodes = [
+            NodeState(
+                "full",
+                Resources(8000, 64 * GIB, 110),
+                Resources(),
+                extended={"nvidia.com/gpu": 4},
+                extended_used={"nvidia.com/gpu": 4},
+            ),
+            NodeState(
+                "free", Resources(8000, 64 * GIB, 110), Resources(), extended={"nvidia.com/gpu": 4}
+            ),
+        ]
+        pod = PendingPod("ns", "g-0", Resources(1000, GIB, 1), extended={"nvidia.com/gpu": 2})
+        [result] = schedule(nodes, {}, [PendingGroup("ns", "g", "q", 0, "1", 1, [pod])])
+        assert isinstance(result, Placement) and result.nodes == {"g-0": "free"}

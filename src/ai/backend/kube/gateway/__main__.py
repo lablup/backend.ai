@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import signal
 import socket
 from pathlib import Path
@@ -16,10 +17,15 @@ from ai.backend.kube.controller.naming import LABEL_MANAGED_BY, MANAGED_BY
 from ai.backend.kube.events import make_event_producer
 from ai.backend.kube.gateway.heartbeat import GatewayHeartbeat, GatewayIdentity
 from ai.backend.kube.gateway.images import GatewayImages
-from ai.backend.kube.gateway.kernel_index import KernelIndex
+from ai.backend.kube.gateway.kernel_index import (
+    LABEL_NAMESPACE_MANAGED_BY,
+    NAMESPACE_MANAGED_BY,
+    KernelIndex,
+)
 from ai.backend.kube.gateway.kernels import GatewayKernels
 from ai.backend.kube.gateway.server import GatewayRPCServer
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
+from ai.backend.kube.nodehelper.server import NODE_HELPER_TOKEN_ENV
 from ai.backend.kube.watch import watch_forever
 from ai.backend.logging.logger import LocalLogger
 from ai.backend.logging.structured import StructuredLogger
@@ -49,7 +55,7 @@ async def _serve(
     )
     resource_group, advertised_addr, region = identity_args
     identity = GatewayIdentity(resource_group, advertised_addr, public_key, region)
-    index = KernelIndex()
+    index = KernelIndex(on_removed=lambda kernel_id: kernels.schedule_forget(kernel_id))
     async with client.ApiClient() as api, WsApiClient() as ws_api:
         kernels = GatewayKernels(index, api, ws_api, event_producer)
         core = client.CoreV1Api(api)
@@ -82,12 +88,24 @@ async def _serve(
         try:
             async with server, asyncio.TaskGroup() as tg:
                 tg.create_task(GatewayHeartbeat(api, event_producer, identity).run())
+                # Only Pods in the namespaces the Manager created are kernels (KernelIndex).
+                tg.create_task(
+                    watch_forever(
+                        lambda **kw: core.list_namespace(
+                            label_selector=f"{LABEL_NAMESPACE_MANAGED_BY}={NAMESPACE_MANAGED_BY}",
+                            **kw,
+                        ),
+                        index.apply_namespace,
+                        on_relist=index.replace_namespaces,
+                    )
+                )
                 tg.create_task(
                     watch_forever(
                         lambda **kw: core.list_pod_for_all_namespaces(
                             label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY}", **kw
                         ),
                         index.apply,
+                        on_relist=index.replace_pods,
                     )
                 )
         except asyncio.CancelledError:
@@ -130,12 +148,6 @@ async def _serve(
 @click.option("--node-helper-namespace", envvar="POD_NAMESPACE", default="backendai-system")
 @click.option("--node-helper-port", envvar="BACKENDAI_NODE_HELPER_PORT", type=int, default=6090)
 @click.option(
-    "--node-helper-token",
-    envvar="BACKENDAI_NODE_HELPER_TOKEN",
-    default=None,
-    help="Shared with the node helpers; without it, session commit is not offered.",
-)
-@click.option(
     "--log-level",
     envvar="BACKENDAI_LOG_LEVEL",
     type=click.Choice([lv.name for lv in LogLevel]),
@@ -153,9 +165,11 @@ def main(
     valkey_password: str | None,
     node_helper_namespace: str,
     node_helper_port: int,
-    node_helper_token: str | None,
     log_level: str,
 ) -> None:
+    # Only from the environment (a Secret): an argument would show in the process list.
+    # Shared with the node helpers; without it, session commit is not offered.
+    node_helper_token = os.environ.get(NODE_HELPER_TOKEN_ENV) or None
     node_helper = (
         (node_helper_namespace, node_helper_port, node_helper_token) if node_helper_token else None
     )

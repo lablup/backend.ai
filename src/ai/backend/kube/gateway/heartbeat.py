@@ -30,7 +30,7 @@ from ai.backend.common.types import ResourceSlotEntry, SlotTypes
 from ai.backend.kube.controller.devices import device_key
 from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.device import DeviceProfile, DeviceProfileSpec, SharingMode
-from ai.backend.kube.scheduler.snapshot import build_nodes
+from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, build_nodes
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -63,36 +63,46 @@ def cluster_slots(
     resource_slices: Sequence[Mapping[str, Any]] = (),
     profiles: Sequence[DeviceProfileSpec] = (),
 ) -> list[ResourceSlotEntry]:
-    """CPU cores, memory and whole devices of the nodes a session Pod can land on."""
+    """CPU cores, memory, whole devices and device shares of the nodes a session Pod can land
+    on (the sokovan dedicated taint is tolerated by session Pods)."""
     cpu = Decimal(0)
     mem = 0
     devices: dict[str, int] = {}
+    shares: dict[str, int] = {}  # driver → 0.01-share units
+    extended: dict[str, int] = {}
     for node in build_nodes(nodes, [], resource_slices):
-        blocked = any(t.effect in ("NoSchedule", "NoExecute") for t in node.taints)
+        blocked = any(
+            t.effect in ("NoSchedule", "NoExecute") and t.key != DEDICATED_TAINT_KEY
+            for t in node.taints
+        )
         if node.schedulable and not blocked:
             cpu += Decimal(node.allocatable.cpu_milli) / 1000
             mem += node.allocatable.memory
             for driver, count in node.devices.items():
                 devices[driver] = devices.get(driver, 0) + count
+            for driver, capacities in node.share_capacity.items():
+                shares[driver] = shares.get(driver, 0) + sum(capacities.values())
+            for name, count in node.extended.items():
+                extended[name] = extended.get(name, 0) + count
     entries = [
         ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity=str(cpu.normalize())),
         ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity=str(mem)),
     ]
     for profile in profiles:
-        # One unit of a slot is one device: a whole GPU, a MIG instance, or (fraction) the
-        # devices it is split from.
-        key = (
-            profile.driver_name
-            if profile.sharing_mode == SharingMode.FRACTION
-            else device_key(profile)
+        if profile.sharing_mode not in _REPORTED_MODES:
+            continue
+        # A fraction slot counts shares (a device holds its own share capacity); the others
+        # count devices: a whole GPU, a MIG instance, or a device plugin's extended resource.
+        extended_name: str | None = getattr(profile, "extended_resource_name", None)
+        if profile.sharing_mode == SharingMode.FRACTION:
+            quantity = str((Decimal(shares.get(profile.driver_name, 0)) / 100).normalize())
+        elif extended_name:
+            quantity = str(extended.get(extended_name, 0))
+        else:
+            quantity = str(devices.get(device_key(profile), 0))
+        entries.append(
+            ResourceSlotEntry(resource_type=ResourceSlotName(profile.slot_name), quantity=quantity)
         )
-        if profile.sharing_mode in _REPORTED_MODES:
-            entries.append(
-                ResourceSlotEntry(
-                    resource_type=ResourceSlotName(profile.slot_name),
-                    quantity=str(devices.get(key, 0)),
-                )
-            )
     return entries
 
 
