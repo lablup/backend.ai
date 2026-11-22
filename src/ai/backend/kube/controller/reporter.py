@@ -1,8 +1,9 @@
 """Turn kernel phase changes into the kernel events the Manager takes from an Agent.
 
 The last phase sent is kept in the SessionWorkload status (`reportedPhase`), so a restart
-resends nothing and misses nothing. Events go in order, skipped phases included, because
-the Manager moves a kernel only SCHEDULED → PULLING → CREATING → RUNNING.
+misses nothing and resends at most the one event sent before it was recorded (at least once).
+Events go in order, skipped phases included, because the Manager moves a kernel only
+SCHEDULED → PULLING → CREATING → RUNNING.
 """
 
 from __future__ import annotations
@@ -30,6 +31,9 @@ from ai.backend.common.events.event_types.kernel.types import (
     ServicePortInfo,
     UsedDevice,
     UsedDevices,
+)
+from ai.backend.common.events.event_types.session.anycast import (
+    SessionPlacementTimeoutAnycastEvent,
 )
 from ai.backend.common.types import (
     ContainerId,
@@ -124,6 +128,18 @@ class StatusReporter:
         self._producer = producer
         self._logs = logs
 
+    async def report_placement_timeout(
+        self, workload: SessionWorkload, reason: str, message: str | None
+    ) -> None:
+        """The session stayed unplaced past the placement timeout (contract C11)."""
+        await self._producer.anycast_event(
+            SessionPlacementTimeoutAnycastEvent(
+                session_id=SessionId(UUID(workload.spec.session_id)),
+                reason=reason,
+                message=message,
+            )
+        )
+
     async def report(
         self,
         workload: SessionWorkload,
@@ -165,6 +181,8 @@ class StatusReporter:
         reason = KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER
 
         async def sent(reported_phase: SessionPhase) -> KernelStatus:
+            # Recorded after the send: a crash in between resends the event (at least once).
+            # A resent termination replaces the container's log chunks (logs.py).
             updated = status.model_copy(update={"reported_phase": reported_phase})
             if persist is not None:
                 await persist(updated)

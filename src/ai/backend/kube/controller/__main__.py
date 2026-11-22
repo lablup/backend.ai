@@ -167,6 +167,13 @@ async def _serve(
     help="ClusterQueue the LocalQueues of sessions on the kueue scheduler point to.",
 )
 @click.option(
+    "--placement-timeout",
+    envvar="BACKENDAI_PLACEMENT_TIMEOUT",
+    type=click.IntRange(min=1),
+    default=600,
+    help="Seconds an admitted session may stay unplaced before it goes back to the Manager.",
+)
+@click.option(
     "--leader-election/--no-leader-election",
     envvar="BACKENDAI_LEADER_ELECTION",
     default=False,
@@ -194,6 +201,7 @@ def main(
     metrics_port: int,
     kubelet_insecure_tls: bool,
     kueue_cluster_queue: str,
+    placement_timeout: int,
     leader_election: bool,
     lease_namespace: str,
     identity: str,
@@ -211,6 +219,7 @@ def main(
         bind_mode=SokovanBindMode(bind_mode),
         gpu_allocation_policy=GPUAllocationPolicy(gpu_allocation_policy),
         kueue_cluster_queue=kueue_cluster_queue,
+        placement_timeout_seconds=float(placement_timeout),
     )
     with LocalLogger(log_level=LogLevel[log_level]):
         quiet_client_logs()

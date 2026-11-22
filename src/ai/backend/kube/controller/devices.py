@@ -22,9 +22,11 @@ from ai.backend.kube.controller.naming import (
     ANNOTATION_SHARED_DEVICES,
     kernel_labels,
     kernel_pod_name,
+    session_labels,
 )
 from ai.backend.kube.crd.device import (
     DeviceProfileSpec,
+    DriverKind,
     FractionStrategy,
     GPUAllocationPolicy,
     SharingMode,
@@ -37,6 +39,14 @@ SHARES_CAPACITY: Final = "shares"  # a bare key: in the domain of the device's d
 SHARES_CAPACITY_QUALIFIED: Final = "dra.backend.ai/shares"
 SHARE_UNITS_PER_SHARE: Final = 100
 PCI_BUS_ID_ATTRIBUTE: Final = "resource.kubernetes.io/pciBusID"
+SLOT_NAME_ATTRIBUTE: Final = "slotName"
+STANDARD_ATTRIBUTE_DOMAIN: Final = "resource.kubernetes.io"
+_STANDARD_ATTRIBUTES: Final = frozenset({"numaNode", "pcieRoot", "pciBusID"})
+# ComputeDomain of the NVIDIA DRA driver (v0.5, namespaced): IMEX channels for multi-node NVLink.
+COMPUTE_DOMAIN_GROUP: Final = "resource.nvidia.com"
+COMPUTE_DOMAIN_VERSION: Final = "v1beta1"
+COMPUTE_DOMAIN_PLURAL: Final = "computedomains"
+COMPUTE_DOMAIN_CLAIM: Final = "compute-domain-channel"
 _SLOT_NAME_ATTRIBUTES: Final = ("slotName", "dra.backend.ai/slotName")
 _RX_NAME: Final = re.compile(r"[^a-z0-9-]+")
 
@@ -299,8 +309,33 @@ def _evenly(units: int, caps: Sequence[int]) -> list[int] | None:
     return None
 
 
-def slot_selector(profile: DeviceProfileSpec) -> str:
-    return f'device.attributes["{profile.driver_name}"].slotName == "{profile.slot_name}"'
+def attribute_name(profile: DeviceProfileSpec, name: str) -> str:
+    """The fully qualified attribute the profile's driver publishes for a Backend.AI name:
+    `attributeMap` first, then the standard attributes, then the driver's own domain."""
+    mapped = profile.attribute_map.get(name)
+    if mapped is None:
+        mapped = f"{STANDARD_ATTRIBUTE_DOMAIN}/{name}" if name in _STANDARD_ATTRIBUTES else name
+    return mapped if "/" in mapped else f"{profile.driver_name}/{mapped}"
+
+
+def attribute_cel(profile: DeviceProfileSpec, name: str) -> str:
+    domain, _, attr = attribute_name(profile, name).rpartition("/")
+    return f"device.attributes[{json.dumps(domain)}].{attr}"
+
+
+def attribute_selector(profile: DeviceProfileSpec, name: str, value: str) -> str:
+    """CEL matching devices whose attribute (a Backend.AI name, e.g. `model`) equals `value`."""
+    return f"{attribute_cel(profile, name)} == {json.dumps(value)}"
+
+
+def slot_selector(profile: DeviceProfileSpec) -> str | None:
+    """None for an external driver that publishes no slot attribute: its DeviceClass selects."""
+    if (
+        profile.driver_kind == DriverKind.EXTERNAL
+        and SLOT_NAME_ATTRIBUTE not in profile.attribute_map
+    ):
+        return None
+    return attribute_selector(profile, SLOT_NAME_ATTRIBUTE, profile.slot_name)
 
 
 def capacity_selector(profile: DeviceProfileSpec, capacity_name: str, value: int) -> str:
@@ -331,7 +366,8 @@ def _request_body(
     selectors = []
     if claim.profile.sharing_mode in (SharingMode.EXCLUSIVE, SharingMode.PARTITION):
         # A whole GPU and a MIG instance of one driver differ by the slot they serve.
-        selectors.append({"cel": {"expression": slot_selector(claim.profile)}})
+        if (slot := slot_selector(claim.profile)) is not None:
+            selectors.append({"cel": {"expression": slot}})
     if request.shares is not None:
         body["capacity"] = {"requests": {claim.shares_capacity: str(request.shares)}}
     if capacity is not None:
@@ -364,10 +400,14 @@ def build_resource_claim(
     names = [r.name for r in claim.requests]
     constraints: list[dict[str, Any]] = []
     if len(claim.requests) > 1:
-        constraints.append({"requests": names, "distinctAttribute": PCI_BUS_ID_ATTRIBUTE})
+        constraints.append({
+            "requests": names,
+            "distinctAttribute": attribute_name(claim.profile, PCI_BUS_ID_ATTRIBUTE),
+        })
     if claim.profile.match_attributes and claim.count > 1:
         constraints += [
-            {"requests": names, "matchAttribute": attr} for attr in claim.profile.match_attributes
+            {"requests": names, "matchAttribute": attribute_name(claim.profile, attr)}
+            for attr in claim.profile.match_attributes
         ]
     spec: dict[str, Any] = {"devices": {"requests": requests}}
     if constraints:
@@ -403,8 +443,49 @@ class PodDeviceParts:
     annotations: dict[str, str]
 
 
+def needs_compute_domain(
+    workload: SessionWorkload, devices: Mapping[str, Sequence[DeviceClaim]]
+) -> bool:
+    """A session of several kernels with a device of a `computeDomain` profile."""
+    return len(workload.spec.kernels) > 1 and any(
+        c.profile.compute_domain for claims in devices.values() for c in claims
+    )
+
+
+def compute_domain_name(workload: SessionWorkload) -> str:
+    return str(workload.metadata["name"])
+
+
+def compute_domain_channel_template(workload: SessionWorkload) -> str:
+    """The ResourceClaimTemplate the NVIDIA DRA driver creates for the ComputeDomain."""
+    return f"{compute_domain_name(workload)}-channel"
+
+
+def build_compute_domain(workload: SessionWorkload, owner: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "apiVersion": f"{COMPUTE_DOMAIN_GROUP}/{COMPUTE_DOMAIN_VERSION}",
+        "kind": "ComputeDomain",
+        "metadata": {
+            "name": compute_domain_name(workload),
+            "namespace": workload.metadata["namespace"],
+            "labels": session_labels(workload),
+            "ownerReferences": [dict(owner)],
+        },
+        "spec": {
+            "numNodes": len(workload.spec.kernels),
+            "channel": {
+                "resourceClaimTemplate": {"name": compute_domain_channel_template(workload)}
+            },
+        },
+    }
+
+
 def pod_device_parts(
-    workload: SessionWorkload, kernel: KernelSpec, claims: Sequence[DeviceClaim]
+    workload: SessionWorkload,
+    kernel: KernelSpec,
+    claims: Sequence[DeviceClaim],
+    *,
+    compute_domain: bool = False,
 ) -> PodDeviceParts:
     whole: dict[str, int] = {}
     shared: dict[str, int] = {}
@@ -424,12 +505,19 @@ def pod_device_parts(
     if shared:
         annotations[ANNOTATION_SHARED_DEVICES] = json.dumps(shared, sort_keys=True)
     dra = [c for c in claims if c.extended_resource is None]
+    pod_claims = [
+        {"name": c.name, "resourceClaimName": resource_claim_name(workload, kernel, c)} for c in dra
+    ]
+    container_claims = [{"name": c.name} for c in dra]
+    if compute_domain:
+        pod_claims.append({
+            "name": COMPUTE_DOMAIN_CLAIM,
+            "resourceClaimTemplateName": compute_domain_channel_template(workload),
+        })
+        container_claims.append({"name": COMPUTE_DOMAIN_CLAIM})
     return PodDeviceParts(
-        pod_claims=[
-            {"name": c.name, "resourceClaimName": resource_claim_name(workload, kernel, c)}
-            for c in dra
-        ],
-        container_claims=[{"name": c.name} for c in dra],
+        pod_claims=pod_claims,
+        container_claims=container_claims,
         extended_resources={k: str(v) for k, v in extended.items()},
         annotations=annotations,
     )

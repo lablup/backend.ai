@@ -26,6 +26,9 @@ _PG = PodGroup.crd
 Key = tuple[str, str]  # (namespace, name)
 _ENDED: Final = frozenset({SessionPhase.ERROR.value, SessionPhase.TERMINATED.value})
 _RESYNC_TIMEOUT: Final = 60.0
+# A failed reconcile is retried after 1, 2, 4, ... seconds, at most this long.
+_RETRY_BASE_SECONDS: Final = 1.0
+_RETRY_MAX_SECONDS: Final = 60.0
 
 
 class WorkQueue:
@@ -70,6 +73,7 @@ class SessionController:
     _workers: int
     _resync_seconds: float
     _cache: ClusterObjectCache | None
+    _retries: dict[Key, int]
 
     def __init__(
         self,
@@ -86,6 +90,7 @@ class SessionController:
         self._queue = WorkQueue()
         self._workers = workers
         self._resync_seconds = resync_seconds
+        self._retries = {}
 
     async def run(self) -> None:
         custom = client.CustomObjectsApi(self._api)
@@ -146,14 +151,26 @@ class SessionController:
             await asyncio.sleep(self._resync_seconds)
 
     async def _work_forever(self) -> None:
+        loop = asyncio.get_running_loop()
         while True:
             key = await self._queue.get()
             try:
                 await self._reconciler.reconcile(*key)
             except Exception:
                 log.exception("reconcile failed", k8s_namespace=key[0], name=key[1])
+                attempts = self._retries.get(key, 0)
+                self._retries[key] = attempts + 1
+                loop.call_later(retry_delay(attempts), self._queue.add, key)
+            else:
+                self._retries.pop(key, None)
             finally:
                 self._queue.done(key)
+
+
+def retry_delay(attempts: int) -> float:
+    """Seconds before the retry of a reconcile that failed `attempts` times before."""
+    backoff: float = _RETRY_BASE_SECONDS * (1 << min(attempts, 16))
+    return min(backoff, _RETRY_MAX_SECONDS)
 
 
 def needs_resync(workload: Mapping[str, Any]) -> bool:

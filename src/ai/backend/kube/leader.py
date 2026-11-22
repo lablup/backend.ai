@@ -5,9 +5,13 @@ Same rules as client-go's leaderelection (suggestion-1122 12.1):
 | rule | how |
 |---|---|
 | a holder renews every `renew_interval` | each Lease call has a request timeout below `renew_deadline` |
-| a holder stops working | when it has not renewed for `renew_deadline`, or another holder took the Lease |
+| a holder stops working | when it has not renewed for `renew_deadline` (a renewal in flight is cut off at that deadline), or another holder took the Lease |
+| the work stops in time | it gets `(lease_duration - renew_deadline) / 2` after the cancel; `run` returns then even if it has not stopped, and the caller exits |
 | a standby takes over | once the record it read has not changed for `lease_duration` on its own clock |
-| a holder that exits | releases the Lease so that a standby takes it at once |
+| a holder that exits | releases the Lease so that a standby takes it at once, only when its work stopped |
+
+A renewal counts from when it was sent, which is never later than when a standby can see it:
+the holder stops by `renew_deadline` plus the stop grace after it, before `lease_duration`.
 """
 
 from __future__ import annotations
@@ -62,6 +66,7 @@ class LeaderElector:
     _observed: Record | None
     _observed_at: float
     _last_renew: float | None
+    _stop_grace: float
 
     def __init__(
         self,
@@ -89,6 +94,7 @@ class LeaderElector:
         self._observed = None
         self._observed_at = 0.0
         self._last_renew = None
+        self._stop_grace = max(lease_duration - renew_deadline, 0) / 2
 
     async def run(self, work: Callable[[], Coroutine[Any, Any, None]]) -> None:
         """Wait for the Lease, then run `work` while holding it. Losing it stops `work` and
@@ -100,27 +106,53 @@ class LeaderElector:
         task = asyncio.create_task(work())
         try:
             while not task.done():
-                await asyncio.wait({task}, timeout=self._renew_interval)
+                await self._wait_for(task, min(self._renew_interval, self._remaining()))
                 if task.done():
                     break
-                if await self.try_acquire():
+                renewed = False
+                if (remaining := self._remaining()) > 0:
+                    renewed = await self._bounded(self.try_acquire(), remaining) is True
+                if renewed:
                     continue
-                if self._holder_changed() or not self._within_deadline():
+                if self._holder_changed() or self._remaining() <= 0:
                     log.info("leadership lost", lease=self._name, identity=self._identity)
                     break
         finally:
             if not task.done():
                 task.cancel()
-            await asyncio.wait({task})
-            await self.release()
-        if not task.cancelled() and (exc := task.exception()) is not None:
+                await self._wait_for(task, self._stop_grace)
+            if task.done():
+                await self._bounded(self.release(), self._request_timeout)
+            else:
+                # The Lease is left to expire: a standby must not start while this work runs.
+                log.warning("work did not stop after losing the lease", lease=self._name)
+        if task.done() and not task.cancelled() and (exc := task.exception()) is not None:
             raise exc
 
-    def _within_deadline(self) -> bool:
-        return (
-            self._last_renew is not None
-            and self._clock() - self._last_renew <= self._renew_deadline
-        )
+    def _remaining(self) -> float:
+        """Seconds until the renew deadline."""
+        if self._last_renew is None:
+            return 0.0
+        return self._last_renew + self._renew_deadline - self._clock()
+
+    async def _wait_for(self, task: asyncio.Future[Any], seconds: float) -> None:
+        """Wait until `task` is done or `seconds` passed on the injected sleep."""
+        if task.done():
+            return
+        timer = asyncio.ensure_future(self._sleep(max(seconds, 0.0)))
+        try:
+            await asyncio.wait({task, timer}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            timer.cancel()
+
+    async def _bounded[T](self, call: Coroutine[Any, Any, T], seconds: float) -> T | None:
+        """The result of `call`, or None when `seconds` passed first; then it is cancelled."""
+        future = asyncio.ensure_future(call)
+        await self._wait_for(future, seconds)
+        if not future.done():
+            future.cancel()
+            return None
+        return future.result()
 
     def _holder_changed(self) -> bool:
         return self._observed is not None and self._observed[0] not in (None, "", self._identity)
@@ -136,6 +168,7 @@ class LeaderElector:
         """Take or renew the Lease; False when another holder's Lease is still fresh or the
         API server did not answer."""
         now = _now()
+        sent_at = self._clock()
         try:
             lease = await self._api.read_namespaced_lease(
                 self._name, self._namespace, _request_timeout=self._request_timeout
@@ -144,7 +177,7 @@ class LeaderElector:
             if e.status != 404:
                 log.warning("lease read failed", lease=self._name, status=e.status)
                 return False
-            return await self._create(now)
+            return await self._create(now, sent_at)
         except (TimeoutError, aiohttp.ClientError, OSError) as e:
             log.warning("lease read failed", lease=self._name, exc_info=e)
             return False
@@ -178,15 +211,16 @@ class LeaderElector:
         except (TimeoutError, aiohttp.ClientError, OSError) as e:
             log.warning("lease update failed", lease=self._name, exc_info=e)
             return False
-        self._renewed()
+        self._renewed(sent_at)
         return True
 
-    def _renewed(self) -> None:
-        self._last_renew = self._clock()
+    def _renewed(self, sent_at: float) -> None:
+        """A renewal counts from when it was sent: a standby cannot have seen it earlier."""
+        self._last_renew = sent_at
         self._observed = (self._identity, None, None, None)
-        self._observed_at = self._last_renew
+        self._observed_at = self._clock()
 
-    async def _create(self, now: datetime) -> bool:
+    async def _create(self, now: datetime, sent_at: float) -> bool:
         body = client.V1Lease(
             metadata=client.V1ObjectMeta(name=self._name, namespace=self._namespace),
             spec=client.V1LeaseSpec(
@@ -208,7 +242,7 @@ class LeaderElector:
         except (TimeoutError, aiohttp.ClientError, OSError) as e:
             log.warning("lease create failed", lease=self._name, exc_info=e)
             return False
-        self._renewed()
+        self._renewed(sent_at)
         return True
 
     async def release(self) -> None:

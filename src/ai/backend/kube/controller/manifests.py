@@ -80,6 +80,8 @@ class ControllerSettings:
     bind_mode: SokovanBindMode = SokovanBindMode.GATE
     kueue_cluster_queue: str = "backendai"
     gpu_allocation_policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA
+    # An admitted session not placed this long is handed back to the Manager (contract C11).
+    placement_timeout_seconds: float = 600.0
 
 
 @dataclass(frozen=True)
@@ -255,11 +257,13 @@ def build_kernel_pod(
     devices: Sequence[DeviceClaim] = (),
     *,
     sudo_session: bool = False,
+    compute_domain: bool = False,
 ) -> dict[str, Any]:
-    """`sudo_session` lets the kernel user gain root through sudo, as the Agent allows."""
+    """`sudo_session` lets the kernel user gain root through sudo, as the Agent allows;
+    `compute_domain` adds the claim of the session's ComputeDomain channel."""
     if len(mounts) != len(kernel.mounts):
         raise InvalidSessionWorkloadError(f"kernel {kernel.kernel_id}: unresolved vfolder mounts")
-    device_parts = pod_device_parts(workload, kernel, devices)
+    device_parts = pod_device_parts(workload, kernel, devices, compute_domain=compute_domain)
     scheduling = scheduler_adapter(workload, settings).pod(workload)
     distro = kernel.image.labels.get(LabelName.BASE_DISTRO, "ubuntu22.04")
     krunner = select_krunner(distro, kernel.image.architecture)
