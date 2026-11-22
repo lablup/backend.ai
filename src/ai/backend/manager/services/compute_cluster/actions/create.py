@@ -11,11 +11,13 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 @dataclass(frozen=True)
 class CreateComputeClusterAction(BaseGlobalAction):
-    """Register a Kubernetes cluster. ``kubeconfig`` is plaintext; the service encrypts it."""
+    """Register a Kubernetes cluster. ``kubeconfig`` is plaintext; the service encrypts it.
+
+    ``api_server`` is read from the kubeconfig; a given value must match it."""
 
     name: str
     description: str | None
-    api_server: str
+    api_server: str | None
     kubeconfig: str = field(repr=False)
     namespace_prefix: str
     gateway_addr: str | None

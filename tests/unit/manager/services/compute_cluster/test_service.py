@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.manager.data.compute_cluster.types import ComputeClusterData, ComputeClusterStatus
+from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 from ai.backend.manager.models.compute_cluster.creators import ComputeClusterCreator
 from ai.backend.manager.models.compute_cluster.row import COMPUTE_CLUSTER_KUBECONFIG_CONTEXT
 from ai.backend.manager.models.compute_cluster.updaters import ComputeClusterUpdater
@@ -21,9 +22,27 @@ from ai.backend.manager.services.compute_cluster.actions.update import (
     UpdateComputeClusterAction,
 )
 from ai.backend.manager.services.compute_cluster.service import ComputeClusterService
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
-_PLAINTEXT = "apiVersion: v1\nkind: Config\n"
+_PLAINTEXT = """\
+apiVersion: v1
+kind: Config
+clusters:
+- name: k8s-a
+  cluster:
+    server: https://10.0.0.1:6443
+    certificate-authority-data: Y2E=
+users:
+- name: manager
+  user:
+    token: secret-token
+contexts:
+- name: k8s-a
+  context:
+    cluster: k8s-a
+    user: manager
+current-context: k8s-a
+"""
 _ENCRYPTED = SecretValue("stands-in-for-ciphertext")
 
 
@@ -129,7 +148,7 @@ class TestUpdate:
         await service.update(
             UpdateComputeClusterAction(
                 updater=ComputeClusterUpdater(
-                    compute_cluster_id=cluster_id, api_server=OptionalState.update("https://x")
+                    compute_cluster_id=cluster_id, description=TriState.update("d")
                 ),
             )
         )
@@ -137,3 +156,101 @@ class TestUpdate:
         key_provider_pool.encrypt.assert_not_awaited()
         updater = ops_repository.update.call_args.args[0]
         assert "kubeconfig" not in updater.build_values()
+
+
+class TestKubeconfigValidation:
+    async def test_create_reads_the_api_server_from_the_kubeconfig(
+        self,
+        service: ComputeClusterService,
+        ops_repository: MagicMock,
+    ) -> None:
+        await service.create(
+            CreateComputeClusterAction(
+                name="k8s-a",
+                description=None,
+                api_server=None,
+                kubeconfig=_PLAINTEXT,
+                namespace_prefix="bai-",
+                gateway_addr=None,
+                gateway_public_key=None,
+            )
+        )
+
+        creator = ops_repository.create_entity.call_args.args[0]
+        assert creator.api_server == "https://10.0.0.1:6443"
+
+    async def test_create_rejects_a_different_api_server(
+        self,
+        service: ComputeClusterService,
+        ops_repository: MagicMock,
+    ) -> None:
+        with pytest.raises(InvalidKubeconfig):
+            await service.create(
+                CreateComputeClusterAction(
+                    name="k8s-a",
+                    description=None,
+                    api_server="https://elsewhere:6443",
+                    kubeconfig=_PLAINTEXT,
+                    namespace_prefix="bai-",
+                    gateway_addr=None,
+                    gateway_public_key=None,
+                )
+            )
+        ops_repository.create_entity.assert_not_awaited()
+
+    async def test_create_rejects_an_exec_credential(
+        self,
+        service: ComputeClusterService,
+        ops_repository: MagicMock,
+        key_provider_pool: MagicMock,
+    ) -> None:
+        kubeconfig = _PLAINTEXT.replace(
+            "    token: secret-token\n", "    exec:\n      command: /bin/sh\n"
+        )
+        with pytest.raises(InvalidKubeconfig):
+            await service.create(
+                CreateComputeClusterAction(
+                    name="k8s-a",
+                    description=None,
+                    api_server=None,
+                    kubeconfig=kubeconfig,
+                    namespace_prefix="bai-",
+                    gateway_addr=None,
+                    gateway_public_key=None,
+                )
+            )
+        key_provider_pool.encrypt.assert_not_awaited()
+        ops_repository.create_entity.assert_not_awaited()
+
+    async def test_update_sets_the_api_server_with_the_kubeconfig(
+        self,
+        service: ComputeClusterService,
+        ops_repository: MagicMock,
+        cluster_id: ComputeClusterID,
+    ) -> None:
+        await service.update(
+            UpdateComputeClusterAction(
+                updater=ComputeClusterUpdater(compute_cluster_id=cluster_id),
+                kubeconfig=OptionalState.update(_PLAINTEXT),
+            )
+        )
+
+        updater = ops_repository.update.call_args.args[0]
+        assert updater.build_values()["api_server"] == "https://10.0.0.1:6443"
+
+    async def test_update_rejects_an_api_server_without_a_kubeconfig(
+        self,
+        service: ComputeClusterService,
+        ops_repository: MagicMock,
+        cluster_id: ComputeClusterID,
+    ) -> None:
+        with pytest.raises(InvalidKubeconfig):
+            await service.update(
+                UpdateComputeClusterAction(
+                    updater=ComputeClusterUpdater(
+                        compute_cluster_id=cluster_id,
+                        api_server=OptionalState.update("https://x"),
+                    ),
+                )
+            )
+        ops_repository.update.assert_not_awaited()

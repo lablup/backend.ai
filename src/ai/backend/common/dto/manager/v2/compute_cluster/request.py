@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated, Self
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.compute_cluster.kubeconfig import parse_kubeconfig
 from ai.backend.common.dto.manager.v2.compute_cluster.types import (
     ComputeClusterOrderField,
     ComputeClusterStatus,
@@ -30,6 +31,34 @@ _NamespacePrefix = Annotated[str, StringConstraints(min_length=1, max_length=32)
 _Description = Annotated[str, StringConstraints(max_length=512)]
 _GatewayAddr = Annotated[str, StringConstraints(min_length=1, max_length=256)]
 _Kubeconfig = Annotated[str, StringConstraints(min_length=1)]
+_KUBECONFIG_DESCRIPTION = (
+    "Kubeconfig the manager uses to reach the cluster. Stored encrypted and never returned."
+    " Only inline credentials are accepted: `certificate-authority-data`,"
+    " `client-certificate-data`, `client-key-data` and `token`; `exec`, `auth-provider` and"
+    " file paths are rejected."
+)
+_API_SERVER_DESCRIPTION = (
+    "URL of the cluster's Kubernetes API server. Read from the kubeconfig's current context;"
+    " a different value is rejected."
+)
+
+
+def _validated_kubeconfig(value: str | None | Unset) -> str | None | Unset:
+    if isinstance(value, str):
+        parse_kubeconfig(value)
+    return value
+
+
+def _check_api_server(api_server: str | None | Unset, kubeconfig: str | None | Unset) -> None:
+    if not isinstance(api_server, str):
+        return
+    if not isinstance(kubeconfig, str):
+        raise ValueError("api_server is read from the kubeconfig; send the kubeconfig instead")
+    server = parse_kubeconfig(kubeconfig).server
+    if api_server.rstrip("/") != server.rstrip("/"):
+        raise ValueError(
+            f"api_server {api_server!r} differs from the kubeconfig's server {server!r}"
+        )
 
 
 class CreateComputeClusterInput(BaseRequestModel):
@@ -44,14 +73,12 @@ class CreateComputeClusterInput(BaseRequestModel):
         default=None,
         description=f"Added in {NEXT_RELEASE_VERSION}. Optional description.",
     )
-    api_server: _ApiServer = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. URL of the cluster's Kubernetes API server.",
+    api_server: _ApiServer | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. {_API_SERVER_DESCRIPTION}",
     )
     kubeconfig: _Kubeconfig = Field(
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Kubeconfig the manager uses to reach the cluster. "
-            "Stored encrypted and never returned."
-        ),
+        description=f"Added in {NEXT_RELEASE_VERSION}. {_KUBECONFIG_DESCRIPTION}",
     )
     namespace_prefix: _NamespacePrefix = Field(
         default="bai-",
@@ -68,6 +95,17 @@ class CreateComputeClusterInput(BaseRequestModel):
         description=f"Added in {NEXT_RELEASE_VERSION}. Public key of the cluster's gateway.",
     )
 
+    @field_validator("kubeconfig")
+    @classmethod
+    def _check_kubeconfig(cls, value: str) -> str:
+        parse_kubeconfig(value)
+        return value
+
+    @model_validator(mode="after")
+    def _check_api_server_matches(self) -> Self:
+        _check_api_server(self.api_server, self.kubeconfig)
+        return self
+
 
 class UpdateComputeClusterInput(BaseRequestModel):
     """Input for updating a compute cluster.
@@ -81,13 +119,16 @@ class UpdateComputeClusterInput(BaseRequestModel):
     )
     api_server: _ApiServer | None | Unset = Field(
         default=UNSET,
-        description=f"Added in {NEXT_RELEASE_VERSION}. Omit to leave unchanged.",
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. {_API_SERVER_DESCRIPTION}"
+            " Only accepted together with `kubeconfig`."
+        ),
     )
     kubeconfig: _Kubeconfig | None | Unset = Field(
         default=UNSET,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Replaces the stored kubeconfig. "
-            "Omit to leave unchanged."
+            f"Added in {NEXT_RELEASE_VERSION}. {_KUBECONFIG_DESCRIPTION}"
+            " Replaces the stored kubeconfig. Omit to leave unchanged."
         ),
     )
     namespace_prefix: _NamespacePrefix | None | Unset = Field(
@@ -106,6 +147,16 @@ class UpdateComputeClusterInput(BaseRequestModel):
         default=UNSET,
         description=f"Added in {NEXT_RELEASE_VERSION}. Omit to leave unchanged.",
     )
+
+    @field_validator("kubeconfig")
+    @classmethod
+    def _check_kubeconfig(cls, value: str | None | Unset) -> str | None | Unset:
+        return _validated_kubeconfig(value)
+
+    @model_validator(mode="after")
+    def _check_api_server_matches(self) -> Self:
+        _check_api_server(self.api_server, self.kubeconfig)
+        return self
 
 
 class ComputeClusterFilter(BaseRequestModel):

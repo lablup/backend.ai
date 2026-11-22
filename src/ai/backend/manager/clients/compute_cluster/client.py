@@ -6,11 +6,14 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, Final, Self
 
-import yaml
 from kubernetes_asyncio import client
 from kubernetes_asyncio.client.exceptions import ApiException
 from kubernetes_asyncio.config import kube_config
 
+from ai.backend.common.dto.manager.v2.compute_cluster.kubeconfig import (
+    InvalidKubeconfigError,
+    parse_kubeconfig,
+)
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.kube.crd.base import CRD_VERSION
@@ -25,6 +28,7 @@ from ai.backend.manager.clients.compute_cluster.mapping import (
     queue_name,
 )
 from ai.backend.manager.data.compute_cluster.types import ProjectQueueData
+from ai.backend.manager.errors.compute_cluster import InvalidKubeconfig
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -49,9 +53,15 @@ class ComputeClusterClient:
 
     @classmethod
     async def from_kubeconfig(cls, kubeconfig: str) -> Self:
+        """Load only the validated current context, so a stored kubeconfig never runs a
+        command or reads a file on the Manager's host."""
+        try:
+            parsed = parse_kubeconfig(kubeconfig)
+        except InvalidKubeconfigError as e:
+            raise InvalidKubeconfig(str(e)) from e
         configuration = client.Configuration()
         await kube_config.load_kube_config_from_dict(
-            yaml.safe_load(kubeconfig), client_configuration=configuration
+            dict(parsed.config), client_configuration=configuration
         )
         return cls(client.ApiClient(configuration=configuration))
 
