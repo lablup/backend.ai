@@ -121,11 +121,18 @@ NotIn on the labels of nodes whose GPUs another allocator owns. (dict "root" $ "
 {{- $terms := list -}}
 {{- range ($required.nodeSelectorTerms | default (list dict)) -}}
 {{- $exprs := concat (.matchExpressions | default list) $exclude -}}
-{{- $terms = append $terms (merge (dict "matchExpressions" $exprs) (omit . "matchExpressions")) -}}
+{{- $term := omit . "matchExpressions" -}}
+{{- if $exprs }}{{ $_ := set $term "matchExpressions" $exprs }}{{ end -}}
+{{- /* An empty term matches no node: drop it. */ -}}
+{{- if $term }}{{ $terms = append $terms $term }}{{ end -}}
 {{- end -}}
+{{- if $terms -}}
 {{- $_ := set $required "nodeSelectorTerms" $terms -}}
 {{- $_ = set $nodeAffinity "requiredDuringSchedulingIgnoredDuringExecution" $required -}}
-{{- $_ = set $affinity "nodeAffinity" $nodeAffinity -}}
+{{- else -}}
+{{- $nodeAffinity = omit $nodeAffinity "requiredDuringSchedulingIgnoredDuringExecution" -}}
+{{- end -}}
+{{- if $nodeAffinity }}{{ $_ := set $affinity "nodeAffinity" $nodeAffinity }}{{ else }}{{ $affinity = omit $affinity "nodeAffinity" }}{{ end -}}
 {{- toYaml $affinity -}}
 {{- end -}}
 
