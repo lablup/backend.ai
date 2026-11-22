@@ -24,6 +24,10 @@ rules:
   - apiGroups: ["scheduling.backend.ai"]
     resources: ["deviceprofiles"]
     verbs: ["get", "list", "watch"]
+  # The kernel index trusts a Pod only for the SessionWorkload that declares it.
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

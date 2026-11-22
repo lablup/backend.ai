@@ -33,6 +33,10 @@ rules:
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceclaims/status"]
     verbs: ["update"]
+  # The conflict check reads device capacities from the ResourceSlices.
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceslices"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

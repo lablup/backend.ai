@@ -218,7 +218,7 @@ deviceProfiles: []
 #    driverKind: external
 #    driverName: gpu.nvidia.com
 #    deviceClassName: gpu.nvidia.com
-#    attributeMap: {productName: model}
+#    attributeMap: {model: productName}   # schema name → the driver's attribute
 #    # A multi-node session gets a ComputeDomain (IMEX channels, resource.nvidia.com) named after
 #    # it; its kernel Pods claim the domain's channel. Needs the NVIDIA DRA driver's ComputeDomain
 #    # support (NVLink multi-node systems such as GB200 NVL72).
