@@ -118,11 +118,13 @@ storageBindings: []
 # registers with the kubelet and writes CDI specs.
 #
 # A GPU has one allocator. Every entry needs nodeSelector or affinity (normally
-# `dra.backend.ai/driver-mode: bai`); the chart fails without one. The DaemonSets also never run
-# on nodes carrying a label of excludeNodeLabels, and the pre-flight checks fail when a
-# `driver-mode=bai` node has `nvidia.com/gpu` allocatable or `gpu.nvidia.com` devices. For an
-# fGPU pool, take its nodes out of the NVIDIA DRA driver's kubelet plugin (its chart value
-# `kubeletPlugin.affinity`, an AICR overlay) and set `nvidia.com/gpu.deploy.device-plugin=false`.
+# `dra.backend.ai/driver-mode: bai`); the chart fails without one. GPU entries (`gpu: true`;
+# default: a shared entry or a CUDA plugin) never run on nodes carrying a label of
+# excludeNodeLabels, and the pre-flight checks fail when a node with their devices has
+# `nvidia.com/gpu` allocatable or `gpu.nvidia.com` devices. NPU entries may share a node with
+# GPUs of another allocator. For an fGPU pool, take its nodes out of the NVIDIA DRA driver's
+# kubelet plugin (its chart value `kubeletPlugin.affinity`, an AICR overlay) and set
+# `nvidia.com/gpu.deploy.device-plugin=false`.
 #
 # isolation (per entry) limits a shared allocation (suggestion-1122 4.6); `shared: true` needs
 # hami-core or bai-hook and the chart fails otherwise:
@@ -134,6 +136,8 @@ storageBindings: []
 #              (varBasePath). Limits as BACKEND_CUDA_* env keyed by GPU UUID: cooperative against
 #              a process that rewrites its own environment until the hook reads a fixed file.
 #   none       No limits: exclusive devices only. The default without hamiCore.
+# The cuda_open plugin needs `pluginConfig: {device_injector: cdi}` (a DRA node has no Docker to
+# probe); the chart fails without it.
 baiDra:
   driverImage:
     repository: lablup/bai-dra-driver
@@ -171,12 +175,14 @@ baiDra:
 #  - name: fgpu
 #    driverName: cuda-shares.dra.backend.ai
 #    plugin: ai.backend.accelerator.cuda_open.plugin:CUDAPlugin
+#    pluginConfig: {device_injector: cdi}     # required for cuda_open
 #    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/sharing-mode: fraction}
 #    runtimeClassName: nvidia                 # a plugin that reads the driver library (NVML)
 #    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
 #    shared: true                             # needs DRAConsumableCapacity
 #    isolation: hami-core
 #    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
+#    gpu: true                                # default for shared entries and CUDA plugins
 #    priorityClassName: system-node-critical  # per entry, overrides baiDra.priorityClassName
 #    driverResources: {}                      # per entry, overrides baiDra.resources.driver
 #    pluginHostResources: {}                  # per entry, overrides baiDra.resources.pluginHost
@@ -300,6 +306,10 @@ managerAccess:
 # allocator per GPU, gpuAllocationPolicy consistency, gates).
 preflight:
   enabled: true
+  # On a fresh install the bai-dra DaemonSets register after the Job starts: while the only
+  # failures are drivers without ResourceSlices, the checks are retried this long. Keep it
+  # below helm's --timeout (default 5m).
+  waitSeconds: 240
 
 # The kueue scheduler adapter (a resource group's driver_opts.scheduler = "kueue"). Kueue itself is
 # installed separately; with `manage`, this chart creates its ResourceFlavor and ClusterQueue.
@@ -317,7 +327,12 @@ nodeHelper:
     tag: ""
     digest: ""
   # An existing Secret with the shared token of the helpers and the gateway (create it first:
-  # kubectl create secret generic node-helper-token --from-literal=token=$(openssl rand -hex 32)).
+  # kubectl create secret generic backendai-node-helper-token --from-literal=token=$(openssl rand -hex 32)).
+  # Upgrading a release that generated `node-helper-token` (chart versions before the token
+  # moved out of the chart): helm deletes that Secret on upgrade. Create the Secret under another
+  # name, or keep the old one with
+  #   kubectl annotate secret node-helper-token helm.sh/resource-policy=keep
+  # before upgrading.
   tokenSecret: {name: "", key: token}
   port: 6090
   priorityClassName: ""

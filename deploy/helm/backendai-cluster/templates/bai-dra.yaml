@@ -109,6 +109,9 @@ spec:
 {{- if and (eq $isolation "hami-core") (not .hamiCore) }}
 {{- fail (printf "baiDra.drivers %s: isolation hami-core needs hamiCore (image, libDir)" $name) }}
 {{- end }}
+{{- if and (contains "accelerator.cuda_open." (.plugin | default "")) (ne ((.pluginConfig | default dict).device_injector | default "") "cdi") }}
+{{- fail (printf "baiDra.drivers %s: the cuda_open plugin needs pluginConfig.device_injector: cdi (a DRA node has no Docker)" $name) }}
+{{- end }}
 {{- if and .shared (eq $policy "device-plugin") }}
 {{- fail (printf "baiDra.drivers %s: gpuAllocationPolicy device-plugin has no fraction (shared) pool" $name) }}
 {{- end }}
@@ -166,7 +169,7 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      # Never on a node whose GPUs the device plugin or another driver allocates.
+      # A GPU entry never runs on a node whose GPUs the device plugin or another driver allocates.
       affinity:
         {{- include "backendai-cluster.baiDraAffinity" (dict "root" $ "driver" .) | nindent 8 }}
       {{- with .tolerations }}
@@ -175,12 +178,17 @@ spec:
       {{- end }}
       {{- if eq $isolation "hami-core" }}
       initContainers:
-        # HAMi-core's preload library goes to the node: CDI mounts it read-only into shared containers.
+        # HAMi-core's preload library goes to the node: CDI mounts it read-only into shared
+        # containers. A rename, not an overwrite: running containers keep the file they mapped.
         - name: hami-core
           image: {{ required "hamiCore.image is required" .hamiCore.image }}
-          command: [sh, -c]
+          command: [sh, -ec]
           args:
-            - cp /k8s-vgpu/lib/nvidia/libvgpu.so.* /host/libvgpu.so && echo /usr/local/vgpu/libvgpu.so > /host/ld.so.preload
+            - >-
+              cp /k8s-vgpu/lib/nvidia/libvgpu.so.* /host/.libvgpu.so.tmp &&
+              mv -f /host/.libvgpu.so.tmp /host/libvgpu.so &&
+              echo /usr/local/vgpu/libvgpu.so > /host/.ld.so.preload.tmp &&
+              mv -f /host/.ld.so.preload.tmp /host/ld.so.preload
           volumeMounts:
             - {name: hami-core, mountPath: /host}
       {{- end }}

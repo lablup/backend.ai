@@ -59,6 +59,7 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   backoffLimit: 0
+  activeDeadlineSeconds: {{ add (int .Values.preflight.waitSeconds) 120 }}
   template:
     spec:
       serviceAccountName: preflight
@@ -70,4 +71,6 @@ spec:
           env:
             - {name: HOME, value: /tmp}
             {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
+            - {name: BACKENDAI_PREFLIGHT_BAI_GPU_DRIVERS, value: {{ include "backendai-cluster.baiDraGpuDrivers" . | quote }}}
+            - {name: BACKENDAI_PREFLIGHT_WAIT_SECONDS, value: {{ .Values.preflight.waitSeconds | quote }}}
 {{- end }}

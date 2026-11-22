@@ -2,6 +2,7 @@
 cluster, run as a Helm hook Job. Exits non-zero when a required check fails.
 
 python -m ai.backend.kube.preflight [--json] [--gpu-allocation-policy dra|device-plugin]
+    [--bai-gpu-drivers <driver,...>] [--wait-seconds <n>]
 """
 
 from __future__ import annotations
@@ -10,7 +11,8 @@ import asyncio
 import enum
 import json
 import sys
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any, Final
 
@@ -28,6 +30,7 @@ from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
 DRIVER_MODE_LABEL: Final = "dra.backend.ai/driver-mode"
 NVIDIA_DRA_DRIVER: Final = "gpu.nvidia.com"
 NVIDIA_EXTENDED_RESOURCE: Final = "nvidia.com/gpu"
+RETRY_INTERVAL_SECONDS: Final = 10.0
 _CRDS: Final[Sequence[type[CustomResource]]] = (
     SessionWorkload,
     StorageBinding,
@@ -49,6 +52,8 @@ class Check:
     name: str
     outcome: Outcome
     detail: str
+    # Fails only until the bai-dra DaemonSets have registered (a fresh install): retried.
+    transient: bool = False
 
 
 def check_crds(served: Mapping[str, Sequence[str]]) -> list[Check]:
@@ -90,6 +95,7 @@ def check_dra_drivers(
                 ", ".join(sorted(drivers))
                 if drivers
                 else "no ResourceSlice (driver not registered)",
+                transient=not drivers,
             )
         )
     all_drivers = {d for ds in published.values() for d in ds}
@@ -126,15 +132,30 @@ def _nvidia_dra_devices(slices: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def _gpu_driver_nodes(slices: Sequence[Mapping[str, Any]], drivers: Collection[str]) -> set[str]:
+    return {
+        rs["spec"]["nodeName"]
+        for rs in slices
+        if rs.get("spec", {}).get("driver") in drivers and rs["spec"].get("nodeName")
+    }
+
+
 def check_bai_node_ownership(
-    nodes: Sequence[Mapping[str, Any]], slices: Sequence[Mapping[str, Any]]
+    nodes: Sequence[Mapping[str, Any]],
+    slices: Sequence[Mapping[str, Any]],
+    gpu_drivers: Collection[str] | None = None,
 ) -> list[Check]:
-    """A `driver-mode=bai` node's GPUs have no other allocator (device plugin, NVIDIA DRA driver)."""
+    """A node where bai-dra allocates GPUs has no other GPU allocator (device plugin, NVIDIA DRA
+    driver). `gpu_drivers`: the bai-dra drivers of GPUs (None: every `driver-mode=bai` node);
+    a node whose bai-dra devices are NPUs may keep its GPUs on another allocator."""
     nvidia_dra = _nvidia_dra_devices(slices)
+    gpu_nodes = None if gpu_drivers is None else _gpu_driver_nodes(slices, gpu_drivers)
     checks = []
     for node in nodes:
         meta = node["metadata"]
         if (meta.get("labels") or {}).get(DRIVER_MODE_LABEL) != "bai":
+            continue
+        if gpu_nodes is not None and meta["name"] not in gpu_nodes:
             continue
         others = []
         if (count := _gpu_allocatable(node)) > 0:
@@ -216,11 +237,20 @@ def check_consumable_capacity(
             "shared devices published"
             if shared
             else "fraction profile but no device allows multiple allocations (feature gate off?)",
+            transient=not shared,
         )
     ]
 
 
-async def run_checks(api: client.ApiClient, gpu_policy: str) -> list[Check]:
+def should_retry(checks: Sequence[Check]) -> bool:
+    """Some check failed, and every failure may still pass once the DaemonSets register."""
+    failed = [c for c in checks if c.outcome == Outcome.FAIL]
+    return bool(failed) and all(c.transient for c in failed)
+
+
+async def run_checks(
+    api: client.ApiClient, gpu_policy: str, gpu_drivers: Collection[str] | None = None
+) -> list[Check]:
     ext = client.ApiextensionsV1Api(api)
     core = client.CoreV1Api(api)
     custom = client.CustomObjectsApi(api)
@@ -244,16 +274,24 @@ async def run_checks(api: client.ApiClient, gpu_policy: str) -> list[Check]:
         )["items"]
     nodes = [api.sanitize_for_serialization(n) for n in (await core.list_node()).items]
     checks += check_dra_drivers(nodes, slices, profiles)
-    checks += check_bai_node_ownership(nodes, slices)
+    checks += check_bai_node_ownership(nodes, slices, gpu_drivers)
     checks.append(check_gpu_policy(gpu_policy, nodes, slices, profiles))
     checks += check_consumable_capacity(profiles, slices)
     return checks
 
 
-async def _main(as_json: bool, gpu_policy: str) -> int:
+async def _main(
+    as_json: bool, gpu_policy: str, gpu_drivers: Collection[str] | None, wait_seconds: float
+) -> int:
     await load_kube_config()
+    deadline = time.monotonic() + wait_seconds
     async with client.ApiClient() as api:
-        checks = await run_checks(api, gpu_policy)
+        while True:
+            checks = await run_checks(api, gpu_policy, gpu_drivers)
+            if not should_retry(checks) or time.monotonic() >= deadline:
+                break
+            click.echo("waiting for the bai-dra drivers to register", err=True)
+            await asyncio.sleep(RETRY_INTERVAL_SECONDS)
     if as_json:
         click.echo(json.dumps([asdict(c) for c in checks], indent=2))
     else:
@@ -271,9 +309,27 @@ async def _main(as_json: bool, gpu_policy: str) -> int:
     default=GPUAllocationPolicy.DRA.value,
     help="Who allocates NVIDIA GPUs: dra (the NVIDIA DRA driver) or device-plugin.",
 )
-def main(as_json: bool, gpu_policy: str) -> None:
+@click.option(
+    "--bai-gpu-drivers",
+    envvar="BACKENDAI_PREFLIGHT_BAI_GPU_DRIVERS",
+    default=None,
+    help="Comma-separated bai-dra drivers of GPUs. Unset: check every driver-mode=bai node.",
+)
+@click.option(
+    "--wait-seconds",
+    envvar="BACKENDAI_PREFLIGHT_WAIT_SECONDS",
+    type=click.FloatRange(min=0),
+    default=0,
+    help="Retry this long while the only failures are drivers that have not registered yet.",
+)
+def main(as_json: bool, gpu_policy: str, bai_gpu_drivers: str | None, wait_seconds: float) -> None:
     quiet_client_logs()
-    sys.exit(asyncio.run(_main(as_json, gpu_policy)))
+    gpu_drivers = (
+        None
+        if bai_gpu_drivers is None
+        else [d.strip() for d in bai_gpu_drivers.split(",") if d.strip()]
+    )
+    sys.exit(asyncio.run(_main(as_json, gpu_policy, gpu_drivers, wait_seconds)))
 
 
 if __name__ == "__main__":

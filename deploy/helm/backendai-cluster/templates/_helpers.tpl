@@ -93,13 +93,27 @@ none
 {{- end -}}
 
 {{/*
-Node affinity of a bai-dra DaemonSet: the entry's affinity or nodeSelector, plus NotIn on the
-labels of nodes whose GPUs another allocator owns. (dict "root" $ "driver" <baiDra.drivers entry>)
+"true" when a bai-dra driver entry allocates GPUs: `gpu`, else a shared entry or a CUDA plugin.
+Only GPU entries take part in the single-GPU-allocator rules (excludeNodeLabels, pre-flight).
+*/}}
+{{- define "backendai-cluster.baiDraGpu" -}}
+{{- if hasKey . "gpu" -}}
+{{- if .gpu }}true{{ end -}}
+{{- else if or .shared (regexMatch "^ai[.]backend[.]accelerator[.]cuda(_open|_unified)?[.:]" (.plugin | default "")) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Node affinity of a bai-dra DaemonSet: the entry's affinity or nodeSelector, plus, for a GPU entry,
+NotIn on the labels of nodes whose GPUs another allocator owns. (dict "root" $ "driver" <entry>)
 */}}
 {{- define "backendai-cluster.baiDraAffinity" -}}
 {{- $exclude := list -}}
+{{- if include "backendai-cluster.baiDraGpu" .driver -}}
 {{- range $key, $values := .root.Values.baiDra.excludeNodeLabels -}}
 {{- $exclude = append $exclude (dict "key" $key "operator" "NotIn" "values" $values) -}}
+{{- end -}}
 {{- end -}}
 {{- $affinity := deepCopy (.driver.affinity | default dict) -}}
 {{- $nodeAffinity := $affinity.nodeAffinity | default dict -}}
@@ -113,4 +127,15 @@ labels of nodes whose GPUs another allocator owns. (dict "root" $ "driver" <baiD
 {{- $_ = set $nodeAffinity "requiredDuringSchedulingIgnoredDuringExecution" $required -}}
 {{- $_ = set $affinity "nodeAffinity" $nodeAffinity -}}
 {{- toYaml $affinity -}}
+{{- end -}}
+
+{{/* Comma-separated driver names of the GPU entries of baiDra.drivers (pre-flight). */}}
+{{- define "backendai-cluster.baiDraGpuDrivers" -}}
+{{- $drivers := list -}}
+{{- range .Values.baiDra.drivers -}}
+{{- if include "backendai-cluster.baiDraGpu" . -}}
+{{- $drivers = append $drivers .driverName -}}
+{{- end -}}
+{{- end -}}
+{{- uniq $drivers | join "," -}}
 {{- end -}}

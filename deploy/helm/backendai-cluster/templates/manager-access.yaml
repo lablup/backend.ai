@@ -104,9 +104,13 @@ spec:
         apiVersions: ["v1"]
         operations: ["CREATE", "UPDATE"]
         resources: ["rolebindings"]
+  # The upgrade hook that binds the roles in existing namespaces (namespace-bindings.yaml) too.
   matchConditions:
     - name: manager
-      expression: request.userInfo.username == "system:serviceaccount:{{ $ns }}:backendai-manager"
+      expression: >-
+        request.userInfo.username in [
+        "system:serviceaccount:{{ $ns }}:backendai-manager",
+        "system:serviceaccount:{{ $ns }}:backendai-namespace-bindings"]
   # Variables are evaluated lazily: each is read only where it applies.
   variables:
     - name: pairs

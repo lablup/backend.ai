@@ -1,0 +1,142 @@
+{{- $ns := .Release.Namespace }}
+{{- $hook := dict "helm.sh/hook" "post-install,post-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+# Releases before the per-namespace roles granted the components their rights cluster-wide:
+# after an upgrade, the session namespaces that exist get the RoleBindings that the Manager's
+# ensure_namespace creates in new ones (backendai-manager-scope admits only those).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backendai-namespace-bindings
+  namespace: {{ $ns }}
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+    helm.sh/hook-weight: "-1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-namespace-bindings
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+    helm.sh/hook-weight: "-1"
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames:
+      - backendai-session-controller-namespaced
+      - backendai-session-gateway-namespaced
+      - backendai-manager-namespaced
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-namespace-bindings
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+    helm.sh/hook-weight: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-namespace-bindings
+subjects:
+  - {kind: ServiceAccount, name: backendai-namespace-bindings, namespace: {{ $ns }}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backendai-namespace-bindings
+  namespace: {{ $ns }}
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+    helm.sh/hook-weight: "-1"
+data:
+  # The bindings of ComputeClusterClient.ensure_namespace (SESSION_NAMESPACE_BINDINGS).
+  bind.py: |
+    import asyncio
+
+    from kubernetes_asyncio import client, config
+    from kubernetes_asyncio.client.exceptions import ApiException
+
+    SYSTEM_NAMESPACE = {{ $ns | quote }}
+    LABELS = {"app.kubernetes.io/managed-by": "backendai-manager"}
+    BINDINGS = [
+        ("backendai-session-controller", "backendai-session-controller-namespaced", "session-controller"),
+        ("backendai-session-gateway", "backendai-session-gateway-namespaced", "session-gateway"),
+        ("backendai-manager", "backendai-manager-namespaced", "backendai-manager"),
+    ]
+
+
+    async def main() -> None:
+        config.load_incluster_config()
+        async with client.ApiClient() as api:
+            core, rbac = client.CoreV1Api(api), client.RbacAuthorizationV1Api(api)
+            selector = ",".join(f"{k}={v}" for k, v in LABELS.items())
+            namespaces = (await core.list_namespace(label_selector=selector)).items
+            for ns in namespaces:
+                name = ns.metadata.name
+                for binding, role, account in BINDINGS:
+                    subjects = [{"kind": "ServiceAccount", "name": account, "namespace": SYSTEM_NAMESPACE}]
+                    body = {
+                        "apiVersion": "rbac.authorization.k8s.io/v1",
+                        "kind": "RoleBinding",
+                        "metadata": {"name": binding, "namespace": name, "labels": LABELS},
+                        "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": role},
+                        "subjects": subjects,
+                    }
+                    try:
+                        await rbac.create_namespaced_role_binding(name, body)
+                    except ApiException as e:
+                        if e.status != 409:
+                            raise
+                        patch = {"metadata": {"labels": LABELS}, "subjects": subjects}
+                        await rbac.patch_namespaced_role_binding(
+                            binding, name, patch, _content_type="application/merge-patch+json"
+                        )
+            print(f"bound the session roles in {len(namespaces)} namespaces")
+
+
+    asyncio.run(main())
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backendai-namespace-bindings
+  namespace: {{ $ns }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      serviceAccountName: backendai-namespace-bindings
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bind
+          image: {{ include "backendai-cluster.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python, /scripts/bind.py]
+          env:
+            - {name: HOME, value: /tmp}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+      volumes:
+        - name: scripts
+          configMap: {name: backendai-namespace-bindings}
