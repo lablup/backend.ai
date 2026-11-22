@@ -9,9 +9,14 @@ from __future__ import annotations
 import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from ai.backend.kube.crd.device import GPUAllocationPolicy
+from ai.backend.kube.crd.session import (
+    SessionGroupAdmission,
+    SessionGroupDirection,
+    SessionGroupEnforcement,
+)
 
 if TYPE_CHECKING:
     from ai.backend.kube.scheduler.selection import NodeSelector
@@ -22,6 +27,11 @@ class SkipReason(enum.StrEnum):
     UNSCHEDULABLE = "Unschedulable"
     RESERVED = "WaitingForEarlierGroup"
     UNSUPPORTED = "Unsupported"
+    WAITING_FOR_GROUP_MEMBERS = "WaitingForGroupMembers"
+    GROUP_DOES_NOT_FIT = "GroupDoesNotFit"
+
+
+_SHARES_UNSUPPORTED: Final = "device shares need the bai or nvidia-dra GPU allocation policy"
 
 
 @dataclass(frozen=True)
@@ -94,6 +104,21 @@ class Toleration:
         return self.operator == "Exists" or self.value == taint.value
 
 
+@dataclass(frozen=True)
+class GroupPolicy:
+    """The SessionGroup of a session and its placement policy (BEP-1064, BEP-1083)."""
+
+    id: str
+    direction: SessionGroupDirection = SessionGroupDirection.NONE
+    enforcement: SessionGroupEnforcement = SessionGroupEnforcement.PREFERRED
+    admission: SessionGroupAdmission = SessionGroupAdmission.INDEPENDENT
+    member_count: int | None = None
+
+    @property
+    def all_or_none(self) -> bool:
+        return self.admission == SessionGroupAdmission.ALL_OR_NONE
+
+
 @dataclass
 class NodeState:
     name: str
@@ -111,10 +136,21 @@ class NodeState:
     # Devices with `shares` capacity: driver → device → shares
     share_capacity: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
     share_used: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
+    # SessionGroup id → sessions of the group with a kernel on the node
+    group_members: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
     @property
     def free(self) -> Resources:
         return self.allocatable - self.used
+
+    def member_count(self, group_id: str, session: str) -> int:
+        """Other sessions of the group on the node: a session does not count against itself."""
+        return len(self.group_members.get(group_id, frozenset()) - {session})
+
+    def add_member(self, group_id: str, session: str) -> None:
+        members = dict(self.group_members)
+        members[group_id] = members.get(group_id, frozenset()) | {session}
+        self.group_members = members
 
     def has_devices(self, demand: Mapping[str, int], shared: Mapping[str, int]) -> bool:
         """Free whole devices for `demand`; for `shared`, only that the devices exist."""
@@ -221,6 +257,20 @@ class PendingGroup:
     placed_members: int = 0  # members bound or with a bind in flight
     placed_nodes: Sequence[str] = ()  # nodes of those members
     session_id: str | None = None
+    session_group: GroupPolicy | None = None
+    # Sessions of an all_or_none group whose SessionWorkload and every kernel Pod exist
+    group_ready: int = 0
+
+    @property
+    def member(self) -> str:
+        """The session as a member of its SessionGroup, as kernel Pods label it."""
+        return self.session_id or f"{self.namespace}/{self.name}"
+
+    @property
+    def unit(self) -> str | None:
+        """The all_or_none SessionGroup placed together with this session, if any."""
+        group = self.session_group
+        return group.id if group is not None and group.all_or_none else None
 
 
 @dataclass(frozen=True)
@@ -256,10 +306,22 @@ def _fits(node: NodeState, pod: PendingPod) -> bool:
 
 
 def _choose(
-    nodes: Sequence[NodeState], pod: PendingPod, selector: NodeSelector, session_id: str | None
+    nodes: Sequence[NodeState],
+    pod: PendingPod,
+    selector: NodeSelector,
+    group: PendingGroup,
+    world: Sequence[NodeState],
 ) -> NodeState | None:
-    """The node the sokovan_core strategy picks among those the Pod fits on."""
-    return selector.choose([n for n in nodes if _fits(n, pod)], pod, session_id)
+    """The node the sokovan_core strategy picks among those the Pod fits on; `world` holds
+    every node, for the SessionGroup members placed so far."""
+    return selector.choose(
+        [n for n in nodes if _fits(n, pod)],
+        pod,
+        group.session_id,
+        group=group.session_group,
+        member=group.member,
+        world=world,
+    )
 
 
 def _domains(nodes: Sequence[NodeState], levels: Sequence[str]) -> list[list[NodeState]]:
@@ -275,7 +337,10 @@ def _domains(nodes: Sequence[NodeState], levels: Sequence[str]) -> list[list[Nod
 
 
 def _place_gang(
-    nodes: Sequence[NodeState], group: PendingGroup, selector: NodeSelector
+    nodes: Sequence[NodeState],
+    group: PendingGroup,
+    selector: NodeSelector,
+    world: Sequence[NodeState],
 ) -> dict[str, str] | None:
     """The first topology domain that takes every pod of the group; members already placed
     fix the domain."""
@@ -289,24 +354,37 @@ def _place_gang(
     for domain in _domains(nodes, levels):
         if levels and joined and {tuple(domain[0].labels[lv] for lv in levels)} != joined:
             continue
-        placed = _place_in(domain, group, selector)
+        placed = _place_in(domain, group, selector, world)
         if placed is not None:
             return placed
     return None
 
 
+def _commit(original: NodeState, tried: NodeState) -> None:
+    original.used = tried.used
+    original.devices_used = tried.devices_used
+    original.extended_used = tried.extended_used
+    original.share_used = tried.share_used
+    original.group_members = tried.group_members
+
+
 def _place_in(
-    nodes: Sequence[NodeState], group: PendingGroup, selector: NodeSelector
+    nodes: Sequence[NodeState],
+    group: PendingGroup,
+    selector: NodeSelector,
+    world: Sequence[NodeState],
 ) -> dict[str, str] | None:
     """Place every pod of the group on a tentative copy; nothing changes unless all fit."""
     trial = [replace(n) for n in nodes]
+    tried = {n.name: n for n in trial}
+    view = [tried.get(n.name, n) for n in world]
     placed: dict[str, str] = {}
 
     def size(p: PendingPod) -> tuple[int, int, int]:
         return (-sum(p.devices.values()), -p.requests.cpu_milli, -p.requests.memory)
 
     for pod in sorted(group.pods, key=size):
-        node = _choose(trial, pod, selector, group.session_id)
+        node = _choose(trial, pod, selector, group, view)
         if node is None:
             return None
         node.used = node.used + pod.requests
@@ -314,12 +392,11 @@ def _place_in(
         node.take_extended(pod.extended)
         if pod.share_claims:
             node.take_shares(node.fit_shares(pod.share_claims) or {})
+        if group.session_group is not None:
+            node.add_member(group.session_group.id, group.member)
         placed[pod.name] = node.name
-    for original, tried in zip(nodes, trial, strict=True):
-        original.used = tried.used
-        original.devices_used = tried.devices_used
-        original.extended_used = tried.extended_used
-        original.share_used = tried.share_used
+    for original, node in zip(nodes, trial, strict=True):
+        _commit(original, node)
     return placed
 
 
@@ -327,10 +404,136 @@ def _empty(node: NodeState) -> NodeState:
     return replace(node, used=Resources(), devices_used={}, extended_used={}, share_used={})
 
 
-def _would_fit_when_idle(
-    nodes: Sequence[NodeState], group: PendingGroup, selector: NodeSelector
-) -> bool:
-    return _place_gang([_empty(n) for n in nodes], group, selector) is not None
+def _place_unit(
+    usable: Sequence[NodeState],
+    world: Sequence[NodeState],
+    unit: Sequence[PendingGroup],
+    selector: NodeSelector,
+) -> list[dict[str, str]] | None:
+    """Place every session of the unit on tentative copies of `world`, in order; nothing
+    changes unless all fit. Later sessions count the earlier ones as group members."""
+    trial = [replace(n) for n in world]
+    tried = {n.name: n for n in trial}
+    usable_trial = [tried[n.name] for n in usable]
+    placements = []
+    for group in unit:
+        placed = _place_gang(usable_trial, group, selector, trial)
+        if placed is None:
+            return None
+        placements.append(placed)
+    for original, node in zip(world, trial, strict=True):
+        _commit(original, node)
+    return placements
+
+
+def _order(g: PendingGroup) -> tuple[int, str, str, str]:
+    return (-g.priority, g.created_at, g.namespace, g.name)
+
+
+def _units(groups: Sequence[PendingGroup]) -> list[list[PendingGroup]]:
+    """Sessions in placement order; the pending sessions of an all_or_none SessionGroup form
+    one unit, ordered by its highest priority, then its oldest SessionWorkload."""
+    by_unit: dict[str, list[PendingGroup]] = {}
+    units: list[list[PendingGroup]] = []
+    for group in sorted(groups, key=_order):
+        if group.unit is None:
+            units.append([group])
+        elif group.unit in by_unit:
+            by_unit[group.unit].append(group)
+        else:
+            by_unit[group.unit] = [group]
+            units.append(by_unit[group.unit])
+
+    def key(unit: list[PendingGroup]) -> tuple[int, str, str, str]:
+        return (
+            -max(g.priority for g in unit),
+            min(g.created_at for g in unit),
+            unit[0].namespace,
+            unit[0].name,
+        )
+
+    return sorted(units, key=key)
+
+
+@dataclass
+class _Cycle:
+    """The state one `schedule` call carries from unit to unit."""
+
+    nodes: Sequence[NodeState]
+    selector: NodeSelector
+    policy: GPUAllocationPolicy
+    # The first unit that does not fit now but would on idle nodes, and the nodes it keeps
+    head: tuple[PendingGroup, frozenset[str]] | None = None
+
+    def usable(self) -> Sequence[NodeState]:
+        if self.head is None:
+            return self.nodes
+        kept = self.head[1]
+        return [n for n in self.nodes if n.name not in kept]
+
+    def unsupported(self, unit: Sequence[PendingGroup]) -> bool:
+        return self.policy == GPUAllocationPolicy.DEVICE_PLUGIN and any(
+            p.share_claims for g in unit for p in g.pods
+        )
+
+    def blocked(self, unit: Sequence[PendingGroup]) -> str | None:
+        """Why a unit that does not fit now waits behind the head; otherwise it becomes the
+        head if it would fit on idle nodes, and None is returned."""
+        if self.head is not None:
+            copies = [replace(n) for n in self.nodes]
+            if _place_unit(copies, copies, unit, self.selector) is None:
+                return None
+            head = self.head[0]
+            return f"waiting behind {head.namespace}/{head.name}, which goes first"
+        idle = [_empty(n) for n in self.nodes]
+        if _place_unit(idle, idle, unit, self.selector) is not None:
+            keeps = frozenset(
+                n.name for n in self.nodes if any(_eligible(n, p) for g in unit for p in g.pods)
+            )
+            self.head = (unit[0], keeps)
+        return None
+
+    def one(self, group: PendingGroup) -> Placement | Skip:
+        present = len(group.pods) + group.placed_members
+        if present < group.min_member:
+            return Skip(
+                group, SkipReason.WAITING_FOR_PODS, f"{present} of {group.min_member} pods exist"
+            )
+        if self.unsupported([group]):
+            return Skip(group, SkipReason.UNSUPPORTED, _SHARES_UNSUPPORTED)
+        placed = _place_gang(self.usable(), group, self.selector, self.nodes)
+        if placed is not None:
+            return Placement(group, placed)
+        if (message := self.blocked([group])) is not None:
+            return Skip(group, SkipReason.RESERVED, message)
+        return Skip(group, SkipReason.UNSCHEDULABLE, "not every pod of the group fits now")
+
+    def all_or_none(
+        self, unit: Sequence[PendingGroup], policy: GroupPolicy
+    ) -> list[Placement | Skip]:
+        def skip(reason: SkipReason, message: str) -> list[Placement | Skip]:
+            return [Skip(g, reason, message) for g in unit]
+
+        if policy.member_count is None:
+            return skip(SkipReason.UNSUPPORTED, "all_or_none admission needs memberCount")
+        ready = unit[0].group_ready
+        incomplete = any(len(g.pods) + g.placed_members < g.min_member for g in unit)
+        if ready < policy.member_count or incomplete:
+            return skip(
+                SkipReason.WAITING_FOR_GROUP_MEMBERS,
+                f"{ready} of {policy.member_count} sessions of group {policy.id} have every"
+                " kernel Pod",
+            )
+        if self.unsupported(unit):
+            return skip(SkipReason.UNSUPPORTED, _SHARES_UNSUPPORTED)
+        placements = _place_unit(self.usable(), self.nodes, unit, self.selector)
+        if placements is not None:
+            return [Placement(g, p) for g, p in zip(unit, placements, strict=True)]
+        if (message := self.blocked(unit)) is not None:
+            return skip(SkipReason.RESERVED, message)
+        return skip(
+            SkipReason.GROUP_DOES_NOT_FIT, f"not every session of group {policy.id} fits now"
+        )
 
 
 def schedule(
@@ -340,55 +543,17 @@ def schedule(
     policy: GPUAllocationPolicy = GPUAllocationPolicy.BAI,
 ) -> list[Placement | Skip]:
     """Place the pending groups in order: higher priority, then the older SessionWorkload,
-    then the name.
+    then the name. An all_or_none SessionGroup places all its pending sessions or none.
 
     The first group that does not fit now, but would on idle nodes, keeps the nodes it can
     use: later groups may only use other nodes, so it is not starved.
     """
-
-    def order(g: PendingGroup) -> tuple[int, str, str, str]:
-        return (-g.priority, g.created_at, g.namespace, g.name)
-
-    head: tuple[PendingGroup, frozenset[str]] | None = None
+    cycle = _Cycle(nodes, selector, policy)
     results: list[Placement | Skip] = []
-    for group in sorted(groups, key=order):
-        present = len(group.pods) + group.placed_members
-        if present < group.min_member:
-            results.append(
-                Skip(
-                    group,
-                    SkipReason.WAITING_FOR_PODS,
-                    f"{present} of {group.min_member} pods exist",
-                )
-            )
-            continue
-        if policy == GPUAllocationPolicy.DEVICE_PLUGIN and any(p.share_claims for p in group.pods):
-            results.append(
-                Skip(
-                    group,
-                    SkipReason.UNSUPPORTED,
-                    "device shares need the bai or nvidia-dra GPU allocation policy",
-                )
-            )
-            continue
-        usable = nodes if head is None else [n for n in nodes if n.name not in head[1]]
-        placed = _place_gang(usable, group, selector)
-        if placed is None:
-            if head is not None and _place_gang([replace(n) for n in nodes], group, selector):
-                results.append(
-                    Skip(
-                        group,
-                        SkipReason.RESERVED,
-                        f"waiting behind {head[0].namespace}/{head[0].name}, which goes first",
-                    )
-                )
-                continue
-            if head is None and _would_fit_when_idle(nodes, group, selector):
-                keeps = frozenset(n.name for n in nodes if any(_eligible(n, p) for p in group.pods))
-                head = (group, keeps)
-            results.append(
-                Skip(group, SkipReason.UNSCHEDULABLE, "not every pod of the group fits now")
-            )
-            continue
-        results.append(Placement(group, placed))
+    for unit in _units(groups):
+        group_policy = unit[0].session_group
+        if group_policy is not None and group_policy.all_or_none:
+            results.extend(cycle.all_or_none(unit, group_policy))
+        else:
+            results.append(cycle.one(unit[0]))
     return results

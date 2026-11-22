@@ -11,20 +11,23 @@ from decimal import Decimal
 from typing import Any, Final
 
 from kubernetes.utils.quantity import parse_quantity
+from pydantic import ValidationError
 
 from ai.backend.kube.controller.naming import (
     ANNOTATION_DEVICES,
     ANNOTATION_SHARED_DEVICES,
     HOSTNAME_LABEL,
     LABEL_MANAGED_BY,
+    LABEL_SESSION_GROUP,
     LABEL_SESSION_ID,
     MANAGED_BY,
     SOKOVAN_GATE,
     SOKOVAN_SCHEDULER,
 )
 from ai.backend.kube.crd.scheduling import BindRequestPhase
-from ai.backend.kube.crd.session import PlacementPhase, SessionPhase
+from ai.backend.kube.crd.session import PlacementPhase, SessionGroupSpec, SessionPhase
 from ai.backend.kube.scheduler.cycle import (
+    GroupPolicy,
     NodeState,
     PendingGroup,
     PendingPod,
@@ -352,6 +355,7 @@ def build_nodes(
     used: dict[str, Resources] = defaultdict(Resources)
     devices_used: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     extended_used: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    group_members: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for pod in pods:
         target = target_node(pod, in_flight)
         if target is not None and holds_resources(pod):
@@ -360,6 +364,8 @@ def build_nodes(
                 devices_used[target][driver] += count
             for name, count in pod_extended(pod).items():
                 extended_used[target][name] += count
+            if (member := group_member_of(pod)) is not None:
+                group_members[target][member[0]].add(member[1])
     devices: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     share_capacity: dict[str, dict[str, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
     # (driver, pool, device) → (node, slot, device key, shares capacity)
@@ -438,6 +444,7 @@ def build_nodes(
                 extended_used=dict(extended_used[name]),
                 share_capacity={d: dict(v) for d, v in share_capacity[name].items()},
                 share_used={d: dict(v) for d, v in share_used[name].items()},
+                group_members={g: frozenset(v) for g, v in group_members[name].items()},
             )
         )
     # Shares of session claims not allocated yet land where the allocator would put them.
@@ -485,6 +492,35 @@ def session_of(pod: Mapping[str, Any], sessions: SessionIndex) -> str | None:
     return sessions.get((meta.get("namespace", ""), labels[LABEL_SESSION_ID]))
 
 
+def group_member_of(pod: Mapping[str, Any]) -> tuple[str, str] | None:
+    """(SessionGroup id, session id) of a kernel Pod in a SessionGroup."""
+    labels = pod["metadata"].get("labels") or {}
+    if labels.get(LABEL_MANAGED_BY) != MANAGED_BY:
+        return None
+    group, session = labels.get(LABEL_SESSION_GROUP), labels.get(LABEL_SESSION_ID)
+    if not group or not session:
+        return None
+    return str(group), str(session)
+
+
+def session_group_of(spec: Mapping[str, Any]) -> GroupPolicy | None:
+    """The SessionGroup policy of a SessionWorkload spec; None without a valid one."""
+    raw = spec.get("sessionGroup")
+    if not raw:
+        return None
+    try:
+        group = SessionGroupSpec.model_validate(raw)
+    except ValidationError:
+        return None
+    return GroupPolicy(
+        id=group.id,
+        direction=group.direction,
+        enforcement=group.enforcement,
+        admission=group.admission,
+        member_count=group.member_count,
+    )
+
+
 def required_levels(spec: Mapping[str, Any]) -> list[str]:
     """A single-node session keeps all its kernels on one node, as on one Agent."""
     single = spec.get("clusterMode", "single-node") == "single-node"
@@ -514,12 +550,14 @@ def build_pending_groups(
     }
     gated: dict[SessionKey, list[PendingPod]] = defaultdict(list)
     placed: dict[SessionKey, list[str]] = defaultdict(list)
+    present: dict[SessionKey, int] = defaultdict(int)
     for pod in pods:
         meta = pod["metadata"]
         session = session_of(pod, sessions)
         if session is None or meta.get("deletionTimestamp") or not holds_resources(pod):
             continue
         key = (meta["namespace"], session)
+        present[key] += 1
         if (node := target_node(pod, in_flight)) is not None:
             placed[key].append(node)
             continue
@@ -544,11 +582,26 @@ def build_pending_groups(
                 share_claims=pod_share_claims(pod, claims, profiles),
             )
         )
+    # Per all_or_none SessionGroup: its sessions whose every kernel Pod exists
+    ready: dict[str, int] = defaultdict(int)
+    for workload in workloads:
+        meta, spec = workload["metadata"], workload.get("spec") or {}
+        group = session_group_of(spec)
+        if (
+            group is not None
+            and group.all_or_none
+            and is_sokovan_session(workload)
+            and not meta.get("deletionTimestamp")
+            and (workload.get("status") or {}).get("phase") not in _UNPLACEABLE_PHASES
+            and present[meta["namespace"], meta["name"]] >= len(spec.get("kernels") or [])
+        ):
+            ready[group.id] += 1
     groups = []
     for workload in workloads:
         meta, spec = workload["metadata"], workload.get("spec") or {}
         key = (meta["namespace"], meta["name"])
         phase = (workload.get("status") or {}).get("phase")
+        group = session_group_of(spec)
         # A placed session whose Pods wait again lost a member's bind (binder failure,
         # timeout): only the missing members are placed.
         if key not in gated or meta.get("deletionTimestamp") or phase in _UNPLACEABLE_PHASES:
@@ -565,6 +618,8 @@ def build_pending_groups(
                 placed_members=len(placed[key]),
                 placed_nodes=sorted(set(placed[key])),
                 session_id=spec.get("sessionId"),
+                session_group=group,
+                group_ready=ready[group.id] if group is not None else 0,
             )
         )
     return groups

@@ -15,23 +15,32 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AgentId, AgentSelectionStrategy, ArchName, SessionId
 from ai.backend.sokovan_core.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.sokovan_core.selectors.dispersed import DispersedAgentSelector
 from ai.backend.sokovan_core.selectors.filters.exclusion.architecture import (
     ArchitectureTrackerFilter,
 )
+from ai.backend.sokovan_core.selectors.filters.exclusion.session_group_strict import (
+    SessionGroupStrictTrackerFilter,
+)
 from ai.backend.sokovan_core.selectors.filters.stateful.resource import ResourceTrackerFilter
+from ai.backend.sokovan_core.selectors.orders.session_group import SessionGroupOrder
 from ai.backend.sokovan_core.selectors.roundrobin import RoundRobinAgentSelector
 from ai.backend.sokovan_core.selectors.selector import AbstractAgentSelector, AgentSelectionCriteria
 from ai.backend.sokovan_core.selectors.tracker import AgentStateTracker
 from ai.backend.sokovan_core.selectors.types import ResourceRequirements
 from ai.backend.sokovan_core.types.agent import AgentInfo, AgentLimit, AgentResource, SlotResource
-from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
-from ai.backend.sokovan_core.types.workload import ResourceRequest
+from ai.backend.sokovan_core.types.policy import (
+    AgentSelectionPolicy,
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
+from ai.backend.sokovan_core.types.workload import ResourceRequest, SessionGroupPolicy
 
 if TYPE_CHECKING:
-    from ai.backend.kube.scheduler.cycle import NodeState, PendingPod
+    from ai.backend.kube.scheduler.cycle import GroupPolicy, NodeState, PendingPod
 
 ARCH_LABEL: Final = "kubernetes.io/arch"
 CPU_SLOT: Final = "cpu"
@@ -101,14 +110,32 @@ def pod_request(pod: PendingPod, slot_names: Sequence[str]) -> ResourceRequest:
     return ResourceRequest(slots={ResourceSlotName(k): v for k, v in slots.items()})
 
 
+def group_policy(group: GroupPolicy | None) -> SessionGroupPolicy | None:
+    """The SessionGroup policy as the sokovan_core selectors take it; None without one."""
+    if group is None:
+        return None
+    try:
+        group_id = SessionGroupID(UUID(group.id))
+    except ValueError:
+        return None
+    return SessionGroupPolicy(
+        group_id=group_id,
+        direction=SessionGroupPlacementDirection(group.direction),
+        enforcement=SessionGroupPlacementEnforcement(group.enforcement),
+    )
+
+
 class NodeSelector:
     """Picks one of the nodes that fit a Pod with a sokovan_core strategy; other strategies
-    fall back to concentrated, as in the Manager's strategy pool."""
+    fall back to concentrated, as in the Manager's strategy pool. A SessionGroup applies
+    first, per node: strict as a filter, then preferred as an order (BEP-1064)."""
 
     _strategy: AgentSelectionStrategy
     _roundrobin: RoundRobinAgentSelector
     _architecture: ArchitectureTrackerFilter
     _resources: ResourceTrackerFilter
+    _group_strict: SessionGroupStrictTrackerFilter
+    _group_order: SessionGroupOrder
 
     def __init__(self, strategy: AgentSelectionStrategy) -> None:
         self._strategy = strategy
@@ -116,15 +143,26 @@ class NodeSelector:
         self._roundrobin = RoundRobinAgentSelector()
         self._architecture = ArchitectureTrackerFilter()
         self._resources = ResourceTrackerFilter()
+        self._group_strict = SessionGroupStrictTrackerFilter()
+        self._group_order = SessionGroupOrder()
 
     @property
     def strategy(self) -> AgentSelectionStrategy:
         return self._strategy
 
     def choose(
-        self, candidates: Sequence[NodeState], pod: PendingPod, session_id: str | None = None
+        self,
+        candidates: Sequence[NodeState],
+        pod: PendingPod,
+        session_id: str | None = None,
+        *,
+        group: GroupPolicy | None = None,
+        member: str = "",
+        world: Sequence[NodeState] = (),
     ) -> NodeState | None:
-        """One of `candidates` (nodes the Pod fits on), or None if the filters drop them all."""
+        """One of `candidates` (nodes the Pod fits on), or None if the filters drop them all.
+        `world` is every node: the strict filter keeps its pack anchor over all of them, and
+        `member` (the session) does not count as a member of its own group."""
         if not candidates:
             return None
         by_name = {node.name: node for node in candidates}
@@ -144,16 +182,31 @@ class NodeSelector:
             designated_agent_ids=None,
             job_priority=0,
             victim_candidates=None,
-            session_group=None,
+            session_group=group_policy(group),
         )
-        trackers: Sequence[AgentStateTracker] = [
-            AgentStateTracker(original_agent=node_agent(node)) for node in candidates
-        ]
+
+        def tracker(node: NodeState) -> AgentStateTracker:
+            counts = {}
+            if criteria.session_group is not None and group is not None:
+                counts[criteria.session_group.group_id] = node.member_count(group.id, member)
+            return AgentStateTracker(original_agent=node_agent(node), group_member_counts=counts)
+
+        trackers: Sequence[AgentStateTracker] = [tracker(node) for node in candidates]
+        if criteria.session_group is not None:
+            conforming = {
+                str(t.original_agent.agent_id)
+                for t in self._group_strict.filter(
+                    [tracker(node) for node in world or candidates], criteria, requirement
+                )
+            }
+            trackers = [t for t in trackers if str(t.original_agent.agent_id) in conforming]
         if arch:
             trackers = self._architecture.filter(trackers, criteria, requirement)
         trackers = self._resources.filter(trackers, criteria, requirement, _NO_LIMIT)
         if not trackers:
             return None
+        best = min(self._group_order.rank(t, criteria) for t in trackers)
+        trackers = [t for t in trackers if self._group_order.rank(t, criteria) == best]
         picked = self._selector(request).select_tracker_by_strategy(trackers, requirement)
         return by_name[str(picked.original_agent.agent_id)]
 

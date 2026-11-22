@@ -99,6 +99,36 @@ class KernelSpec(CRDModel):
     startup_command: str | None = None
 
 
+class SessionGroupDirection(enum.StrEnum):
+    """How the members of a SessionGroup sit relative to each other, per node (BEP-1064)."""
+
+    SPREAD = "spread"
+    PACK = "pack"
+    NONE = "none"
+
+
+class SessionGroupEnforcement(enum.StrEnum):
+    PREFERRED = "preferred"
+    STRICT = "strict"
+
+
+class SessionGroupAdmission(enum.StrEnum):
+    INDEPENDENT = "independent"
+    ALL_OR_NONE = "all_or_none"
+
+
+class SessionGroupSpec(CRDModel):
+    """The SessionGroup a session belongs to and its placement policy (BEP-1083)."""
+
+    id: str = Field(json_schema_extra=_UUID)
+    direction: SessionGroupDirection = SessionGroupDirection.NONE
+    enforcement: SessionGroupEnforcement = SessionGroupEnforcement.PREFERRED
+    admission: SessionGroupAdmission = SessionGroupAdmission.INDEPENDENT
+    member_count: int | None = Field(
+        default=None, ge=1, description="Members placed together under all_or_none admission"
+    )
+
+
 class SessionWorkloadSpec(CRDModel):
     session_id: str = Field(json_schema_extra=_UUID)
     session_name: str
@@ -123,6 +153,7 @@ class SessionWorkloadSpec(CRDModel):
         ),
     )
     kernels: list[KernelSpec] = Field(min_length=1)
+    session_group: SessionGroupSpec | None = None
 
 
 class KernelStatus(CRDModel):

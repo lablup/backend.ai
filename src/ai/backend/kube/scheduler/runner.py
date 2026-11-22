@@ -73,7 +73,17 @@ _DRA_VERSION: Final = "v1"
 _MAX_NAME: Final = 253
 
 # Skips that leave the session unplaceable as it is; the others wait for something to change.
-_UNSCHEDULABLE: Final = frozenset({SkipReason.UNSCHEDULABLE, SkipReason.UNSUPPORTED})
+_UNSCHEDULABLE: Final = frozenset({
+    SkipReason.UNSCHEDULABLE,
+    SkipReason.UNSUPPORTED,
+    SkipReason.GROUP_DOES_NOT_FIT,
+})
+# Skips of a partly placed gang whose missing members do not fit.
+_STUCK: Final = frozenset({
+    SkipReason.UNSCHEDULABLE,
+    SkipReason.RESERVED,
+    SkipReason.GROUP_DOES_NOT_FIT,
+})
 
 
 def _devices_of(allocation: Mapping[str, Any]) -> list[tuple[str, str, str, str]]:
@@ -142,6 +152,33 @@ def bind_request_name(pod: Mapping[str, Any]) -> str:
 
 def _rfc3339(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def batches(results: Sequence[Placement | Skip]) -> list[list[Placement] | Skip]:
+    """Results in order, with the placements of one all_or_none SessionGroup in one batch:
+    they are started together or not at all."""
+    out: list[list[Placement] | Skip] = []
+    by_unit: dict[str, list[Placement]] = {}
+    for result in results:
+        if isinstance(result, Skip):
+            out.append(result)
+        elif (unit := result.group.unit) is None:
+            out.append([result])
+        elif unit in by_unit:
+            by_unit[unit].append(result)
+        else:
+            by_unit[unit] = [result]
+            out.append(by_unit[unit])
+    return out
+
+
+def _skip_all(
+    batch: Sequence[Placement], reason: SkipReason, message: str
+) -> list[Placement | Skip]:
+    """Skip every session of a batch; an all_or_none SessionGroup that does not fit says so."""
+    if batch[0].group.unit is not None and reason == SkipReason.UNSCHEDULABLE:
+        reason = SkipReason.GROUP_DOES_NOT_FIT
+    return [Skip(p.group, reason, message) for p in batch]
 
 
 class SokovanScheduler:
@@ -352,11 +389,7 @@ class SokovanScheduler:
         for result in results:
             group = result.group
             key = (group.namespace, group.name)
-            if (
-                isinstance(result, Skip)
-                and result.reason in (SkipReason.UNSCHEDULABLE, SkipReason.RESERVED)
-                and group.placed_members > 0
-            ):
+            if isinstance(result, Skip) and result.reason in _STUCK and group.placed_members > 0:
                 stuck.add(key)
                 since = self._stuck_since.setdefault(key, now)
                 if (now - since).total_seconds() > STALE_GANG_TIMEOUT:
@@ -410,68 +443,75 @@ class SokovanScheduler:
         pods: Sequence[Mapping[str, Any]],
         reserved: list[dict[str, Any]],
     ) -> list[Placement | Skip]:
-        """Allocate each placed group's claims and write its BindRequests; a group whose
+        """Allocate the claims of each placed batch and write its BindRequests; a batch whose
         devices do not fit after all is skipped."""
         by_key: dict[PodKey, Mapping[str, Any]] = {
             (p["metadata"]["namespace"], p["metadata"]["name"]): p for p in pods
         }
         out: list[Placement | Skip] = []
         async with aiohttp.ClientSession() as http:
-            for result in results:
-                if not isinstance(result, Placement):
-                    out.append(result)
-                    continue
-                ns = result.group.namespace
-                claims_of = {
-                    pod_name: [
-                        {"namespace": ns, "name": c["resourceClaimName"]}
-                        for c in by_key[ns, pod_name]["spec"].get("resourceClaims") or []
-                        if c.get("resourceClaimName")
-                    ]
-                    for pod_name in result.nodes
-                }
-                if not any(claims_of.values()):
-                    # No devices: the DRA allocator has nothing to decide (and may be down).
-                    for pod_name, node in result.nodes.items():
-                        await self._create_bind_request(
-                            by_key[ns, pod_name], node, result.group.name, []
-                        )
-                    out.append(result)
-                    continue
-                request = {
-                    "reserved": reserved,
-                    "pods": [
-                        {"name": pod_name, "node": node, "claims": claims_of[pod_name]}
-                        for pod_name, node in result.nodes.items()
-                    ],
-                }
-                try:
-                    async with http.post(
-                        f"{self._allocator_url}/v1/allocate", json=request
-                    ) as resp:
-                        resp.raise_for_status()
-                        answer = await resp.json()
-                except aiohttp.ClientError as e:
-                    log.warning("DRA allocator unreachable", exc_info=e)
-                    out.append(
-                        Skip(result.group, SkipReason.UNSCHEDULABLE, "DRA allocator unavailable")
-                    )
-                    continue
-                if not answer["fits"]:
-                    out.append(Skip(result.group, SkipReason.UNSCHEDULABLE, answer["reason"]))
-                    continue
-                for pod_alloc in answer["pods"]:
-                    pod = by_key[ns, pod_alloc["name"]]
-                    allocations = pod_alloc.get("allocations") or []
-                    await self._create_bind_request(
-                        pod, result.nodes[pod_alloc["name"]], result.group.name, allocations
-                    )
-                    reserved += [
-                        {"namespace": ns, "name": ca["name"], "allocation": ca["allocation"]}
-                        for ca in allocations
-                    ]
-                out.append(result)
+            for batch in batches(results):
+                if isinstance(batch, Skip):
+                    out.append(batch)
+                else:
+                    out += await self._bind_batch(http, batch, by_key, reserved)
         return out
+
+    async def _bind_batch(
+        self,
+        http: aiohttp.ClientSession,
+        batch: Sequence[Placement],
+        by_key: Mapping[PodKey, Mapping[str, Any]],
+        reserved: list[dict[str, Any]],
+    ) -> list[Placement | Skip]:
+        """One allocation for every Pod of the batch; the BindRequests are written only once
+        all of them fit."""
+        # pod name → (namespace, SessionWorkload, node); kernel Pod names carry the session
+        targets = {
+            pod_name: (p.group.namespace, p.group.name, node)
+            for p in batch
+            for pod_name, node in p.nodes.items()
+        }
+        claims_of = {
+            pod_name: [
+                {"namespace": ns, "name": c["resourceClaimName"]}
+                for c in by_key[ns, pod_name]["spec"].get("resourceClaims") or []
+                if c.get("resourceClaimName")
+            ]
+            for pod_name, (ns, _, _) in targets.items()
+        }
+        if not any(claims_of.values()):
+            # No devices: the DRA allocator has nothing to decide (and may be down).
+            for pod_name, (ns, session, node) in targets.items():
+                await self._create_bind_request(by_key[ns, pod_name], node, session, [])
+            return list(batch)
+        request = {
+            "reserved": reserved,
+            "pods": [
+                {"name": pod_name, "node": node, "claims": claims_of[pod_name]}
+                for pod_name, (_, _, node) in targets.items()
+            ],
+        }
+        try:
+            async with http.post(f"{self._allocator_url}/v1/allocate", json=request) as resp:
+                resp.raise_for_status()
+                answer = await resp.json()
+        except aiohttp.ClientError as e:
+            log.warning("DRA allocator unreachable", exc_info=e)
+            return _skip_all(batch, SkipReason.UNSCHEDULABLE, "DRA allocator unavailable")
+        if not answer["fits"]:
+            return _skip_all(batch, SkipReason.UNSCHEDULABLE, answer["reason"])
+        for pod_alloc in answer["pods"]:
+            ns, session, node = targets[pod_alloc["name"]]
+            allocations = pod_alloc.get("allocations") or []
+            await self._create_bind_request(
+                by_key[ns, pod_alloc["name"]], node, session, allocations
+            )
+            reserved += [
+                {"namespace": ns, "name": ca["name"], "allocation": ca["allocation"]}
+                for ca in allocations
+            ]
+        return list(batch)
 
     async def _create_bind_request(
         self,
@@ -512,18 +552,44 @@ class SokovanScheduler:
 
     async def _release_all(self, results: Sequence[Placement | Skip]) -> list[Placement | Skip]:
         out: list[Placement | Skip] = []
-        for result in results:
-            if isinstance(result, Placement):
-                out.append(await self._release(result))
+        for batch in batches(results):
+            if isinstance(batch, Skip):
+                out.append(batch)
             else:
-                out.append(result)
+                out += await self._release_batch(batch)
         return out
 
     async def _release(self, placement: Placement) -> Placement | Skip:
-        """Pin and ungate every Pod of the placement; nothing is patched unless every Pod
-        still waits for sokovan."""
+        [result] = await self._release_batch([placement])
+        return result
+
+    async def _release_batch(self, batch: Sequence[Placement]) -> list[Placement | Skip]:
+        """Pin and ungate every Pod of the batch; nothing is patched unless every Pod still
+        waits for sokovan."""
+        patches: list[tuple[str, str, list[dict[str, Any]]]] = []
+        for placement in batch:
+            found = await self._release_patches(placement)
+            if isinstance(found, Skip):
+                return _skip_all(batch, found.reason, found.message)
+            patches += found
+        for ns, pod_name, patch in patches:
+            await self._core.patch_namespaced_pod(pod_name, ns, patch, _content_type=_JSON_PATCH)
+        for placement in batch:
+            log.trace(
+                "session released",
+                k8s_namespace=placement.group.namespace,
+                session_id=placement.group.session_id,
+                nodes=",".join(sorted(set(placement.nodes.values()))),
+            )
+        return list(batch)
+
+    async def _release_patches(
+        self, placement: Placement
+    ) -> list[tuple[str, str, list[dict[str, Any]]]] | Skip:
+        """The patches that pin and ungate the Pods of one placement, or why it cannot be
+        released."""
         ns = placement.group.namespace
-        patches = []
+        patches: list[tuple[str, str, list[dict[str, Any]]]] = []
         for pod_name, node in placement.nodes.items():
             try:
                 pod = await self._core.read_namespaced_pod(pod_name, ns)
@@ -542,7 +608,11 @@ class SokovanScheduler:
                     SkipReason.WAITING_FOR_PODS,
                     f"pod {pod_name} changed before its release",
                 )
-            selector = {"op": "add", "path": "/spec/nodeSelector", "value": {HOSTNAME_LABEL: node}}
+            selector: dict[str, Any] = {
+                "op": "add",
+                "path": "/spec/nodeSelector",
+                "value": {HOSTNAME_LABEL: node},
+            }
             if pod.spec.node_selector is not None:
                 selector = {
                     "op": "add",
@@ -551,18 +621,11 @@ class SokovanScheduler:
                 }
             remaining = [{"name": g.name} for g in gates if g.name != SOKOVAN_GATE]
             patches.append((
+                ns,
                 pod_name,
                 [selector, {"op": "replace", "path": "/spec/schedulingGates", "value": remaining}],
             ))
-        for pod_name, patch in patches:
-            await self._core.patch_namespaced_pod(pod_name, ns, patch, _content_type=_JSON_PATCH)
-        log.trace(
-            "session released",
-            k8s_namespace=ns,
-            session_id=placement.group.session_id,
-            nodes=",".join(sorted(set(placement.nodes.values()))),
-        )
-        return placement
+        return patches
 
     async def _report(self, result: Placement | Skip, current: Mapping[str, Any] | None) -> None:
         now = datetime.now(UTC).isoformat()
