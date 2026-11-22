@@ -2,8 +2,8 @@
 {{- $w := .Values.appproxyWorker }}
 {{- $valkey := .Values.controlPlane.valkey }}
 {{- $secretName := required "appproxyWorker.secrets.name (an existing Secret) is required" $w.secrets.name }}
-# appproxy worker in the cluster (suggestion-1122 9.2): it reaches session Pods by Pod IP and
-# registers with the control plane's coordinator. The config holds no secret: an init container
+# appproxy worker in the cluster (suggestion-1122 9.2): it reaches session Pods by Pod IP,
+# registers with the control plane's coordinator and is reached through its Service. The config holds no secret: an init container
 # fills the @@NAME@@ placeholders from existing Secrets.
 apiVersion: v1
 kind: ConfigMap
@@ -56,7 +56,7 @@ metadata:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
     app.kubernetes.io/name: appproxy-worker
 spec:
-  # Port mode binds host ports: one worker per node.
+  # Port mode: the Service publishes one worker's ports.
   replicas: 1
   strategy:
     type: Recreate
@@ -70,8 +70,7 @@ spec:
       annotations:
         checksum/config: {{ toJson $w | sha256sum }}
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # Pod network, not hostNetwork: session NetworkPolicies admit Pods of the system namespace.
       {{- with $w.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -112,6 +111,8 @@ spec:
           command: [python, -m, ai.backend.cli, app-proxy-worker, start-server, -f, /etc/backend.ai/app-proxy-worker.toml]
           env:
             - {name: HOME, value: /tmp}
+          ports:
+            - {name: api, containerPort: {{ $w.apiPort }}}
           volumeMounts:
             - {name: config, mountPath: /etc/backend.ai, readOnly: true}
       volumes:
@@ -120,4 +121,27 @@ spec:
         # The rendered config with the secrets: memory only.
         - name: config
           emptyDir: {medium: Memory}
+---
+# Users reach advertisedHost on the same port numbers the worker binds.
+apiVersion: v1
+kind: Service
+metadata:
+  name: appproxy-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+  {{- with $w.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $w.service.type }}
+  selector:
+    app.kubernetes.io/name: appproxy-worker
+  ports:
+    {{- $nodePort := eq $w.service.type "NodePort" }}
+    - {name: api, port: {{ $w.apiPort }}, targetPort: {{ $w.apiPort }}{{ if $nodePort }}, nodePort: {{ $w.apiPort }}{{ end }}}
+    {{- range $port := untilStep (int (index $w.portRange 0)) (int (add1 (index $w.portRange 1))) 1 }}
+    - {name: p{{ $port }}, port: {{ $port }}, targetPort: {{ $port }}{{ if $nodePort }}, nodePort: {{ $port }}{{ end }}}
+    {{- end }}
 {{- end }}

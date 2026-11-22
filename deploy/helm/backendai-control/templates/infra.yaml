@@ -61,3 +61,71 @@ spec:
   selector: {app: etcd}
   ports: [{port: 2379, targetPort: 2379}]
 {{- end }}
+{{- if .Values.infra.enabled }}
+---
+# The configs need etcd credentials: turn on root auth once etcd answers (v3 HTTP gateway).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: etcd-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-control.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: enable-auth
+          image: {{ include "backendai-control.image" .Values.image }}
+          command: [python, -c]
+          args:
+            - |
+              import json, os, sys, time, urllib.error, urllib.request
+
+              BASE = "http://etcd:2379/v3/auth/"
+
+              def call(path, body, accept=("already exists",)):
+                  req = urllib.request.Request(
+                      BASE + path, json.dumps(body).encode(), {"Content-Type": "application/json"}
+                  )
+                  try:
+                      with urllib.request.urlopen(req, timeout=5) as resp:
+                          return json.load(resp)
+                  except urllib.error.HTTPError as e:
+                      answer = json.loads(e.read() or b"{}")
+                      if any(a in answer.get("error", "") for a in accept):
+                          return answer
+                      sys.exit(f"{path}: {e.code} {answer}")
+
+              password = os.environ["ROOT_PASSWORD"]
+              # Logging in as root works once auth is on (with the same password).
+              for _ in range(90):
+                  try:
+                      login = call(
+                          "authenticate",
+                          {"name": "root", "password": password},
+                          accept=("authentication is not enabled",),
+                      )
+                      break
+                  except OSError:
+                      time.sleep(2)
+              else:
+                  sys.exit("etcd did not answer")
+              if "token" in login:
+                  sys.exit(0)
+              call("role/add", {"name": "root"})
+              call("user/add", {"name": "root", "password": password})
+              call("user/grant", {"user": "root", "role": "root"})
+              call("enable", {})
+          env:
+            - name: ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "infra.etcdAuthSecret.name is required" .Values.infra.etcdAuthSecret.name }}
+                  key: {{ .Values.infra.etcdAuthSecret.key }}
+{{- end }}

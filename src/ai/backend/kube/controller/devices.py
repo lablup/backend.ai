@@ -388,7 +388,10 @@ def capacity_selector(profile: DeviceProfileSpec, capacity_name: str, value: int
 
 
 def device_key(profile: DeviceProfileSpec) -> str:
-    """How sokovan counts the devices of a profile: `<driver>/<slot it is published for>`."""
+    """How sokovan counts the devices of a profile: `<driver>/<slot it is published for>`. An
+    external driver's devices without a slotName attribute count under the driver name."""
+    if slot_selector(profile) is None:
+        return f"{profile.driver_name}/{profile.driver_name}"
     return f"{profile.driver_name}/{profile.shared_slot or profile.slot_name}"
 
 

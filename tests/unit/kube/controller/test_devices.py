@@ -476,6 +476,28 @@ class TestAttributeMap:
             'device.attributes["dra.backend.ai"].slotName == "cuda.device"'
         )
 
+    @pytest.mark.parametrize("policy", [GPUAllocationPolicy.BAI, GPUAllocationPolicy.NVIDIA_DRA])
+    def test_the_demand_is_keyed_by_driver(
+        self,
+        workload: SessionWorkload,
+        gpu_kernel: KernelSpec,
+        nvidia_profile: DeviceProfileSpec,
+        settings: ControllerSettings,
+        policy: GPUAllocationPolicy,
+    ) -> None:
+        claims = translate(gpu_kernel, {"cuda.device": nvidia_profile}, policy)
+        pod = build_kernel_pod(workload, gpu_kernel, settings, devices=claims)
+        annotations = pod["metadata"]["annotations"]
+        assert json.loads(annotations[ANNOTATION_DEVICES]) == {"gpu.nvidia.com/gpu.nvidia.com": 2}
+
+    def test_a_mapped_slot_attribute_keys_the_demand_by_slot(
+        self, nvidia_profile: DeviceProfileSpec
+    ) -> None:
+        profile = nvidia_profile.model_copy(
+            update={"attribute_map": {"slotName": "dra.backend.ai/slotName"}}
+        )
+        assert device_key(profile) == "gpu.nvidia.com/cuda.device"
+
 
 class TestComputeDomain:
     @pytest.fixture

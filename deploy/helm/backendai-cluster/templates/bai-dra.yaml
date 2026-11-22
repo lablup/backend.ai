@@ -240,10 +240,8 @@ spec:
       # A GPU entry never runs on a node whose GPUs the device plugin or another driver allocates.
       affinity:
         {{- include "backendai-cluster.baiDraAffinity" (dict "root" $ "driver" .) | nindent 8 }}
-      {{- with .tolerations }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "backendai-cluster.sessionNodeTolerations" (dict "extra" .tolerations) | nindent 8 }}
       {{- if eq $isolation "hami-core" }}
       initContainers:
         # HAMi-core's preload library goes to the node: CDI mounts it read-only into shared

@@ -69,10 +69,19 @@ spec:
       containers:
         - name: migrate
           image: {{ include "backendai-control.image" .Values.image }}
-          command: [python, -m, alembic, -c, /etc/backend.ai/alembic.ini, upgrade, head]
+          # A new database gets every table at once (old revisions cannot run from empty);
+          # an existing one only its pending revisions.
+          command:
+            - sh
+            - -c
+            - >-
+              python -m ai.backend.cli mgr -f /etc/backend.ai/manager.toml schema oneshot
+              -f /etc/backend.ai/alembic.ini
+              && python -m alembic -c /etc/backend.ai/alembic.ini upgrade head
           workingDir: /tmp
           env: [{name: HOME, value: /tmp}]
           volumeMounts:
+            - {name: config, mountPath: /etc/backend.ai/manager.toml, subPath: manager.toml}
             - {name: config, mountPath: /etc/backend.ai/alembic.ini, subPath: alembic.ini}
       volumes:
         - name: config

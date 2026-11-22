@@ -59,10 +59,8 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.nodeHelper.tolerations }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "backendai-cluster.sessionNodeTolerations" (dict "extra" .Values.nodeHelper.tolerations) | nindent 8 }}
       containers:
         - name: helper
           image: {{ include "backendai-cluster.image" .Values.nodeHelper.image }}

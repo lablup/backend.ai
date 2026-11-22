@@ -79,4 +79,5 @@ spec:
             - {name: BACKENDAI_PREFLIGHT_BAI_GPU_DRIVERS, value: {{ include "backendai-cluster.baiDraGpuDrivers" . | quote }}}
             - {name: BACKENDAI_PREFLIGHT_DYNAMIC_MIG_DRIVERS, value: {{ include "backendai-cluster.baiDraDynamicMigDrivers" . | quote }}}
             - {name: BACKENDAI_PREFLIGHT_WAIT_SECONDS, value: {{ .Values.preflight.waitSeconds | quote }}}
+            - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
 {{- end }}

@@ -15,6 +15,7 @@ from zmq.auth.certs import load_certificate
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.kube.controller.naming import LABEL_MANAGED_BY, MANAGED_BY
 from ai.backend.kube.crd.base import CRD_VERSION
+from ai.backend.kube.crd.scheduling import SokovanBindMode
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.events import make_event_producer
 from ai.backend.kube.gateway.heartbeat import GatewayHeartbeat, GatewayIdentity
@@ -46,6 +47,7 @@ async def _serve(
     valkey_password: str | None,
     identity_args: tuple[str, str, str | None],
     node_helper: tuple[str, int, str] | None,
+    bind_mode: SokovanBindMode,
 ) -> None:
     await load_kube_config()
     manager_pkey, _ = load_certificate(str(manager_public_key))
@@ -91,7 +93,13 @@ async def _serve(
                 loop.add_signal_handler(sig, run_task.cancel)
         try:
             async with server, asyncio.TaskGroup() as tg:
-                tg.create_task(GatewayHeartbeat(api, event_producer, identity).run())
+                heartbeat = GatewayHeartbeat(
+                    api,
+                    event_producer,
+                    identity,
+                    dedicated_only=bind_mode == SokovanBindMode.BINDER,
+                )
+                tg.create_task(heartbeat.run())
                 # Only Pods in the namespaces the Manager created are kernels (KernelIndex).
                 tg.create_task(
                     watch_forever(
@@ -164,6 +172,12 @@ async def _serve(
 @click.option("--node-helper-namespace", envvar="POD_NAMESPACE", default="backendai-system")
 @click.option("--node-helper-port", envvar="BACKENDAI_NODE_HELPER_PORT", type=int, default=6090)
 @click.option(
+    "--sokovan-bind-mode",
+    envvar="BACKENDAI_SOKOVAN_BIND_MODE",
+    type=click.Choice([m.value for m in SokovanBindMode]),
+    default=SokovanBindMode.GATE.value,
+)
+@click.option(
     "--log-level",
     envvar="BACKENDAI_LOG_LEVEL",
     type=click.Choice([lv.name for lv in LogLevel]),
@@ -181,6 +195,7 @@ def main(
     valkey_password: str | None,
     node_helper_namespace: str,
     node_helper_port: int,
+    sokovan_bind_mode: str,
     log_level: str,
 ) -> None:
     # Only from the environment (a Secret): an argument would show in the process list.
@@ -201,6 +216,7 @@ def main(
                 valkey_password,
                 (resource_group, advertised_addr, region),
                 node_helper,
+                SokovanBindMode(sokovan_bind_mode),
             )
         )
 

@@ -32,7 +32,7 @@ from ai.backend.kube.crd.base import CRD_VERSION
 from ai.backend.kube.crd.device import DeviceProfile, DeviceProfileSpec, SharingMode
 from ai.backend.kube.scheduler.counters import without_counter_blocked_devices
 from ai.backend.kube.scheduler.cycle import NodeState
-from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, build_nodes
+from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, build_nodes, is_dedicated
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -69,9 +69,12 @@ class ClusterCapacity:
     node_shapes: list[dict[str, str]]  # distinct allocatable shapes of the counted nodes
 
 
-def _counted(node: NodeState) -> bool:
+def _counted(node: NodeState, dedicated_only: bool = False) -> bool:
     """A node a session Pod can land on (the sokovan dedicated taint is tolerated by session
-    Pods); `schedulable` already leaves out unready, cordoned and to-be-recycled nodes."""
+    Pods; `dedicated_only`: sokovan's binder places Pods only on nodes with it). `schedulable`
+    already leaves out unready, cordoned and to-be-recycled nodes."""
+    if dedicated_only and not is_dedicated(node):
+        return False
     blocked = any(
         t.effect in ("NoSchedule", "NoExecute") and t.key != DEDICATED_TAINT_KEY
         for t in node.taints
@@ -110,6 +113,8 @@ def cluster_capacity(
     resource_slices: Sequence[Mapping[str, Any]] = (),
     profiles: Sequence[DeviceProfileSpec] = (),
     resource_claims: Sequence[Mapping[str, Any]] = (),
+    *,
+    dedicated_only: bool = False,
 ) -> ClusterCapacity:
     """The slots of the nodes a session Pod can land on, in total and per distinct node.
     A device whose shared counters are taken by others counts as absent (a MIG slot: the held
@@ -121,7 +126,7 @@ def cluster_capacity(
             totals.setdefault(profile.slot_name, Decimal(0))
     shapes: dict[tuple[tuple[str, str], ...], dict[str, str]] = {}
     for node in build_nodes(nodes, [], resource_slices):
-        if not _counted(node):
+        if not _counted(node, dedicated_only):
             continue
         slots = _node_slots(node, profiles)
         for name, amount in slots.items():
@@ -143,15 +148,22 @@ class GatewayHeartbeat:
     _custom: client.CustomObjectsApi
     _producer: EventProducer
     _identity: GatewayIdentity
+    _dedicated_only: bool
 
     def __init__(
-        self, api: client.ApiClient, producer: EventProducer, identity: GatewayIdentity
+        self,
+        api: client.ApiClient,
+        producer: EventProducer,
+        identity: GatewayIdentity,
+        *,
+        dedicated_only: bool = False,
     ) -> None:
         self._api = api
         self._core = client.CoreV1Api(api)
         self._custom = client.CustomObjectsApi(api)
         self._producer = producer
         self._identity = identity
+        self._dedicated_only = dedicated_only
 
     async def run(self) -> None:
         started = False
@@ -175,7 +187,13 @@ class GatewayHeartbeat:
         )
         raw_nodes = [self._api.sanitize_for_serialization(n) for n in nodes.items]
         profiles = [DeviceProfile.model_validate(p).spec for p in listed_profiles["items"]]
-        capacity = cluster_capacity(raw_nodes, slices["items"], profiles, claims["items"])
+        capacity = cluster_capacity(
+            raw_nodes,
+            slices["items"],
+            profiles,
+            claims["items"],
+            dedicated_only=self._dedicated_only,
+        )
         extra: dict[str, Any] = {}
         if _NODE_SHAPES_FIELD in AgentInfo.model_fields:
             extra[_NODE_SHAPES_FIELD] = capacity.node_shapes

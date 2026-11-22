@@ -150,3 +150,11 @@ NotIn on the labels of nodes whose GPUs another allocator owns. (dict "root" $ "
 {{- end -}}
 {{- uniq $drivers | join "," -}}
 {{- end -}}
+
+{{/* Tolerations of a DaemonSet that serves session nodes: sokovan's dedicated taint, then `extra`. */}}
+{{- define "backendai-cluster.sessionNodeTolerations" -}}
+- {key: sokovan.backend.ai/dedicated, operator: Equal, value: "true", effect: NoSchedule}
+{{- with .extra }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}

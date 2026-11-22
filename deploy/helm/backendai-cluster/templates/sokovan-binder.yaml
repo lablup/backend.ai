@@ -33,6 +33,10 @@ rules:
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceclaims/status"]
     verbs: ["update"]
+  # Kubernetes 1.36+ also checks this subresource before status.allocation or reservedFor changes.
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims/binding"]
+    verbs: ["update"]
   # The conflict check reads device capacities from the ResourceSlices.
   - apiGroups: ["resource.k8s.io"]
     resources: ["resourceslices"]

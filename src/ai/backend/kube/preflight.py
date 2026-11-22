@@ -3,6 +3,7 @@ cluster, run as a Helm hook Job. Exits non-zero when a required check fails.
 
 python -m ai.backend.kube.preflight [--json] [--gpu-allocation-policy bai|nvidia-dra|device-plugin]
     [--bai-gpu-drivers <driver,...>] [--dynamic-mig-drivers <driver,...>] [--wait-seconds <n>]
+    [--sokovan-bind-mode gate|binder]
 """
 
 from __future__ import annotations
@@ -22,11 +23,12 @@ from kubernetes_asyncio.client.exceptions import ApiException
 
 from ai.backend.kube.crd.base import CRD_VERSION, CustomResource
 from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
-from ai.backend.kube.crd.scheduling import BindRequest, Queue
+from ai.backend.kube.crd.scheduling import BindRequest, Queue, SokovanBindMode
 from ai.backend.kube.crd.schema import build_crd
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.crd.storage import StorageBinding
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
+from ai.backend.kube.scheduler.snapshot import DEDICATED_TAINT_KEY, DEDICATED_TAINT_VALUE
 
 DRIVER_MODE_LABEL: Final = "dra.backend.ai/driver-mode"
 NVIDIA_DRA_DRIVER: Final = "gpu.nvidia.com"
@@ -234,6 +236,30 @@ def _other_policy_conflict(
     return None
 
 
+def check_sokovan_nodes(nodes: Sequence[Mapping[str, Any]], bind_mode: str) -> Check:
+    """In binder mode sokovan places sessions only on nodes with its dedicated taint."""
+    name = "sokovan nodes"
+    if bind_mode != SokovanBindMode.BINDER:
+        return Check(name, Outcome.PASS, f"{bind_mode} mode: kube-scheduler binds")
+    dedicated = sorted(
+        node["metadata"]["name"]
+        for node in nodes
+        if any(
+            t.get("key") == DEDICATED_TAINT_KEY
+            and t.get("value") == DEDICATED_TAINT_VALUE
+            and t.get("effect") == "NoSchedule"
+            for t in (node.get("spec") or {}).get("taints") or []
+        )
+    )
+    if not dedicated:
+        return Check(
+            name,
+            Outcome.FAIL,
+            f"binder mode but no node has {DEDICATED_TAINT_KEY}={DEDICATED_TAINT_VALUE}:NoSchedule",
+        )
+    return Check(name, Outcome.PASS, ", ".join(dedicated))
+
+
 def check_bai_node_ownership(
     nodes: Sequence[Mapping[str, Any]],
     slices: Sequence[Mapping[str, Any]],
@@ -392,6 +418,7 @@ async def run_checks(
     gpu_policy: str,
     gpu_drivers: Collection[str] | None = None,
     dynamic_mig_drivers: Collection[str] = (),
+    bind_mode: str = SokovanBindMode.GATE.value,
 ) -> list[Check]:
     ext = client.ApiextensionsV1Api(api)
     core = client.CoreV1Api(api)
@@ -422,6 +449,7 @@ async def run_checks(
             )
         )["items"]
     nodes = [api.sanitize_for_serialization(n) for n in (await core.list_node()).items]
+    checks.append(check_sokovan_nodes(nodes, bind_mode))
     checks += check_dra_drivers(nodes, slices, profiles)
     checks += check_bai_node_ownership(nodes, slices, gpu_drivers)
     checks.append(check_gpu_policy(gpu_policy, nodes, slices, profiles, gpu_drivers))
@@ -437,12 +465,13 @@ async def _main(
     gpu_drivers: Collection[str] | None,
     dynamic_mig_drivers: Collection[str],
     wait_seconds: float,
+    bind_mode: str,
 ) -> int:
     await load_kube_config()
     deadline = time.monotonic() + wait_seconds
     async with client.ApiClient() as api:
         while True:
-            checks = await run_checks(api, gpu_policy, gpu_drivers, dynamic_mig_drivers)
+            checks = await run_checks(api, gpu_policy, gpu_drivers, dynamic_mig_drivers, bind_mode)
             if not should_retry(checks) or time.monotonic() >= deadline:
                 break
             click.echo("waiting for the bai-dra drivers to register", err=True)
@@ -485,12 +514,21 @@ async def _main(
     default=0,
     help="Retry this long while the only failures are drivers that have not registered yet.",
 )
+@click.option(
+    "--sokovan-bind-mode",
+    "bind_mode",
+    envvar="BACKENDAI_SOKOVAN_BIND_MODE",
+    type=click.Choice([m.value for m in SokovanBindMode]),
+    default=SokovanBindMode.GATE.value,
+    help="How sokovan binds placed Pods; binder needs nodes with its dedicated taint.",
+)
 def main(
     as_json: bool,
     gpu_policy: str,
     bai_gpu_drivers: str | None,
     dynamic_mig_drivers: str,
     wait_seconds: float,
+    bind_mode: str,
 ) -> None:
     quiet_client_logs()
     gpu_drivers = (
@@ -499,7 +537,9 @@ def main(
         else [d.strip() for d in bai_gpu_drivers.split(",") if d.strip()]
     )
     mig_drivers = [d.strip() for d in dynamic_mig_drivers.split(",") if d.strip()]
-    sys.exit(asyncio.run(_main(as_json, gpu_policy, gpu_drivers, mig_drivers, wait_seconds)))
+    sys.exit(
+        asyncio.run(_main(as_json, gpu_policy, gpu_drivers, mig_drivers, wait_seconds, bind_mode))
+    )
 
 
 if __name__ == "__main__":
