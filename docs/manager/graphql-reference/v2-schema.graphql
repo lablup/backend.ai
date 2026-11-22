@@ -2965,6 +2965,135 @@ enum ClusterMode {
 }
 
 """
+Added in 26.10.0. A Kubernetes cluster that runs the sessions of Kubernetes-backed resource groups. The kubeconfig is never returned.
+"""
+type ComputeCluster implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the compute cluster."""
+  entityId: UUID!
+
+  """Unique compute cluster name."""
+  name: String!
+
+  """Optional description."""
+  description: String
+
+  """URL of the cluster's Kubernetes API server."""
+  apiServer: String!
+
+  """Prefix of the namespaces created in the cluster."""
+  namespacePrefix: String!
+
+  """Address of the cluster's network gateway."""
+  gatewayAddr: String
+
+  """Public key of the cluster's gateway."""
+  gatewayPublicKey: String
+
+  """Whether the cluster's API server is reachable."""
+  status: ComputeClusterStatus!
+
+  """When the status last changed."""
+  statusChangedAt: DateTime
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last modification timestamp."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.10.0. Paginated connection for compute clusters."""
+type ComputeClusterConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ComputeClusterEdge!]!
+
+  """Total number of compute clusters matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ComputeClusterEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ComputeCluster!
+}
+
+"""Added in 26.10.0. Filter input for querying compute clusters."""
+input ComputeClusterFilter {
+  """Filter by compute cluster ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Filter by status."""
+  status: ComputeClusterStatusFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Match all of the given sub-filters."""
+  AND: [ComputeClusterFilter!] = null
+
+  """Match any of the given sub-filters."""
+  OR: [ComputeClusterFilter!] = null
+
+  """Negate the given sub-filters."""
+  NOT: [ComputeClusterFilter!] = null
+}
+
+"""Added in 26.10.0. Specifies ordering for compute cluster results."""
+input ComputeClusterOrderBy {
+  """The field to order by."""
+  field: ComputeClusterOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering compute cluster results.
+"""
+enum ComputeClusterOrderField {
+  NAME
+  CREATED_AT
+}
+
+"""
+Added in 26.10.0. Whether the manager reaches a compute cluster's API server.
+"""
+enum ComputeClusterStatus {
+  UNKNOWN
+  ALIVE
+  LOST
+}
+
+"""
+Added in 26.10.0. Filter for compute cluster status with equality and membership operators.
+"""
+input ComputeClusterStatusFilter {
+  """Exact match."""
+  equals: ComputeClusterStatus = null
+
+  """Match any of the provided values."""
+  in: [ComputeClusterStatus!] = null
+
+  """Exclude an exact match."""
+  notEquals: ComputeClusterStatus = null
+
+  """Exclude any of the provided values."""
+  notIn: [ComputeClusterStatus!] = null
+}
+
+"""
 Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
 """
 type ComputePluginEntry {
@@ -3292,6 +3421,36 @@ Added in 26.3.0. Payload returned after creating a query preset category.
 type CreateCategoryPayload {
   """Created category."""
   category: QueryPresetCategory!
+}
+
+"""Added in 26.10.0. Input for registering a compute cluster."""
+input CreateComputeClusterInput {
+  """Unique compute cluster name."""
+  name: String!
+
+  """URL of the cluster's Kubernetes API server."""
+  apiServer: String!
+
+  """Kubeconfig the manager uses to reach the cluster. Stored encrypted."""
+  kubeconfig: String!
+
+  """Optional description."""
+  description: String = null
+
+  """Prefix of the namespaces created in the cluster."""
+  namespacePrefix: String! = "bai-"
+
+  """Address of the cluster's network gateway."""
+  gatewayAddr: String = null
+
+  """Public key of the cluster's gateway."""
+  gatewayPublicKey: String = null
+}
+
+"""Added in 26.10.0. Payload for compute cluster creation."""
+type CreateComputeClusterPayload {
+  """The created compute cluster."""
+  computeCluster: ComputeCluster!
 }
 
 """Added in 26.4.2. Input for creating a container registry."""
@@ -3872,6 +4031,16 @@ input CreateResourceGroupInput {
 
   """Added in 26.10.0. Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE)."""
   schedulerType: SchedulerType! = FIFO
+
+  """
+  Added in 26.10.0. Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driverOpts.compute_cluster`.
+  """
+  driver: String! = "static"
+
+  """
+  Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster.
+  """
+  driverOpts: JSON! = {}
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
@@ -11609,6 +11778,19 @@ type Mutation {
   """
   partialBulkPurgeLoginClientTypes(input: PartialBulkPurgeLoginClientTypesInput!): PartialBulkLoginClientTypesPayload!
 
+  """Added in 26.10.0. Register a compute cluster (super admin only)."""
+  adminCreateComputeCluster(input: CreateComputeClusterInput!): CreateComputeClusterPayload
+
+  """
+  Added in 26.10.0. Update a compute cluster; only provided fields change (super admin only).
+  """
+  adminUpdateComputeCluster(id: UUID!, input: UpdateComputeClusterInput!): UpdateComputeClusterPayload
+
+  """
+  Added in 26.10.0. Permanently remove a compute cluster (super admin only).
+  """
+  adminPurgeComputeCluster(id: UUID!): PurgeComputeClusterPayload
+
   """
   Added in 26.7.0. Register a new app config definition (super admin only).
   """
@@ -15182,6 +15364,15 @@ type PurgeClientIPMaskingPolicyPayload {
   entityId: UUID!
 }
 
+"""Added in 26.10.0. Payload for compute cluster purge."""
+type PurgeComputeClusterPayload {
+  """Global ID of the purged compute cluster."""
+  purgedId: ID!
+
+  """UUID of the purged compute cluster."""
+  entityId: UUID!
+}
+
 """Added in 26.10.0. Payload for container registry purge."""
 type PurgeContainerRegistryPayload {
   """Added in 26.10.0. Global ID of the purged container registry."""
@@ -16692,6 +16883,16 @@ type Query {
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection
 
   """
+  Added in 26.10.0. Get a single compute cluster by id (super admin only).
+  """
+  adminComputeCluster(id: UUID!): ComputeCluster
+
+  """
+  Added in 26.10.0. Search compute clusters with filtering, ordering, and pagination (super admin only).
+  """
+  adminComputeClusters(filter: ComputeClusterFilter = null, orderBy: [ComputeClusterOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ComputeClusterConnection
+
+  """
   Added in 26.7.0. Get a single app config definition by id (super admin only).
   """
   adminAppConfigDefinition(id: UUID!): AppConfigDefinition
@@ -17815,6 +18016,14 @@ type ResourceGroup implements Node {
   Added in 26.2.0. Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.
   """
   scheduler: ResourceGroupSchedulerConfig!
+
+  """
+  Added in 26.10.0. Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driverOpts.compute_cluster`.
+  """
+  driver: String!
+
+  """Added in 26.10.0. Options of the resource group driver."""
+  driverOpts: JSON!
 
   """
   Added in 26.4.4. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
@@ -22326,6 +22535,38 @@ type UpdateAutoScalingRulePayload {
 }
 
 """
+Added in 26.10.0. Input for updating a compute cluster. Only provided fields are updated.
+"""
+input UpdateComputeClusterInput {
+  """Updated description. Null clears it."""
+  description: String
+
+  """Updated API server URL."""
+  apiServer: String
+
+  """Replacement kubeconfig. Stored encrypted."""
+  kubeconfig: String
+
+  """Updated namespace prefix."""
+  namespacePrefix: String
+
+  """Updated gateway address. Null clears it."""
+  gatewayAddr: String
+
+  """Updated gateway public key. Null clears it."""
+  gatewayPublicKey: String
+
+  """Updated status."""
+  status: ComputeClusterStatus
+}
+
+"""Added in 26.10.0. Payload for compute cluster update."""
+type UpdateComputeClusterPayload {
+  """The updated compute cluster."""
+  computeCluster: ComputeCluster!
+}
+
+"""
 Added in 26.4.2. Input for updating a container registry. All fields optional except id.
 """
 input UpdateContainerRegistryInput {
@@ -23200,6 +23441,16 @@ input UpdateResourceGroupV2Input {
   Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.
   """
   preemption: PreemptionConfigInput
+
+  """
+  Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driverOpts.compute_cluster`. Omit to leave unchanged; `kubernetes` requires `driverOpts` in the same update.
+  """
+  driver: String
+
+  """
+  Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster. Replaces the stored options. Omit to leave unchanged.
+  """
+  driverOpts: JSON
 }
 
 """Added in 26.4.2. Payload for resource preset update."""

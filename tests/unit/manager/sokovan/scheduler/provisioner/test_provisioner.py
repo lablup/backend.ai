@@ -19,7 +19,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import create_agent_selector
+from ai.backend.manager.sokovan.scheduler.provisioner.selection import create_agent_selector
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
     DependenciesValidator,

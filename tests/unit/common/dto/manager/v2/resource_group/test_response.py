@@ -93,6 +93,8 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
                 route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
             ),
         ),
+        driver="static",
+        driver_opts={},
         default_deployment_options=DeploymentOptionsInfo(
             handler_options=DeploymentHandlerOptionsInfo(
                 default=DeploymentHandlerOptionsDefaultInfo(timeout_sec=None, max_retry_count=None),

@@ -38,6 +38,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.system_session_environ.repository import (
     SystemSessionEnvironRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -50,13 +51,13 @@ from ai.backend.manager.sokovan.scheduler.factory import (
 )
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import FairShareAggregator
 from ai.backend.manager.sokovan.scheduler.fair_share.calculator import FairShareFactorCalculator
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
 from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.sokovan_core.selectors.selector import AgentSelector
 
 log = StructuredLogger(logging.getLogger(__name__))
 
@@ -83,6 +84,7 @@ class SokovanOrchestratorInput:
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     agent_selector: AgentSelector
+    key_provider_pool: KeyProviderPool
     # Controller dependencies
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
@@ -137,6 +139,7 @@ class SokovanOrchestratorDependency(
             setup_input.network_plugin_ctx,
             setup_input.valkey_schedule,
             setup_input.agent_selector,
+            setup_input.key_provider_pool,
         )
 
         # Create HTTP client pool for deployment operations

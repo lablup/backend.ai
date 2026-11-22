@@ -104,6 +104,7 @@ def terminator(
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             valkey_schedule=mock_valkey_schedule,
+            compute_clusters=_no_compute_cluster(),
         )
     )
 
@@ -338,3 +339,11 @@ def valkey_one_stale_response(
             mock_status.presence = HealthCheckStatus.HEALTHY
         response[KernelId(kernel.id)] = mock_status
     return response
+
+
+def _no_compute_cluster() -> AsyncMock:
+    """A resolver for which no agent belongs to a compute cluster."""
+    resolver = AsyncMock()
+    resolver.for_resource_group.return_value = None
+    resolver.for_agent.return_value = None
+    return resolver

@@ -12,7 +12,7 @@ from ai.backend.manager.data.session.compute_schedule import (
     ComputeScheduleResult,
 )
 from ai.backend.manager.data.session.draft import KernelResourceInput
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 @dataclass(frozen=True)

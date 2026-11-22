@@ -1,0 +1,58 @@
+# The identity the Manager uses in this cluster (the kubeconfig registered as its compute
+# cluster). It writes SessionWorkloads and their Secrets, and creates the session namespaces.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backendai-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: backendai-manager-token
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    kubernetes.io/service-account.name: backendai-manager
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-manager
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["queues", "deviceprofiles"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["queues/status"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-manager
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-manager
+subjects:
+  - kind: ServiceAccount
+    name: backendai-manager
+    namespace: {{ .Release.Namespace }}

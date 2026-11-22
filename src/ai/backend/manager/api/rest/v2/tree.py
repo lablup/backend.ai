@@ -49,6 +49,8 @@ def build_v2_routes(
     from .auto_generated_file.registry import register_v2_auto_generated_file_routes
     from .client_ip_masking.handler import V2ClientIPMaskingHandler
     from .client_ip_masking.registry import register_v2_client_ip_masking_routes
+    from .compute_cluster.handler import V2ComputeClusterHandler
+    from .compute_cluster.registry import register_v2_compute_cluster_routes
     from .container_registry.handler import V2ContainerRegistryHandler
     from .container_registry.registry import register_v2_container_registry_routes
     from .deployment.handler import V2DeploymentHandler
@@ -182,6 +184,7 @@ def build_v2_routes(
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
     login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
+    compute_cluster_handler = V2ComputeClusterHandler(adapter=adapters.compute_cluster)
     client_ip_masking_handler = V2ClientIPMaskingHandler(adapter=adapters.client_ip_masking)
     secret_handler = V2SecretHandler(adapter=adapters.secret)
     login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
@@ -284,6 +287,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_login_client_type_routes(login_client_type_handler, route_deps)
     )
+    v2_reg.add_subregistry(register_v2_compute_cluster_routes(compute_cluster_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_client_ip_masking_routes(client_ip_masking_handler, route_deps)
     )

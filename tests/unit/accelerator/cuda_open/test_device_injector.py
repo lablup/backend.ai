@@ -325,3 +325,34 @@ class TestGenerateDockerArgs:
         docker_args = await cuda_plugin.generate_docker_args(AsyncMock(), _device_alloc("0"))
         assert docker_args == {}
         cuda_plugin.list_devices.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+class TestConfiguredCDIInjector:
+    """`device_injector = "cdi"` in the plugin config: a host without a container engine."""
+
+    @pytest.fixture
+    def no_engine(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def unreachable(*args: Any, **kwargs: Any) -> None:
+            raise AssertionError("the container engine must not be queried")
+
+        monkeypatch.setattr("ai.backend.accelerator.cuda_open.plugin.aiodocker.Docker", unreachable)
+        monkeypatch.setattr(CUDAPlugin, "list_devices", AsyncMock(return_value=[]))
+
+    @pytest.fixture
+    def plugin(self) -> CUDAPlugin:
+        return CUDAPlugin({"device_injector": "cdi"}, {})
+
+    async def test_uses_cdi_without_the_engine(
+        self, plugin: CUDAPlugin, no_engine: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(CUDAPlugin, "_has_cdi_spec", lambda self: True)
+        await plugin.init()
+        assert plugin.enabled
+        assert isinstance(plugin._device_injector, CDIInjector)
+
+    async def test_is_disabled_without_a_cdi_spec(
+        self, plugin: CUDAPlugin, no_engine: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(CUDAPlugin, "_has_cdi_spec", lambda self: False)
+        await plugin.init()
+        assert not plugin.enabled

@@ -8,9 +8,9 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.session_group.types import SessionGroupPlacementDirection
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
+from ai.backend.sokovan_core.types.policy import SessionGroupPlacementDirection
 
 
 @dataclass

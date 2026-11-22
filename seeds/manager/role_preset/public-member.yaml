@@ -17,6 +17,7 @@ items:
       artifact_registry:                []
       auto_generated_file:              []
       client_ip_masking_policy:         []
+      compute_cluster:                  []
       container_registry:               [read]
       deployment:                       []
       deployment_preset:                [read]

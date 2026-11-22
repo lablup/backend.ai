@@ -24,11 +24,11 @@ from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectio
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.deployment.handlers.replica import CheckReplicaDeploymentHandler
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,

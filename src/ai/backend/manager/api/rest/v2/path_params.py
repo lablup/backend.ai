@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 
@@ -97,6 +98,10 @@ class RolePresetIdPathParam(BaseRequestModel):
 
 class LoginClientTypeIdPathParam(BaseRequestModel):
     login_client_type_id: UUID = Field(description="Login client type UUID")
+
+
+class ComputeClusterIdPathParam(BaseRequestModel):
+    compute_cluster_id: ComputeClusterID = Field(description="Compute cluster UUID")
 
 
 class ClientIPMaskingPolicyIdPathParam(BaseRequestModel):

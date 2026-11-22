@@ -106,7 +106,6 @@ from ai.backend.manager.data.session.creation import (
     ResolvedPresetValues,
     UserContext,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -245,6 +244,7 @@ from ai.backend.manager.repositories.ops.v2.reconciler.write import ReconcileTra
 from ai.backend.manager.repositories.vfolder.mount_policy import MountPolicyInputs
 from ai.backend.manager.types import OptionalState
 from ai.backend.manager.utils import query_userinfo_from_session
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 @dataclass

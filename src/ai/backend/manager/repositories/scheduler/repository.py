@@ -46,6 +46,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.compute_cluster.types import (
+    ProjectQueueData,
+    ResourceGroupComputeCluster,
+)
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
@@ -69,7 +73,6 @@ from ai.backend.manager.repositories.scheduler.types.session import SessionHisto
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.types import UserScope
-from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
 from ai.backend.manager.views.sokovan.allocation import SessionAllocation
 from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForPullWithImages,
@@ -92,6 +95,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
     SystemSnapshot,
 )
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
+from ai.backend.sokovan_core.types.agent import AgentLimit, ResourceGroupResource
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
@@ -313,6 +317,24 @@ class SchedulerRepository:
     async def admit_prereserved_kernels(self, session_ids: Sequence[SessionId]) -> list[KernelId]:
         """Admit prereserved kernels that fit now, first reserved first."""
         return await self._db_source.admit_prereserved_kernels(session_ids)
+
+    @scheduler_repository_resilience.apply()
+    async def get_compute_cluster_of_resource_group(
+        self, resource_group: str
+    ) -> ResourceGroupComputeCluster | None:
+        """The compute cluster a `kubernetes` resource group runs its sessions in, if any."""
+        return await self._db_source.get_compute_cluster_of_resource_group(resource_group)
+
+    @scheduler_repository_resilience.apply()
+    async def get_project_queue_data(
+        self, project_id: UUID, resource_group: str
+    ) -> ProjectQueueData:
+        """The limit and fair share factor of a project's queue in a compute cluster."""
+        return await self._db_source.get_project_queue_data(project_id, resource_group)
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_of_agent(self, agent_id: AgentId) -> str | None:
+        return await self._db_source.get_resource_group_of_agent(agent_id)
 
     @scheduler_repository_resilience.apply()
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:

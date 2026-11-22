@@ -1,0 +1,18 @@
+{{- range .Values.storageBindings }}
+---
+apiVersion: backend.ai/v1alpha1
+kind: StorageBinding
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "backendai-cluster.labels" $ | nindent 4 }}
+spec:
+  storageHost: {{ .storageHost | quote }}
+  mountBasePath: {{ .mountBasePath | quote }}
+  pv:
+    {{- toYaml .pv | nindent 4 }}
+  {{- with .nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

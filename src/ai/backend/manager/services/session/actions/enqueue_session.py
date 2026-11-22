@@ -16,7 +16,6 @@ from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
@@ -27,6 +26,7 @@ from ai.backend.manager.services.session.base import (
     SessionScopeAction,
     SessionScopeActionResult,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 @dataclass(frozen=True)

@@ -48,11 +48,11 @@ from ai.backend.manager.data.session.creation import (
     UserContext,
 )
 from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft, SchedulingTargetDraft
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
     DeploymentSessionDraftBuilder,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 def _revision_data(model_definition: ModelDefinition | None) -> ModelRevisionData:

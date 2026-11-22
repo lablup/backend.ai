@@ -10,6 +10,7 @@ visibility_private_component(
     allowed_dependents=[
         "//src/ai/backend/kernel/**",
         "//src/ai/backend/agent/**",
+        "//src/ai/backend/kube/**",
     ],
     allowed_dependencies=[],
 )

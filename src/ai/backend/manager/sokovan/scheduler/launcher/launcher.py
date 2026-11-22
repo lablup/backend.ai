@@ -31,6 +31,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.clients.compute_cluster.mapping import (
+    SessionPlacement,
+    build_session_objects,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
@@ -54,6 +58,10 @@ from ai.backend.manager.repositories.system_session_environ.repository import (
     SystemSessionEnvironRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.compute_cluster import (
+    ComputeClusterResolver,
+    ComputeClusterTarget,
+)
 from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -73,6 +81,7 @@ class SessionLauncherArgs:
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
+    compute_clusters: ComputeClusterResolver
 
 
 class SessionLauncher:
@@ -100,6 +109,7 @@ class SessionLauncher:
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
+        self._compute_clusters = args.compute_clusters
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
     async def trigger_image_pulling(
@@ -280,7 +290,18 @@ class SessionLauncher:
             idle_timeout = 600  # Default timeout in seconds
 
             # Setup network configuration
-            network_setup = await self._setup_network_configuration(session)
+            compute_cluster = await self._compute_clusters.for_resource_group(
+                session.kernels[0].resource_group
+            )
+            if compute_cluster is None:
+                network_setup = await self._setup_network_configuration(session)
+            else:
+                # The cluster connects the session's Pods itself (headless Service, NetworkPolicy).
+                network_setup = NetworkSetup(
+                    network_name=None,
+                    network_config={"mode": "kubernetes"},
+                    cluster_ssh_port_mapping=None,
+                )
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
             # Setup environment variables - similar to registry.py
@@ -419,6 +440,11 @@ class SessionLauncher:
                     "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
                 }
 
+                if compute_cluster is not None:
+                    await self._create_in_compute_cluster(
+                        compute_cluster, session, kernel_configs, cluster_info
+                    )
+                    return
                 # Create the kernels using connection pool
                 async with self._agent_client_pool.acquire(agent_id) as client:
                     await client.create_kernels(
@@ -573,6 +599,48 @@ class SessionLauncher:
             network_config=network_config,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
         )
+
+    async def _create_in_compute_cluster(
+        self,
+        target: ComputeClusterTarget,
+        session: SessionDataForStart,
+        kernel_configs: list[KernelCreationConfig],
+        cluster_info: ClusterInfo,
+    ) -> None:
+        """Write the session's SessionWorkload; the cluster's sokovan places its Pods."""
+        namespace = f"{target.namespace_prefix}{session.project_id}"
+        await target.client.ensure_namespace(
+            namespace, {"backend.ai/project-id": str(session.project_id)}
+        )
+        resource_group = session.kernels[0].resource_group
+        queue = await target.client.sync_project_queue(
+            resource_group,
+            await self._scheduler_repository.get_project_queue_data(
+                session.project_id, resource_group
+            ),
+        )
+        placement = SessionPlacement(
+            namespace=namespace,
+            session_id=session.session_id,
+            session_name=session.name,
+            session_type=str(session.session_type),
+            owner_user_id=str(session.user_uuid),
+            owner_project_id=str(session.project_id),
+            access_key=str(session.access_key),
+            domain_name=None,
+            resource_group=resource_group,
+            queue=queue,
+            priority=0,
+            scheduler_name=target.scheduler,
+            # Only a persistent network joins sessions; a volatile one is the session itself.
+            network_id=(
+                session.network_id if session.network_type == NetworkType.PERSISTENT else None
+            ),
+        )
+        await target.client.create_session(
+            build_session_objects(placement, kernel_configs, cluster_info)
+        )
+        log.debug("session workload created", compute_cluster=target.name, k8s_namespace=namespace)
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         """

@@ -36,10 +36,6 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
@@ -87,6 +83,10 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.user.db_source.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.testutils.db import with_tables
 
 _RESOURCE_GROUP = "default"

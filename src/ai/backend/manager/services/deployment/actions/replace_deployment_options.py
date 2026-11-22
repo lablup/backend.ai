@@ -3,10 +3,10 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 @dataclass

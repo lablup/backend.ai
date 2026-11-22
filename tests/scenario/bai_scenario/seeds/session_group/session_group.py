@@ -17,17 +17,17 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
 )
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupData,
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.updaters import SessionGroupRetentionUpdater
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import (
     Naming,

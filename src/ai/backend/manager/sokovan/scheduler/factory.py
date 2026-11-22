@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import FairShareAggregator
 from ai.backend.manager.sokovan.scheduler.fair_share.calculator import FairShareFactorCalculator
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
@@ -76,7 +78,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
     DependenciesValidator,
@@ -99,6 +100,7 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminatorArgs,
 )
 from ai.backend.manager.views.sokovan.result import PromotionSpec
+from ai.backend.sokovan_core.selectors.selector import AgentSelector
 
 
 def create_default_scheduler_components(
@@ -110,6 +112,7 @@ def create_default_scheduler_components(
     network_plugin_ctx: NetworkPluginContext,
     valkey_schedule: ValkeyScheduleClient,
     agent_selector: AgentSelector,
+    key_provider_pool: KeyProviderPool,
 ) -> SchedulerComponents:
     """
     Create scheduler components with default configuration.
@@ -123,6 +126,7 @@ def create_default_scheduler_components(
         network_plugin_ctx: Network plugin context for network management
         valkey_schedule: Valkey client for scheduling operations
         agent_selector: Agent selector shared with the scheduling controller
+        key_provider_pool: Decrypts the kubeconfig of a compute cluster
 
     Returns:
         A configured SchedulerComponents instance
@@ -148,6 +152,10 @@ def create_default_scheduler_components(
         )
     )
 
+    compute_clusters = ComputeClusterResolver(
+        scheduler_repository, key_provider_pool, config_provider
+    )
+
     # Create launcher
     launcher = SessionLauncher(
         SessionLauncherArgs(
@@ -157,6 +165,7 @@ def create_default_scheduler_components(
             network_plugin_ctx=network_plugin_ctx,
             config_provider=config_provider,
             valkey_schedule=valkey_schedule,
+            compute_clusters=compute_clusters,
         )
     )
 
@@ -166,6 +175,7 @@ def create_default_scheduler_components(
             repository=scheduler_repository,
             agent_client_pool=agent_client_pool,
             valkey_schedule=valkey_schedule,
+            compute_clusters=compute_clusters,
         )
     )
 

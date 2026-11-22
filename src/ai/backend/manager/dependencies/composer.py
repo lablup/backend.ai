@@ -55,9 +55,7 @@ from ai.backend.manager.dependencies.system.composer import (
     SystemResources,
 )
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
-    create_agent_selector,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selection import create_agent_selector
 
 from .plugins.base import PluginsInput
 from .plugins.monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
@@ -313,6 +311,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 appproxy_client_pool=agents.appproxy_client_pool,
                 network_plugin_ctx=plugins.network_plugin_ctx,
                 agent_selector=agent_selector,
+                key_provider_pool=bootstrap.key_provider_pool,
                 scheduling_controller=agents.scheduling_controller,
                 deployment_controller=agents.deployment_controller,
                 route_controller=agents.route_controller,

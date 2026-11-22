@@ -690,6 +690,20 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+id = "sokovan-core-inward"
+name = "sokovan_core imports no component"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["ai.backend.sokovan_core"]
+forbidden_modules = [
+    "ai.backend.manager",
+    "ai.backend.kube",
+    "ai.backend.agent",
+    "ai.backend.storage",
+    "ai.backend.appproxy",
+]
+
+[[tool.importlinter.contracts]]
 id = "agent-docker"
 name = "agent docker imports no kubernetes or dummy"
 type = "forbidden"

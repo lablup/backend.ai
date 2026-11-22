@@ -198,20 +198,21 @@ class MockPlugin(AbstractComputePlugin):
                 stdout, _ = await proc.communicate()
                 lines = stdout.decode().splitlines()
             except FileNotFoundError:
-                log.exception(
-                    "accelerator disabled: docker version command failed", plugin_name=self.key
-                )
-                self.enabled = False
-                return
-            rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
-            docker_version_data = json.loads(lines[0])
-            m = rx_triple_version.search(docker_version_data["Server"]["Version"])
-            if m:
-                self.docker_version = tuple(map(int, m.group(1).split(".")))
-            else:
-                log.error("accelerator disabled: docker version not detected", plugin_name=self.key)
-                self.enabled = False
-                return
+                # The version is only reported: a host without Docker (a DRA node) runs the mock too.
+                lines = []
+                log.info("docker not found, its version left unknown", plugin_name=self.key)
+            if lines:
+                rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
+                docker_version_data = json.loads(lines[0])
+                m = rx_triple_version.search(docker_version_data["Server"]["Version"])
+                if m:
+                    self.docker_version = tuple(map(int, m.group(1).split(".")))
+                else:
+                    log.error(
+                        "accelerator disabled: docker version not detected", plugin_name=self.key
+                    )
+                    self.enabled = False
+                    return
             log.info(
                 "mock cuda runtime detected",
                 nvidia_driver_version=str(self.mock_config["attributes"]["nvidia_driver"]),

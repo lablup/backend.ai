@@ -23,36 +23,36 @@ from ai.backend.common.types import (
     PreemptionOrder,
     SessionId,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-    BatchAgentSelectionFailedError,
-    NoAgentsInResourceGroupError,
-    NoCompatibleAgentError,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
-    create_agent_selector,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionCriteria,
-    AgentSelector,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
-    PlacementFailure,
-    ResourceRequirements,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.exceptions import (
     ConcurrencyLimitExceeded,
     DependenciesNotSatisfied,
     MultipleValidationErrors,
 )
-from ai.backend.manager.views.sokovan.agent import (
+from ai.backend.sokovan_core.selectors.exceptions import (
+    BatchAgentSelectionFailedError,
+    NoAgentsInResourceGroupError,
+    NoCompatibleAgentError,
+)
+from ai.backend.sokovan_core.selectors.pool import (
+    create_agent_selector,
+)
+from ai.backend.sokovan_core.selectors.selector import (
+    AgentSelectionCriteria,
+    AgentSelector,
+)
+from ai.backend.sokovan_core.selectors.tracker import AgentStateTracker
+from ai.backend.sokovan_core.selectors.types import (
+    PlacementFailure,
+    ResourceRequirements,
+)
+from ai.backend.sokovan_core.types.agent import (
     AgentInfo,
     AgentLimit,
     AgentResource,
     SlotResource,
 )
-from ai.backend.manager.views.sokovan.workload import ResourceRequest
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
+from ai.backend.sokovan_core.types.workload import ResourceRequest
 
 
 def _slots(slots: Mapping[str, str]) -> dict[ResourceSlotName, Decimal]:

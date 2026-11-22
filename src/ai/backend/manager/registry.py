@@ -17,7 +17,6 @@ from typing import (
     cast,
 )
 
-import aiodocker
 import aiotools
 import sqlalchemy as sa
 import yarl
@@ -326,7 +325,6 @@ class AgentRegistry:
     ) -> None:
         self._ops_provider = ops_provider
         self.config_provider = config_provider
-        self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
         self._agent_client_pool = agent_client_pool

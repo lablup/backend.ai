@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backendai-control
+description: Backend.AI control plane for Kubernetes workload clusters (suggestion-1122 9.6)
+type: application
+version: 0.1.0
+appVersion: "26.10.0"

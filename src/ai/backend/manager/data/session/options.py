@@ -29,6 +29,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     ResourceSlotEntry,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 class _OptionsBaseModel(BackendAISchema):
@@ -92,18 +93,6 @@ class FailurePolicy(enum.StrEnum):
     TOLERANT = "tolerant"
     """Session keeps running as long as at least one replica stays up;
     individual replica failures are logged but non-fatal."""
-
-
-class AgentSelectionPolicy(enum.StrEnum):
-    """Scheduling constraint for ``SchedulingTarget.designated_agents``."""
-
-    STRICT = "strict"
-    """Schedule only onto ``designated_agents``; fail the schedule if
-    none are available."""
-
-    PREFERRED = "preferred"
-    """Prefer ``designated_agents`` but fall back to any eligible agent
-    when they have no capacity."""
 
 
 class HandlerOptions(_OptionsBaseModel):

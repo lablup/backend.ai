@@ -1,0 +1,48 @@
+# Backend.AI control plane. Config files carry secrets, so each component reads an existing
+# Secret: create it from the component's sample config before installing.
+image:
+  repository: lablup/backend.ai-kube
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+manager:
+  # Secret with `manager.toml`, `manager.key_secret` and (for the migration) `alembic.ini`.
+  configSecret: manager-config
+  service: {type: NodePort, nodePort: 30891}
+  resources: {}
+  # alembic upgrade head before each install and upgrade.
+  migration:
+    enabled: true
+
+storageProxy:
+  enabled: true
+  configSecret: storage-proxy-config  # `storage-proxy.toml`
+  runAsUser: 1000
+  # Storage volumes, mounted where storage-proxy.toml's volumes point.
+  volumes: []
+  #  - {name: nfs, mountPath: /vfroot/nfs, claimName: nfs}
+
+appproxyCoordinator:
+  enabled: true
+  configSecret: appproxy-coordinator-config  # `app-proxy-coordinator.toml`, `alembic.ini`
+  service: {type: NodePort, nodePort: 30200}
+
+prometheus:
+  enabled: true
+  image: prom/prometheus:v2.55.1
+  retention: 2d
+  # Workload clusters' session controllers (DNS of their headless metrics Service).
+  sessionControllerTargets: []
+  #  - session-controller-metrics.backendai-system.svc.cluster.local
+
+loki:
+  enabled: true
+  image: grafana/loki:3.3.2
+  retention: 72h
+
+# Valkey and etcd for a development install; production points the configs to external ones.
+infra:
+  enabled: false
+  valkeyImage: redis:7
+  etcdImage: quay.io/coreos/etcd:v3.5.14

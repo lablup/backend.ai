@@ -1,0 +1,165 @@
+# This cluster as the Manager sees it: one agent (the session gateway) in one resource group.
+cluster:
+  agentId: ""
+  resourceGroup: ""
+
+# The control plane's Valkey: kernel events and the gateway heartbeat go to its event stream.
+controlPlane:
+  valkey:
+    addr: ""
+    passwordSecret: {name: "", key: password}
+
+# Image of the in-cluster Python components. Pin a digest: nodes cache mutable tags.
+image:
+  repository: lablup/backend.ai-kube
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# Kernel runner image copied into every session Pod by an init container (deploy/krunner).
+krunner:
+  repository: lablup/backend.ai-krunner
+  tag: ""
+  digest: ""
+
+sessionController:
+  replicas: 1  # keep 1 until leader election exists
+  workers: 4
+  logLevel: INFO
+  # uid/gid of the kernel user when the session does not set one (images with `uid-match`).
+  kernelUid: 1000
+  kernelGid: 1000
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 512Mi}
+  nodeSelector: {}
+  tolerations: []
+
+sessionGateway:
+  replicas: 1
+  logLevel: INFO
+  rpcPort: 6001
+  service:
+    # The Manager connects to this Service as it connects to an Agent's RPC port.
+    type: ClusterIP
+    annotations: {}
+  # Secret holding `manager.key` (the manager's public key) and `gateway.key_secret`
+  # (this gateway's CurveZMQ keypair).
+  keySecretName: session-gateway-keys
+  # tcp://host:port at which the Manager reaches the gateway. Empty: the Service's cluster DNS name.
+  advertisedAddr: ""
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "2", memory: 1Gi}
+  nodeSelector: {}
+  tolerations: []
+
+sokovanScheduler:
+  logLevel: INFO
+  intervalSeconds: 2
+  strategy: concentrated  # concentrated | dispersed
+  # binder: KAI form (DRA allocator sidecar + sokovan binder). gate: Kueue form, kube-scheduler binds.
+  bindMode: binder
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  nodeSelector: {}
+  tolerations: []
+
+# Storage volumes of the storage-proxy that sessions mount vfolders from (suggestion-1122 7.4).
+# mountBasePath is the volume's path in the storage-proxy; a vfolder under it is mounted with
+# a subPath of the PV below.
+storageBindings: []
+#  - name: nfs
+#    storageHost: local:nfs
+#    mountBasePath: /vfroot/nfs
+#    pv:
+#      csi: {driver: nfs.csi.k8s.io, volumeHandle: nfs, volumeAttributes: {server: 10.0.0.1, share: /}}
+#      mountOptions: [nfsvers=4.1]
+
+# bai-dra: Backend.AI accelerator plugins exposed as DRA drivers (suggestion-1122 4). One DaemonSet
+# per entry, on the nodes labeled `dra.backend.ai/driver-mode=bai`; the plugin host runs the
+# plugin, the Go driver registers with the kubelet and writes CDI specs.
+baiDra:
+  driverImage:
+    repository: lablup/bai-dra-driver
+    tag: ""
+    digest: ""
+  drivers: []
+#  - name: mock-cuda
+#    driverName: cuda.dra.backend.ai
+#    plugin: ai.backend.accelerator.mock.plugin:MockPlugin
+#    pluginConfig: {allocation_mode: discrete}
+#    files: {mock-accelerator.toml: "..."}   # put in /etc/backend.ai of the plugin host
+#    nodeSelector: {dra.backend.ai/driver-mode: bai}
+#    runtimeClassName: nvidia                 # a plugin that reads the driver library (NVML)
+#    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
+#    shared: true                             # devices split by `shares` (DRAConsumableCapacity)
+#    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
+
+# DeviceProfiles: Backend.AI slot name → DeviceClass (suggestion-1122 4.8). The session controller
+# turns a kernel's device slots into ResourceClaims with them; the gateway reports the slots.
+deviceProfiles: []
+#  - name: cuda-device
+#    slotName: cuda.device
+#    sharingMode: exclusive
+#    driverName: cuda.dra.backend.ai
+#    deviceClassName: cuda.dra.backend.ai
+#    matchAttributes: []
+
+# sokovan binder and DRA allocator (go/sokovan-binder), used when sokovanScheduler.bindMode=binder.
+sokovanBinder:
+  image:
+    repository: lablup/sokovan-binder
+    tag: ""
+    digest: ""
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: "1", memory: 512Mi}
+
+# Log collection (suggestion-1122 11.2): kernel Pods and these components → control plane Loki.
+logCollector:
+  enabled: false
+  image: grafana/promtail:3.3.2
+  lokiUrl: http://loki.backendai-control.svc:3100
+  # A NotReady node a toleration lets the DaemonSet onto holds every rollout.
+  tolerations: []
+
+# appproxy worker (suggestion-1122 9.2), port mode on the host network of one node.
+appproxyWorker:
+  enabled: false
+  coordinatorEndpoint: ""    # e.g. http://appproxy-coordinator.backendai-control.svc:10200
+  authority: ""              # defaults to cluster.agentId
+  advertisedHost: ""         # the node address users reach
+  apiPort: 10211
+  portRange: [12000, 12100]
+  nodeSelector: {}
+  logLevel: INFO
+  secrets: {apiSecret: "", jwtSecret: "", permitHashSecret: ""}  # the coordinator's
+
+# Lease leader election (suggestion-1122 12.1): the controller, scheduler and binder run this many
+# replicas, one active. Without it each runs one replica.
+leaderElection:
+  enabled: true
+  replicas: 2
+
+# Pre-flight checks as a post-install/upgrade hook Job (CRDs, DRA API, bai-dra nodes, gates).
+preflight:
+  enabled: true
+
+# The kueue scheduler adapter (a resource group's driver_opts.scheduler = "kueue"). Kueue itself is
+# installed separately; with `manage`, this chart creates its ResourceFlavor and ClusterQueue.
+kueue:
+  clusterQueue: backendai
+  manage: false
+  nominalQuota: {cpu: "1000", memory: 4Ti}
+
+# node helper (suggestion-1122 9.2): session commit and image push on the node's containerd.
+nodeHelper:
+  enabled: false
+  image:
+    repository: lablup/backend.ai-node-helper
+    tag: ""
+    digest: ""
+  nodeSelector: {}
+  tolerations: []

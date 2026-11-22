@@ -1,0 +1,52 @@
+{{- if .Values.appproxyCoordinator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appproxy-coordinator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-control.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: appproxy-coordinator}}
+  template:
+    metadata: {labels: {app: appproxy-coordinator}}
+    spec:
+      initContainers:
+        # Creates the schema on an empty database; stamps head otherwise.
+        - name: schema
+          image: {{ include "backendai-control.image" .Values.image }}
+          command: [python, -m, ai.backend.cli, app-proxy-coordinator, schema, oneshot, -f, /etc/backend.ai/alembic.ini]
+          workingDir: /tmp
+          env: [{name: HOME, value: /tmp}]
+          volumeMounts: [{name: config, mountPath: /etc/backend.ai}]
+      containers:
+        - name: coordinator
+          image: {{ include "backendai-control.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /tmp
+          command: [python, -m, ai.backend.cli, app-proxy-coordinator, start-server, -f, /etc/backend.ai/app-proxy-coordinator.toml]
+          env: [{name: HOME, value: /tmp}]
+          ports: [{containerPort: 10200}]
+          volumeMounts: [{name: config, mountPath: /etc/backend.ai}]
+      volumes:
+        - name: config
+          secret: {secretName: {{ .Values.appproxyCoordinator.configSecret }}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appproxy-coordinator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-control.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.appproxyCoordinator.service.type }}
+  selector: {app: appproxy-coordinator}
+  ports:
+    - port: 10200
+      targetPort: 10200
+      {{- if and (eq .Values.appproxyCoordinator.service.type "NodePort") .Values.appproxyCoordinator.service.nodePort }}
+      nodePort: {{ .Values.appproxyCoordinator.service.nodePort }}
+      {{- end }}
+{{- end }}

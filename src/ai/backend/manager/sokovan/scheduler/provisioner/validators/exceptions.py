@@ -16,8 +16,8 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.views.sokovan.snapshot import SlotExcess
+from ai.backend.sokovan_core.exceptions import SchedulingError
 
 
 class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):

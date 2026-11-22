@@ -64,7 +64,6 @@ from ai.backend.manager.data.kernel.types import (
     UserPermission,
 )
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionEntityData,
@@ -79,6 +78,7 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
 from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
     BulkGetSessionDesignatedAgentIdsAction,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 def _create_session_data(

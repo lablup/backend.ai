@@ -1,0 +1,29 @@
+{{- if .Values.leaderElection.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backendai-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backendai-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: backendai-leader-election
+subjects:
+  - {kind: ServiceAccount, name: session-controller, namespace: {{ .Release.Namespace }}}
+  - {kind: ServiceAccount, name: sokovan-scheduler, namespace: {{ .Release.Namespace }}}
+  - {kind: ServiceAccount, name: sokovan-binder, namespace: {{ .Release.Namespace }}}
+{{- end }}

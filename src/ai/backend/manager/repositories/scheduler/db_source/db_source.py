@@ -63,6 +63,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.compute_cluster.types import (
+    DEFAULT_CLUSTER_SCHEDULER,
+    KUBERNETES_RESOURCE_GROUP_DRIVER,
+    ProjectQueueData,
+    ResourceGroupComputeCluster,
+)
 from ai.backend.manager.data.dotfile.types import (
     DotfileBundle,
     DotfileEntry,
@@ -93,6 +99,7 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.compute_cluster import ComputeClusterNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.errors.network import NetworkNotFound
@@ -109,11 +116,16 @@ from ai.backend.manager.models.bootstrap_script.row import (
     UserDefaultBootstrapScriptRow,
 )
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
+from ai.backend.manager.models.compute_cluster.row import ComputeClusterRow
+from ai.backend.manager.models.compute_cluster.searchable_fields import (
+    ComputeClusterSearchableFields,
+)
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain_container_registry_relation.row import (
     DomainContainerRegistryRelationRow,
 )
+from ai.backend.manager.models.fair_share.row import ProjectFairShareRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher
@@ -193,11 +205,6 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
 )
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.types import UserScope
-from ai.backend.manager.views.sokovan.agent import (
-    AgentMeta,
-    AgentResource,
-    SlotResource,
-)
 from ai.backend.manager.views.sokovan.allocation import (
     SessionAllocation,
 )
@@ -225,29 +232,38 @@ from ai.backend.manager.views.sokovan.session_creation import (
     ResourceGroupEnqueueInfo,
 )
 from ai.backend.manager.views.sokovan.snapshot import (
-    PreemptionCandidate,
     PreemptionCandidateSnapshot,
     ResourceAllocation,
     ResourceGroupSchedulingPolicy,
     ResourceLimit,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
-    ScopeVictimCandidates,
     SessionDependencySnapshot,
     SlotAllocation,
     UserResourceAllocation,
     UserResourceLimit,
 )
 from ai.backend.manager.views.sokovan.workload import (
-    KernelWorkload,
     PreemptionScopeKey,
-    ResourceRequest,
     SessionDependencyInfo,
-    SessionGroupPolicy,
-    SessionPlacement,
     SessionWorkload,
     WorkloadMeta,
     WorkloadOwner,
+)
+from ai.backend.sokovan_core.types.agent import (
+    AgentMeta,
+    AgentResource,
+    SlotResource,
+)
+from ai.backend.sokovan_core.types.preemption import (
+    PreemptionCandidate,
+    ScopeVictimCandidates,
+)
+from ai.backend.sokovan_core.types.workload import (
+    KernelWorkload,
+    ResourceRequest,
+    SessionGroupPolicy,
+    SessionPlacement,
 )
 
 from .types import AgentResourcesByAgent
@@ -1785,6 +1801,62 @@ class ScheduleDBSource:
             await self._record_scheduling_history(db_sess, histories)
 
         return force_terminated_sessions
+
+    async def get_compute_cluster_of_resource_group(
+        self, resource_group: str
+    ) -> ResourceGroupComputeCluster | None:
+        """The compute cluster a `kubernetes` resource group runs its sessions in, if any."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            group = (
+                await session.execute(
+                    sa.select(ResourceGroupRow.driver, ResourceGroupRow.driver_opts).where(
+                        ResourceGroupRow.name == resource_group
+                    )
+                )
+            ).first()
+            if group is None or group.driver != KUBERNETES_RESOURCE_GROUP_DRIVER:
+                return None
+            opts = group.driver_opts or {}
+            cluster_name = opts.get("compute_cluster")
+            row = await session.scalar(
+                sa.select(ComputeClusterRow).where(ComputeClusterRow.name == cluster_name)
+            )
+            if row is None:
+                raise ComputeClusterNotFound(
+                    f"resource group {resource_group} names compute cluster {cluster_name!r},"
+                    " which is not registered"
+                )
+            return ResourceGroupComputeCluster(
+                cluster=ComputeClusterSearchableFields.own.to_data(row),
+                scheduler=str(opts.get("scheduler") or DEFAULT_CLUSTER_SCHEDULER),
+            )
+
+    async def get_project_queue_data(
+        self, project_id: UUID, resource_group: str
+    ) -> ProjectQueueData:
+        """The limit and fair share factor of a project's queue in a compute cluster."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            slots = await session.scalar(
+                sa.select(ProjectRow.total_resource_slots).where(ProjectRow.id == project_id)
+            )
+            factor = await session.scalar(
+                sa.select(ProjectFairShareRow.fair_share_factor).where(
+                    ProjectFairShareRow.project_id == project_id,
+                    ProjectFairShareRow.resource_group == resource_group,
+                )
+            )
+        return ProjectQueueData(
+            project_id=project_id,
+            total_resource_slots={str(k): str(v) for k, v in (slots or {}).items()},
+            fair_share_factor=factor,
+        )
+
+    async def get_resource_group_of_agent(self, agent_id: AgentId) -> str | None:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            resource_group: str | None = await session.scalar(
+                sa.select(AgentRow.scaling_group).where(AgentRow.id == agent_id)
+            )
+            return resource_group
 
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
         """Get ids of all defined resource groups."""

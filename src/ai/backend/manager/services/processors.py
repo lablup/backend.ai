@@ -77,6 +77,10 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.client_ip_masking.processors import (
         ClientIPMaskingProcessors,
     )
+    from ai.backend.manager.services.compute_cluster.processors import (
+        ComputeClusterProcessors,
+    )
+    from ai.backend.manager.services.compute_cluster.service import ComputeClusterService
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
@@ -434,6 +438,7 @@ class Services:
     stream: StreamService
     system_session_environ: SystemSessionEnvironService
     ssh_key: SSHKeyService
+    compute_cluster: ComputeClusterService
     events: EventsService
 
 
@@ -514,6 +519,7 @@ class Processors:
     template: TemplateProcessors
     stream: StreamProcessors
     login_client_type: LoginClientTypeProcessors
+    compute_cluster: ComputeClusterProcessors
 
 
 @dataclass

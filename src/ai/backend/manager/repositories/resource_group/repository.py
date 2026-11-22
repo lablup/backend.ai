@@ -21,7 +21,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     ResourceInfo,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
@@ -34,6 +34,7 @@ from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdat
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.db_source.db_source import ResourceGroupDBSource
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

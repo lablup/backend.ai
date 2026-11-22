@@ -64,10 +64,10 @@ from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionResult,
     RouteProvisionTarget,
 )
-from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from ai.backend.sokovan_core.exceptions import SchedulingError
 
 log = StructuredLogger(logging.getLogger(__name__))
 

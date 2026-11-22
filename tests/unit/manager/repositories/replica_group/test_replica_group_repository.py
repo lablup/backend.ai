@@ -37,10 +37,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.session.types import SchedulingResult
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -93,6 +89,10 @@ from ai.backend.manager.repositories.replica_group.types import (
     ReplicaGroupScalingReconcileApply,
 )
 from ai.backend.manager.types import OptionalState
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.testutils.db import with_tables
 
 

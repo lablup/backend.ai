@@ -35,7 +35,8 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
-from ai.backend.manager.data.session.options import AgentSelectionPolicy, HandlerOptions
+from ai.backend.manager.data.session.options import HandlerOptions
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 if TYPE_CHECKING:
     from ai.backend.common.schema.deployment import (

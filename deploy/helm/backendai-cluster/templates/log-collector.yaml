@@ -1,0 +1,112 @@
+{{- if .Values.logCollector.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-log-collector
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-log-collector
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-log-collector
+subjects:
+  - kind: ServiceAccount
+    name: log-collector
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+data:
+  promtail.yaml: |
+    server: {http_listen_port: 9080, grpc_listen_port: 0}
+    positions: {filename: /run/promtail/positions.yaml}
+    clients:
+      - url: {{ .Values.logCollector.lokiUrl }}/loki/api/v1/push
+        external_labels: {cluster: {{ .Values.cluster.agentId | quote }}}
+    scrape_configs:
+      - job_name: backendai
+        pipeline_stages: [{cri: {}}]
+        kubernetes_sd_configs:
+          - role: pod
+            selectors: [{role: pod, field: "spec.nodeName=${HOSTNAME}"}]
+        relabel_configs:
+          # Kernel Pods of sessions, and the cluster's Backend.AI components.
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_managed_by, __meta_kubernetes_namespace]
+            separator: ";"
+            regex: "backendai-session-controller;.*|.*;{{ .Release.Namespace }}"
+            action: keep
+          - {source_labels: [__meta_kubernetes_namespace], target_label: namespace}
+          - {source_labels: [__meta_kubernetes_pod_name], target_label: pod}
+          - {source_labels: [__meta_kubernetes_pod_container_name], target_label: container}
+          - {source_labels: [__meta_kubernetes_pod_label_backend_ai_session_id], target_label: session_id}
+          - {source_labels: [__meta_kubernetes_pod_label_backend_ai_kernel_id], target_label: kernel_id}
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            separator: /
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/name: log-collector
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: log-collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: log-collector
+    spec:
+      serviceAccountName: log-collector
+      {{- with .Values.logCollector.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: promtail
+          image: {{ .Values.logCollector.image }}
+          args: ["-config.file=/etc/promtail/promtail.yaml", "-config.expand-env=true"]
+          env:
+            - name: HOSTNAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          volumeMounts:
+            - {name: config, mountPath: /etc/promtail}
+            - {name: pods, mountPath: /var/log/pods, readOnly: true}
+            - {name: positions, mountPath: /run/promtail}
+      volumes:
+        - name: config
+          configMap: {name: log-collector}
+        - name: pods
+          hostPath: {path: /var/log/pods}
+        - name: positions
+          hostPath: {path: /var/lib/backendai-log-collector, type: DirectoryOrCreate}
+{{- end }}

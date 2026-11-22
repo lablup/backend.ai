@@ -64,9 +64,7 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentControllerArgs,
 )
 from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
-    create_agent_selector,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selection import create_agent_selector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,

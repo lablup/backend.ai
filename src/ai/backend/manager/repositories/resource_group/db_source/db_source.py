@@ -21,7 +21,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupListResult,
     ResourceInfo,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -36,6 +36,7 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
 )
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

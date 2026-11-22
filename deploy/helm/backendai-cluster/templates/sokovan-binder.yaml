@@ -1,0 +1,97 @@
+{{- if eq .Values.sokovanScheduler.bindMode "binder" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sokovan-binder
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-sokovan-binder
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["bindrequests"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["bindrequests/status"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/binding"]
+    verbs: ["create"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims"]
+    verbs: ["get"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims/status"]
+    verbs: ["update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-sokovan-binder
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-sokovan-binder
+subjects:
+  - kind: ServiceAccount
+    name: sokovan-binder
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sokovan-binder
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/name: sokovan-binder
+spec:
+  replicas: {{ if .Values.leaderElection.enabled }}{{ .Values.leaderElection.replicas }}{{ else }}1{{ end }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sokovan-binder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sokovan-binder
+    spec:
+      serviceAccountName: sokovan-binder
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: binder
+          image: {{ include "backendai-cluster.image" .Values.sokovanBinder.image }}
+          args: ["binder"{{ if .Values.leaderElection.enabled }}, "--leader-elect"{{ end }}]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            {{- toYaml .Values.sokovanBinder.resources | nindent 12 }}
+      {{- with .Values.sokovanScheduler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sokovanScheduler.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

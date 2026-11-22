@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 
 from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.sokovan_core.types.agent import AgentLimit, ResourceGroupResource
 
-from .agent import AgentLimit, ResourceGroupResource
 from .resource_group import ResourceGroupMeta
 from .session_creation import SessionSpecContext
 from .snapshot import SystemSnapshot

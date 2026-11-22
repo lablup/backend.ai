@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backendai-cluster
+description: Backend.AI components installed in each Kubernetes workload cluster
+type: application
+version: 0.1.0
+appVersion: "26.10.0"

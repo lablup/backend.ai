@@ -39,14 +39,15 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.system_session_environ.repository import (
     SystemSessionEnvironRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.sokovan_core.selectors.selector import AgentSelector
 
 from .idle_checker import IdleCheckerHostDependency, IdleCheckerInput
 from .leader_election import LeaderElectionDependency, LeaderElectionInput
@@ -87,6 +88,7 @@ class OrchestrationInput:
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
     agent_selector: AgentSelector
+    key_provider_pool: KeyProviderPool
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
     route_controller: RouteController
@@ -175,6 +177,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             valkey_live=setup_input.valkey_live,
             valkey_stat=setup_input.valkey_stat,
             agent_selector=setup_input.agent_selector,
+            key_provider_pool=setup_input.key_provider_pool,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             route_controller=setup_input.route_controller,

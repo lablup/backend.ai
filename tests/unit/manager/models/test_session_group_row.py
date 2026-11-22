@@ -14,10 +14,6 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -34,6 +30,10 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.testutils.db import with_tables
 
 

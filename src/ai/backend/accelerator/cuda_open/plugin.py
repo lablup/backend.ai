@@ -282,21 +282,27 @@ class CUDAPlugin(AbstractComputePlugin):
     enabled: bool = True
 
     async def init(self, context: Any | None = None) -> None:
-        # Basic container engine & device access mechanism check
-        try:
-            async with closing_async(aiodocker.Docker()) as docker:
-                docker_info = await docker.system.info()
-                version_info = EngineVersion.model_validate(await docker.version())
-        except DockerError as e:
-            log.warning(
-                "accelerator disabled: docker engine query failed",
-                plugin_name=self.key,
-                exc_info=e,
-            )
-            self.enabled = False
-            return
-
-        device_injector = self._detect_device_injector(docker_info, version_info)
+        device_injector: DeviceInjector | None
+        if self.plugin_config.get("device_injector") == "cdi":
+            # A host without Docker (a DRA node) names the injector; only the CDI spec is needed.
+            device_injector = CDIInjector() if self._has_cdi_spec() else None
+            if device_injector is None:
+                log.error("CDI spec not found", cdi_kind=CDI_KIND)
+        else:
+            # Basic container engine & device access mechanism check
+            try:
+                async with closing_async(aiodocker.Docker()) as docker:
+                    docker_info = await docker.system.info()
+                    version_info = EngineVersion.model_validate(await docker.version())
+            except DockerError as e:
+                log.warning(
+                    "accelerator disabled: docker engine query failed",
+                    plugin_name=self.key,
+                    exc_info=e,
+                )
+                self.enabled = False
+                return
+            device_injector = self._detect_device_injector(docker_info, version_info)
         if device_injector is None:
             log.warning("accelerator disabled: no device injector", plugin_name=self.key)
             self.enabled = False

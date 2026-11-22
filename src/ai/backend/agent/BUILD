@@ -25,6 +25,8 @@ python_sources(
 visibility_private_component(
     allowed_dependents=[
         "//src/ai/backend/accelerator/**",
+        "//src/ai/backend/dra/**",
+        "//src/ai/backend/kube/**",
         "//src/ai/backend/testutils/**",
     ],
     allowed_dependencies=[

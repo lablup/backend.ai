@@ -12,11 +12,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupData,
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.repository import ForeignKeyViolationError, NotNullViolationError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
@@ -25,6 +21,10 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 
 
 @dataclass

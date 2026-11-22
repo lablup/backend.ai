@@ -1,0 +1,63 @@
+{{- if .Values.nodeHelper.enabled }}
+{{- $secret := lookup "v1" "Secret" .Release.Namespace "node-helper-token" }}
+# node helper (suggestion-1122 9.2): session commit and push with the node's containerd.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: node-helper-token
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+data:
+  # Kept across upgrades: the gateway and the helpers share it.
+  token: {{ if $secret }}{{ index $secret.data "token" }}{{ else }}{{ randAlphaNum 40 | b64enc }}{{ end }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-helper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/name: node-helper
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: node-helper
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: node-helper
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.nodeHelper.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeHelper.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: helper
+          image: {{ include "backendai-cluster.image" .Values.nodeHelper.image }}
+          args: ["ai.backend.kube.nodehelper"]
+          env:
+            - {name: HOME, value: /tmp}
+            - name: BACKENDAI_NODE_HELPER_TOKEN
+              valueFrom: {secretKeyRef: {name: node-helper-token, key: token}}
+          ports:
+            - {name: api, containerPort: 6090}
+          securityContext:
+            # containerd's socket and snapshotter are root's.
+            runAsUser: 0
+          volumeMounts:
+            - {name: containerd, mountPath: /run/containerd/containerd.sock}
+            - {name: nerdctl, mountPath: /var/lib/nerdctl}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: containerd
+          hostPath: {path: /run/containerd/containerd.sock, type: Socket}
+        - {name: nerdctl, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
+{{- end }}

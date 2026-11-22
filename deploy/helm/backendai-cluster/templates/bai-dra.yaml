@@ -1,0 +1,161 @@
+{{- if .Values.baiDra.drivers }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bai-dra
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-bai-dra
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceslices"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-bai-dra
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-bai-dra
+subjects:
+  - kind: ServiceAccount
+    name: bai-dra
+    namespace: {{ .Release.Namespace }}
+{{- $classes := dict }}
+{{- range .Values.baiDra.drivers }}
+{{- if not (hasKey $classes .driverName) }}
+{{- $_ := set $classes .driverName true }}
+---
+# Drivers of one name run different plugins on different nodes; one DeviceClass serves them.
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: {{ .driverName }}
+  labels:
+    {{- include "backendai-cluster.labels" $ | nindent 4 }}
+spec:
+  selectors:
+    - cel:
+        expression: device.driver == {{ .driverName | quote }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bai-dra-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" $ | nindent 4 }}
+data:
+  {{- toYaml (.files | default dict) | nindent 2 }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: bai-dra-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: bai-dra-{{ .name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bai-dra-{{ .name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bai-dra-{{ .name }}
+    spec:
+      serviceAccountName: bai-dra
+      {{- with .runtimeClassName }}
+      runtimeClassName: {{ . }}
+      {{- end }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .hamiCore }}
+      initContainers:
+        # HAMi-core's preload library goes to the node: CDI mounts it into shared containers.
+        - name: hami-core
+          image: {{ .image }}
+          command: [sh, -c]
+          args:
+            - cp /k8s-vgpu/lib/nvidia/libvgpu.so.* /host/libvgpu.so && echo /usr/local/vgpu/libvgpu.so > /host/ld.so.preload
+          volumeMounts:
+            - {name: hami-core, mountPath: /host}
+      {{- end }}
+      containers:
+        - name: driver
+          image: {{ include "backendai-cluster.image" $.Values.baiDra.driverImage }}
+          env:
+            - {name: BAI_DRA_DRIVER_NAME, value: {{ .driverName | quote }}}
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          volumeMounts:
+            - {name: bridge, mountPath: /run/bai-dra}
+            - {name: plugins-registry, mountPath: /var/lib/kubelet/plugins_registry}
+            - {name: plugins, mountPath: /var/lib/kubelet/plugins}
+            - {name: cdi, mountPath: /var/run/cdi}
+        - name: plugin-host
+          image: {{ include "backendai-cluster.image" $.Values.image }}
+          args: ["ai.backend.dra.host"]
+          workingDir: /etc/backend.ai
+          env:
+            - {name: BAI_DRA_PLUGIN, value: {{ .plugin | quote }}}
+            - {name: BAI_DRA_PLUGIN_CONFIG, value: {{ toJson (.pluginConfig | default dict) | quote }}}
+            - {name: BAI_DRA_BRIDGE_SOCKET, value: /run/bai-dra/bridge.sock}
+            - {name: HOME, value: /tmp}
+            - {name: BAI_DRA_SHARED, value: {{ .shared | default false | quote }}}
+            {{- with .hamiCore }}
+            - {name: BAI_DRA_HAMI_LIB_DIR, value: {{ .libDir | quote }}}
+            {{- end }}
+            {{- range $k, $v := .pluginHostEnv }}
+            - {name: {{ $k }}, value: {{ $v | quote }}}
+            {{- end }}
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - {name: bridge, mountPath: /run/bai-dra}
+            - {name: files, mountPath: /etc/backend.ai}
+            - {name: tmp, mountPath: /tmp}
+            # Plugins that name devices of other CDI specs check that the spec exists.
+            - {name: cdi, mountPath: /var/run/cdi, readOnly: true}
+      volumes:
+        - {name: bridge, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
+        - name: files
+          configMap: {name: bai-dra-{{ .name }}}
+        - name: plugins-registry
+          hostPath: {path: /var/lib/kubelet/plugins_registry, type: Directory}
+        - name: plugins
+          hostPath: {path: /var/lib/kubelet/plugins, type: DirectoryOrCreate}
+        - name: cdi
+          hostPath: {path: /var/run/cdi, type: DirectoryOrCreate}
+        {{- with .hamiCore }}
+        - name: hami-core
+          hostPath: {path: {{ .libDir }}, type: DirectoryOrCreate}
+        {{- end }}
+{{- end }}
+{{- end }}

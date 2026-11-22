@@ -73,9 +73,9 @@ from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext, UserContext
 from ai.backend.manager.data.session.draft import SchedulingTargetDraft, SessionSpecDraft
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 _TRACE_LEVEL = 5
 

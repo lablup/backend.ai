@@ -55,12 +55,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
-    AgentSelectionPolicy,
     FailurePolicy,
     InternalDataExtras,
     ResourceOpts,
     SessionHandlerOptions,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 class _DraftBaseModel(BackendAISchema):

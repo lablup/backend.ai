@@ -1,0 +1,7 @@
+*
+!requirements.txt
+!VERSION
+!src/ai/backend
+src/ai/backend/**/__pycache__
+src/ai/backend/runner/*.bin
+src/ai/backend/runner/*.tar.xz

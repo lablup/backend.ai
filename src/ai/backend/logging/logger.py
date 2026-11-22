@@ -94,13 +94,16 @@ class LocalLogger(AbstractLogger):
                 file=None,
                 logstash=None,
                 graylog=None,
-                pkg_ns=default_pkg_ns,
+                pkg_ns=dict(default_pkg_ns),  # a copy: the override below must not leak
             )
         else:
             self.config = config
         if log_level != LogLevel.NOTSET:
             self.config.level = log_level
             self.config.pkg_ns["ai.backend"] = log_level
+            # dictConfig applies `loggers`, so the namespace override must land there too.
+            if (ns_logger := self.config.loggers.get("ai.backend")) is not None:
+                ns_logger.level = log_level
         logging.config.dictConfig(self.config.model_dump())
 
     @override

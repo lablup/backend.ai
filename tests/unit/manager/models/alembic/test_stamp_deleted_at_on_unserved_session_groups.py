@@ -20,10 +20,6 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
 from ai.backend.manager.models.alembic.versions import (
     afcdb49cc729_stamp_deleted_at_on_unserved_session_groups as revision,
 )
@@ -42,6 +38,10 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.testutils.db import HasTable, with_tables
 
 _TABLES: list[Table | type[HasTable]] = [

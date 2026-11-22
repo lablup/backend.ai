@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -102,26 +102,25 @@ class TestReconcileAgentResources:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
-        with patch("ai.backend.manager.registry.aiodocker.Docker"):
-            reg = AgentRegistry(
-                config_provider=mock_config,
-                db=db_with_tables,
-                agent_cache=MagicMock(),
-                agent_client_pool=MagicMock(),
-                valkey_stat=MagicMock(),
-                valkey_live=MagicMock(),
-                valkey_image=MagicMock(),
-                event_producer=MagicMock(),
-                event_hub=MagicMock(),
-                storage_manager=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                network_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                scheduler_repository=MagicMock(),
-                ops_provider=MagicMock(),
-                manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
-                manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
-            )
+        reg = AgentRegistry(
+            config_provider=mock_config,
+            db=db_with_tables,
+            agent_cache=MagicMock(),
+            agent_client_pool=MagicMock(),
+            valkey_stat=MagicMock(),
+            valkey_live=MagicMock(),
+            valkey_image=MagicMock(),
+            event_producer=MagicMock(),
+            event_hub=MagicMock(),
+            storage_manager=MagicMock(),
+            hook_plugin_ctx=MagicMock(),
+            network_plugin_ctx=MagicMock(),
+            scheduling_controller=MagicMock(),
+            scheduler_repository=MagicMock(),
+            ops_provider=MagicMock(),
+            manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
+            manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
+        )
         await reg.init()
         try:
             yield reg
@@ -507,26 +506,25 @@ class TestOrphanedAllocationCleanup:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
-        with patch("ai.backend.manager.registry.aiodocker.Docker"):
-            reg = AgentRegistry(
-                config_provider=mock_config,
-                db=db,
-                agent_cache=MagicMock(),
-                agent_client_pool=MagicMock(),
-                valkey_stat=MagicMock(),
-                valkey_live=MagicMock(),
-                valkey_image=MagicMock(),
-                event_producer=MagicMock(),
-                event_hub=MagicMock(),
-                storage_manager=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                network_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                scheduler_repository=MagicMock(),
-                ops_provider=MagicMock(),
-                manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
-                manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
-            )
+        reg = AgentRegistry(
+            config_provider=mock_config,
+            db=db,
+            agent_cache=MagicMock(),
+            agent_client_pool=MagicMock(),
+            valkey_stat=MagicMock(),
+            valkey_live=MagicMock(),
+            valkey_image=MagicMock(),
+            event_producer=MagicMock(),
+            event_hub=MagicMock(),
+            storage_manager=MagicMock(),
+            hook_plugin_ctx=MagicMock(),
+            network_plugin_ctx=MagicMock(),
+            scheduling_controller=MagicMock(),
+            scheduler_repository=MagicMock(),
+            ops_provider=MagicMock(),
+            manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
+            manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
+        )
         await reg.init()
         try:
             yield reg
@@ -977,26 +975,25 @@ class TestTerminalSessionKernelReconciliation:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
-        with patch("ai.backend.manager.registry.aiodocker.Docker"):
-            reg = AgentRegistry(
-                config_provider=mock_config,
-                db=db,
-                agent_cache=MagicMock(),
-                agent_client_pool=MagicMock(),
-                valkey_stat=MagicMock(),
-                valkey_live=MagicMock(),
-                valkey_image=MagicMock(),
-                event_producer=MagicMock(),
-                event_hub=MagicMock(),
-                storage_manager=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                network_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                scheduler_repository=MagicMock(),
-                ops_provider=MagicMock(),
-                manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
-                manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
-            )
+        reg = AgentRegistry(
+            config_provider=mock_config,
+            db=db,
+            agent_cache=MagicMock(),
+            agent_client_pool=MagicMock(),
+            valkey_stat=MagicMock(),
+            valkey_live=MagicMock(),
+            valkey_image=MagicMock(),
+            event_producer=MagicMock(),
+            event_hub=MagicMock(),
+            storage_manager=MagicMock(),
+            hook_plugin_ctx=MagicMock(),
+            network_plugin_ctx=MagicMock(),
+            scheduling_controller=MagicMock(),
+            scheduler_repository=MagicMock(),
+            ops_provider=MagicMock(),
+            manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
+            manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
+        )
         await reg.init()
         try:
             yield reg

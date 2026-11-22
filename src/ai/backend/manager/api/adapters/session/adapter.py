@@ -154,7 +154,6 @@ from ai.backend.manager.data.kernel_group.types import (
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionStatus,
@@ -270,6 +269,7 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 def _fold_kernel_status(status: KernelStatus) -> str:

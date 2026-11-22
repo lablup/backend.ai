@@ -28,7 +28,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -36,6 +35,7 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 class TestDeploymentFromPreset:

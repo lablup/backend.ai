@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterTarget
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -160,6 +161,7 @@ def launcher(
             network_plugin_ctx=mock_network_plugin_ctx,
             config_provider=mock_config_provider,
             valkey_schedule=mock_valkey_schedule,
+            compute_clusters=_no_compute_cluster(),
         )
     )
 
@@ -377,3 +379,47 @@ def image_config_default() -> dict[UUID, ImageConfigData]:
     return {
         config.id: config,
     }
+
+
+def _no_compute_cluster() -> AsyncMock:
+    """A resolver for which no resource group runs on a compute cluster."""
+    resolver = AsyncMock()
+    resolver.for_resource_group.return_value = None
+    resolver.for_agent.return_value = None
+    return resolver
+
+
+@pytest.fixture
+def cluster_client() -> AsyncMock:
+    """The client of the compute cluster a resource group runs on."""
+    client = AsyncMock()
+    client.sync_project_queue.return_value = "k8s.project"
+    return client
+
+
+@pytest.fixture
+def launcher_on_cluster(
+    mock_repository: AsyncMock,
+    mock_system_session_environ_repository: AsyncMock,
+    mock_agent_client_pool: MagicMock,
+    mock_network_plugin_ctx: MagicMock,
+    mock_config_provider: MagicMock,
+    mock_valkey_schedule: AsyncMock,
+    cluster_client: AsyncMock,
+) -> SessionLauncher:
+    """A launcher for which every resource group runs on a compute cluster."""
+    resolver = AsyncMock()
+    resolver.for_resource_group.return_value = ComputeClusterTarget(
+        name="k8s-local", namespace_prefix="bai-", client=cluster_client
+    )
+    return SessionLauncher(
+        SessionLauncherArgs(
+            scheduler_repository=mock_repository,
+            system_session_environ_repository=mock_system_session_environ_repository,
+            agent_client_pool=mock_agent_client_pool,
+            network_plugin_ctx=mock_network_plugin_ctx,
+            config_provider=mock_config_provider,
+            valkey_schedule=mock_valkey_schedule,
+            compute_clusters=resolver,
+        )
+    )

@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: session-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-session-gateway
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["deviceprofiles"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["backend.ai"]
+    resources: ["sessionworkloads"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-session-gateway
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-session-gateway
+subjects:
+  - kind: ServiceAccount
+    name: session-gateway
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: session-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+  {{- with .Values.sessionGateway.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sessionGateway.service.type }}
+  selector:
+    app.kubernetes.io/name: session-gateway
+  ports:
+    - name: rpc
+      port: {{ .Values.sessionGateway.rpcPort }}
+      targetPort: rpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: session-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/name: session-gateway
+spec:
+  replicas: {{ .Values.sessionGateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: session-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: session-gateway
+    spec:
+      serviceAccountName: session-gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: gateway
+          image: {{ include "backendai-cluster.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["ai.backend.kube.gateway"]
+          env:
+            {{- if .Values.nodeHelper.enabled }}
+            - name: BACKENDAI_NODE_HELPER_TOKEN
+              valueFrom: {secretKeyRef: {name: node-helper-token, key: token}}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            {{- end }}
+            {{- include "backendai-cluster.eventEnv" . | nindent 12 }}
+            - {name: BACKENDAI_RESOURCE_GROUP, value: {{ required "cluster.resourceGroup is required" .Values.cluster.resourceGroup | quote }}}
+            - name: BACKENDAI_ADVERTISED_ADDR
+              value: {{ .Values.sessionGateway.advertisedAddr | default (printf "tcp://session-gateway.%s.svc.cluster.local:%v" .Release.Namespace .Values.sessionGateway.rpcPort) | quote }}
+            - {name: BACKENDAI_RPC_LISTEN_ADDR, value: "0.0.0.0:{{ .Values.sessionGateway.rpcPort }}"}
+            - {name: BACKENDAI_MANAGER_PUBLIC_KEY, value: /etc/backend.ai/keys/manager.key}
+            - {name: BACKENDAI_GATEWAY_KEYPAIR, value: /etc/backend.ai/keys/gateway.key_secret}
+            - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sessionGateway.logLevel | quote }}}
+          ports:
+            - {name: rpc, containerPort: {{ .Values.sessionGateway.rpcPort }}}
+          readinessProbe:
+            tcpSocket: {port: rpc}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: keys, mountPath: /etc/backend.ai/keys, readOnly: true}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            {{- toYaml .Values.sessionGateway.resources | nindent 12 }}
+      volumes:
+        - name: keys
+          secret:
+            secretName: {{ .Values.sessionGateway.keySecretName }}
+      {{- with .Values.sessionGateway.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sessionGateway.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

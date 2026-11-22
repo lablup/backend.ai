@@ -6,7 +6,6 @@ from datetime import datetime
 
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AgentId
-from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.snapshot import (
     PreemptionCandidateSnapshot,
@@ -16,6 +15,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
     SessionDependencySnapshot,
 )
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
+from ai.backend.sokovan_core.types.agent import AgentMeta
 
 
 @dataclass(frozen=True)

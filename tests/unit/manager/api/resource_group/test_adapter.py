@@ -5,9 +5,21 @@ Tests conversion from DTO filter objects to repository Querier objects.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import uuid
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupInput,
+    UpdateResourceGroupConfigInput,
+    UpdateResourceGroupInput,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceGroupFilter as ResourceGroupFilterDTO,
 )
@@ -18,8 +30,22 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
 )
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
+from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.resource_group.types import (
+    FairShareResourceGroupSpec,
+    ResourceGroupData,
+    ResourceGroupDriverConfig,
+    ResourceGroupMetadata,
+    ResourceGroupNetworkConfig,
+    ResourceGroupSchedulerConfig,
+    ResourceGroupSchedulerOptions,
+    ResourceGroupStatus,
+    SchedulerType,
+)
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
@@ -234,3 +260,131 @@ class TestResourceGroupAdapterBuildQuerier:
         assert isinstance(querier.pagination, OffsetPagination)
         assert querier.pagination.limit == 10
         assert querier.pagination.offset == 5
+
+
+_K8S_OPTS: dict[str, Any] = {"compute_cluster": "k8s-a"}
+
+
+def _make_resource_group_data(
+    driver: str = "static", driver_opts: dict[str, Any] | None = None
+) -> ResourceGroupData:
+    return ResourceGroupData(
+        id=ResourceGroupID(uuid.uuid4()),
+        name="rg",
+        status=ResourceGroupStatus(is_active=True, is_public=True, is_default=False),
+        metadata=ResourceGroupMetadata(description="", created_at=datetime.now(tz=UTC)),
+        network=ResourceGroupNetworkConfig(
+            wsproxy_addr="", wsproxy_api_token="", use_host_network=False
+        ),
+        driver=ResourceGroupDriverConfig(name=driver, options=driver_opts or {}),
+        scheduler=ResourceGroupSchedulerConfig(
+            name=SchedulerType.FIFO,
+            options=ResourceGroupSchedulerOptions(
+                allowed_session_types=[SessionTypes.INTERACTIVE],
+                pending_timeout=timedelta(seconds=0),
+                config={},
+                agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
+                agent_selector_config={},
+                allow_fractional_resource_fragmentation=True,
+                route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
+            ),
+        ),
+        fair_share_spec=FairShareResourceGroupSpec(),
+        default_deployment_options=DeploymentOptions(),
+        default_session_options=DefaultSessionOptions(),
+    )
+
+
+class TestResourceGroupAdapterDriver:
+    """The adapter carries driver and driver_opts to the actions and back to the node."""
+
+    @pytest.fixture
+    def kubernetes_data(self) -> ResourceGroupData:
+        return _make_resource_group_data(driver="kubernetes", driver_opts=_K8S_OPTS)
+
+    @pytest.fixture
+    def resource_group_processors(self, kubernetes_data: ResourceGroupData) -> MagicMock:
+        processors = MagicMock()
+        processors.create_resource_group.run = AsyncMock(
+            return_value=MagicMock(resource_group=kubernetes_data)
+        )
+        processors.update_resource_group.run = AsyncMock(
+            return_value=MagicMock(resource_group=kubernetes_data)
+        )
+        processors.lookup.run = AsyncMock(
+            return_value=MagicMock(entity_id=MagicMock(return_value=kubernetes_data.id))
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, resource_group_processors: MagicMock) -> ResourceGroupAdapter:
+        return ResourceGroupAdapter(
+            resource_group=resource_group_processors,
+            rbac=MagicMock(),
+            domain=MagicMock(),
+            deployment_coordinator=MagicMock(),
+            schedule_coordinator=MagicMock(),
+        )
+
+    async def test_create_passes_driver_to_creator(
+        self, adapter: ResourceGroupAdapter, resource_group_processors: MagicMock
+    ) -> None:
+        payload = await adapter.create(
+            CreateResourceGroupInput(
+                name="rg", domain_name="default", driver="kubernetes", driver_opts=_K8S_OPTS
+            )
+        )
+        action = resource_group_processors.create_resource_group.run.await_args.args[0]
+        assert action.creator.driver == "kubernetes"
+        assert dict(action.creator.driver_opts) == _K8S_OPTS
+        assert payload.resource_group.driver == "kubernetes"
+        assert payload.resource_group.driver_opts == _K8S_OPTS
+
+    async def test_create_defaults_to_static_driver(
+        self, adapter: ResourceGroupAdapter, resource_group_processors: MagicMock
+    ) -> None:
+        await adapter.create(CreateResourceGroupInput(name="rg", domain_name="default"))
+        action = resource_group_processors.create_resource_group.run.await_args.args[0]
+        assert action.creator.driver == "static"
+        assert dict(action.creator.driver_opts) == {}
+
+    async def test_update_writes_driver_and_driver_opts(
+        self,
+        adapter: ResourceGroupAdapter,
+        resource_group_processors: MagicMock,
+        kubernetes_data: ResourceGroupData,
+    ) -> None:
+        payload = await adapter.update(
+            kubernetes_data.id,
+            UpdateResourceGroupInput(driver="kubernetes", driver_opts=_K8S_OPTS),
+        )
+        action = resource_group_processors.update_resource_group.run.await_args.args[0]
+        values = action.updater.build_values()
+        assert values["driver"] == "kubernetes"
+        assert values["driver_opts"] == _K8S_OPTS
+        assert payload.resource_group.driver == "kubernetes"
+
+    async def test_update_without_driver_leaves_it_unchanged(
+        self,
+        adapter: ResourceGroupAdapter,
+        resource_group_processors: MagicMock,
+        kubernetes_data: ResourceGroupData,
+    ) -> None:
+        await adapter.update(kubernetes_data.id, UpdateResourceGroupInput(is_active=False))
+        action = resource_group_processors.update_resource_group.run.await_args.args[0]
+        values = action.updater.build_values()
+        assert "driver" not in values
+        assert "driver_opts" not in values
+
+    async def test_update_config_writes_driver_and_driver_opts(
+        self, adapter: ResourceGroupAdapter, resource_group_processors: MagicMock
+    ) -> None:
+        await adapter.update_config(
+            UpdateResourceGroupConfigInput(
+                resource_group_name="rg", driver="kubernetes", driver_opts=_K8S_OPTS
+            )
+        )
+        action = resource_group_processors.update_resource_group.run.await_args.args[0]
+        values = action.updater.build_values()
+        assert values["driver"] == "kubernetes"
+        assert values["driver_opts"] == _K8S_OPTS

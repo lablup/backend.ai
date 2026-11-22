@@ -94,7 +94,6 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     SchedulerType,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -187,6 +186,7 @@ from ai.backend.manager.services.resource_group.actions.update_fair_share_spec i
 )
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 def _normalize_quantity(value: Decimal) -> Decimal:
@@ -501,9 +501,8 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         creator = ResourceGroupCreator(
             name=input.name,
-            # ResourceGroupCreator requires a driver field which is not exposed in
-            # CreateResourceGroupInput. Default to the "static" driver.
-            driver="static",
+            driver=input.driver,
+            driver_opts=input.driver_opts,
             scheduler=SchedulerType(input.scheduler_type).value,
             description=input.description,
             is_active=input.is_active,
@@ -587,6 +586,8 @@ class ResourceGroupAdapter(BaseAdapter):
             wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
             wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
             use_host_network=OptionalState.from_unset(input.use_host_network),
+            driver=OptionalState.from_unset(input.driver),
+            driver_opts=OptionalState.from_unset(input.driver_opts),
             scheduler=scheduler,
             preemption_config=preemption_config,
         )
@@ -738,6 +739,8 @@ class ResourceGroupAdapter(BaseAdapter):
                 use_host_network=input.use_host_network,
                 scheduler_type=input.scheduler_type,
                 preemption=input.preemption,
+                driver=input.driver,
+                driver_opts=input.driver_opts,
             ),
         )
         return UpdateResourceGroupConfigPayloadNode(resource_group=payload.resource_group)
@@ -1118,6 +1121,8 @@ class ResourceGroupAdapter(BaseAdapter):
                     ),
                 ),
             ),
+            driver=data.driver.name,
+            driver_opts=dict(data.driver.options),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),
             default_session_options=default_session_options_to_info(data.default_session_options),
         )

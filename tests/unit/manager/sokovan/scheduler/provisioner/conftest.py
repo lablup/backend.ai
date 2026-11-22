@@ -29,14 +29,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.views.sokovan.agent import (
-    AgentLimit,
-    AgentMeta,
-    AgentResource,
-    ResourceGroupResource,
-    SlotResource,
-)
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.scheduling import SchedulingData
 from ai.backend.manager.views.sokovan.snapshot import (
@@ -49,14 +41,24 @@ from ai.backend.manager.views.sokovan.snapshot import (
     SystemSnapshot,
 )
 from ai.backend.manager.views.sokovan.workload import (
-    KernelWorkload,
-    ResourceRequest,
     SessionDependencyInfo,
-    SessionGroupPolicy,
-    SessionPlacement,
     SessionWorkload,
     WorkloadMeta,
     WorkloadOwner,
+)
+from ai.backend.sokovan_core.types.agent import (
+    AgentLimit,
+    AgentMeta,
+    AgentResource,
+    ResourceGroupResource,
+    SlotResource,
+)
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
+from ai.backend.sokovan_core.types.workload import (
+    KernelWorkload,
+    ResourceRequest,
+    SessionGroupPolicy,
+    SessionPlacement,
 )
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID(int=0))

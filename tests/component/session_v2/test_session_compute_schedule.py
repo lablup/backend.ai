@@ -64,7 +64,7 @@ from ai.backend.manager.data.kernel_group.types import (
     KernelGroupResourceSlotData,
 )
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -121,11 +121,12 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import create_agent_selector
+from ai.backend.manager.sokovan.scheduler.provisioner.selection import create_agent_selector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 from .conftest import build_session_registries
 

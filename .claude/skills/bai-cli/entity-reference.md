@@ -27,6 +27,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **service-catalog**: admin(search, create, update, delete)
 - **runtime-variant**: user(search, get) | admin(search, create, update, delete)
 - **runtime-variant-preset**: user(search, get) | admin(search, create, update, delete)
+- **compute-cluster**: admin(create, get, search, update, purge)
 - **scheduling-history**: sub: session(search, search-scoped), deployment(search, search-scoped), route(search, search-scoped)
 
 ## Storage

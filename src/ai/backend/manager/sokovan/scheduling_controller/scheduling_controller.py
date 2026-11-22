@@ -53,17 +53,6 @@ from ai.backend.manager.metrics.scheduler import (
 from ai.backend.manager.plugin.hook_args import PostEnqueueSessionHookArgs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionCriteria,
-    AgentSelector,
-    PlacementPlan,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import (
-    build_agent_trackers,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
-    ResourceRequirements,
-)
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.compute_kernel_resources_rule import (
     ComputeKernelResourcesRule,
@@ -145,9 +134,18 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
-from ai.backend.manager.views.sokovan.workload import (
-    ResourceRequest,
+from ai.backend.sokovan_core.selectors.selector import (
+    AgentSelectionCriteria,
+    AgentSelector,
+    PlacementPlan,
 )
+from ai.backend.sokovan_core.selectors.tracker import (
+    build_agent_trackers,
+)
+from ai.backend.sokovan_core.selectors.types import (
+    ResourceRequirements,
+)
+from ai.backend.sokovan_core.types.workload import ResourceRequest
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

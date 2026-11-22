@@ -20,7 +20,6 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.sokovan.recorder.context import (
     RecorderContext,
 )
-from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduler.results import (
     PreemptionPlanEntry,
     ScheduleResult,
@@ -33,17 +32,22 @@ from ai.backend.manager.views.sokovan.allocation import (
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.scheduling import SchedulingData
-from ai.backend.manager.views.sokovan.snapshot import ScopeVictimCandidates, SystemSnapshot
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
-
-from .selectors.exceptions import BatchAgentSelectionFailedError, NoAvailableAgentError
-from .selectors.selector import (
+from ai.backend.sokovan_core.exceptions import SchedulingError
+from ai.backend.sokovan_core.selectors.exceptions import (
+    BatchAgentSelectionFailedError,
+    NoAvailableAgentError,
+)
+from ai.backend.sokovan_core.selectors.selector import (
     AgentSelection,
-    AgentSelectionCriteria,
     AgentSelector,
     PlacementPlan,
 )
-from .selectors.tracker import AgentStateTracker, build_agent_trackers
+from ai.backend.sokovan_core.selectors.tracker import AgentStateTracker, build_agent_trackers
+from ai.backend.sokovan_core.types.preemption import ScopeVictimCandidates
+
+from .selection import selection_criteria_from_workload
 from .sequencers.drf import DRFSequencer
 from .sequencers.fair_share import FairShareSequencer
 from .sequencers.fifo import FIFOSequencer
@@ -372,7 +376,7 @@ class SessionProvisioner:
         # Project the workload's placement into the plan (requirement +
         # kernel pairs) and the agent selection criteria.
         plan = PlacementPlan.from_placement(session_workload.placement)
-        criteria = AgentSelectionCriteria.from_workload(
+        criteria = selection_criteria_from_workload(
             session_workload,
             plan,
             victim_candidates=self._victim_candidates_for(

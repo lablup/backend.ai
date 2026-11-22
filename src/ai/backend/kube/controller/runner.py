@@ -1,0 +1,144 @@
+"""Watch SessionWorkloads and their Pods, and feed a deduplicated work queue."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any
+
+from kubernetes_asyncio import client
+from kubernetes_asyncio.client.exceptions import ApiException
+
+from ai.backend.kube.controller.naming import LABEL_MANAGED_BY, MANAGED_BY
+from ai.backend.kube.controller.reconciler import SessionReconciler
+from ai.backend.kube.crd.base import CRD_VERSION
+from ai.backend.kube.crd.scheduling import PodGroup
+from ai.backend.kube.crd.session import SessionWorkload
+from ai.backend.kube.watch import watch_forever
+from ai.backend.logging.structured import StructuredLogger
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+_SW = SessionWorkload.crd
+_PG = PodGroup.crd
+
+Key = tuple[str, str]  # (namespace, name)
+
+
+class WorkQueue:
+    """A key is queued at most once; a key changed while in progress is processed again."""
+
+    _queue: asyncio.Queue[Key]
+    _queued: set[Key]
+    _active: set[Key]
+    _dirty: set[Key]
+
+    def __init__(self) -> None:
+        self._queue = asyncio.Queue()
+        self._queued = set()
+        self._active = set()
+        self._dirty = set()
+
+    def add(self, key: Key) -> None:
+        if key in self._active:
+            self._dirty.add(key)
+            return
+        if key not in self._queued:
+            self._queued.add(key)
+            self._queue.put_nowait(key)
+
+    async def get(self) -> Key:
+        key = await self._queue.get()
+        self._queued.discard(key)
+        self._active.add(key)
+        return key
+
+    def done(self, key: Key) -> None:
+        self._active.discard(key)
+        if key in self._dirty:
+            self._dirty.discard(key)
+            self.add(key)
+
+
+class SessionController:
+    _api: client.ApiClient
+    _reconciler: SessionReconciler
+    _queue: WorkQueue
+    _workers: int
+    _resync_seconds: float
+
+    def __init__(
+        self,
+        api: client.ApiClient,
+        reconciler: SessionReconciler,
+        *,
+        workers: int = 4,
+        resync_seconds: float = 30.0,
+    ) -> None:
+        self._api = api
+        self._reconciler = reconciler
+        self._queue = WorkQueue()
+        self._workers = workers
+        self._resync_seconds = resync_seconds
+
+    async def run(self) -> None:
+        custom = client.CustomObjectsApi(self._api)
+        core = client.CoreV1Api(self._api)
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(
+                watch_forever(
+                    lambda **kw: custom.list_cluster_custom_object(
+                        _SW.group, CRD_VERSION, _SW.plural, **kw
+                    ),
+                    self._on_workload,
+                )
+            )
+            tg.create_task(
+                watch_forever(
+                    lambda **kw: core.list_pod_for_all_namespaces(
+                        label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY}", **kw
+                    ),
+                    self._on_owned_object,
+                )
+            )
+            tg.create_task(
+                watch_forever(
+                    lambda **kw: custom.list_cluster_custom_object(
+                        _PG.group, CRD_VERSION, _PG.plural, **kw
+                    ),
+                    self._on_owned_object,
+                )
+            )
+            tg.create_task(self._resync_forever(custom))
+            for _ in range(self._workers):
+                tg.create_task(self._work_forever())
+
+    def _on_workload(self, _event: str, obj: Any) -> None:
+        meta = obj["metadata"]
+        self._queue.add((meta["namespace"], meta["name"]))
+
+    def _on_owned_object(self, _event: str, obj: Any) -> None:
+        meta = obj["metadata"]
+        for ref in meta.get("ownerReferences") or []:
+            if ref["kind"] == _SW.kind:
+                self._queue.add((meta["namespace"], ref["name"]))
+
+    async def _resync_forever(self, custom: client.CustomObjectsApi) -> None:
+        while True:
+            try:
+                listed = await custom.list_cluster_custom_object(_SW.group, CRD_VERSION, _SW.plural)
+                for item in listed["items"]:
+                    self._on_workload("RESYNC", item)
+            except ApiException as e:
+                log.warning("resync list failed", exc_info=e)
+            await asyncio.sleep(self._resync_seconds)
+
+    async def _work_forever(self) -> None:
+        while True:
+            key = await self._queue.get()
+            try:
+                await self._reconciler.reconcile(*key)
+            except Exception:
+                log.exception("reconcile failed", k8s_namespace=key[0], name=key[1])
+            finally:
+                self._queue.done(key)

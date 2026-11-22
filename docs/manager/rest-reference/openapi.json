@@ -17088,6 +17088,505 @@
         "title": "PartialBulkPurgeLoginClientTypesInput",
         "type": "object"
       },
+      "CreateComputeClusterInput": {
+        "description": "Input for registering a compute cluster.",
+        "properties": {
+          "name": {
+            "description": "Added in 26.10.0. Unique compute cluster name.",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Optional description.",
+            "title": "Description"
+          },
+          "api_server": {
+            "description": "Added in 26.10.0. URL of the cluster's Kubernetes API server.",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Api Server",
+            "type": "string"
+          },
+          "kubeconfig": {
+            "description": "Added in 26.10.0. Kubeconfig the manager uses to reach the cluster. Stored encrypted and never returned.",
+            "minLength": 1,
+            "title": "Kubeconfig",
+            "type": "string"
+          },
+          "namespace_prefix": {
+            "default": "bai-",
+            "description": "Added in 26.10.0. Prefix of the namespaces created in the cluster.",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Namespace Prefix",
+            "type": "string"
+          },
+          "gateway_addr": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Address of the cluster's network gateway.",
+            "title": "Gateway Addr"
+          },
+          "gateway_public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Public key of the cluster's gateway.",
+            "title": "Gateway Public Key"
+          }
+        },
+        "required": [
+          "name",
+          "api_server",
+          "kubeconfig"
+        ],
+        "title": "CreateComputeClusterInput",
+        "type": "object"
+      },
+      "ComputeClusterFilter": {
+        "description": "Filter criteria for compute cluster search.",
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by compute cluster ID."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by name."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeClusterStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by status."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by creation datetime."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComputeClusterFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComputeClusterFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComputeClusterFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "ComputeClusterFilter",
+        "type": "object"
+      },
+      "ComputeClusterOrder": {
+        "description": "Single ordering criterion for compute cluster search.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ComputeClusterOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Sort direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ComputeClusterOrder",
+        "type": "object"
+      },
+      "ComputeClusterOrderField": {
+        "description": "Fields available for ordering compute clusters.",
+        "enum": [
+          "name",
+          "created_at"
+        ],
+        "title": "ComputeClusterOrderField",
+        "type": "string"
+      },
+      "ComputeClusterStatus": {
+        "description": "Whether the manager reaches a compute cluster's API server.",
+        "enum": [
+          "UNKNOWN",
+          "ALIVE",
+          "LOST"
+        ],
+        "title": "ComputeClusterStatus",
+        "type": "string"
+      },
+      "ComputeClusterStatusFilter": {
+        "description": "Filter for compute cluster status values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeClusterStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComputeClusterStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeClusterStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComputeClusterStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "ComputeClusterStatusFilter",
+        "type": "object"
+      },
+      "SearchComputeClustersInput": {
+        "description": "Input for paginated compute cluster search.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeClusterFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter criteria."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComputeClusterOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ordering criteria.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-based: number of items after cursor",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-based: start cursor (exclusive)",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-based: number of items before cursor",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-based: end cursor (exclusive)",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: maximum number of results.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: number of results to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "SearchComputeClustersInput",
+        "type": "object"
+      },
+      "UpdateComputeClusterInput": {
+        "description": "Input for updating a compute cluster.\n\nEvery field defaults to UNSET (no change). The nullable fields accept ``null`` to clear.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Omit to leave unchanged; null clears.",
+            "title": "Description"
+          },
+          "api_server": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Omit to leave unchanged.",
+            "title": "Api Server"
+          },
+          "kubeconfig": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Replaces the stored kubeconfig. Omit to leave unchanged.",
+            "title": "Kubeconfig"
+          },
+          "namespace_prefix": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Omit to leave unchanged.",
+            "title": "Namespace Prefix"
+          },
+          "gateway_addr": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Omit to leave unchanged; null clears.",
+            "title": "Gateway Addr"
+          },
+          "gateway_public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Omit to leave unchanged; null clears.",
+            "title": "Gateway Public Key"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeClusterStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added in 26.10.0. Omit to leave unchanged.",
+            "title": "Status"
+          }
+        },
+        "title": "UpdateComputeClusterInput",
+        "type": "object"
+      },
       "ClientIPMaskingMode": {
         "enum": [
           "none",
@@ -26106,6 +26605,18 @@
             "$ref": "#/components/schemas/SchedulerTypeDTO",
             "default": "fifo",
             "description": "Scheduler type value (fifo/lifo/drf/fair-share)."
+          },
+          "driver": {
+            "default": "static",
+            "description": "Added in 26.10.0. Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driver_opts.compute_cluster`.",
+            "title": "Driver",
+            "type": "string"
+          },
+          "driver_opts": {
+            "additionalProperties": true,
+            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster.",
+            "title": "Driver Opts",
+            "type": "object"
           }
         },
         "required": [
@@ -26369,6 +26880,17 @@
             ],
             "description": "Preemption configuration. Omit to leave unchanged.",
             "title": "Preemption"
+          },
+          "driver": {
+            "description": "Added in 26.10.0. Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driver_opts.compute_cluster`. Omit to leave unchanged; `kubernetes` requires `driver_opts` in the same update.",
+            "title": "Driver",
+            "type": "string"
+          },
+          "driver_opts": {
+            "additionalProperties": true,
+            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster. Replaces the stored options. Omit to leave unchanged.",
+            "title": "Driver Opts",
+            "type": "object"
           }
         },
         "title": "UpdateResourceGroupInput",
@@ -26629,6 +27151,17 @@
             ],
             "description": "Preemption configuration. Omit to leave unchanged.",
             "title": "Preemption"
+          },
+          "driver": {
+            "description": "Added in 26.10.0. Resource group driver. `static`: sessions run on the agents of the resource group. `kubernetes`: sessions run as Pods in the compute cluster named by `driver_opts.compute_cluster`. Omit to leave unchanged; `kubernetes` requires `driver_opts` in the same update.",
+            "title": "Driver",
+            "type": "string"
+          },
+          "driver_opts": {
+            "additionalProperties": true,
+            "description": "Added in 26.10.0. Options of the resource group driver. Empty for `static`; `kubernetes` requires `compute_cluster`, the name of a registered compute cluster. Replaces the stored options. Omit to leave unchanged.",
+            "title": "Driver Opts",
+            "type": "object"
           }
         },
         "required": [
@@ -59117,6 +59650,156 @@
         },
         "parameters": [],
         "description": "Permanently remove several login client types, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/compute-clusters/": {
+      "post": {
+        "operationId": "v2/compute-clusters.admin_create",
+        "tags": [
+          "v2/compute-clusters"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateComputeClusterInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Register a compute cluster.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/compute-clusters/search": {
+      "post": {
+        "operationId": "v2/compute-clusters.admin_search",
+        "tags": [
+          "v2/compute-clusters"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchComputeClustersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search compute clusters with filter/order/pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/compute-clusters/{compute_cluster_id}": {
+      "get": {
+        "operationId": "v2/compute-clusters.admin_get",
+        "tags": [
+          "v2/compute-clusters"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "compute_cluster_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a compute cluster by id.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/compute-clusters.admin_update",
+        "tags": [
+          "v2/compute-clusters"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateComputeClusterInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "compute_cluster_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a compute cluster.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/compute-clusters.admin_purge",
+        "tags": [
+          "v2/compute-clusters"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "compute_cluster_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a compute cluster.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/client-ip-masking-policies/search": {

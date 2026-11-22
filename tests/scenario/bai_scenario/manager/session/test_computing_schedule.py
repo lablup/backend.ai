@@ -27,7 +27,7 @@ from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+from ai.backend.sokovan_core.selectors.exceptions import (
     NoAgentsInResourceGroupError,
 )
 from ai.backend.testutils.scenario_steps import (

@@ -278,6 +278,16 @@ class ResourceGroupDetailNode(BaseResponseModel):
     scheduler: ResourceGroupSchedulerConfigInfo = Field(
         description="Scheduler configuration for the resource group."
     )
+    driver: str = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Resource group driver. `static`: sessions run on"
+            " the agents of the resource group. `kubernetes`: sessions run as Pods in the"
+            " compute cluster named by `driver_opts.compute_cluster`."
+        ),
+    )
+    driver_opts: dict[str, Any] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Options of the resource group driver.",
+    )
     default_deployment_options: DeploymentOptionsInfo = Field(
         description=(
             "Default deployment options (timeouts, etc.) snapshot-copied"

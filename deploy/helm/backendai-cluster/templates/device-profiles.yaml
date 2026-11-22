@@ -1,0 +1,11 @@
+{{- range .Values.deviceProfiles }}
+---
+apiVersion: scheduling.backend.ai/v1alpha1
+kind: DeviceProfile
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "backendai-cluster.labels" $ | nindent 4 }}
+spec:
+  {{- toYaml (omit . "name") | nindent 2 }}
+{{- end }}

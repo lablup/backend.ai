@@ -36,11 +36,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupData,
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -72,6 +68,10 @@ from ai.backend.manager.services.session_group.actions.scoped_search import (
 from ai.backend.manager.services.session_group.actions.update import UpdateSessionGroupAction
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
 from ai.backend.manager.types import OptionalState
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 
 __all__ = ("SessionGroupAdapter",)
 

@@ -16,11 +16,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SessionTypes
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupData,
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.session_group import (
     SessionGroupInUseForEnqueue,
     SessionGroupNotFound,
@@ -32,6 +28,10 @@ from ai.backend.manager.services.session.actions.enqueue_session import (
     SessionSchedulingSpec,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 
 _USER_ID = UserID(uuid.uuid4())
 _PROJECT_ID = ProjectID(uuid.uuid4())

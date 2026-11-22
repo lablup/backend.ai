@@ -78,13 +78,7 @@ provisioner/
 │   ├── lifo.py          # Last-In-First-Out
 │   └── drf.py           # Dominant Resource Fairness
 │
-├── selectors/           # Agent selection
-│   ├── selector.py      # AgentSelector base class
-│   ├── exceptions.py    # Selection exceptions
-│   ├── concentrated.py  # Concentrated placement
-│   ├── dispersed.py     # Dispersed placement
-│   ├── roundrobin.py    # Round-robin
-│   └── ...
+├── selection.py         # Manager boundary of sokovan_core.selectors
 │
 └── allocators/          # Resource allocation
     ├── allocator.py     # SchedulingAllocator base class
@@ -140,6 +134,8 @@ Details: [sequencers/README.md](./sequencers/README.md)
 
 ### 3. Selectors
 
+Agent selection lives in the `ai.backend.sokovan_core.selectors` component. `selection.py` builds the selector with the manager recorder and converts a `SessionWorkload` into `AgentSelectionCriteria`.
+
 Selects the optimal agent to run a session.
 
 **Execution Point:** for each session in the order the Sequencer returns them
@@ -156,7 +152,7 @@ Selects the optimal agent to run a session.
 | DispersedSelector | ensure high availability by dispersing resources |
 | RoundRobinSelector | sequential agent rotation |
 
-Details: [selectors/README.md](./selectors/README.md)
+Details: [sokovan_core/selectors/README.md](../../../../sokovan_core/selectors/README.md)
 
 ### 4. Allocators
 
@@ -254,7 +250,7 @@ class CustomSequencer(WorkloadSequencer):
 ### Selector Example
 
 ```python
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
+from ai.backend.sokovan_core.selectors.selector import AgentSelector
 
 class CustomSelector(AgentSelector):
     def select(
@@ -288,5 +284,5 @@ scaling_group_config = {
 - [Scheduler README](../README.md) - Overall scheduler architecture
 - [validators/README.md](./validators/README.md) - Validator details
 - [sequencers/README.md](./sequencers/README.md) - Sequencer details
-- [selectors/README.md](./selectors/README.md) - Selector details
+- [sokovan_core/selectors/README.md](../../../../sokovan_core/selectors/README.md) - Selector details
 - [allocators/README.md](./allocators/README.md) - Allocator details

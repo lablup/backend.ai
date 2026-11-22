@@ -9,12 +9,12 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.session_group.types import (
+from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.sokovan_core.types.policy import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.models.base import GUID, Base, StrEnumType
-from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 __all__ = ("SessionGroupRow",)
 

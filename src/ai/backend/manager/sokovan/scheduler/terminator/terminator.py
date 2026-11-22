@@ -17,6 +17,7 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterResolver
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.views.sokovan.session import (
     KernelTerminationResult,
@@ -33,6 +34,7 @@ class SessionTerminatorArgs:
     repository: SchedulerRepository
     agent_client_pool: AgentClientPool
     valkey_schedule: ValkeyScheduleClient
+    compute_clusters: ComputeClusterResolver
 
 
 class SessionTerminator:
@@ -41,11 +43,13 @@ class SessionTerminator:
     _repository: SchedulerRepository
     _agent_client_pool: AgentClientPool
     _valkey_schedule: ValkeyScheduleClient
+    _compute_clusters: ComputeClusterResolver
 
     def __init__(self, args: SessionTerminatorArgs) -> None:
         self._repository = args.repository
         self._agent_client_pool = args.agent_client_pool
         self._valkey_schedule = args.valkey_schedule
+        self._compute_clusters = args.compute_clusters
 
     async def terminate_sessions_for_handler(
         self,
@@ -170,11 +174,17 @@ class SessionTerminator:
         """
         with with_log_context(session_id=session_id):
             try:
-                async with self._agent_client_pool.acquire(agent_id) as client:
-                    # Call agent's destroy_kernel RPC method with correct parameters
-                    await client.destroy_kernel(
-                        kernel_id, session_id, reason, suppress_events=False
-                    )
+                compute_cluster = await self._compute_clusters.for_agent(agent_id)
+                if compute_cluster is not None:
+                    # Deleting the workload ends every kernel of the session; the other
+                    # kernels' calls find it gone.
+                    await compute_cluster.client.destroy_session(session_id, reason)
+                else:
+                    async with self._agent_client_pool.acquire(agent_id) as client:
+                        # Call agent's destroy_kernel RPC method with correct parameters
+                        await client.destroy_kernel(
+                            kernel_id, session_id, reason, suppress_events=False
+                        )
                 return KernelTerminationResult(
                     kernel_id=kernel_id,
                     agent_id=agent_id,

@@ -22,10 +22,6 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
@@ -39,6 +35,10 @@ from ai.backend.manager.services.session.actions.enqueue_session import (
     ResourceSlotEntry,
     SessionResourceSpec,
     SessionSchedulingSpec,
+)
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
 )
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData

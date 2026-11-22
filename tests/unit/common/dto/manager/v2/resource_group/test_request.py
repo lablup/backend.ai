@@ -245,3 +245,114 @@ class TestDeleteResourceGroupInput:
         json_data = req.model_dump_json()
         restored = DeleteResourceGroupInput.model_validate_json(json_data)
         assert restored.id == req.id
+
+
+class TestCreateResourceGroupInputDriver:
+    """Tests for the driver and driver_opts of CreateResourceGroupInput."""
+
+    def test_driver_defaults_to_static_with_empty_opts(self) -> None:
+        req = CreateResourceGroupInput(name="my-group", domain_name="default")
+        assert req.driver == "static"
+        assert req.driver_opts == {}
+
+    def test_kubernetes_driver_with_compute_cluster_is_valid(self) -> None:
+        req = CreateResourceGroupInput(
+            name="my-group",
+            domain_name="default",
+            driver="kubernetes",
+            driver_opts={"compute_cluster": "k8s-a"},
+        )
+        assert req.driver == "kubernetes"
+        assert req.driver_opts == {"compute_cluster": "k8s-a"}
+
+    def test_unknown_driver_is_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateResourceGroupInput(name="my-group", domain_name="default", driver="slurm")
+
+    @pytest.mark.parametrize(
+        "driver_opts",
+        [{}, {"compute_cluster": ""}, {"compute_cluster": "   "}, {"compute_cluster": 1}],
+        ids=["missing", "empty", "blank", "not-a-string"],
+    )
+    def test_kubernetes_driver_without_compute_cluster_is_rejected(
+        self, driver_opts: dict[str, object]
+    ) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateResourceGroupInput(
+                name="my-group",
+                domain_name="default",
+                driver="kubernetes",
+                driver_opts=driver_opts,
+            )
+
+    def test_driver_survives_round_trip(self) -> None:
+        req = CreateResourceGroupInput(
+            name="my-group",
+            domain_name="default",
+            driver="kubernetes",
+            driver_opts={"compute_cluster": "k8s-a"},
+        )
+        restored = CreateResourceGroupInput.model_validate_json(req.model_dump_json())
+        assert restored.driver == "kubernetes"
+        assert restored.driver_opts == {"compute_cluster": "k8s-a"}
+
+
+class TestUpdateResourceGroupInputDriver:
+    """Tests for the driver and driver_opts of UpdateResourceGroupInput."""
+
+    def test_driver_fields_default_to_unset(self) -> None:
+        req = UpdateResourceGroupInput()
+        assert req.driver is UNSET
+        assert req.driver_opts is UNSET
+
+    def test_kubernetes_driver_with_compute_cluster_is_valid(self) -> None:
+        req = UpdateResourceGroupInput(
+            driver="kubernetes", driver_opts={"compute_cluster": "k8s-a"}
+        )
+        assert req.driver == "kubernetes"
+        assert req.driver_opts == {"compute_cluster": "k8s-a"}
+
+    def test_static_driver_alone_is_valid(self) -> None:
+        req = UpdateResourceGroupInput(driver="static")
+        assert req.driver == "static"
+        assert req.driver_opts is UNSET
+
+    def test_driver_opts_alone_is_not_checked(self) -> None:
+        req = UpdateResourceGroupInput(driver_opts={"compute_cluster": "k8s-b"})
+        assert req.driver is UNSET
+        assert req.driver_opts == {"compute_cluster": "k8s-b"}
+
+    def test_unknown_driver_is_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateResourceGroupInput(driver="slurm")
+
+    def test_kubernetes_driver_without_driver_opts_is_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateResourceGroupInput(driver="kubernetes")
+
+    def test_kubernetes_driver_without_compute_cluster_is_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateResourceGroupInput(driver="kubernetes", driver_opts={"other": "x"})
+
+    def test_omitted_driver_survives_round_trip(self) -> None:
+        req = UpdateResourceGroupInput(is_active=True)
+        restored = UpdateResourceGroupInput.model_validate_json(req.model_dump_json())
+        assert restored.driver is UNSET
+        assert restored.driver_opts is UNSET
+
+
+class TestUpdateResourceGroupConfigInputDriver:
+    """Tests for the driver and driver_opts of UpdateResourceGroupConfigInput."""
+
+    def test_kubernetes_driver_with_compute_cluster_is_valid(self) -> None:
+        req = UpdateResourceGroupConfigInput(
+            resource_group_name="rg",
+            driver="kubernetes",
+            driver_opts={"compute_cluster": "k8s-a"},
+        )
+        assert req.driver == "kubernetes"
+        assert req.driver_opts == {"compute_cluster": "k8s-a"}
+
+    def test_kubernetes_driver_without_compute_cluster_is_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UpdateResourceGroupConfigInput(resource_group_name="rg", driver="kubernetes")

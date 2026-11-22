@@ -11,10 +11,15 @@ from uuid import UUID
 import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    STATIC_RESOURCE_GROUP_DRIVER,
+    PreemptionConfigInputDTO,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput as CreateResourceGroupInputDTO,
 )
@@ -26,9 +31,6 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     PartialBulkUpdateResourceGroupsInput as PartialBulkUpdateResourceGroupsInputDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_group.request import (
-    PreemptionConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     ReplaceResourceGroupDefaultDeploymentOptionsGQLInput as ReplaceResourceGroupDefaultDeploymentOptionsGQLInputDTO,
@@ -511,6 +513,22 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         BackendAIGQLMeta(
             added_version="26.2.0",
             description="Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.",
+        )
+    )
+    driver: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Resource group driver. `static`: sessions run on the agents of the resource group."
+                " `kubernetes`: sessions run as Pods in the compute cluster named by"
+                " `driverOpts.compute_cluster`."
+            ),
+        )
+    )
+    driver_opts: JSON = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Options of the resource group driver.",
         )
     )
     default_deployment_options: DeploymentOptionsInfoGQL = gql_added_field(
@@ -1060,6 +1078,23 @@ class UpdateResourceGroupV2InputGQL(PydanticInputMixin[UpdateResourceGroupInputD
         ),
         default=UNSET,
     )
+    driver: str | None = gql_field(
+        description=(
+            "Resource group driver. `static`: sessions run on the agents of the resource group."
+            " `kubernetes`: sessions run as Pods in the compute cluster named by"
+            " `driverOpts.compute_cluster`."
+            " Omit to leave unchanged; `kubernetes` requires `driverOpts` in the same update."
+        ),
+        default=UNSET,
+    )
+    driver_opts: JSON | None = gql_field(
+        description=(
+            "Options of the resource group driver. Empty for `static`; `kubernetes` requires"
+            " `compute_cluster`, the name of a registered compute cluster."
+            " Replaces the stored options. Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_input(
@@ -1174,6 +1209,27 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
             description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE).",
         ),
         default=SchedulerTypeGQL.FIFO,
+    )
+    driver: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Resource group driver. `static`: sessions run on the agents of the resource group."
+                " `kubernetes`: sessions run as Pods in the compute cluster named by"
+                " `driverOpts.compute_cluster`."
+            ),
+        ),
+        default=STATIC_RESOURCE_GROUP_DRIVER,
+    )
+    driver_opts: JSON = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Options of the resource group driver. Empty for `static`; `kubernetes` requires"
+                " `compute_cluster`, the name of a registered compute cluster."
+            ),
+        ),
+        default_factory=dict,
     )
 
 

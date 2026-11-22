@@ -91,6 +91,13 @@ from ai.backend.manager.api.gql.client_ip_masking.resolver import (
     purge_client_ip_masking_policy,
     upsert_client_ip_masking_policy,
 )
+from ai.backend.manager.api.gql.compute_cluster.resolver import (
+    admin_compute_cluster,
+    admin_compute_clusters,
+    admin_create_compute_cluster,
+    admin_purge_compute_cluster,
+    admin_update_compute_cluster,
+)
 from ai.backend.manager.api.gql.container_registry.resolver.mutation import (
     admin_create_container_registry_v2,
     admin_delete_container_registry_v2,
@@ -1068,6 +1075,9 @@ class Query:
     admin_resource_preset_v2 = admin_resource_preset_v2
     login_client_type = login_client_type
     login_client_types = login_client_types
+    # Compute Cluster APIs
+    admin_compute_cluster = admin_compute_cluster
+    admin_compute_clusters = admin_compute_clusters
     # App Config Definition APIs
     admin_app_config_definition = admin_app_config_definition
     admin_app_config_definitions = admin_app_config_definitions
@@ -1469,6 +1479,10 @@ class Mutation:
     purge_login_client_type = purge_login_client_type
     partial_bulk_update_login_client_types = partial_bulk_update_login_client_types
     partial_bulk_purge_login_client_types = partial_bulk_purge_login_client_types
+    # Compute Cluster mutations
+    admin_create_compute_cluster = admin_create_compute_cluster
+    admin_update_compute_cluster = admin_update_compute_cluster
+    admin_purge_compute_cluster = admin_purge_compute_cluster
     # App Config Definition mutations
     admin_create_app_config_definition = admin_create_app_config_definition
     admin_purge_app_config_definition = admin_purge_app_config_definition

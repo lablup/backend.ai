@@ -533,3 +533,29 @@ class TestSessionLauncherNetworkSetup:
 
         # Assert - Error info should be updated
         mock_repository.update_session_error_info.assert_awaited()
+
+
+class TestSessionLauncherComputeCluster:
+    """A session of a `kubernetes` resource group becomes a SessionWorkload, not agent RPCs."""
+
+    async def test_session_is_written_to_the_cluster(
+        self,
+        launcher_on_cluster: SessionLauncher,
+        cluster_client: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_multi_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        session = session_for_start_multi_kernel
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher_on_cluster.start_sessions_for_handler([session], image_config_default)
+
+        cluster_client.ensure_namespace.assert_awaited_once()
+        assert cluster_client.ensure_namespace.call_args[0][0] == f"bai-{session.project_id}"
+        cluster_client.create_session.assert_awaited_once()
+        objects = cluster_client.create_session.call_args[0][0]
+        assert objects.workload["spec"]["queue"] == "k8s.project"
+        kernels = objects.workload["spec"]["kernels"]
+        assert [k["kernelId"] for k in kernels] == [str(k.kernel_id) for k in session.kernels]
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_agent_client_pool._mock_client.create_local_network.assert_not_awaited()

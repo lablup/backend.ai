@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.artifact_registry import (
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
+from ai.backend.common.data.entity.compute_cluster import ComputeClusterID
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
@@ -128,6 +129,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.client_ip_masking.types import (  # pants: no-infer-dep
         ClientIPMaskingPolicyGQL,
+    )
+    from ai.backend.manager.api.gql.compute_cluster.types import (  # pants: no-infer-dep
+        ComputeClusterGQL,
     )
     from ai.backend.manager.api.gql.container_registry.types import (  # pants: no-infer-dep
         ContainerRegistryGQL,
@@ -1652,6 +1656,27 @@ class DataLoaders:
             return [
                 dto if dto is None or isinstance(dto, Exception) else ES.from_pydantic(dto)
                 for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def compute_cluster_loader(
+        self,
+    ) -> DataLoader[ComputeClusterID, ComputeClusterGQL | None]:
+        adapter = self._adapters.compute_cluster
+
+        async def load_fn(
+            ids: list[ComputeClusterID],
+        ) -> list[ComputeClusterGQL | Exception | None]:
+            from ai.backend.manager.api.gql.compute_cluster.types import (  # pants: no-infer-dep
+                ComputeClusterGQL as CCG,
+            )
+
+            nodes = await adapter.bulk_get_ids(ids)
+            return [
+                node if node is None or isinstance(node, Exception) else CCG.from_pydantic(node)
+                for node in nodes
             ]
 
         return DataLoader(load_fn=load_fn)

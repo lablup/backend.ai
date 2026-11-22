@@ -90,6 +90,7 @@ def terminator(mock_repository: MagicMock, mock_agent_client_pool: MagicMock) ->
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             valkey_schedule=mock_valkey_schedule,
+            compute_clusters=_no_compute_cluster(),
         )
     )
 
@@ -380,3 +381,11 @@ class TestTerminateSessions:
         # Verify
         # Session without kernels cannot be terminated
         assert len(result.scheduled_session_ids) == 0
+
+
+def _no_compute_cluster() -> AsyncMock:
+    """A resolver for which no agent belongs to a compute cluster."""
+    resolver = AsyncMock()
+    resolver.for_resource_group.return_value = None
+    resolver.for_agent.return_value = None
+    return resolver

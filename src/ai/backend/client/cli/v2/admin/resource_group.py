@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import click
 
@@ -11,6 +12,7 @@ from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     entity_label_filter_options,
     entity_label_relations,
+    load_model,
     load_v2_config,
     nullable_option,
     parse_order_options,
@@ -101,6 +103,17 @@ def search(
     asyncio.run(_run())
 
 
+_DRIVER_HELP = (
+    "Resource group driver. static: sessions run on the agents of the resource group;"
+    " kubernetes: sessions run as Pods in the compute cluster named by"
+    " --driver-opts compute_cluster."
+)
+_DRIVER_OPTS_HELP = (
+    "Driver options as a JSON object or @path to a JSON file"
+    ' (e.g. \'{"compute_cluster": "k8s-a"}\'). Required with --driver kubernetes.'
+)
+
+
 @resource_group.command()
 @click.argument("name", type=str)
 def get(name: str) -> None:
@@ -127,9 +140,28 @@ def get(name: str) -> None:
     default=False,
     help="Make this the default resource group. Clear the current default first.",
 )
-def create(name: str, domain_name: str, description: str | None, is_default: bool) -> None:
+@click.option(
+    "--driver",
+    type=click.Choice(["static", "kubernetes"]),
+    default="static",
+    show_default=True,
+    help=_DRIVER_HELP,
+)
+@click.option("--driver-opts", default=None, help=_DRIVER_OPTS_HELP)
+def create(
+    name: str,
+    domain_name: str,
+    description: str | None,
+    is_default: bool,
+    driver: str,
+    driver_opts: str | None,
+) -> None:
     """Create a new resource group (superadmin only)."""
     from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
+
+    driver_opts_value: dict[str, Any] = (
+        load_model(driver_opts, dict[str, Any]) if driver_opts is not None else {}
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -140,6 +172,8 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
                     domain_name=domain_name,
                     description=description,
                     is_default=is_default,
+                    driver=driver,
+                    driver_opts=driver_opts_value,
                 ),
             )
             print_result(result)
@@ -176,6 +210,17 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
     default=None,
     help="Make this the default resource group. Clear the current default first.",
 )
+@click.option(
+    "--driver",
+    type=click.Choice(["static", "kubernetes"]),
+    default=None,
+    help=_DRIVER_HELP,
+)
+@click.option(
+    "--driver-opts",
+    default=None,
+    help=f"{_DRIVER_OPTS_HELP} Replaces the stored options.",
+)
 def update(
     name: str,
     description: str | None,
@@ -183,13 +228,20 @@ def update(
     is_active: bool | None,
     is_public: bool | None,
     is_default: bool | None,
+    driver: str | None,
+    driver_opts: str | None,
 ) -> None:
     """Update a resource group (superadmin only). Omitted options keep their current value."""
     from ai.backend.common.dto.manager.v2.resource_group.request import (
         UpdateResourceGroupConfigInput,
     )
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
     description_value = nullable_option(description, set_null_description, option="description")
+    driver_value: str | Unset = driver if driver is not None else UNSET
+    driver_opts_value: dict[str, Any] | Unset = (
+        load_model(driver_opts, dict[str, Any]) if driver_opts is not None else UNSET
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -202,6 +254,8 @@ def update(
                     is_active=is_active,
                     is_public=is_public,
                     is_default=is_default,
+                    driver=driver_value,
+                    driver_opts=driver_opts_value,
                 ),
             )
             print_result(result)

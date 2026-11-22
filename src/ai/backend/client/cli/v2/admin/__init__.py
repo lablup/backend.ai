@@ -203,6 +203,15 @@ def resource_group() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.compute_cluster:compute_cluster",
+    name="compute-cluster",
+)
+def compute_cluster() -> None:
+    """Admin compute cluster commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.login_client_type:login_client_type",
     name="login-client-type",
 )

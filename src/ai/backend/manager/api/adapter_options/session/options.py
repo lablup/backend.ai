@@ -55,7 +55,6 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
 )
 from ai.backend.manager.data.session.options import (
-    AgentSelectionPolicy,
     DefaultSessionOptions,
     FailurePolicy,
     HandlerOptions,
@@ -64,6 +63,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 __all__ = (
     "default_session_options_from_input",

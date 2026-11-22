@@ -115,11 +115,11 @@ from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.sokovan_core.selectors.selector import AgentSelector
 from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.fakes.events import SilentEventProducer
 from bai_scenario.fakes.storage_proxy import (

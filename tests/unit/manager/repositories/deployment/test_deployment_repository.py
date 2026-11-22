@@ -67,10 +67,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent.row import AgentRow
@@ -136,6 +132,10 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 

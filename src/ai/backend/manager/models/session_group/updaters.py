@@ -13,11 +13,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
-from ai.backend.manager.data.session_group.types import (
-    SessionGroupData,
-    SessionGroupPlacementDirection,
-    SessionGroupPlacementEnforcement,
-)
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.session_group import SessionGroupInUseForUpdate
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -26,6 +22,10 @@ from ai.backend.manager.models.session_group.searchable_fields import SessionGro
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
+from ai.backend.sokovan_core.types.policy import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 
 __all__ = ("SessionGroupRetentionUpdater", "SessionGroupUpdater")
 

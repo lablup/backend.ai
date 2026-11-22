@@ -5,10 +5,10 @@ Request DTOs for resource group DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
@@ -52,6 +52,33 @@ __all__ = (
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
 )
+
+STATIC_RESOURCE_GROUP_DRIVER = "static"
+KUBERNETES_RESOURCE_GROUP_DRIVER = "kubernetes"
+RESOURCE_GROUP_DRIVERS = frozenset({STATIC_RESOURCE_GROUP_DRIVER, KUBERNETES_RESOURCE_GROUP_DRIVER})
+_DRIVER_DESCRIPTION = (
+    "Resource group driver. `static`: sessions run on the agents of the resource group."
+    " `kubernetes`: sessions run as Pods in the compute cluster named by"
+    " `driver_opts.compute_cluster`."
+)
+_DRIVER_OPTS_DESCRIPTION = (
+    "Options of the resource group driver. Empty for `static`; `kubernetes` requires"
+    " `compute_cluster`, the name of a registered compute cluster."
+)
+
+
+def _validate_driver(driver: str | Unset, driver_opts: dict[str, Any] | Unset) -> None:
+    if isinstance(driver, Unset):
+        return
+    if driver not in RESOURCE_GROUP_DRIVERS:
+        raise ValueError(f"driver must be one of {sorted(RESOURCE_GROUP_DRIVERS)}, got {driver!r}")
+    if driver != KUBERNETES_RESOURCE_GROUP_DRIVER:
+        return
+    compute_cluster = None if isinstance(driver_opts, Unset) else driver_opts.get("compute_cluster")
+    if not isinstance(compute_cluster, str) or not compute_cluster.strip():
+        raise ValueError(
+            "driver_opts.compute_cluster must be a non-empty string when driver is kubernetes"
+        )
 
 
 class CreateResourceGroupInput(BaseRequestModel):
@@ -104,6 +131,19 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=SchedulerTypeDTO.FIFO,
         description="Scheduler type value (fifo/lifo/drf/fair-share).",
     )
+    driver: str = Field(
+        default=STATIC_RESOURCE_GROUP_DRIVER,
+        description=f"Added in {NEXT_RELEASE_VERSION}. {_DRIVER_DESCRIPTION}",
+    )
+    driver_opts: dict[str, Any] = Field(
+        default_factory=dict,
+        description=f"Added in {NEXT_RELEASE_VERSION}. {_DRIVER_OPTS_DESCRIPTION}",
+    )
+
+    @model_validator(mode="after")
+    def _check_driver(self) -> Self:
+        _validate_driver(self.driver, self.driver_opts)
+        return self
 
     @field_validator("name", mode="before")
     @classmethod
@@ -215,6 +255,25 @@ class UpdateResourceGroupInput(BaseRequestModel):
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
     )
+    driver: str | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. {_DRIVER_DESCRIPTION}"
+            " Omit to leave unchanged; `kubernetes` requires `driver_opts` in the same update."
+        ),
+    )
+    driver_opts: dict[str, Any] | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. {_DRIVER_OPTS_DESCRIPTION}"
+            " Replaces the stored options. Omit to leave unchanged."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_driver(self) -> Self:
+        _validate_driver(self.driver, self.driver_opts)
+        return self
 
 
 class PartialBulkUpdateResourceGroupItemInput(BaseRequestModel):
@@ -405,6 +464,25 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
     )
+    driver: str | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. {_DRIVER_DESCRIPTION}"
+            " Omit to leave unchanged; `kubernetes` requires `driver_opts` in the same update."
+        ),
+    )
+    driver_opts: dict[str, Any] | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. {_DRIVER_OPTS_DESCRIPTION}"
+            " Replaces the stored options. Omit to leave unchanged."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_driver(self) -> Self:
+        _validate_driver(self.driver, self.driver_opts)
+        return self
 
 
 class UpdateAllowedResourceGroupsForDomainInput(BaseRequestModel):

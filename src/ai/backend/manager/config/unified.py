@@ -3791,6 +3791,23 @@ class RetentionConfig(BaseConfigSchema):
     ]
 
 
+class KubernetesConfig(BaseConfigSchema):
+    """Resource groups backed by a Kubernetes cluster (`driver = "kubernetes"`)."""
+
+    enabled: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Experimental. Allow resource groups whose driver is `kubernetes`: their"
+                " sessions run as Pods in a registered compute cluster instead of on agents."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
+
 class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: Annotated[
@@ -4235,6 +4252,16 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "including tick cadence, delete chunk size, and an optional per-tick budget."
             ),
             added_version="26.7.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    kubernetes: Annotated[
+        KubernetesConfig,
+        Field(default_factory=KubernetesConfig),
+        BackendAIConfigMeta(
+            description="Kubernetes-backed resource groups (experimental).",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

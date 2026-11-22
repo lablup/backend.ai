@@ -1273,3 +1273,11 @@
   # means no budget (every enabled category is fully drained each tick).
   # Added in 26.7.0
   ## per-tick-budget = 100000
+
+# Kubernetes-backed resource groups (experimental).
+# Added in 26.10.0
+[kubernetes]
+  # Experimental. Allow resource groups whose driver is `kubernetes`: their
+  # sessions run as Pods in a registered compute cluster instead of on agents.
+  # Added in 26.10.0
+  enabled = false

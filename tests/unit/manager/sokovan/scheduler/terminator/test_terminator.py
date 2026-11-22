@@ -14,7 +14,11 @@ from unittest.mock import AsyncMock, MagicMock
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
+from ai.backend.manager.sokovan.scheduler.compute_cluster import ComputeClusterTarget
+from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
+    SessionTerminator,
+    SessionTerminatorArgs,
+)
 from ai.backend.manager.views.sokovan.session import TerminatingSessionData
 
 # =============================================================================
@@ -378,3 +382,35 @@ class TestSessionTerminatorStaleDetection:
         # Assert
         assert len(result) == 0
         mock_valkey_schedule.check_kernel_presence_status_batch.assert_not_awaited()
+
+
+class TestSessionTerminatorComputeCluster:
+    """A kernel of a compute cluster ends by deleting its session's workload."""
+
+    async def test_workload_is_deleted_instead_of_agent_rpc(
+        self,
+        mock_repository: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        terminating_session_multi_kernel: TerminatingSessionData,
+    ) -> None:
+        cluster_client = AsyncMock()
+        resolver = AsyncMock()
+        resolver.for_agent.return_value = ComputeClusterTarget(
+            name="k8s-local", namespace_prefix="bai-", client=cluster_client
+        )
+        terminator = SessionTerminator(
+            SessionTerminatorArgs(
+                repository=mock_repository,
+                agent_client_pool=mock_agent_client_pool,
+                valkey_schedule=mock_valkey_schedule,
+                compute_clusters=resolver,
+            )
+        )
+        session = terminating_session_multi_kernel
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await terminator.terminate_sessions_for_handler([session])
+
+        assert cluster_client.destroy_session.await_count == len(session.kernels)
+        cluster_client.destroy_session.assert_awaited_with(session.session_id, session.status_info)
+        mock_agent_client_pool._mock_client.destroy_kernel.assert_not_awaited()

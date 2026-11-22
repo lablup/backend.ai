@@ -233,7 +233,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
@@ -416,6 +415,7 @@ from ai.backend.manager.services.deployment.actions.sync_replicas import SyncRep
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 DEFAULT_PAGINATION_LIMIT = 10
 

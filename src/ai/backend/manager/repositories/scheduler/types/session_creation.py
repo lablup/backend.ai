@@ -14,12 +14,12 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
-from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.session_creation import (
     GlobalEnqueueInfo,
     ResourceGroupEnqueueInfo,
     UserEnqueueInfo,
 )
+from ai.backend.sokovan_core.types.agent import AgentMeta
 
 
 @dataclass

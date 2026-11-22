@@ -19,7 +19,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import (
     DefaultResourceGroupAlreadyExists,
@@ -83,6 +82,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 

@@ -16,6 +16,7 @@ items:
       artifact_registry:                []
       auto_generated_file:              [read, update, create, soft_delete, hard_delete]
       client_ip_masking_policy:         []
+      compute_cluster:                  []
       container_registry:               [read]
       deployment:                       [read, update, create, soft_delete, hard_delete]
       deployment_preset:                [read, update, create, soft_delete, hard_delete]

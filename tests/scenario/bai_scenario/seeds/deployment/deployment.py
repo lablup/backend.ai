@@ -10,7 +10,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentOptions
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.endpoint.creators import (
     DeploymentCreator,
@@ -18,6 +17,7 @@ from ai.backend.manager.models.endpoint.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, joined
 

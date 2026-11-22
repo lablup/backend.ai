@@ -1,0 +1,56 @@
+{{- if .Values.storageProxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-control.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: storage-proxy}}
+  template:
+    metadata: {labels: {app: storage-proxy}}
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.storageProxy.runAsUser }}
+        runAsGroup: {{ .Values.storageProxy.runAsUser }}
+      containers:
+        - name: storage-proxy
+          image: {{ include "backendai-control.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python, -m, ai.backend.cli, storage, start-server, -f, /etc/backend.ai/storage-proxy.toml]
+          env:
+            - {name: HOME, value: /tmp}
+            - {name: BACKENDAI_PROMETHEUS_DIR, value: /tmp/prometheus}
+          ports: [{containerPort: 6021}, {containerPort: 6022}]
+          readinessProbe: {tcpSocket: {port: 6022}, periodSeconds: 5}
+          volumeMounts:
+            - {name: config, mountPath: /etc/backend.ai/storage-proxy.toml, subPath: storage-proxy.toml}
+            - {name: tmp, mountPath: /tmp}
+            {{- range .Values.storageProxy.volumes }}
+            - {name: {{ .name }}, mountPath: {{ .mountPath }}}
+            {{- end }}
+      volumes:
+        - name: config
+          secret: {secretName: {{ .Values.storageProxy.configSecret }}}
+        - {name: tmp, emptyDir: {}}
+        {{- range .Values.storageProxy.volumes }}
+        - name: {{ .name }}
+          persistentVolumeClaim: {claimName: {{ .claimName }}}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-control.labels" . | nindent 4 }}
+spec:
+  selector: {app: storage-proxy}
+  ports:
+    - {name: client, port: 6021, targetPort: 6021}
+    - {name: manager, port: 6022, targetPort: 6022}
+{{- end }}

@@ -74,7 +74,6 @@ from ai.backend.manager.data.session.draft import (
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
-    AgentSelectionPolicy,
     DefaultSessionOptions,
     ResourceOpts,
     SessionHandlerOptions,
@@ -93,6 +92,7 @@ from ai.backend.manager.views.sokovan.session_creation import (
     SessionSpecContext,
     UserEnqueueInfo,
 )
+from ai.backend.sokovan_core.types.policy import AgentSelectionPolicy
 
 
 @pytest.fixture

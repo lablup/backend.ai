@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sokovan-scheduler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-sokovan-scheduler
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["podgroups", "queues"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceslices", "resourceclaims", "deviceclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["bindrequests"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["scheduling.backend.ai"]
+    resources: ["podgroups/status"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-sokovan-scheduler
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-sokovan-scheduler
+subjects:
+  - kind: ServiceAccount
+    name: sokovan-scheduler
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sokovan-scheduler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/name: sokovan-scheduler
+spec:
+  replicas: {{ if .Values.leaderElection.enabled }}{{ .Values.leaderElection.replicas }}{{ else }}1{{ end }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sokovan-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sokovan-scheduler
+    spec:
+      serviceAccountName: sokovan-scheduler
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: scheduler
+          image: {{ include "backendai-cluster.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["ai.backend.kube.scheduler"]
+          env:
+            - {name: BACKENDAI_SCHEDULER_INTERVAL, value: {{ .Values.sokovanScheduler.intervalSeconds | quote }}}
+            - {name: BACKENDAI_SCHEDULER_STRATEGY, value: {{ .Values.sokovanScheduler.strategy | quote }}}
+            - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sokovanScheduler.logLevel | quote }}}
+            - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
+            {{- if .Values.leaderElection.enabled }}
+            - {name: BACKENDAI_LEADER_ELECTION, value: "true"}
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            {{- toYaml .Values.sokovanScheduler.resources | nindent 12 }}
+        {{- if eq .Values.sokovanScheduler.bindMode "binder" }}
+        - name: dra-allocator
+          image: {{ include "backendai-cluster.image" .Values.sokovanBinder.image }}
+          args: ["allocator", "--listen=127.0.0.1:8786"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            {{- toYaml .Values.sokovanBinder.resources | nindent 12 }}
+        {{- end }}
+      {{- with .Values.sokovanScheduler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sokovanScheduler.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

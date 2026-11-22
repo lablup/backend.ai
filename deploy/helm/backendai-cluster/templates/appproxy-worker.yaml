@@ -1,0 +1,89 @@
+{{- if .Values.appproxyWorker.enabled }}
+{{- $w := .Values.appproxyWorker }}
+# appproxy worker in the cluster (suggestion-1122 9.2): it reaches session Pods by Pod IP and
+# registers with the control plane's coordinator.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: appproxy-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+stringData:
+  app-proxy-worker.toml: |
+    [redis]
+    addr = { host = {{ (splitList ":" .Values.controlPlane.valkey.addr) | first | quote }}, port = {{ (splitList ":" .Values.controlPlane.valkey.addr) | last }} }
+    {{- with .Values.controlPlane.valkey.password }}
+    password = {{ . | quote }}
+    {{- end }}
+
+    [proxy_worker]
+    coordinator_endpoint = {{ $w.coordinatorEndpoint | quote }}
+    authority = {{ $w.authority | default .Values.cluster.agentId | quote }}
+    tls_listen = false
+    tls_advertised = false
+    frontend_mode = "port"
+    protocol = "http"
+    accepted_traffics = ["inference", "interactive"]
+    api_bind_addr = { host = "0.0.0.0", port = {{ $w.apiPort }} }
+    api_advertised_addr = { host = {{ $w.advertisedHost | quote }}, port = {{ $w.apiPort }} }
+
+    [proxy_worker.port_proxy]
+    bind_host = "0.0.0.0"
+    advertised_host = {{ $w.advertisedHost | quote }}
+    bind_port_range = [{{ index $w.portRange 0 }}, {{ index $w.portRange 1 }}]
+
+    [secrets]
+    api_secret = {{ $w.secrets.apiSecret | quote }}
+    jwt_secret = {{ $w.secrets.jwtSecret | quote }}
+
+    [permit_hash]
+    secret = {{ $w.secrets.permitHashSecret | quote }}
+
+    [logging]
+    level = {{ $w.logLevel | quote }}
+    drivers = ["console"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appproxy-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/name: appproxy-worker
+spec:
+  # Port mode binds host ports: one worker per node.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: appproxy-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: appproxy-worker
+      annotations:
+        checksum/config: {{ toJson $w | sha256sum }}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- with $w.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ include "backendai-cluster.image" .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /tmp
+          command: [python, -m, ai.backend.cli, app-proxy-worker, start-server, -f, /etc/backend.ai/app-proxy-worker.toml]
+          env:
+            - {name: HOME, value: /tmp}
+          volumeMounts:
+            - {name: config, mountPath: /etc/backend.ai}
+      volumes:
+        - name: config
+          secret: {secretName: appproxy-worker}
+{{- end }}

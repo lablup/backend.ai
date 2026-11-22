@@ -1,0 +1,25 @@
+{{- if .Values.kueue.manage }}
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: backendai-default
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: {{ .Values.kueue.clusterQueue }}
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  namespaceSelector:
+    matchLabels: {app.kubernetes.io/managed-by: backendai-manager}
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: backendai-default
+          resources:
+            - {name: cpu, nominalQuota: {{ .Values.kueue.nominalQuota.cpu | quote }}}
+            - {name: memory, nominalQuota: {{ .Values.kueue.nominalQuota.memory | quote }}}
+{{- end }}

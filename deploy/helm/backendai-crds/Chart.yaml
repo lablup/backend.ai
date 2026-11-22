@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backendai-crds
+description: Backend.AI custom resource definitions for a Kubernetes workload cluster
+type: application
+version: 0.1.0
+appVersion: "26.10.0"
