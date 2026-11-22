@@ -1,4 +1,6 @@
 {{- if .Values.baiDra.drivers }}
+{{- $policy := include "backendai-cluster.gpuAllocationPolicy" . }}
+{{- $mountRoot := .Values.baiDra.mountRoot }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -40,6 +42,16 @@ subjects:
     namespace: {{ .Release.Namespace }}
 {{- $classes := dict }}
 {{- range .Values.baiDra.drivers }}
+{{- $name := required "baiDra.drivers[].name is required" .name }}
+{{- if not (or .nodeSelector .affinity) }}
+{{- fail (printf "baiDra.drivers %s: set nodeSelector or affinity to the nodes bai-dra owns (dra.backend.ai/driver-mode=bai)" $name) }}
+{{- end }}
+{{- if and .shared (not .hamiCore) }}
+{{- fail (printf "baiDra.drivers %s: shared devices need an isolation provider (hamiCore)" $name) }}
+{{- end }}
+{{- if and .shared (eq $policy "device-plugin") }}
+{{- fail (printf "baiDra.drivers %s: gpuAllocationPolicy device-plugin has no fraction (shared) pool" $name) }}
+{{- end }}
 {{- if not (hasKey $classes .driverName) }}
 {{- $_ := set $classes .driverName true }}
 ---
@@ -47,7 +59,7 @@ subjects:
 apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
-  name: {{ .driverName }}
+  name: {{ required "baiDra.drivers[].driverName is required" .driverName }}
   labels:
     {{- include "backendai-cluster.labels" $ | nindent 4 }}
 spec:
@@ -59,7 +71,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: bai-dra-{{ .name }}
+  name: bai-dra-{{ $name }}
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "backendai-cluster.labels" $ | nindent 4 }}
@@ -69,21 +81,24 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: bai-dra-{{ .name }}
+  name: bai-dra-{{ $name }}
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "backendai-cluster.labels" $ | nindent 4 }}
-    app.kubernetes.io/name: bai-dra-{{ .name }}
+    app.kubernetes.io/name: bai-dra-{{ $name }}
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: bai-dra-{{ .name }}
+      app.kubernetes.io/name: bai-dra-{{ $name }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: bai-dra-{{ .name }}
+        app.kubernetes.io/name: bai-dra-{{ $name }}
     spec:
       serviceAccountName: bai-dra
+      {{- with (.priorityClassName | default $.Values.baiDra.priorityClassName) }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- with .runtimeClassName }}
       runtimeClassName: {{ . }}
       {{- end }}
@@ -91,15 +106,18 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # Never on a node whose GPUs the device plugin or another driver allocates.
+      affinity:
+        {{- include "backendai-cluster.baiDraAffinity" (dict "root" $ "driver" .) | nindent 8 }}
       {{- with .tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .hamiCore }}
       initContainers:
-        # HAMi-core's preload library goes to the node: CDI mounts it into shared containers.
+        # HAMi-core's preload library goes to the node: CDI mounts it read-only into shared containers.
         - name: hami-core
-          image: {{ .image }}
+          image: {{ required "hamiCore.image is required" .image }}
           command: [sh, -c]
           args:
             - cp /k8s-vgpu/lib/nvidia/libvgpu.so.* /host/libvgpu.so && echo /usr/local/vgpu/libvgpu.so > /host/ld.so.preload
@@ -111,8 +129,22 @@ spec:
           image: {{ include "backendai-cluster.image" $.Values.baiDra.driverImage }}
           env:
             - {name: BAI_DRA_DRIVER_NAME, value: {{ .driverName | quote }}}
+            - {name: BAI_DRA_HEALTH_ADDR, value: ":8081"}
             - name: NODE_NAME
               valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          ports:
+            - {name: health, containerPort: 8081}
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+            periodSeconds: 10
+          resources:
+            {{- toYaml (.driverResources | default $.Values.baiDra.resources.driver) | nindent 12 }}
           volumeMounts:
             - {name: bridge, mountPath: /run/bai-dra}
             - {name: plugins-registry, mountPath: /var/lib/kubelet/plugins_registry}
@@ -123,9 +155,10 @@ spec:
           args: ["ai.backend.dra.host"]
           workingDir: /etc/backend.ai
           env:
-            - {name: BAI_DRA_PLUGIN, value: {{ .plugin | quote }}}
+            - {name: BAI_DRA_PLUGIN, value: {{ required "baiDra.drivers[].plugin is required" .plugin | quote }}}
             - {name: BAI_DRA_PLUGIN_CONFIG, value: {{ toJson (.pluginConfig | default dict) | quote }}}
             - {name: BAI_DRA_BRIDGE_SOCKET, value: /run/bai-dra/bridge.sock}
+            - {name: BAI_DRA_MOUNT_ROOT, value: {{ $mountRoot | quote }}}
             - {name: HOME, value: /tmp}
             - {name: BAI_DRA_SHARED, value: {{ .shared | default false | quote }}}
             {{- with .hamiCore }}
@@ -134,28 +167,54 @@ spec:
             {{- range $k, $v := .pluginHostEnv }}
             - {name: {{ $k }}, value: {{ $v | quote }}}
             {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  import socket, sys
+                  s = socket.socket(socket.AF_UNIX)
+                  s.settimeout(5)
+                  s.connect("/run/bai-dra/bridge.sock")
+                  s.sendall(b"GET /v1/health HTTP/1.0\r\n\r\n")
+                  sys.exit(0 if b" 200 " in s.recv(64) else 1)
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
           securityContext:
             runAsUser: 0
+          resources:
+            {{- toYaml (.pluginHostResources | default $.Values.baiDra.resources.pluginHost) | nindent 12 }}
           volumeMounts:
             - {name: bridge, mountPath: /run/bai-dra}
             - {name: files, mountPath: /etc/backend.ai}
             - {name: tmp, mountPath: /tmp}
+            # The files plugins generate for a claim: CDI mounts name the node path, so the
+            # container sees it at the same path.
+            - {name: mounts, mountPath: {{ $mountRoot }}}
             # Plugins that name devices of other CDI specs check that the spec exists.
             - {name: cdi, mountPath: /var/run/cdi, readOnly: true}
+            - {name: cdi-static, mountPath: /etc/cdi, readOnly: true}
       volumes:
         - {name: bridge, emptyDir: {}}
         - {name: tmp, emptyDir: {}}
         - name: files
-          configMap: {name: bai-dra-{{ .name }}}
+          configMap: {name: bai-dra-{{ $name }}}
+        - name: mounts
+          hostPath: {path: {{ $mountRoot }}, type: DirectoryOrCreate}
         - name: plugins-registry
           hostPath: {path: /var/lib/kubelet/plugins_registry, type: Directory}
         - name: plugins
           hostPath: {path: /var/lib/kubelet/plugins, type: DirectoryOrCreate}
         - name: cdi
           hostPath: {path: /var/run/cdi, type: DirectoryOrCreate}
+        - name: cdi-static
+          hostPath: {path: /etc/cdi, type: DirectoryOrCreate}
         {{- with .hamiCore }}
         - name: hami-core
-          hostPath: {path: {{ .libDir }}, type: DirectoryOrCreate}
+          hostPath: {path: {{ required "hamiCore.libDir is required" .libDir }}, type: DirectoryOrCreate}
         {{- end }}
 {{- end }}
 {{- end }}

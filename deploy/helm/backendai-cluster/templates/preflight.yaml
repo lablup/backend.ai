@@ -69,4 +69,5 @@ spec:
           args: ["ai.backend.kube.preflight"]
           env:
             - {name: HOME, value: /tmp}
+            {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
 {{- end }}

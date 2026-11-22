@@ -22,16 +22,32 @@ krunner:
   tag: ""
   digest: ""
 
+# Who allocates the cluster's NVIDIA GPUs (suggestion-1122 4.11). One value per cluster: AICR's
+# GPU allocation policy is cluster-wide (one recipe value turns the device plugin or the NVIDIA DRA
+# driver's GPU publishing on for every node) and AICR validation rejects a mix.
+#   dra            NVIDIA GPUs only through ResourceClaims of the NVIDIA DRA driver (gpu.nvidia.com,
+#                  AICR `dra-resource-claim` overlay: devicePlugin.enabled=false). NPUs and fGPU
+#                  (cuda.shares) through bai-dra on `dra.backend.ai/driver-mode=bai` node pools.
+#   device-plugin  NVIDIA GPUs only as the device plugin's extended resource (nvidia.com/gpu,
+#                  AICR's default): exclusive whole GPUs, no fraction DeviceProfile, no fGPU pool.
+# Passed to the session controller, the sokovan scheduler and the pre-flight checks.
+gpuAllocationPolicy: dra
+
 sessionController:
-  replicas: 1  # keep 1 until leader election exists
+  # Empty: leaderElection.replicas. More than one needs leaderElection.enabled.
+  replicas: null
   workers: 4
   logLevel: INFO
   # uid/gid of the kernel user when the session does not set one (images with `uid-match`).
   kernelUid: 1000
   kernelGid: 1000
+  # CSI drivers whose PersistentVolumes the controller may create, besides those of
+  # storageBindings. Admission refuses any other PersistentVolume from the controller.
+  allowedCsiDrivers: []
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: "1", memory: 512Mi}
+  priorityClassName: ""
   nodeSelector: {}
   tolerations: []
 
@@ -51,24 +67,39 @@ sessionGateway:
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: "2", memory: 1Gi}
+  priorityClassName: ""
   nodeSelector: {}
   tolerations: []
 
 sokovanScheduler:
+  # Empty: leaderElection.replicas.
+  replicas: null
   logLevel: INFO
   intervalSeconds: 2
   strategy: concentrated  # concentrated | dispersed
   # binder: KAI form (DRA allocator sidecar + sokovan binder). gate: Kueue form, kube-scheduler binds.
+  #
+  # In binder mode sokovan owns its nodes: it places Pods only on nodes with the taint
+  # `sokovan.backend.ai/dedicated=true:NoSchedule`, and kernel Pods carry the matching
+  # toleration. Label and taint the node pool before installing, and keep other workloads
+  # off it (the taint does that for Pods without the toleration):
+  #   kubectl label node <node> dra.backend.ai/driver-mode=bai        # NPU / fGPU pools only
+  #   kubectl taint node <node> sokovan.backend.ai/dedicated=true:NoSchedule
+  # A node without the taint is not a sokovan node; a node with it is used by sokovan only.
+  # Pools of driver mode `none` carry no taint. In gate mode kube-scheduler binds and no taint
+  # is needed.
   bindMode: binder
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: "1", memory: 1Gi}
+  priorityClassName: ""
   nodeSelector: {}
   tolerations: []
 
 # Storage volumes of the storage-proxy that sessions mount vfolders from (suggestion-1122 7.4).
 # mountBasePath is the volume's path in the storage-proxy; a vfolder under it is mounted with
-# a subPath of the PV below.
+# a subPath of the PV below. Only CSI volumes: their drivers are the ones the session controller
+# may create PersistentVolumes of. CSI secret references must be in this release's namespace.
 storageBindings: []
 #  - name: nfs
 #    storageHost: local:nfs
@@ -78,37 +109,108 @@ storageBindings: []
 #      mountOptions: [nfsvers=4.1]
 
 # bai-dra: Backend.AI accelerator plugins exposed as DRA drivers (suggestion-1122 4). One DaemonSet
-# per entry, on the nodes labeled `dra.backend.ai/driver-mode=bai`; the plugin host runs the
-# plugin, the Go driver registers with the kubelet and writes CDI specs.
+# per entry, on the nodes the entry selects; the plugin host runs the plugin, the Go driver
+# registers with the kubelet and writes CDI specs.
+#
+# A GPU has one allocator. Every entry needs nodeSelector or affinity (normally
+# `dra.backend.ai/driver-mode: bai`); the chart fails without one. The DaemonSets also never run
+# on nodes carrying a label of excludeNodeLabels, and the pre-flight checks fail when a
+# `driver-mode=bai` node has `nvidia.com/gpu` allocatable or `gpu.nvidia.com` devices. For an
+# fGPU pool, take its nodes out of the NVIDIA DRA driver's kubelet plugin (its chart value
+# `kubeletPlugin.affinity`, an AICR overlay) and set `nvidia.com/gpu.deploy.device-plugin=false`.
 baiDra:
   driverImage:
     repository: lablup/bai-dra-driver
     tag: ""
     digest: ""
+  # Node labels (key → values) of nodes another allocator owns; the DaemonSets stay off them.
+  excludeNodeLabels:
+    nvidia.com/gpu.deploy.device-plugin: ["true"]
+  # Node directory for the files plugins mount into containers, mounted at the same path in the
+  # plugin host so that CDI specs can name it. Claims' directories are removed on unprepare.
+  mountRoot: /var/lib/bai-dra/mounts
+  # A node's devices are unusable while its driver is down: keep it from being evicted.
+  priorityClassName: system-node-critical
+  resources:
+    driver:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 500m, memory: 128Mi}
+    pluginHost:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: "1", memory: 512Mi}
   drivers: []
+#  # NPU pool: exclusive devices.
+#  - name: atom
+#    driverName: atom.dra.backend.ai
+#    plugin: ai.backend.accelerator.rebellions.atom.plugin:ATOMPlugin
+#    pluginConfig: {}
+#    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/accelerator: atom}
+#  # fGPU pool (gpuAllocationPolicy dra only): devices split by `shares`. One share is the
+#  # plugin's share_units(): unit_mem bytes + unit_proc SMs (default 2 GiB + 8 SMs); a device
+#  # publishes min(memory / unit_mem, SMs / unit_proc) shares in 0.01 units.
+#  # shared needs hamiCore: the chart fails otherwise. HAMi-core enforces the limits from the
+#  # container's environment; they are cooperative against a process that rewrites its own
+#  # environment and re-executes.
+#  - name: fgpu
+#    driverName: cuda-shares.dra.backend.ai
+#    plugin: ai.backend.accelerator.cuda_open.plugin:CUDAPlugin
+#    nodeSelector: {dra.backend.ai/driver-mode: bai, dra.backend.ai/sharing-mode: fraction}
+#    runtimeClassName: nvidia                 # a plugin that reads the driver library (NVML)
+#    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
+#    shared: true                             # needs DRAConsumableCapacity
+#    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
+#    priorityClassName: system-node-critical  # per entry, overrides baiDra.priorityClassName
+#    driverResources: {}                      # per entry, overrides baiDra.resources.driver
+#    pluginHostResources: {}                  # per entry, overrides baiDra.resources.pluginHost
+#  # Test pool without GPUs: the mock plugin. A mock-accelerator.toml may set unit_mem/unit_proc
+#  # through pluginConfig as well.
 #  - name: mock-cuda
 #    driverName: cuda.dra.backend.ai
 #    plugin: ai.backend.accelerator.mock.plugin:MockPlugin
 #    pluginConfig: {allocation_mode: discrete}
 #    files: {mock-accelerator.toml: "..."}   # put in /etc/backend.ai of the plugin host
 #    nodeSelector: {dra.backend.ai/driver-mode: bai}
-#    runtimeClassName: nvidia                 # a plugin that reads the driver library (NVML)
-#    pluginHostEnv: {NVIDIA_VISIBLE_DEVICES: all}
-#    shared: true                             # devices split by `shares` (DRAConsumableCapacity)
-#    hamiCore: {image: projecthami/hami:v2.6.1, libDir: /var/lib/bai-dra/hami-core}
 
 # DeviceProfiles: Backend.AI slot name → DeviceClass (suggestion-1122 4.8). The session controller
-# turns a kernel's device slots into ResourceClaims with them; the gateway reports the slots.
+# turns a kernel's device slots into ResourceClaims (or extended resources) with them; the gateway
+# reports the slots. The chart fails on a fraction profile under gpuAllocationPolicy device-plugin.
 deviceProfiles: []
+#  # gpuAllocationPolicy dra: NVIDIA GPUs through the NVIDIA DRA driver.
 #  - name: cuda-device
 #    slotName: cuda.device
 #    sharingMode: exclusive
-#    driverName: cuda.dra.backend.ai
-#    deviceClassName: cuda.dra.backend.ai
-#    matchAttributes: []
+#    driverKind: external
+#    driverName: gpu.nvidia.com
+#    deviceClassName: gpu.nvidia.com
+#    attributeMap: {productName: model}
+#  # gpuAllocationPolicy device-plugin: NVIDIA GPUs as the device plugin's extended resource.
+#  # The kernel container gets resources.limits[nvidia.com/gpu]; no ResourceClaim.
+#  - name: cuda-device
+#    slotName: cuda.device
+#    sharingMode: exclusive
+#    driverKind: external
+#    driverName: gpu.nvidia.com
+#    deviceClassName: gpu.nvidia.com
+#    extendedResourceName: nvidia.com/gpu
+#  # bai-dra NPUs (baiDra.drivers `atom` above).
+#  - name: atom-device
+#    slotName: atom.device
+#    sharingMode: exclusive
+#    driverName: atom.dra.backend.ai
+#    deviceClassName: atom.dra.backend.ai
+#  # bai-dra fGPU pool (baiDra.drivers `fgpu` above, gpuAllocationPolicy dra only).
+#  - name: cuda-shares
+#    slotName: cuda.shares
+#    sharingMode: fraction
+#    driverName: cuda-shares.dra.backend.ai
+#    deviceClassName: cuda-shares.dra.backend.ai
+#    isolationProvider: hami-core
+#    fractionStrategy: fill                   # fill | evenly: split across devices
 
 # sokovan binder and DRA allocator (go/sokovan-binder), used when sokovanScheduler.bindMode=binder.
 sokovanBinder:
+  # Empty: leaderElection.replicas.
+  replicas: null
   image:
     repository: lablup/sokovan-binder
     tag: ""
@@ -124,6 +226,10 @@ logCollector:
   lokiUrl: http://loki.backendai-control.svc:3100
   # A NotReady node a toleration lets the DaemonSet onto holds every rollout.
   tolerations: []
+  priorityClassName: ""
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
 
 # appproxy worker (suggestion-1122 9.2), port mode on the host network of one node.
 appproxyWorker:
@@ -135,15 +241,29 @@ appproxyWorker:
   portRange: [12000, 12100]
   nodeSelector: {}
   logLevel: INFO
-  secrets: {apiSecret: "", jwtSecret: "", permitHashSecret: ""}  # the coordinator's
+  # An existing Secret with the coordinator's secrets (the keys below). The Valkey password comes
+  # from controlPlane.valkey.passwordSecret.
+  secrets:
+    name: ""
+    apiSecretKey: api-secret
+    jwtSecretKey: jwt-secret
+    permitHashSecretKey: permit-hash-secret
 
 # Lease leader election (suggestion-1122 12.1): the controller, scheduler and binder run this many
-# replicas, one active. Without it each runs one replica.
+# replicas, one active, and roll out one replica at a time. Without it each runs one replica.
 leaderElection:
   enabled: true
   replicas: 2
 
-# Pre-flight checks as a post-install/upgrade hook Job (CRDs, DRA API, bai-dra nodes, gates).
+# The Manager's ServiceAccount backendai-manager (manager-access.yaml).
+managerAccess:
+  # A long-lived token Secret (backendai-manager-token) for the Manager's kubeconfig. Without it,
+  # issue a bound token yourself (kubectl create token backendai-manager --duration=...).
+  # Rotation: NOTES.txt.
+  tokenSecret: true
+
+# Pre-flight checks as a post-install/upgrade hook Job (CRDs, DRA API, bai-dra nodes, single
+# allocator per GPU, gpuAllocationPolicy consistency, gates).
 preflight:
   enabled: true
 
@@ -155,11 +275,20 @@ kueue:
   nominalQuota: {cpu: "1000", memory: 4Ti}
 
 # node helper (suggestion-1122 9.2): session commit and image push on the node's containerd.
+# Only session-gateway Pods reach its port (NetworkPolicy).
 nodeHelper:
   enabled: false
   image:
     repository: lablup/backend.ai-node-helper
     tag: ""
     digest: ""
+  # An existing Secret with the shared token of the helpers and the gateway (create it first:
+  # kubectl create secret generic node-helper-token --from-literal=token=$(openssl rand -hex 32)).
+  tokenSecret: {name: "", key: token}
+  port: 6090
+  priorityClassName: ""
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: "2", memory: 1Gi}
   nodeSelector: {}
   tolerations: []

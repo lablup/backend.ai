@@ -1,4 +1,5 @@
 {{- if eq .Values.sokovanScheduler.bindMode "binder" }}
+{{- $replicas := include "backendai-cluster.replicas" (dict "root" . "replicas" .Values.sokovanBinder.replicas) }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -57,9 +58,9 @@ metadata:
     {{- include "backendai-cluster.labels" . | nindent 4 }}
     app.kubernetes.io/name: sokovan-binder
 spec:
-  replicas: {{ if .Values.leaderElection.enabled }}{{ .Values.leaderElection.replicas }}{{ else }}1{{ end }}
+  replicas: {{ $replicas }}
   strategy:
-    type: Recreate
+    {{- include "backendai-cluster.strategy" . | nindent 4 }}
   selector:
     matchLabels:
       app.kubernetes.io/name: sokovan-binder
@@ -69,6 +70,9 @@ spec:
         app.kubernetes.io/name: sokovan-binder
     spec:
       serviceAccountName: sokovan-binder
+      {{- with .Values.sokovanScheduler.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -94,4 +98,5 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- include "backendai-cluster.pdb" (dict "root" . "name" "sokovan-binder" "replicas" $replicas) }}
 {{- end }}

@@ -1,4 +1,11 @@
+{{- $policy := include "backendai-cluster.gpuAllocationPolicy" . }}
 {{- range .Values.deviceProfiles }}
+{{- if and (eq $policy "device-plugin") (eq .sharingMode "fraction") }}
+{{- fail (printf "deviceProfiles %s: gpuAllocationPolicy device-plugin allows no fraction profile" .name) }}
+{{- end }}
+{{- if and .extendedResourceName (ne .sharingMode "exclusive") }}
+{{- fail (printf "deviceProfiles %s: extendedResourceName needs sharingMode exclusive" .name) }}
+{{- end }}
 ---
 apiVersion: scheduling.backend.ai/v1alpha1
 kind: DeviceProfile
