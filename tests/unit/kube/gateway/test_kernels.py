@@ -17,16 +17,24 @@ from ai.backend.kube.gateway.pod_exec import ExecResult
 KERNEL_ID = "00000000-0000-0000-0000-000000000001"
 
 
+SESSION_ID = str(uuid4())
+
+
 def _pod() -> dict[str, Any]:
     return {
         "metadata": {
             "name": "s-1-main1",
             "namespace": "bai-p",
             "uid": "pod-uid",
-            "labels": {"backend.ai/kernel-id": KERNEL_ID, "backend.ai/session-id": str(uuid4())},
+            "labels": {"backend.ai/kernel-id": KERNEL_ID, "backend.ai/session-id": SESSION_ID},
             "annotations": {"backend.ai/kernel-uid": "1000", "backend.ai/kernel-gid": "1000"},
             "ownerReferences": [
-                {"apiVersion": "backend.ai/v1alpha1", "kind": "SessionWorkload", "name": "s-1"}
+                {
+                    "apiVersion": "backend.ai/v1alpha1",
+                    "kind": "SessionWorkload",
+                    "name": "s-1",
+                    "uid": "sw-uid",
+                }
             ],
         },
         "spec": {"containers": [{"name": "kernel"}]},
@@ -73,6 +81,12 @@ def kernels(producer: MagicMock) -> GatewayKernels:
                 "name": "bai-p",
                 "labels": {"app.kubernetes.io/managed-by": "backendai-manager"},
             }
+        }
+    ])
+    index.replace_workloads([
+        {
+            "metadata": {"name": "s-1", "namespace": "bai-p", "uid": "sw-uid"},
+            "spec": {"sessionId": SESSION_ID, "kernels": [{"kernelId": KERNEL_ID}]},
         }
     ])
     index.apply("ADDED", _pod())

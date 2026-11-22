@@ -14,6 +14,8 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.kube.controller.naming import LABEL_MANAGED_BY, MANAGED_BY
+from ai.backend.kube.crd.base import CRD_VERSION
+from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.events import make_event_producer
 from ai.backend.kube.gateway.heartbeat import GatewayHeartbeat, GatewayIdentity
 from ai.backend.kube.gateway.images import GatewayImages
@@ -59,6 +61,8 @@ async def _serve(
     async with client.ApiClient() as api, WsApiClient() as ws_api:
         kernels = GatewayKernels(index, api, ws_api, event_producer)
         core = client.CoreV1Api(api)
+        custom = client.CustomObjectsApi(api)
+        sw = SessionWorkload.crd
         images = (
             GatewayImages(
                 api,
@@ -97,6 +101,16 @@ async def _serve(
                         ),
                         index.apply_namespace,
                         on_relist=index.replace_namespaces,
+                    )
+                )
+                # A kernel Pod counts only for the SessionWorkload (by uid) declaring its kernel.
+                tg.create_task(
+                    watch_forever(
+                        lambda **kw: custom.list_cluster_custom_object(
+                            sw.group, CRD_VERSION, sw.plural, **kw
+                        ),
+                        index.apply_workload,
+                        on_relist=index.replace_workloads,
                     )
                 )
                 tg.create_task(
