@@ -9,7 +9,12 @@ from pathlib import Path
 import click
 
 from ai.backend.dra.errors import IsolationRequiredError
-from ai.backend.dra.host.isolation import HamiCore
+from ai.backend.dra.host.isolation import (
+    BAI_HOOK_DEFAULT_DISTRO,
+    IsolationKind,
+    IsolationProvider,
+    isolation_provider,
+)
 from ai.backend.dra.host.plugin_host import DEFAULT_MOUNT_ROOT, PluginHost
 from ai.backend.dra.host.server import serve
 from ai.backend.logging.logger import LocalLogger
@@ -25,11 +30,12 @@ async def _serve(
     plugin_config: dict[str, object],
     socket_path: Path,
     mount_root: Path,
+    local_config: dict[str, object],
     shared: bool,
-    isolation: HamiCore | None,
+    isolation: IsolationProvider | None,
 ) -> None:
     host = await PluginHost.start(
-        plugin, plugin_config, {}, mount_root, shared=shared, isolation=isolation
+        plugin, plugin_config, local_config, mount_root, shared=shared, isolation=isolation
     )
     runner = await serve(host, socket_path)
     stop = asyncio.Event()
@@ -75,14 +81,34 @@ async def _serve(
     "--shared/--exclusive",
     envvar="BAI_DRA_SHARED",
     default=False,
-    help="Publish devices that several claims split by `shares` capacity (needs --hami-lib-dir).",
+    help="Publish devices that several claims split by `shares` capacity (needs --isolation).",
+)
+@click.option(
+    "--isolation",
+    envvar="BAI_DRA_ISOLATION",
+    type=click.Choice([k.value for k in IsolationKind]),
+    default=IsolationKind.NONE.value,
+    help="What limits a shared allocation: hami-core, bai-hook (the enterprise CUDA plugin's hook) or none.",
 )
 @click.option(
     "--hami-lib-dir",
     envvar="BAI_DRA_HAMI_LIB_DIR",
     type=click.Path(path_type=Path),
     default=None,
-    help="Node directory with HAMi-core's libvgpu.so and ld.so.preload; isolates shared devices.",
+    help="Node directory with HAMi-core's libvgpu.so and ld.so.preload (--isolation hami-core).",
+)
+@click.option(
+    "--hook-distro",
+    envvar="BAI_DRA_HOOK_DISTRO",
+    default=BAI_HOOK_DEFAULT_DISTRO,
+    help="The distro whose build of the plugin's hook library to inject (--isolation bai-hook).",
+)
+@click.option(
+    "--var-base-path",
+    envvar="BAI_DRA_VAR_BASE_PATH",
+    type=click.Path(path_type=Path),
+    default=Path("/var/lib/bai-dra/var"),
+    help="Node directory, mounted at the same path, for the plugin's `agent.var-base-path` files (hook cache).",
 )
 @click.option(
     "--log-level",
@@ -96,15 +122,29 @@ def main(
     socket_path: Path,
     mount_root: Path,
     shared: bool,
+    isolation: str,
     hami_lib_dir: Path | None,
+    hook_distro: str,
+    var_base_path: Path,
     log_level: str,
 ) -> None:
-    isolation = HamiCore(hami_lib_dir) if hami_lib_dir is not None else None
-    if shared and isolation is None:
-        raise IsolationRequiredError("--shared needs an isolation provider (--hami-lib-dir)")
+    provider = isolation_provider(
+        IsolationKind(isolation), hami_lib_dir=hami_lib_dir, hook_distro=hook_distro
+    )
+    if shared and provider is None:
+        raise IsolationRequiredError("--shared needs --isolation hami-core or bai-hook")
+    local_config: dict[str, object] = {"agent": {"var-base-path": str(var_base_path)}}
     with LocalLogger(log_level=LogLevel[log_level]):
         asyncio.run(
-            _serve(plugin, json.loads(plugin_config), socket_path, mount_root, shared, isolation)
+            _serve(
+                plugin,
+                json.loads(plugin_config),
+                socket_path,
+                mount_root,
+                local_config,
+                shared,
+                provider,
+            )
         )
 
 

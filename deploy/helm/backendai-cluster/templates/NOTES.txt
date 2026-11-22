@@ -20,4 +20,8 @@ Manager access: register a kubeconfig with the token of Secret backendai-manager
 Node helper: Secret {{ .Values.nodeHelper.tokenSecret.name }} holds the token the helpers and the
 session gateway share. To rotate it, update the Secret and restart both:
   kubectl -n {{ .Release.Namespace }} rollout restart daemonset/node-helper deployment/session-gateway
+{{- if eq .Values.nodeHelper.tokenSecret.name "node-helper-token" }}
+  Earlier chart versions generated node-helper-token and helm deletes it on upgrade unless it
+  carries the annotation helm.sh/resource-policy=keep (nodeHelper.tokenSecret in values.yaml).
+{{- end }}
 {{- end }}

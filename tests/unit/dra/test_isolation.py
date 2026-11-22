@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
+from ai.backend.common.types import DeviceId, SlotName
 from ai.backend.dra.bridge import parse_quantity
-from ai.backend.dra.errors import InvalidQuantityError
-from ai.backend.dra.host.isolation import limit_from_shares
+from ai.backend.dra.errors import InvalidQuantityError, IsolationUnavailableError
+from ai.backend.dra.host.isolation import (
+    BaiHook,
+    HamiCore,
+    IsolationKind,
+    isolation_provider,
+    limit_from_shares,
+    shares_value,
+)
 
 GIB = 1024**3
 
@@ -36,3 +45,27 @@ class TestParseQuantity:
     def test_garbage_is_refused(self) -> None:
         with pytest.raises(InvalidQuantityError):
             parse_quantity("lots")
+
+
+class TestIsolationProvider:
+    def test_hami_core_needs_its_directory(self) -> None:
+        with pytest.raises(IsolationUnavailableError):
+            isolation_provider(IsolationKind.HAMI_CORE)
+
+    def test_each_kind_has_its_provider(self) -> None:
+        hami = isolation_provider(IsolationKind.HAMI_CORE, hami_lib_dir=Path("/x"))
+        assert isinstance(hami, HamiCore)
+        assert isinstance(isolation_provider(IsolationKind.BAI_HOOK), BaiHook)
+        assert isolation_provider(IsolationKind.NONE) is None
+
+
+class TestSharesValue:
+    def test_only_share_slots_in_the_agent_format(self) -> None:
+        alloc = {
+            SlotName("cuda.shares"): {
+                DeviceId("GPU-a"): Decimal("0.5"),
+                DeviceId("GPU-b"): Decimal(2),
+            },
+            SlotName("cuda.device"): {DeviceId("GPU-c"): Decimal(1)},
+        }
+        assert shares_value(alloc) == "GPU-a:0.5,GPU-b:2"

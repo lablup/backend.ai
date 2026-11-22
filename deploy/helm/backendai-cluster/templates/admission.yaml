@@ -1,0 +1,204 @@
+{{- $ns := .Release.Namespace }}
+{{- $sa := printf "system:serviceaccount:%s:" $ns }}
+# Who writes what of the session objects, beyond RBAC (suggestion-1122 3.3): the Manager owns
+# a SessionWorkload's lifecycle and spec, the session controller its status and finalizer, the
+# sokovan scheduler only its requeue annotation. Users and kube-system controllers (namespace
+# deletion, garbage collection) stay under RBAC alone.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-sessionworkload-writers
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["backend.ai"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["sessionworkloads", "sessionworkloads/status"]
+  matchConditions:
+    - name: workload-service-account
+      expression: >-
+        request.userInfo.username.startsWith("system:serviceaccount:") &&
+        !request.userInfo.username.startsWith("system:serviceaccount:kube-system:")
+  variables:
+    - name: user
+      expression: request.userInfo.username
+    - name: manager
+      expression: '"{{ $sa }}backendai-manager"'
+    - name: controller
+      expression: '"{{ $sa }}session-controller"'
+    - name: scheduler
+      expression: '"{{ $sa }}sokovan-scheduler"'
+    - name: requeue
+      expression: '"sokovan.backend.ai/requeue"'
+    - name: status
+      expression: request.?subResource.orValue("") == "status"
+    - name: newAnnotations
+      expression: object.metadata.?annotations.orValue({})
+    - name: oldAnnotations
+      expression: oldObject.metadata.?annotations.orValue({})
+    # Spec, labels and owners unchanged (the finalizers and annotations are checked apart).
+    - name: sameSpec
+      expression: >-
+        object.spec == oldObject.spec &&
+        object.metadata.?labels.orValue({}) == oldObject.metadata.?labels.orValue({}) &&
+        object.metadata.?ownerReferences.orValue([]) == oldObject.metadata.?ownerReferences.orValue([])
+    - name: sameFinalizers
+      expression: object.metadata.?finalizers.orValue([]) == oldObject.metadata.?finalizers.orValue([])
+    - name: onlyRequeueAnnotation
+      expression: >-
+        variables.newAnnotations.all(k, k == variables.requeue ||
+          (k in variables.oldAnnotations && variables.oldAnnotations[k] == variables.newAnnotations[k])) &&
+        variables.oldAnnotations.all(k, k == variables.requeue || k in variables.newAnnotations)
+  validations:
+    - expression: '!variables.status || variables.user == variables.controller'
+      message: Only session-controller writes the status of a SessionWorkload.
+    - expression: >-
+        variables.status || request.operation == "UPDATE" ||
+        variables.user == variables.manager
+      message: Only the Manager (backendai-manager) creates and deletes SessionWorkloads.
+    - expression: >-
+        variables.status || request.operation != "UPDATE" ||
+        variables.user == variables.manager ||
+        (variables.user == variables.controller && variables.sameSpec &&
+          variables.newAnnotations == variables.oldAnnotations) ||
+        (variables.user == variables.scheduler && variables.sameSpec &&
+          variables.sameFinalizers && variables.onlyRequeueAnnotation)
+      message: >-
+        Only the Manager changes a SessionWorkload; session-controller changes only its
+        finalizers and sokovan-scheduler only the sokovan.backend.ai/requeue annotation.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-sessionworkload-writers
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-sessionworkload-writers
+  validationActions: [Deny]
+---
+# sokovan Pods: only the session controller creates Pods for sokovan (scheduler name or gate),
+# and the scheduler and the binder change only the placement of kernel Pods: the scheduling
+# gates, nodeSelector/affinity (gate mode pins the node) and their own annotations.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-sokovan-pods
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  variables:
+    - name: user
+      expression: request.userInfo.username
+    - name: placers
+      expression: '["{{ $sa }}sokovan-scheduler", "{{ $sa }}sokovan-binder"]'
+    - name: sokovanPod
+      expression: >-
+        object.spec.?schedulerName.orValue("") == "sokovan" ||
+        object.spec.?schedulingGates.orValue([]).exists(g, g.name == "scheduling.backend.ai/sokovan")
+    - name: kernelPod
+      expression: >-
+        "app.kubernetes.io/managed-by" in oldObject.metadata.?labels.orValue({}) &&
+        oldObject.metadata.labels["app.kubernetes.io/managed-by"] == "backendai-session-controller"
+    - name: newAnnotations
+      expression: object.metadata.?annotations.orValue({})
+    - name: oldAnnotations
+      expression: oldObject.metadata.?annotations.orValue({})
+    - name: ownAnnotationsOnly
+      expression: >-
+        variables.newAnnotations.all(k, k.startsWith("sokovan.backend.ai/") ||
+          (k in variables.oldAnnotations && variables.oldAnnotations[k] == variables.newAnnotations[k])) &&
+        variables.oldAnnotations.all(k, k.startsWith("sokovan.backend.ai/") || k in variables.newAnnotations)
+    # The other fields the Pod API lets an update change.
+    - name: placementOnly
+      expression: >-
+        object.metadata.?labels.orValue({}) == oldObject.metadata.?labels.orValue({}) &&
+        object.metadata.?finalizers.orValue([]) == oldObject.metadata.?finalizers.orValue([]) &&
+        object.metadata.?ownerReferences.orValue([]) == oldObject.metadata.?ownerReferences.orValue([]) &&
+        object.spec.containers == oldObject.spec.containers &&
+        object.spec.?initContainers.orValue([]) == oldObject.spec.?initContainers.orValue([]) &&
+        object.spec.?tolerations.orValue([]) == oldObject.spec.?tolerations.orValue([]) &&
+        object.spec.?activeDeadlineSeconds.orValue(-1) == oldObject.spec.?activeDeadlineSeconds.orValue(-1) &&
+        object.spec.?terminationGracePeriodSeconds.orValue(-1) == oldObject.spec.?terminationGracePeriodSeconds.orValue(-1)
+  validations:
+    - expression: >-
+        request.operation != "CREATE" || !variables.sokovanPod ||
+        variables.user == "{{ $sa }}session-controller"
+      message: Only session-controller creates Pods for the sokovan scheduler.
+    - expression: >-
+        request.operation != "UPDATE" || !(variables.user in variables.placers) ||
+        (variables.kernelPod && variables.placementOnly && variables.ownAnnotationsOnly)
+      message: >-
+        sokovan-scheduler and sokovan-binder change only the scheduling gates, nodeSelector,
+        affinity and sokovan.backend.ai/ annotations of kernel Pods.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-sokovan-pods
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-sokovan-pods
+  validationActions: [Deny]
+---
+# The scheduler and the binder hold their namespaced write rights cluster-wide (no RoleBinding
+# per session namespace): admission keeps every write inside the session namespaces.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: backendai-sokovan-scope
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["pods", "pods/binding"]
+      - apiGroups: ["scheduling.backend.ai"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["bindrequests", "bindrequests/status", "podgroups", "podgroups/status"]
+      - apiGroups: ["resource.k8s.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["resourceclaims", "resourceclaims/status"]
+      - apiGroups: ["backend.ai"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["sessionworkloads"]
+  matchConditions:
+    - name: placer
+      expression: >-
+        request.userInfo.username in ["{{ $sa }}sokovan-scheduler", "{{ $sa }}sokovan-binder"]
+  validations:
+    - expression: >-
+        "app.kubernetes.io/managed-by" in namespaceObject.metadata.?labels.orValue({}) &&
+        namespaceObject.metadata.labels["app.kubernetes.io/managed-by"] == "backendai-manager"
+      messageExpression: >-
+        request.userInfo.username + " writes only in session namespaces
+        (app.kubernetes.io/managed-by=backendai-manager)"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: backendai-sokovan-scope
+  labels:
+    {{- include "backendai-cluster.labels" . | nindent 4 }}
+spec:
+  policyName: backendai-sokovan-scope
+  validationActions: [Deny]

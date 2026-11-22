@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Mapping
+import asyncio
+import stat
+from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, override
@@ -9,15 +11,18 @@ import aiodocker
 import pytest
 
 from ai.backend.accelerator.mock.plugin import MockPlugin
+from ai.backend.accelerator.mock.types import MockDevice
+from ai.backend.agent.resources import AbstractAllocMap
 from ai.backend.common.types import DeviceId, SlotName
 from ai.backend.dra.errors import (
     InvalidClaimUIDError,
     IsolationRequiredError,
+    IsolationUnavailableError,
     MissingConsumedSharesError,
     UnknownDeviceError,
     UnsupportedContainerArgsError,
 )
-from ai.backend.dra.host.isolation import HamiCore
+from ai.backend.dra.host.isolation import BaiHook, HamiCore
 from ai.backend.dra.host.plugin_host import (
     PluginHost,
     device_name,
@@ -59,6 +64,36 @@ class CDIMockPlugin(MockPlugin):
     ) -> Mapping[str, Any]:
         ids = [f"nvidia.com/gpu={d}" for alloc in device_alloc.values() for d in alloc]
         return {"HostConfig": {"DeviceRequests": [{"Driver": "cdi", "DeviceIDs": ids}]}}
+
+
+class HookMockPlugin(MockPlugin):
+    """Provides hook libraries, as the enterprise CUDA plugin does from its hook cache."""
+
+    hook_dir: Path
+
+    @override
+    async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
+        return [self.hook_dir / "libnvmlhook.so", self.hook_dir / "libcudahook.so"]
+
+
+class SlowListMockPlugin(MockPlugin):
+    """While `relisting`, the device list drops a device and create_alloc_map waits."""
+
+    release: asyncio.Event
+    entered: asyncio.Event
+    relisting: bool
+
+    @override
+    async def list_devices(self) -> Collection[MockDevice]:
+        devices = await super().list_devices()
+        return list(devices)[:1] if self.relisting else devices
+
+    @override
+    async def create_alloc_map(self) -> AbstractAllocMap:
+        if self.relisting:
+            self.entered.set()
+            await self.release.wait()
+        return await super().create_alloc_map()
 
 
 @pytest.fixture
@@ -113,6 +148,16 @@ async def cdi_host(mock_config_dir: Path) -> AsyncIterator[PluginHost]:
     plugin = CDIMockPlugin({"allocation_mode": "discrete"}, {})
     await plugin.init()
     host = PluginHost(plugin, mock_config_dir / "mounts")
+    yield host
+    await host.close()
+
+
+@pytest.fixture
+async def hook_host(mock_config_dir: Path) -> AsyncIterator[PluginHost]:
+    plugin = HookMockPlugin({"allocation_mode": "fractional"}, {})
+    plugin.hook_dir = mock_config_dir / "hook"
+    await plugin.init()
+    host = PluginHost(plugin, mock_config_dir / "mounts", shared=True, isolation=BaiHook())
     yield host
     await host.close()
 
@@ -253,6 +298,12 @@ class TestSharedDevices:
                 shared=True,
             )
 
+    async def test_shared_devices_are_allocated_by_the_shares_slot(
+        self, shared_host: PluginHost
+    ) -> None:
+        devices = (await shared_host.list_devices()).devices
+        assert {d.attributes["slotName"] for d in devices} == {"cuda.shares"}
+
     async def test_capacity_is_the_device_share_capacity(self, shared_host: PluginHost) -> None:
         [first, _] = (await shared_host.list_devices()).devices
         # 108 SMs / 8 per share = 13.5 shares (memory allows 20).
@@ -277,7 +328,23 @@ class TestSharedDevices:
         assert {m.container_path for m in edits.mounts} >= {
             "/usr/local/vgpu/libvgpu.so",
             "/etc/ld.so.preload",
+            "/overrideEnv",
         }
+
+    async def test_hami_limits_are_in_a_read_only_override_file(
+        self, shared_host: PluginHost, mock_config_dir: Path
+    ) -> None:
+        name = (await shared_host.list_devices()).devices[0].name
+        edits, _ = await shared_host.prepare(CLAIM, [name], {name: {"shares": "50"}})
+        [mount] = [m for m in edits.mounts if m.container_path == "/overrideEnv"]
+        override = Path(mount.host_path)
+        assert override.parent == mock_config_dir / "mounts" / CLAIM
+        assert mount.options == ["bind", "ro"]
+        lines = override.read_text().splitlines()
+        assert f"CUDA_DEVICE_MEMORY_LIMIT_0={GIB}" in lines
+        assert "CUDA_DEVICE_SM_LIMIT_0=4" in lines
+        assert all("=" in line for line in lines)
+        assert not override.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
 
     async def test_the_whole_capacity_is_still_isolated(self, shared_host: PluginHost) -> None:
         name = (await shared_host.list_devices()).devices[0].name
@@ -313,3 +380,75 @@ class TestSharedDevices:
         name = (await shared_host.list_devices()).devices[0].name
         with pytest.raises(MissingConsumedSharesError):
             await shared_host.prepare(CLAIM, [name], {name: {"shares": "1351"}})
+
+
+class TestBaiHook:
+    async def test_limits_are_hook_env_keyed_by_device(self, hook_host: PluginHost) -> None:
+        name = (await hook_host.list_devices()).devices[0].name
+        edits, _ = await hook_host.prepare(CLAIM, [name], {name: {"shares": "50"}})
+        uuid = "aaaaaaaa-0000-0000-0000-000000000001"
+        assert f"BACKEND_CUDA_MEMORY_LIMITS={uuid}:{GIB}" in edits.env
+        # 0.5 share → 4 SMs (MIN_SMP_COUNT), an absolute count for the hook.
+        assert f"BACKEND_CUDA_PROCESSOR_LIMITS={uuid}:4" in edits.env
+        assert "BACKEND_CUDA_RESOURCE_VIRTUALIZED=1" in edits.env
+        assert f"BACKEND_CUDA.SHARES_SHARES={uuid}:0.5" in edits.env
+        assert f"BACKEND_CUDA_RESERVED_MEMORY={64 * 1024**2}" in edits.env
+
+    async def test_the_plugin_hooks_are_preloaded_read_only(
+        self, hook_host: PluginHost, mock_config_dir: Path
+    ) -> None:
+        name = (await hook_host.list_devices()).devices[0].name
+        edits, _ = await hook_host.prepare(CLAIM, [name], {name: {"shares": "50"}})
+        mounts = {m.container_path: m for m in edits.mounts}
+        hook = mounts["/usr/local/bai-hook/libnvmlhook.so"]
+        assert hook.host_path == str(mock_config_dir / "hook" / "libnvmlhook.so")
+        preload = mounts["/etc/ld.so.preload"]
+        assert all(m.options == ["bind", "ro"] for m in mounts.values())
+        # NVML first, as the plugin orders them.
+        assert Path(preload.host_path).read_text().splitlines() == [
+            "/usr/local/bai-hook/libnvmlhook.so",
+            "/usr/local/bai-hook/libcudahook.so",
+        ]
+        assert not any(e.startswith("LD_PRELOAD=") for e in edits.env)
+
+    async def test_a_plugin_without_limits_is_refused(self, mock_config_dir: Path) -> None:
+        # The discrete mode gives no CUDA_*_LIMITS: the device would be unlimited.
+        plugin = HookMockPlugin({"allocation_mode": "discrete"}, {})
+        plugin.hook_dir = mock_config_dir / "hook"
+        await plugin.init()
+        host = PluginHost(plugin, mock_config_dir / "mounts", shared=True, isolation=BaiHook())
+        name = (await host.list_devices()).devices[0].name
+        with pytest.raises(IsolationUnavailableError):
+            await host.prepare(CLAIM, [name], {name: {"shares": "50"}})
+        await host.close()
+
+    async def test_a_plugin_without_hooks_is_refused(self, mock_config_dir: Path) -> None:
+        plugin = MockPlugin({"allocation_mode": "fractional"}, {})
+        await plugin.init()
+        host = PluginHost(plugin, mock_config_dir / "mounts", shared=True, isolation=BaiHook())
+        name = (await host.list_devices()).devices[0].name
+        with pytest.raises(IsolationUnavailableError):
+            await host.prepare(CLAIM, [name], {name: {"shares": "50"}})
+        await host.close()
+
+
+class TestDeviceListRace:
+    async def test_a_prepare_during_a_relist_sees_one_generation(
+        self, mock_config_dir: Path
+    ) -> None:
+        plugin = SlowListMockPlugin({"allocation_mode": "discrete"}, {})
+        plugin.release, plugin.entered, plugin.relisting = asyncio.Event(), asyncio.Event(), False
+        await plugin.init()
+        host = PluginHost(plugin, mock_config_dir / "mounts")
+        [_, second] = (await host.list_devices()).devices
+        plugin.relisting = True
+        relist = asyncio.create_task(host.list_devices())
+        await plugin.entered.wait()
+        # The relist has the new device list but not its slots yet: the old maps still serve.
+        edits, _ = await host.prepare(CLAIM, [second.name])
+        assert "BACKENDAI_MOCK_CUDA_DEVICE_COUNT=1" in edits.env
+        plugin.release.set()
+        assert len((await relist).devices) == 1
+        with pytest.raises(UnknownDeviceError):
+            await host.prepare(CLAIM, [second.name])
+        await host.close()

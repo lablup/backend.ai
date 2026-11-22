@@ -94,7 +94,6 @@ spec:
             - {name: BACKENDAI_LOG_LEVEL, value: {{ .Values.sokovanScheduler.logLevel | quote }}}
             {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             - {name: BACKENDAI_SOKOVAN_BIND_MODE, value: {{ .Values.sokovanScheduler.bindMode | quote }}}
-            {{- include "backendai-cluster.gpuPolicyEnv" . | nindent 12 }}
             {{- if .Values.leaderElection.enabled }}
             - {name: BACKENDAI_LEADER_ELECTION, value: "true"}
             - name: POD_NAME

@@ -9,6 +9,7 @@ from ai.backend.kube.preflight import (
     check_crds,
     check_dra_drivers,
     check_gpu_policy,
+    should_retry,
 )
 
 
@@ -88,6 +89,30 @@ class TestBaiNodeOwnership:
         nodes = [_node("a", "bai"), _gpu_node("b", None, 8)]
         checks = check_bai_node_ownership(nodes, [_slice("b", "gpu.nvidia.com")])
         assert [(c.name, c.outcome) for c in checks] == [("single allocator on a", Outcome.PASS)]
+
+    def test_a_bai_npu_node_may_keep_device_plugin_gpus(self) -> None:
+        nodes = [_gpu_node("npu", "bai", 8), _gpu_node("fgpu", "bai", 8)]
+        slices = [_slice("npu", "atom.dra.backend.ai"), _slice("fgpu", "cuda.dra.backend.ai")]
+        checks = check_bai_node_ownership(nodes, slices, ["cuda.dra.backend.ai"])
+        assert [(c.name, c.outcome) for c in checks] == [("single allocator on fgpu", Outcome.FAIL)]
+
+    def test_no_gpu_drivers_checks_no_node(self) -> None:
+        assert check_bai_node_ownership([_gpu_node("npu", "bai", 8)], [], []) == []
+
+
+class TestRetry:
+    def test_unregistered_drivers_are_retried(self) -> None:
+        checks = check_dra_drivers([_node("a", "bai")], [], [])
+        checks += check_consumable_capacity([_profile("fraction")], [])
+        assert should_retry(checks)
+
+    def test_a_lasting_failure_is_not_retried(self) -> None:
+        checks = check_dra_drivers([_node("a", "bai")], [], [])
+        checks += check_bai_node_ownership([_gpu_node("a", "bai", 8)], [])
+        assert not should_retry(checks)
+
+    def test_passing_checks_are_not_retried(self) -> None:
+        assert not should_retry(check_dra_drivers([_node("a", "bai")], [_slice("a", "x")], []))
 
 
 class TestGPUPolicy:
