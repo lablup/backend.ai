@@ -298,3 +298,15 @@ func TestFirstAvailableFallsBackToASubrequestThatFits(t *testing.T) {
 		t.Fatalf("got request %s, want gpu/small", got)
 	}
 }
+
+func TestAnAdminAccessAllocationLeavesItsDeviceFree(t *testing.T) {
+	admin := claim("x")
+	alloc := allocationOf("dev-0")
+	alloc.Devices.Results[0].AdminAccess = ptr(true)
+	admin.Status.Allocation = &alloc
+	a := newTestAllocator(t, admin)
+	resp, err := a.allocate(context.Background(), &AllocateRequest{Pods: []PodPlacement{pod("p0", "a"), pod("p1", "b")}})
+	if err != nil || !resp.Fits {
+		t.Fatalf("both devices must stay usable: %+v %v", resp, err)
+	}
+}

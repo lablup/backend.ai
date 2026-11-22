@@ -2,13 +2,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
@@ -168,22 +174,198 @@ func TestAWrittenAllocationHoldsItsDeviceOnlyUntilTheInformerCatchesUp(t *testin
 	cases := []struct {
 		name     string
 		informer []*resourceapi.ResourceClaim
+		synced   string
 		conflict bool
 	}{
-		{"informer behind the write", []*resourceapi.ResourceClaim{at("9")}, true},
-		{"informer shows the claim freed", []*resourceapi.ResourceClaim{at("11")}, false},
-		{"claim deleted", nil, false},
-		{"claim recreated", []*resourceapi.ResourceClaim{recreated}, false},
+		{"informer behind the write", []*resourceapi.ResourceClaim{at("9")}, "9", true},
+		{"informer shows the claim freed", []*resourceapi.ResourceClaim{at("11")}, "11", false},
+		{"claim deleted after the write", nil, "11", false},
+		{"claim absent before the informer reached the write", nil, "9", true},
+		{"claim recreated", []*resourceapi.ResourceClaim{recreated}, "12", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			b := newBinder(fake.NewClientset(claim("b")), nil)
 			b.claims = claimLister(t, tc.informer...)
+			b.claimsVersion = func() string { return tc.synced }
 			b.written["ns/a"] = written
 			err := b.allocateClaim(context.Background(), "ns", testPod(), ClaimAllocation{Name: "b", Allocation: allocationOf("dev-0")})
 			if (err != nil) != tc.conflict {
 				t.Fatalf("conflict = %v, want %v", err, tc.conflict)
 			}
 		})
+	}
+}
+
+func sliceLister(t *testing.T, devices ...resourceapi.Device) resourcelisters.ResourceSliceLister {
+	t.Helper()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	rs := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "n1-slice"},
+		Spec:       resourceapi.ResourceSliceSpec{Driver: testDriver, Pool: resourceapi.ResourcePool{Name: "n1"}, Devices: devices},
+	}
+	if err := indexer.Add(rs); err != nil {
+		t.Fatal(err)
+	}
+	return resourcelisters.NewResourceSliceLister(indexer)
+}
+
+func shareOf(device, share string, shares int64) resourceapi.AllocationResult {
+	id := types.UID(share)
+	return resourceapi.AllocationResult{Devices: resourceapi.DeviceAllocationResult{Results: []resourceapi.DeviceRequestAllocationResult{{
+		Request: "gpu", Driver: testDriver, Pool: "n1", Device: device, ShareID: &id,
+		ConsumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{"shares": *resource.NewQuantity(shares, resource.DecimalSI)},
+	}}}}
+}
+
+func sharedDevice(multiple bool) resourceapi.Device {
+	return resourceapi.Device{
+		Name:                     "dev-0",
+		AllowMultipleAllocations: &multiple,
+		Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"shares": {Value: resource.MustParse("100")}},
+	}
+}
+
+func TestSharesOfADeviceAreSummedOverEveryHolder(t *testing.T) {
+	cases := []struct {
+		name     string
+		multiple bool
+		mine     int64
+		conflict bool
+	}{
+		{"within the capacity", true, 40, false},
+		{"over the capacity", true, 50, true},
+		{"a device that takes one allocation", false, 10, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			held := claim("a")
+			alloc := shareOf("dev-0", "s1", 60)
+			held.Status.Allocation = &alloc
+			b := newBinder(fake.NewClientset(claim("b")), nil)
+			b.claims = claimLister(t, held)
+			b.slices = sliceLister(t, sharedDevice(tc.multiple))
+			err := b.allocateClaim(context.Background(), "ns", testPod(), ClaimAllocation{Name: "b", Allocation: shareOf("dev-0", "s2", tc.mine)})
+			if (err != nil) != tc.conflict {
+				t.Fatalf("conflict = %v, want %v", err, tc.conflict)
+			}
+		})
+	}
+}
+
+func TestAnAdminAccessAllocationHoldsNoDevice(t *testing.T) {
+	held := claim("a")
+	alloc := allocationOf("dev-0")
+	alloc.Devices.Results[0].AdminAccess = ptr(true)
+	held.Status.Allocation = &alloc
+	b := newBinder(fake.NewClientset(claim("b")), nil)
+	b.claims = claimLister(t, held)
+	if err := b.allocateClaim(context.Background(), "ns", testPod(), ClaimAllocation{Name: "b", Allocation: allocationOf("dev-0")}); err != nil {
+		t.Fatalf("an admin access allocation must not conflict: %v", err)
+	}
+}
+
+func podWithClaims() *corev1.Pod {
+	p := testPod()
+	p.Spec.ResourceClaims = []corev1.PodResourceClaim{
+		{Name: "named", ResourceClaimName: ptr("a")},
+		{Name: "templated", ResourceClaimTemplateName: ptr("t")},
+	}
+	p.Status.ResourceClaimStatuses = []corev1.PodResourceClaimStatus{{Name: "templated", ResourceClaimName: ptr("b")}}
+	return p
+}
+
+func allocatedFor(name string, uid types.UID) *resourceapi.ResourceClaim {
+	c := claim(name)
+	alloc := allocationOf("dev-0")
+	c.Status.Allocation = &alloc
+	c.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{{Resource: "pods", Name: "p", UID: uid}}
+	return c
+}
+
+func TestEveryClaimOfThePodMustBeAllocatedForItBeforeTheBind(t *testing.T) {
+	ready := newBinder(fake.NewClientset(allocatedFor("a", "uid-p"), allocatedFor("b", "uid-p")), nil)
+	if err := ready.checkPodClaims(context.Background(), podWithClaims()); err != nil {
+		t.Fatalf("allocated claims must pass: %v", err)
+	}
+	cases := map[string]*binder{
+		"not reserved for the pod": newBinder(fake.NewClientset(allocatedFor("a", "uid-p"), allocatedFor("b", "uid-q")), nil),
+		"not allocated":            newBinder(fake.NewClientset(allocatedFor("a", "uid-p"), claim("b")), nil),
+		"missing":                  newBinder(fake.NewClientset(allocatedFor("a", "uid-p")), nil),
+	}
+	for name, b := range cases {
+		t.Run(name, func(t *testing.T) {
+			var notReady errClaimsNotReady
+			if err := b.checkPodClaims(context.Background(), podWithClaims()); !errors.As(err, &notReady) {
+				t.Fatalf("got %v, want a not-ready claim", err)
+			}
+		})
+	}
+	uncreated := podWithClaims()
+	uncreated.Status.ResourceClaimStatuses = nil
+	var notReady errClaimsNotReady
+	if err := ready.checkPodClaims(context.Background(), uncreated); !errors.As(err, &notReady) {
+		t.Fatalf("a claim not generated yet must fail the bind: %v", err)
+	}
+}
+
+func succeededRequest() (*bindRequest, *unstructured.Unstructured) {
+	br := &bindRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "p-1", Namespace: "ns", UID: "br-uid"},
+		Spec: bindRequestSpec{
+			PodName: "p", PodUID: "uid-p", SelectedNode: "n1",
+			ResourceClaimAllocations: []ClaimAllocation{{Name: "a", Allocation: allocationOf("dev-0")}},
+		},
+	}
+	obj := &unstructured.Unstructured{}
+	obj.SetAPIVersion("scheduling.backend.ai/v1alpha1")
+	obj.SetKind("BindRequest")
+	obj.SetName(br.Name)
+	obj.SetNamespace(br.Namespace)
+	obj.SetUID(br.UID)
+	return br, obj
+}
+
+func requestExists(t *testing.T, b *binder) bool {
+	t.Helper()
+	_, err := b.dynamic.Resource(bindRequestGVR).Namespace("ns").Get(context.Background(), "p-1", metav1.GetOptions{})
+	return err == nil
+}
+
+func dynamicWith(obj runtime.Object) *dynamicfake.FakeDynamicClient {
+	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
+		runtime.NewScheme(), map[schema.GroupVersionResource]string{bindRequestGVR: "BindRequestList"}, obj)
+}
+
+func TestASucceededRequestStaysUntilTheClaimInformerShowsItsAllocation(t *testing.T) {
+	br, obj := succeededRequest()
+	b := newBinder(nil, dynamicWith(obj))
+	now := time.Now()
+	b.now = func() time.Time { return now }
+	b.claims = claimLister(t, claim("a"))
+	b.deleteSucceeded(context.Background(), br, "ns/p-1")
+	now = now.Add(time.Minute)
+	b.deleteSucceeded(context.Background(), br, "ns/p-1")
+	if !requestExists(t, b) {
+		t.Fatal("deleted before the informer showed the allocation")
+	}
+	b.claims = claimLister(t, allocatedFor("a", "uid-p"))
+	b.deleteSucceeded(context.Background(), br, "ns/p-1")
+	if requestExists(t, b) {
+		t.Fatal("kept after the informer showed the allocation")
+	}
+}
+
+func TestASucceededRequestGoesAfterTheSafetyAge(t *testing.T) {
+	br, obj := succeededRequest()
+	b := newBinder(nil, dynamicWith(obj))
+	now := time.Now()
+	b.now = func() time.Time { return now }
+	b.claims = claimLister(t)
+	b.deleteSucceeded(context.Background(), br, "ns/p-1")
+	now = now.Add(succeededMaxAge + time.Second)
+	b.deleteSucceeded(context.Background(), br, "ns/p-1")
+	if requestExists(t, b) {
+		t.Fatal("kept past the safety age")
 	}
 }

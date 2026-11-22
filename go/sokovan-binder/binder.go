@@ -1,13 +1,16 @@
 package main
 
 // The binder: for each pending BindRequest, record the claim allocations, release the
-// scheduling gate and bind the Pod. A request that keeps failing, or that the scheduler marks
-// failed, rolls its claims back; the scheduler deletes it once the rollback shows. A request
-// that succeeded is deleted after a grace period, when the allocator's informer shows its claims.
+// scheduling gate and bind the Pod once every claim of the Pod is allocated and reserved for it.
+// A request that keeps failing, or that the scheduler marks failed, rolls its claims back; the
+// scheduler deletes it once the rollback shows. A request that succeeded is deleted once the
+// claim informer shows its allocations (the allocator's informer follows the same watch), or
+// after a long safety age.
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -17,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,9 +43,10 @@ const (
 	phasePending          = "Pending"
 	phaseSucceeded        = "Succeeded"
 	phaseFailed           = "Failed"
-	// How long a Succeeded request stays: the scheduler sends its allocations to the allocator
-	// until the allocator's informer shows them on the claims.
-	succeededRetention = 30 * time.Second
+	// The longest a Succeeded request stays when the claim informer never shows its
+	// allocations (the claim or the Pod went away): the scheduler sends its allocations to the
+	// allocator until then.
+	succeededMaxAge = 10 * time.Minute
 	// How long a claim allocation this binder wrote counts in the conflict check while the
 	// claim informer may not show it yet.
 	writtenRetention = time.Minute
@@ -76,11 +81,20 @@ type writtenAllocation struct {
 	at              time.Time
 }
 
+// errClaimsNotReady fails a request at once: retrying the bind cannot allocate a claim the
+// request does not carry.
+type errClaimsNotReady struct{ reason string }
+
+func (e errClaimsNotReady) Error() string { return e.reason }
+
 type binder struct {
 	client   kubernetes.Interface
 	dynamic  dynamic.Interface
 	requests cache.GenericLister
 	claims   resourcelisters.ResourceClaimLister
+	slices   resourcelisters.ResourceSliceLister
+	// resourceVersion the claim informer has seen last (nil: unknown)
+	claimsVersion func() string
 	// claim key → allocation this binder wrote, until the claim informer surely shows it
 	written map[string]writtenAllocation
 	// bind request key → when it was first seen Succeeded
@@ -103,7 +117,10 @@ func runBinder(ctx context.Context, client kubernetes.Interface, dyn dynamic.Int
 	requestInformers := dynamicinformer.NewDynamicSharedInformerFactory(dyn, 10*time.Minute)
 	b.requests = requestInformers.ForResource(bindRequestGVR).Lister()
 	claimInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
-	b.claims = claimInformers.Resource().V1().ResourceClaims().Lister()
+	claimInformer := claimInformers.Resource().V1().ResourceClaims()
+	b.claims = claimInformer.Lister()
+	b.claimsVersion = claimInformer.Informer().LastSyncResourceVersion
+	b.slices = claimInformers.Resource().V1().ResourceSlices().Lister()
 	requestInformers.Start(ctx.Done())
 	claimInformers.Start(ctx.Done())
 	for typ, ok := range requestInformers.WaitForCacheSync(ctx.Done()) {
@@ -180,7 +197,8 @@ func (b *binder) process(ctx context.Context, br *bindRequest) {
 	if err := b.bind(ctx, br); err != nil {
 		status.FailedAttempts++
 		status.Reason = err.Error()
-		if status.FailedAttempts > br.Spec.BackoffLimit {
+		var notReady errClaimsNotReady
+		if status.FailedAttempts > br.Spec.BackoffLimit || errors.As(err, &notReady) {
 			b.rollback(ctx, br)
 			status.Phase = phaseFailed
 		}
@@ -197,10 +215,10 @@ func (b *binder) process(ctx context.Context, br *bindRequest) {
 func (b *binder) deleteSucceeded(ctx context.Context, br *bindRequest, key string) {
 	first, ok := b.succeededAt[key]
 	if !ok {
-		b.succeededAt[key] = b.now()
-		return
+		first = b.now()
+		b.succeededAt[key] = first
 	}
-	if b.now().Sub(first) < succeededRetention {
+	if !b.informerShows(br) && b.now().Sub(first) < succeededMaxAge {
 		return
 	}
 	uid := br.UID
@@ -211,6 +229,30 @@ func (b *binder) deleteSucceeded(ctx context.Context, br *bindRequest, key strin
 		return
 	}
 	delete(b.succeededAt, key)
+}
+
+// informerShows tells whether the claim informer shows every allocation of the request on its
+// claim, reserved for the Pod.
+func (b *binder) informerShows(br *bindRequest) bool {
+	if b.claims == nil {
+		return false
+	}
+	for _, ca := range br.Spec.ResourceClaimAllocations {
+		c, err := b.claims.ResourceClaims(br.Namespace).Get(ca.Name)
+		if err != nil || c.Status.Allocation == nil || !sameDevices(c.Status.Allocation, &ca.Allocation) {
+			return false
+		}
+		if !reservedFor(c, types.UID(br.Spec.PodUID)) {
+			return false
+		}
+	}
+	return true
+}
+
+func reservedFor(c *resourceapi.ResourceClaim, uid types.UID) bool {
+	return slices.ContainsFunc(c.Status.ReservedFor, func(r resourceapi.ResourceClaimConsumerReference) bool {
+		return r.UID == uid
+	})
 }
 
 func (b *binder) bind(ctx context.Context, br *bindRequest) error {
@@ -233,6 +275,9 @@ func (b *binder) bind(ctx context.Context, br *bindRequest) error {
 			return err
 		}
 	}
+	if err := b.checkPodClaims(ctx, pod); err != nil {
+		return err
+	}
 	if gates := withoutGate(pod.Spec.SchedulingGates); len(gates) != len(pod.Spec.SchedulingGates) {
 		patch, err := json.Marshal([]map[string]any{{"op": "replace", "path": "/spec/schedulingGates", "value": gates}})
 		if err != nil {
@@ -246,6 +291,42 @@ func (b *binder) bind(ctx context.Context, br *bindRequest) error {
 		ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace, UID: pod.UID},
 		Target:     corev1.ObjectReference{Kind: "Node", Name: br.Spec.SelectedNode},
 	}, metav1.CreateOptions{})
+}
+
+// checkPodClaims refuses to bind a Pod while one of its claims is not allocated and reserved
+// for it: the kubelet would not start it, and nothing else allocates claims on these nodes.
+func (b *binder) checkPodClaims(ctx context.Context, pod *corev1.Pod) error {
+	claims := b.client.ResourceV1().ResourceClaims(pod.Namespace)
+	for _, ref := range pod.Spec.ResourceClaims {
+		name := podClaimName(pod, ref)
+		if name == "" {
+			return errClaimsNotReady{fmt.Sprintf("claim %s of pod %s is not created yet", ref.Name, pod.Name)}
+		}
+		c, err := claims.Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return errClaimsNotReady{fmt.Sprintf("claim %s of pod %s is gone", name, pod.Name)}
+			}
+			return err
+		}
+		if c.Status.Allocation == nil || !reservedFor(c, pod.UID) {
+			return errClaimsNotReady{fmt.Sprintf("claim %s of pod %s is not allocated for it", name, pod.Name)}
+		}
+	}
+	return nil
+}
+
+// podClaimName is the claim behind a Pod's claim entry: named, or generated from a template.
+func podClaimName(pod *corev1.Pod, ref corev1.PodResourceClaim) string {
+	if ref.ResourceClaimName != nil {
+		return *ref.ResourceClaimName
+	}
+	for _, st := range pod.Status.ResourceClaimStatuses {
+		if st.Name == ref.Name && st.ResourceClaimName != nil {
+			return *st.ResourceClaimName
+		}
+	}
+	return ""
 }
 
 func withoutGate(gates []corev1.PodSchedulingGate) []corev1.PodSchedulingGate {
@@ -276,10 +357,7 @@ func (b *binder) allocateClaim(ctx context.Context, ns string, pod *corev1.Pod, 
 		} else if !sameDevices(claim.Status.Allocation, &ca.Allocation) {
 			return fmt.Errorf("claim %s is allocated to other devices", claim.Name)
 		}
-		reserved := slices.ContainsFunc(claim.Status.ReservedFor, func(r resourceapi.ResourceClaimConsumerReference) bool {
-			return r.UID == pod.UID
-		})
-		if !reserved {
+		if !reservedFor(claim, pod.UID) {
 			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{
 				Resource: "pods", Name: pod.Name, UID: pod.UID,
 			})
@@ -304,8 +382,10 @@ func (b *binder) allocateClaim(ctx context.Context, ns string, pod *corev1.Pod, 
 	})
 }
 
-// checkConflicts refuses an allocation whose devices another claim already holds: a whole
-// device held by anyone, or a share of a device held whole.
+// checkConflicts refuses an allocation whose devices other claims already hold: a device that
+// takes one allocation held by anyone, a share of a device held whole, the same share, or shares
+// whose consumed capacities summed over every holder exceed the device's. Admin access results
+// take nothing.
 func (b *binder) checkConflicts(ns string, ca ClaimAllocation) error {
 	self := ns + "/" + ca.Name
 	held := map[string]*resourceapi.AllocationResult{}
@@ -327,38 +407,119 @@ func (b *binder) checkConflicts(ns string, ca ClaimAllocation) error {
 			held[key] = &w.allocation
 		}
 	}
+	devices, err := b.deviceIndex()
+	if err != nil {
+		return err
+	}
+	// device → what the other claims hold of it
+	theirs := map[string][]heldResult{}
 	for key, alloc := range held {
 		if key == self {
 			continue
 		}
-		for _, mine := range ca.Allocation.Devices.Results {
-			for _, theirs := range alloc.Devices.Results {
-				if deviceKey(mine) != deviceKey(theirs) {
-					continue
+		for _, r := range alloc.Devices.Results {
+			if !isAdminAccess(r) {
+				theirs[deviceKey(r)] = append(theirs[deviceKey(r)], heldResult{key, r})
+			}
+		}
+	}
+	mine := map[string][]resourceapi.DeviceRequestAllocationResult{}
+	for _, r := range ca.Allocation.Devices.Results {
+		if !isAdminAccess(r) {
+			mine[deviceKey(r)] = append(mine[deviceKey(r)], r)
+		}
+	}
+	for dev, results := range mine {
+		others := theirs[dev]
+		if len(others) == 0 {
+			continue
+		}
+		device, known := devices[dev]
+		multiple := known && device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
+		for _, r := range results {
+			for _, o := range others {
+				whole := r.ShareID == nil || o.result.ShareID == nil
+				sameShare := !whole && *r.ShareID == *o.result.ShareID
+				if whole || sameShare || (known && !multiple) {
+					return fmt.Errorf("device %s of claim %s is held by claim %s", dev, ca.Name, o.claim)
 				}
-				if mine.ShareID == nil || theirs.ShareID == nil || *mine.ShareID == *theirs.ShareID {
-					return fmt.Errorf("device %s of claim %s is held by claim %s", deviceKey(mine), ca.Name, key)
-				}
+			}
+		}
+		if !known {
+			continue
+		}
+		total := map[resourceapi.QualifiedName]resource.Quantity{}
+		add := func(r resourceapi.DeviceRequestAllocationResult) {
+			for name, q := range r.ConsumedCapacity {
+				sum := total[name]
+				sum.Add(q)
+				total[name] = sum
+			}
+		}
+		for _, o := range others {
+			add(o.result)
+		}
+		for _, r := range results {
+			add(r)
+		}
+		for name, sum := range total {
+			capacity, ok := device.Capacity[name]
+			if ok && sum.Cmp(capacity.Value) > 0 {
+				return fmt.Errorf("capacity %s of device %s is exceeded by claim %s", name, dev, ca.Name)
 			}
 		}
 	}
 	return nil
 }
 
-// informerCaughtUp tells whether the claim informer already shows the claim at or past the
-// write, so a missing allocation there means it was freed. A claim gone from the informer
-// (deleted or recreated) no longer holds the write either.
+type heldResult struct {
+	claim  string
+	result resourceapi.DeviceRequestAllocationResult
+}
+
+func isAdminAccess(r resourceapi.DeviceRequestAllocationResult) bool {
+	return r.AdminAccess != nil && *r.AdminAccess
+}
+
+// deviceIndex is the devices of the ResourceSlices by driver/pool/device.
+func (b *binder) deviceIndex() (map[string]resourceapi.Device, error) {
+	out := map[string]resourceapi.Device{}
+	if b.slices == nil {
+		return out, nil
+	}
+	all, err := b.slices.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	for _, rs := range all {
+		for _, d := range rs.Spec.Devices {
+			out[rs.Spec.Driver+"/"+rs.Spec.Pool.Name+"/"+d.Name] = d
+		}
+	}
+	return out, nil
+}
+
+// informerCaughtUp tells whether the claim informer reflects the write, so a missing
+// allocation there means it was freed: it shows the claim at or past the write, shows a new
+// claim of that name, or misses the claim after having seen a resourceVersion past the write.
 func (b *binder) informerCaughtUp(seen map[string]*resourceapi.ResourceClaim, key string, w writtenAllocation) bool {
 	if b.claims == nil {
 		return false
 	}
 	c, ok := seen[key]
-	if !ok || c.UID != w.uid {
+	if !ok {
+		return b.claimsVersion != nil && versionAtLeast(b.claimsVersion(), w.resourceVersion)
+	}
+	if c.UID != w.uid {
 		return true
 	}
-	current, err1 := strconv.ParseUint(c.ResourceVersion, 10, 64)
-	written, err2 := strconv.ParseUint(w.resourceVersion, 10, 64)
-	return err1 == nil && err2 == nil && current >= written
+	return versionAtLeast(c.ResourceVersion, w.resourceVersion)
+}
+
+func versionAtLeast(current, written string) bool {
+	c, err1 := strconv.ParseUint(current, 10, 64)
+	w, err2 := strconv.ParseUint(written, 10, 64)
+	return err1 == nil && err2 == nil && c >= w
 }
 
 func (b *binder) expireWritten() {

@@ -236,8 +236,12 @@ func addAllocated(state *structured.AllocatedState, alloc *resourceapi.Allocatio
 	}
 }
 
-// addResult marks a device used: whole, or one share of it with the capacity it consumes.
+// addResult marks a device used: whole, or one share of it with the capacity it consumes
+// (summed over its shares). An admin access result takes nothing, as in kube-scheduler.
 func addResult(state *structured.AllocatedState, r resourceapi.DeviceRequestAllocationResult) {
+	if r.AdminAccess != nil && *r.AdminAccess {
+		return
+	}
 	id := structured.MakeDeviceID(r.Driver, r.Pool, r.Device)
 	if r.ShareID == nil {
 		state.AllocatedDevices.Insert(id)
