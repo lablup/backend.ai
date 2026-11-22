@@ -23,6 +23,7 @@ from kubernetes_asyncio.client.exceptions import ApiException
 from ai.backend.kube.crd.base import CRD_VERSION, CustomResource
 from ai.backend.kube.crd.device import DeviceProfile, GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import BindRequest, Queue
+from ai.backend.kube.crd.schema import build_crd
 from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.crd.storage import StorageBinding
 from ai.backend.kube.kubeconfig import load_kube_config, quiet_client_logs
@@ -73,6 +74,33 @@ def check_crds(served: Mapping[str, Sequence[str]]) -> list[Check]:
             checks.append(Check(f"crd {name}", Outcome.FAIL, f"{CRD_VERSION} not served"))
         else:
             checks.append(Check(f"crd {name}", Outcome.PASS, CRD_VERSION))
+    return checks
+
+
+def check_crd_fields(installed: Mapping[str, Mapping[str, Any]]) -> list[Check]:
+    """`installed`: CRD name → its served openAPIV3Schema. Fails when a spec or status field the
+    components write is missing: the backendai-crds chart was not upgraded before this one."""
+    checks = []
+    for crd in _CRDS:
+        name = f"{crd.crd.plural}.{crd.crd.group}"
+        schema = installed.get(name)
+        if schema is None:
+            continue
+        expected = build_crd(crd)["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+        missing = [
+            f"{part}.{field}"
+            for part in ("spec", "status")
+            for field in expected["properties"][part].get("properties", {})
+            if field not in schema.get("properties", {}).get(part, {}).get("properties", {})
+        ]
+        if missing:
+            checks.append(
+                Check(
+                    f"crd fields {name}",
+                    Outcome.FAIL,
+                    f"missing {', '.join(missing)}: upgrade the backendai-crds chart first",
+                )
+            )
     return checks
 
 
@@ -339,6 +367,13 @@ async def run_checks(
     crds = await ext.list_custom_resource_definition()
     served = {c.metadata.name: [v.name for v in c.spec.versions if v.served] for c in crds.items}
     checks = check_crds(served)
+    installed = {
+        c.metadata.name: api.sanitize_for_serialization(v.schema.open_api_v3_schema)
+        for c in crds.items
+        for v in c.spec.versions
+        if v.name == CRD_VERSION and v.schema is not None
+    }
+    checks += check_crd_fields(installed)
     try:
         slices = (
             await custom.list_cluster_custom_object("resource.k8s.io", "v1", "resourceslices")

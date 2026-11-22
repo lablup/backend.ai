@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai.backend.kube.crd.schema import build_crd
+from ai.backend.kube.crd.session import SessionWorkload
 from ai.backend.kube.preflight import (
     Outcome,
     check_bai_node_ownership,
     check_consumable_capacity,
+    check_crd_fields,
     check_crds,
     check_dra_drivers,
     check_gpu_policy,
@@ -40,6 +43,26 @@ class TestCRDs:
         outcomes = {c.name: c.outcome for c in checks}
         assert outcomes["crd sessionworkloads.backend.ai"] == Outcome.PASS
         assert outcomes["crd bindrequests.scheduling.backend.ai"] == Outcome.FAIL
+
+
+class TestCRDFields:
+    def _schema(self) -> dict[str, Any]:
+        crd = build_crd(SessionWorkload)
+        schema: dict[str, Any] = crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+        return schema
+
+    def test_current_schema_passes(self) -> None:
+        assert check_crd_fields({"sessionworkloads.backend.ai": self._schema()}) == []
+
+    def test_old_crd_without_placement_fails(self) -> None:
+        schema = self._schema()
+        del schema["properties"]["status"]["properties"]["placement"]
+        [check] = check_crd_fields({"sessionworkloads.backend.ai": schema})
+        assert check.outcome == Outcome.FAIL
+        assert "status.placement" in check.detail
+
+    def test_crd_not_installed_is_left_to_check_crds(self) -> None:
+        assert check_crd_fields({}) == []
 
 
 class TestDRADrivers:
