@@ -56,20 +56,20 @@ spec:
                 type: string
               deviceClassName:
                 type: string
-              capacityConversions:
-                items:
-                  properties:
-                    capacity:
-                      description: DRA capacity name, e.g. dra.backend.ai/shares
-                      type: string
-                    factor:
-                      description: DRA quantity per one slot unit
-                      type: number
-                  required:
-                  - capacity
-                  - factor
-                  type: object
-                type: array
+              extendedResourceName:
+                type: string
+                description: Device plugin resource, e.g. nvidia.com/gpu. Under the
+                  device-plugin GPU allocation policy the kernel container requests
+                  it instead of a ResourceClaim. Exclusive profiles only
+                nullable: true
+              fractionStrategy:
+                description: How a fraction request larger than any one device is
+                  split
+                enum:
+                - fill
+                - evenly
+                type: string
+                default: fill
               attributeMap:
                 additionalProperties:
                   type: string

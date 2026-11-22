@@ -1,34 +1,77 @@
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import msgpack
+import pytest
 from prometheus_client import generate_latest
 
 from ai.backend.kube.controller.stats import (
     ContainerMetrics,
     ContainerSample,
     KernelStats,
-    parse_resource_metrics,
+    StatBridge,
+    kubelet_endpoint,
+    parse_stats_summary,
 )
 
-METRICS = """\
-# HELP container_cpu_usage_seconds_total [STABLE] Cumulative cpu time
-container_cpu_usage_seconds_total{container="kernel",namespace="ns",pod="s-1-main1"} 2.5 1700000000000
-container_cpu_usage_seconds_total{container="krunner",namespace="ns",pod="s-1-main1"} 0.1 1700000000000
-container_memory_working_set_bytes{container="kernel",namespace="ns",pod="s-1-main1"} 1048576 1700000000000
-node_cpu_usage_seconds_total 100 1700000000000
-"""
+SUMMARY: dict[str, Any] = {
+    "node": {"nodeName": "n1"},
+    "pods": [
+        {
+            "podRef": {"name": "s-1-main1", "namespace": "ns"},
+            "containers": [
+                {
+                    "name": "kernel",
+                    "cpu": {"time": "2023-11-14T22:13:20Z", "usageCoreNanoSeconds": 2500000000},
+                    "memory": {"workingSetBytes": 1048576},
+                },
+                {
+                    "name": "krunner",
+                    "cpu": {"time": "2023-11-14T22:13:20Z", "usageCoreNanoSeconds": 100},
+                },
+            ],
+        },
+        {
+            "podRef": {"name": "s-2-main1", "namespace": "ns"},
+            "containers": [{"name": "kernel", "cpu": {"time": "2023-11-14T22:13:20Z"}}],
+        },
+    ],
+}
 
 
-class TestParseResourceMetrics:
-    def test_keeps_only_kernel_containers(self) -> None:
-        assert parse_resource_metrics(METRICS) == {
-            ("ns", "s-1-main1"): {
-                "container_cpu_usage_seconds_total": (Decimal("2.5"), 1700000000000),
-                "container_memory_working_set_bytes": (Decimal("1048576"), 1700000000000),
+class TestParseStatsSummary:
+    def test_keeps_only_kernel_containers_with_a_cpu_sample(self) -> None:
+        assert parse_stats_summary(SUMMARY) == {
+            ("ns", "s-1-main1"): ContainerSample(
+                cpu_msec=Decimal(2500), mem_bytes=Decimal(1048576), timestamp_ms=1700000000000
+            )
+        }
+
+
+class TestKubeletEndpoint:
+    def test_internal_ip_and_kubelet_port(self) -> None:
+        node = {
+            "status": {
+                "addresses": [
+                    {"type": "Hostname", "address": "n1"},
+                    {"type": "InternalIP", "address": "10.0.0.5"},
+                ],
+                "daemonEndpoints": {"kubeletEndpoint": {"Port": 10255}},
             }
         }
+        assert kubelet_endpoint(node) == "https://10.0.0.5:10255"
+
+    def test_ipv6_address_is_bracketed(self) -> None:
+        node = {"status": {"addresses": [{"type": "InternalIP", "address": "fd00::5"}]}}
+        assert kubelet_endpoint(node) == "https://[fd00::5]:10250"
+
+    def test_a_node_without_an_internal_ip_has_none(self) -> None:
+        assert kubelet_endpoint({"status": {"addresses": []}}) is None
 
 
 class TestKernelStats:
@@ -63,3 +106,19 @@ class TestContainerMetrics:
         assert 'value_type="current"' in text and 'value_type="pct"' not in text
         metrics.forget(["k1"])
         assert "k1" not in generate_latest(metrics.registry).decode()
+
+
+class TestStatBridgeRun:
+    async def test_any_collection_failure_is_retried(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        bridge = StatBridge(MagicMock(), AsyncMock(), ContainerMetrics("a"), interval=0.001)
+        failures: list[BaseException] = [
+            aiohttp.ClientError("reset"),
+            RuntimeError("valkey"),
+            ValueError("parse"),
+            asyncio.CancelledError(),
+        ]
+        collect = AsyncMock(side_effect=failures)
+        monkeypatch.setattr(bridge, "collect", collect)
+        with pytest.raises(asyncio.CancelledError):
+            await bridge.run()
+        assert collect.await_count == 4

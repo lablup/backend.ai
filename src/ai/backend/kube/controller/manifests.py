@@ -11,10 +11,17 @@ from typing import Any, Final
 from ai.backend.common.docker import LabelName
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.kube.controller.adapters import SchedulerAdapter, adapter_for, build_adapters
-from ai.backend.kube.controller.devices import INTRINSIC_SLOTS, DeviceClaim, pod_device_parts
+from ai.backend.kube.controller.devices import (
+    INTRINSIC_SLOTS,
+    DeviceClaim,
+    PodDeviceParts,
+    pod_device_parts,
+)
 from ai.backend.kube.controller.kernel_files import build_kernel_files
 from ai.backend.kube.controller.krunner import select_krunner
 from ai.backend.kube.controller.naming import (
+    ANNOTATION_KERNEL_GID,
+    ANNOTATION_KERNEL_UID,
     HOSTNAME_LABEL,
     KERNEL_CONTAINER,
     KRUNNER_CONTAINER,
@@ -27,6 +34,7 @@ from ai.backend.kube.controller.naming import (
     session_queue,
 )
 from ai.backend.kube.controller.volumes import ResolvedMount, pod_volumes, volume_mounts
+from ai.backend.kube.crd.device import GPUAllocationPolicy
 from ai.backend.kube.crd.scheduling import (
     PodGroup,
     PodGroupSpec,
@@ -40,6 +48,26 @@ REPL_PORTS: Final = (2000, 2001)
 INTRINSIC_PORTS: Final = {"sshd": 2200, "ttyd": 7681, "etty": 7682}
 DEFAULT_SHMEM: Final = 64 * 1024 * 1024
 _ARCH_TO_K8S: Final = {"x86_64": "amd64", "aarch64": "arm64"}
+_SECCOMP_DEFAULT: Final = {"type": "RuntimeDefault"}
+# The container runtime's default set without NET_RAW, MKNOD, SETFCAP and SETPCAP, plus what
+# the Docker agent adds (IPC_LOCK, SYS_NICE). The entrypoint starts as root and drops to
+# LOCAL_USER_ID with su-exec: that takes SETUID and SETGID, not privilege escalation.
+KERNEL_CAPABILITIES: Final = (
+    "AUDIT_WRITE",
+    "CHOWN",
+    "DAC_OVERRIDE",
+    "FOWNER",
+    "FSETID",
+    "IPC_LOCK",
+    "KILL",
+    "NET_BIND_SERVICE",
+    "SETGID",
+    "SETUID",
+    "SYS_CHROOT",
+    "SYS_NICE",
+)
+# install.sh chowns the two area roots, then places the files as the kernel user.
+KRUNNER_CAPABILITIES: Final = ("CHOWN", "SETGID", "SETUID")
 
 
 @dataclass(frozen=True)
@@ -51,6 +79,7 @@ class ControllerSettings:
     termination_grace_seconds: int = 10
     bind_mode: SokovanBindMode = SokovanBindMode.GATE
     kueue_cluster_queue: str = "backendai"
+    gpu_allocation_policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA
 
 
 @dataclass(frozen=True)
@@ -142,16 +171,21 @@ def kernel_environ(kernel: KernelSpec, settings: ControllerSettings) -> dict[str
     return environ
 
 
-def _resources(kernel: KernelSpec, claims: Sequence[Mapping[str, str]]) -> dict[str, Any]:
-    """Device slots arrive as `claims`; the translator rejects slots it has no profile for."""
+def _resources(kernel: KernelSpec, devices: PodDeviceParts) -> dict[str, Any]:
+    """Device slots arrive as claims or extended resources; the translator rejects slots it
+    has no profile for."""
     slots = kernel.resource_slots
     for slot in INTRINSIC_SLOTS:
         if slot not in slots:
             raise InvalidSessionWorkloadError(f"kernel {kernel.kernel_id}: {slot} slot is required")
-    amounts = {"cpu": _quantity(slots["cpu"]), "memory": _quantity(slots["mem"])}
+    amounts = {
+        "cpu": _quantity(slots["cpu"]),
+        "memory": _quantity(slots["mem"]),
+        **devices.extended_resources,
+    }
     resources: dict[str, Any] = {"requests": amounts, "limits": dict(amounts)}
-    if claims:
-        resources["claims"] = list(claims)
+    if devices.container_claims:
+        resources["claims"] = list(devices.container_claims)
     return resources
 
 
@@ -222,7 +256,7 @@ def build_kernel_pod(
 ) -> dict[str, Any]:
     if len(mounts) != len(kernel.mounts):
         raise InvalidSessionWorkloadError(f"kernel {kernel.kernel_id}: unresolved vfolder mounts")
-    pod_claims, container_claims, device_annotations = pod_device_parts(workload, kernel, devices)
+    device_parts = pod_device_parts(workload, kernel, devices)
     scheduling = scheduler_adapter(workload, settings).pod(workload)
     distro = kernel.image.labels.get(LabelName.BASE_DISTRO, "ubuntu22.04")
     krunner = select_krunner(distro, kernel.image.architecture)
@@ -241,6 +275,7 @@ def build_kernel_pod(
         **scheduling.spec,
         "enableServiceLinks": False,
         "automountServiceAccountToken": False,
+        "securityContext": {"seccompProfile": _SECCOMP_DEFAULT},
         "terminationGracePeriodSeconds": settings.termination_grace_seconds,
         "nodeSelector": {
             "kubernetes.io/arch": _ARCH_TO_K8S.get(
@@ -271,6 +306,13 @@ def build_kernel_pod(
                     "requests": {"cpu": "100m", "memory": "64Mi"},
                     "limits": {"cpu": "1", "memory": "256Mi"},
                 },
+                "securityContext": {
+                    "runAsUser": 0,
+                    "allowPrivilegeEscalation": False,
+                    "readOnlyRootFilesystem": True,
+                    "capabilities": {"drop": ["ALL"], "add": list(KRUNNER_CAPABILITIES)},
+                    "seccompProfile": _SECCOMP_DEFAULT,
+                },
             }
         ],
         "containers": [
@@ -285,7 +327,12 @@ def build_kernel_pod(
                 "stdin": True,
                 "env": env,
                 "ports": _container_ports(kernel),
-                "resources": _resources(kernel, container_claims),
+                "resources": _resources(kernel, device_parts),
+                "securityContext": {
+                    "allowPrivilegeEscalation": False,
+                    "capabilities": {"drop": ["ALL"], "add": list(KERNEL_CAPABILITIES)},
+                    "seccompProfile": _SECCOMP_DEFAULT,
+                },
                 "readinessProbe": {
                     "tcpSocket": {"port": REPL_PORTS[0]},
                     "periodSeconds": 2,
@@ -329,7 +376,8 @@ def build_kernel_pod(
                 "name": "kernel-files",
                 "secret": {
                     "secretName": kernel_secret_name(workload, kernel),
-                    "defaultMode": 0o400,
+                    # Only the init container mounts it; it reads them as the kernel user.
+                    "defaultMode": 0o444,
                 },
             },
             {"name": "config", "emptyDir": {"medium": "Memory", "sizeLimit": "16Mi"}},
@@ -340,8 +388,8 @@ def build_kernel_pod(
     }
     if kernel.image.pull_secret_name:
         pod_spec["imagePullSecrets"] = [{"name": kernel.image.pull_secret_name}]
-    if pod_claims:
-        pod_spec["resourceClaims"] = pod_claims
+    if device_parts.pod_claims:
+        pod_spec["resourceClaims"] = device_parts.pod_claims
     return {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -349,10 +397,25 @@ def build_kernel_pod(
             workload,
             kernel_pod_name(workload, kernel),
             {**kernel_labels(workload, kernel), **scheduling.labels},
-            {**scheduling.annotations, **device_annotations},
+            {
+                **scheduling.annotations,
+                **device_parts.annotations,
+                **_kernel_id_annotations(kernel, settings),
+            },
         ),
         "spec": pod_spec,
     }
+
+
+def _kernel_id_annotations(kernel: KernelSpec, settings: ControllerSettings) -> dict[str, str]:
+    """The kernel's uid and gid, for the gateway (it never parses the user's environ)."""
+    uid, gid = kernel_ids(kernel, settings)
+    annotations = {}
+    if uid is not None:
+        annotations[ANNOTATION_KERNEL_UID] = str(uid)
+    if gid is not None:
+        annotations[ANNOTATION_KERNEL_GID] = str(gid)
+    return annotations
 
 
 def build_kernel_secret(

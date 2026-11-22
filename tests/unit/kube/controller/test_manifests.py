@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 import pytest
@@ -113,7 +114,8 @@ class TestBuildKernelSecret:
         )
         data = build_kernel_secret(workload, main_kernel, settings, secrets)["stringData"]
         entries = {
-            line.split(" ", 3)[3]: line.split(" ", 3)[:3] for line in data["manifest"].splitlines()
+            base64.b64decode(line.split(" ")[3]).decode(): line.split(" ")[:3]
+            for line in data["manifest"].splitlines()
         }
         assert entries["ssh/id_cluster"][0] == "config"
         assert entries["ssh/id_cluster"][2] == "0600"
@@ -162,6 +164,48 @@ class TestBindMode:
         assert spec["schedulerName"] == "sokovan"
         assert spec["schedulingGates"] == [{"name": "scheduling.backend.ai/sokovan"}]
 
+    def test_binder_mode_tolerates_the_dedicated_taint(
+        self, workload: SessionWorkload, main_kernel: KernelSpec
+    ) -> None:
+        settings = ControllerSettings(
+            krunner_image="k@sha256:abc", bind_mode=SokovanBindMode.BINDER
+        )
+        spec = build_kernel_pod(workload, main_kernel, settings)["spec"]
+        assert spec["tolerations"] == [
+            {
+                "key": "sokovan.backend.ai/dedicated",
+                "operator": "Equal",
+                "value": "true",
+                "effect": "NoSchedule",
+            }
+        ]
+
+    def test_gate_mode_needs_no_toleration(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        assert "tolerations" not in build_kernel_pod(workload, main_kernel, settings)["spec"]
+
+
+class TestKernelIdAnnotations:
+    def test_pod_carries_the_kernel_uid_and_gid(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        main_kernel.uid = 2000
+        main_kernel.main_gid = 3000
+        annotations = build_kernel_pod(workload, main_kernel, settings)["metadata"]["annotations"]
+        assert annotations["backend.ai/kernel-uid"] == "2000"
+        assert annotations["backend.ai/kernel-gid"] == "3000"
+
+    def test_unknown_ids_are_not_annotated(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        main_kernel.image.labels["ai.backend.features"] = ""
+        annotations = build_kernel_pod(workload, main_kernel, settings)["metadata"].get(
+            "annotations", {}
+        )
+        assert "backend.ai/kernel-uid" not in annotations
+        assert "backend.ai/kernel-gid" not in annotations
+
 
 class TestMultiKernelSessions:
     @pytest.fixture
@@ -191,3 +235,32 @@ class TestMultiKernelSessions:
         pod = build_kernel_pod(two_kernels, main_kernel, settings)
         env = {e["name"]: e["value"] for e in pod["spec"]["initContainers"][0]["env"]}
         assert env["KRUNNER_WAIT_PEERS"] == "sub1.s-1.bai-p.svc.cluster.local"
+
+
+class TestSecurityContext:
+    def test_pod_uses_the_runtime_seccomp_profile(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        spec = build_kernel_pod(workload, main_kernel, settings)["spec"]
+        assert spec["securityContext"]["seccompProfile"] == {"type": "RuntimeDefault"}
+        for container in [*spec["initContainers"], *spec["containers"]]:
+            ctx = container["securityContext"]
+            assert ctx["seccompProfile"] == {"type": "RuntimeDefault"}
+            assert ctx["allowPrivilegeEscalation"] is False
+            assert ctx["capabilities"]["drop"] == ["ALL"]
+
+    def test_kernel_keeps_what_the_uid_switch_needs_without_net_raw(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        container = build_kernel_pod(workload, main_kernel, settings)["spec"]["containers"][0]
+        added = set(container["securityContext"]["capabilities"]["add"])
+        assert {"SETUID", "SETGID", "CHOWN"} <= added
+        assert not added & {"NET_RAW", "MKNOD", "SYS_ADMIN", "SETFCAP"}
+
+    def test_krunner_holds_only_chown_and_the_uid_switch(
+        self, workload: SessionWorkload, main_kernel: KernelSpec, settings: ControllerSettings
+    ) -> None:
+        init = build_kernel_pod(workload, main_kernel, settings)["spec"]["initContainers"][0]
+        ctx = init["securityContext"]
+        assert set(ctx["capabilities"]["add"]) == {"CHOWN", "SETUID", "SETGID"}
+        assert ctx["readOnlyRootFilesystem"] is True

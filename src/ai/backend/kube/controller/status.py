@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from typing import Any, Final
 
 from ai.backend.kube.controller.naming import KERNEL_CONTAINER, KRUNNER_CONTAINER
@@ -10,13 +11,15 @@ from ai.backend.kube.crd.session import KernelStatus, SessionPhase
 
 # Waiting reasons that do not resolve without a change of spec.
 FATAL_WAITING_REASONS: Final = frozenset({
-    "ErrImagePull",
-    "ImagePullBackOff",
     "InvalidImageName",
+    "ErrImageNeverPull",
     "CreateContainerConfigError",
     "CreateContainerError",
     "CrashLoopBackOff",
 })
+# Pull failures the kubelet retries (a registry hiccup); fatal once they persist.
+PULL_FAILURE_REASONS: Final = frozenset({"ErrImagePull", "ImagePullBackOff"})
+PULL_FAILURE_SECONDS: Final = 300
 
 _ORDER: Final = (
     SessionPhase.PENDING,
@@ -38,7 +41,32 @@ def _condition(pod: Mapping[str, Any], type_: str) -> str | None:
     return next((c.get("status") for c in conditions if c.get("type") == type_), None)
 
 
-def kernel_status_from_pod(kernel_id: str, pod: Mapping[str, Any] | None) -> KernelStatus:
+def _since(pod: Mapping[str, Any]) -> datetime | None:
+    """When the Pod was bound to its node, or created."""
+    conditions: list[Mapping[str, str]] = pod.get("status", {}).get("conditions") or []
+    raw = next(
+        (c.get("lastTransitionTime") for c in conditions if c.get("type") == "PodScheduled"),
+        None,
+    ) or pod["metadata"].get("creationTimestamp")
+    if not raw:
+        return None
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo else raw.replace(tzinfo=UTC)
+    return datetime.fromisoformat(str(raw))
+
+
+def _fatal(pod: Mapping[str, Any], reason: str | None, now: datetime) -> bool:
+    if reason in FATAL_WAITING_REASONS:
+        return True
+    if reason in PULL_FAILURE_REASONS:
+        since = _since(pod)
+        return since is not None and (now - since).total_seconds() > PULL_FAILURE_SECONDS
+    return False
+
+
+def kernel_status_from_pod(
+    kernel_id: str, pod: Mapping[str, Any] | None, now: datetime | None = None
+) -> KernelStatus:
     if pod is None:
         return KernelStatus(kernel_id=kernel_id, phase=SessionPhase.PENDING)
     meta = pod["metadata"]
@@ -59,7 +87,7 @@ def kernel_status_from_pod(kernel_id: str, pod: Mapping[str, Any] | None) -> Ker
         if cs is None:
             continue
         waiting = cs.get("state", {}).get("waiting") or {}
-        if waiting.get("reason") in FATAL_WAITING_REASONS:
+        if _fatal(pod, waiting.get("reason"), now or datetime.now(UTC)):
             return _with(result, SessionPhase.ERROR, waiting["reason"], waiting.get("message"))
         terminated = cs.get("state", {}).get("terminated")
         if terminated is not None and (cs is main or terminated.get("exitCode", 0) != 0):

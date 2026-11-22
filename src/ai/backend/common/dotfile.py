@@ -1,5 +1,6 @@
 """Dotfile path rules shared by the manager and the agent."""
 
+import re
 from pathlib import PurePosixPath
 from typing import override
 
@@ -50,9 +51,18 @@ class InvalidDotfilePath(InvalidAPIParameters):
         )
 
 
+# C0 and C1 control characters, DEL included. A newline would split the kernel file manifest.
+_RX_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+_RX_PERM = re.compile(r"0?[0-7]{3}")
+
+
 def _relative_dotfile_path(raw: str) -> PurePosixPath:
+    if _RX_CONTROL.search(raw):
+        raise InvalidDotfilePath("dotfile path must not contain control characters.")
+    if raw != raw.strip():
+        raise InvalidDotfilePath("dotfile path must not start or end with whitespace.")
     path = PurePosixPath(raw)
-    if "\x00" in raw or ".." in path.parts:
+    if ".." in path.parts:
         raise InvalidDotfilePath(f"dotfile path must stay under {_KERNEL_WORK_DIR}.")
     if path.is_absolute():
         if not path.is_relative_to(_KERNEL_WORK_DIR):
@@ -69,6 +79,14 @@ def validate_dotfile_path(raw: str) -> str:
     """Return ``raw`` unchanged if it is a dotfile path under `/home/work`; raise
     :class:`InvalidDotfilePath` otherwise."""
     _relative_dotfile_path(raw)
+    return raw
+
+
+def validate_dotfile_perm(raw: str) -> str:
+    """Return ``raw`` unchanged if it is an octal file mode from ``000`` to ``0777``; raise
+    :class:`InvalidDotfilePath` otherwise."""
+    if not _RX_PERM.fullmatch(raw):
+        raise InvalidDotfilePath("dotfile permission must be an octal mode from 000 to 0777.")
     return raw
 
 

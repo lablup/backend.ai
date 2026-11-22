@@ -74,8 +74,19 @@ class TestStructuralSchema:
     def test_optional_fields_are_nullable(self) -> None:
         schema = build_crd(SessionWorkload)["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
         spec = schema["properties"]["spec"]
-        assert spec["properties"]["ownerProjectId"] == {"type": "string", "nullable": True}
+        assert spec["properties"]["accessKey"] == {"type": "string", "nullable": True}
+        assert spec["properties"]["ownerProjectId"]["nullable"] is True
         assert "ownerProjectId" not in spec["required"]
+
+    def test_ids_and_hostnames_are_constrained(self) -> None:
+        schema = build_crd(SessionWorkload)["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+        spec = schema["properties"]["spec"]["properties"]
+        kernel = spec["kernels"]["items"]["properties"]
+        assert spec["sessionId"]["maxLength"] == 36
+        assert kernel["kernelId"]["maxLength"] == 36
+        assert kernel["clusterHostname"]["pattern"] == "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        assert kernel["clusterHostname"]["maxLength"] == 63
+        assert spec["resourceGroup"]["maxLength"] == 63
 
 
 class TestCustomResource:

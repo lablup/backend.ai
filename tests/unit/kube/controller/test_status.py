@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -44,7 +45,10 @@ class TestKernelStatusFromPod:
             (_pod(main_state={"running": {}}, ready=True), SessionPhase.RUNNING),
             (_pod(main_state={"terminated": {"exitCode": 0}}), SessionPhase.TERMINATED),
             (_pod(main_state={"terminated": {"exitCode": 137}}), SessionPhase.ERROR),
-            (_pod(main_state={"waiting": {"reason": "ImagePullBackOff"}}), SessionPhase.ERROR),
+            (_pod(main_state={"waiting": {"reason": "ImagePullBackOff"}}), SessionPhase.PULLING),
+            (_pod(main_state={"waiting": {"reason": "ErrImagePull"}}), SessionPhase.PULLING),
+            (_pod(main_state={"waiting": {"reason": "InvalidImageName"}}), SessionPhase.ERROR),
+            (_pod(main_state={"waiting": {"reason": "ErrImageNeverPull"}}), SessionPhase.ERROR),
             (
                 _pod(initialized=False, init_state={"terminated": {"exitCode": 1}}),
                 SessionPhase.ERROR,
@@ -60,11 +64,30 @@ class TestKernelStatusFromPod:
             "exited",
             "killed",
             "pull-backoff",
+            "pull-error",
+            "invalid-image",
+            "never-pull",
             "init-failed",
         ],
     )
     def test_phase(self, pod: dict[str, Any] | None, phase: SessionPhase) -> None:
         assert kernel_status_from_pod("k", pod).phase == phase
+
+    @pytest.mark.parametrize(
+        ("minutes", "phase"), [(1, SessionPhase.PULLING), (10, SessionPhase.ERROR)]
+    )
+    def test_pull_failure_is_fatal_once_it_persists(
+        self, minutes: int, phase: SessionPhase
+    ) -> None:
+        scheduled = datetime(2026, 1, 1, tzinfo=UTC)
+        pod = _pod(main_state={"waiting": {"reason": "ImagePullBackOff"}})
+        pod["status"]["conditions"].append({
+            "type": "PodScheduled",
+            "status": "True",
+            "lastTransitionTime": "2026-01-01T00:00:00Z",
+        })
+        now = scheduled + timedelta(minutes=minutes)
+        assert kernel_status_from_pod("k", pod, now).phase == phase
 
     def test_records_container_id_without_runtime_prefix(self) -> None:
         status = kernel_status_from_pod("k", _pod(main_state={"running": {}}, ready=True))

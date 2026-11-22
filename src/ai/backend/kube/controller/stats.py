@@ -1,23 +1,27 @@
 """stat bridge: kernel statistics in the Agent's Valkey format, from the kubelet (suggestion 11.4).
 
-The Manager, WebUI and idle checker read them unchanged. The kubelet's resource metrics carry
-CPU time and memory; network and I/O stay empty until a Prometheus source is added.
+The Manager, WebUI and idle checker read them unchanged. The kubelet's `/stats/summary`, read
+directly on each node (not through the API server's node proxy), carries CPU time and memory;
+network and I/O stay empty until a Prometheus source is added.
 """
 
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import ssl
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final
 
+import aiohttp
 import msgpack
 from aiohttp import web
 from kubernetes_asyncio import client
-from kubernetes_asyncio.client.exceptions import ApiException
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Gauge, generate_latest
 
 from ai.backend.agent.stats import Measurement, Metric, MetricTypes, MovingStatistics
@@ -42,8 +46,9 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 STAT_INTERVAL: Final = 5.0
-_CPU_SAMPLE: Final = "container_cpu_usage_seconds_total"
-_MEM_SAMPLE: Final = "container_memory_working_set_bytes"
+STAT_MAX_BACKOFF: Final = 60.0
+KUBELET_PORT: Final = 10250
+KUBELET_TIMEOUT: Final = 10.0
 _Q: Final = Decimal("0.000")
 _UNDEFINED: Final = "undefined"
 
@@ -55,21 +60,96 @@ class ContainerSample:
     timestamp_ms: int  # when the kubelet took the CPU sample
 
 
-def parse_resource_metrics(text: str) -> dict[tuple[str, str], dict[str, tuple[Decimal, int]]]:
-    """`(namespace, pod)` of each kernel container → its CPU and memory samples (value, ms)."""
-    samples: dict[tuple[str, str], dict[str, tuple[Decimal, int]]] = defaultdict(dict)
-    for line in text.splitlines():
-        if not line.startswith((_CPU_SAMPLE, _MEM_SAMPLE)):
-            continue
-        name, _, rest = line.partition("{")
-        raw_labels, _, values = rest.partition("}")
-        labels = dict(part.split("=", 1) for part in raw_labels.split(",") if "=" in part)
-        if labels.get("container", "").strip('"') != KERNEL_CONTAINER:
-            continue
-        key = (labels["namespace"].strip('"'), labels["pod"].strip('"'))
-        value, *timestamp = values.split()
-        samples[key][name] = (Decimal(value), int(timestamp[0]) if timestamp else 0)
+def _timestamp_ms(raw: str | None) -> int:
+    if not raw:
+        return 0
+    return int(datetime.fromisoformat(raw).timestamp() * 1000)
+
+
+def parse_stats_summary(summary: Mapping[str, Any]) -> dict[tuple[str, str], ContainerSample]:
+    """`(namespace, pod)` of each kernel container with a CPU sample → its sample."""
+    samples: dict[tuple[str, str], ContainerSample] = {}
+    for pod in summary.get("pods") or []:
+        ref = pod.get("podRef") or {}
+        for container in pod.get("containers") or []:
+            if container.get("name") != KERNEL_CONTAINER:
+                continue
+            cpu = container.get("cpu") or {}
+            if cpu.get("usageCoreNanoSeconds") is None:
+                continue
+            mem = container.get("memory") or {}
+            samples[ref.get("namespace", ""), ref.get("name", "")] = ContainerSample(
+                cpu_msec=Decimal(cpu["usageCoreNanoSeconds"]) / 1_000_000,
+                mem_bytes=Decimal(mem.get("workingSetBytes") or 0),
+                timestamp_ms=_timestamp_ms(cpu.get("time")),
+            )
     return samples
+
+
+def kubelet_endpoint(node: Mapping[str, Any]) -> str | None:
+    """`https://<InternalIP>:<kubelet port>` of a node."""
+    status = node.get("status") or {}
+    address = next(
+        (a["address"] for a in status.get("addresses") or [] if a.get("type") == "InternalIP"),
+        None,
+    )
+    if address is None:
+        return None
+    port = ((status.get("daemonEndpoints") or {}).get("kubeletEndpoint") or {}).get(
+        "Port"
+    ) or KUBELET_PORT
+    host = f"[{address}]" if ipaddress.ip_address(address).version == 6 else address
+    return f"https://{host}:{port}"
+
+
+class KubeletStatsClient:
+    """Reads `/stats/summary` from each kubelet with the API client's credentials (the
+    ServiceAccount token in a Pod; it needs `nodes/stats get`)."""
+
+    _configuration: client.Configuration
+    _ca_file: str | None
+    _verify: bool
+    _session: aiohttp.ClientSession | None
+
+    def __init__(
+        self, api: client.ApiClient, *, ca_file: str | None = None, verify: bool = True
+    ) -> None:
+        self._configuration = api.configuration
+        self._ca_file = ca_file or self._configuration.ssl_ca_cert
+        self._verify = verify
+        self._session = None
+
+    def _ssl(self) -> ssl.SSLContext:
+        ctx = ssl.create_default_context(cafile=self._ca_file)
+        if not self._verify:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        if self._configuration.cert_file:
+            ctx.load_cert_chain(self._configuration.cert_file, self._configuration.key_file)
+        return ctx
+
+    async def summary(self, endpoint: str) -> dict[str, Any]:
+        if self._session is None:
+            self._session = aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=self._ssl()),
+                timeout=aiohttp.ClientTimeout(total=KUBELET_TIMEOUT),
+            )
+        headers = {
+            setting["key"]: setting["value"]
+            for setting in (await self._configuration.auth_settings()).values()
+            if setting.get("in") == "header"
+        }
+        async with self._session.get(
+            f"{endpoint}/stats/summary", headers=headers, params={"only_cpu_and_memory": "true"}
+        ) as resp:
+            resp.raise_for_status()
+            body: dict[str, Any] = await resp.json()
+            return body
+
+    async def close(self) -> None:
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
 
 
 def _mem_limit(pod: Mapping[str, Any]) -> Decimal:
@@ -224,6 +304,7 @@ class ContainerMetrics:
 class StatBridge:
     _api: client.ApiClient
     _core: client.CoreV1Api
+    _kubelet: KubeletStatsClient
     _valkey: ValkeyStatClient
     _kernels: dict[str, KernelStats]
     _metrics: ContainerMetrics
@@ -235,25 +316,32 @@ class StatBridge:
         valkey: ValkeyStatClient,
         metrics: ContainerMetrics,
         interval: float = STAT_INTERVAL,
+        kubelet: KubeletStatsClient | None = None,
     ) -> None:
         self._api = api
         self._core = client.CoreV1Api(api)
+        self._kubelet = kubelet or KubeletStatsClient(api)
         self._valkey = valkey
         self._metrics = metrics
         self._kernels = {}
         self._interval = interval
 
     async def run(self) -> None:
+        """Collect every interval; a failed round is logged and retried with a backoff."""
+        delay = self._interval
         while True:
             try:
                 await self.collect()
-            except (ApiException, OSError) as e:
-                log.warning("kernel stat collection failed", exc_info=e)
-            await asyncio.sleep(self._interval)
+                delay = self._interval
+            except Exception:
+                log.exception("kernel stat collection failed")
+                delay = min(delay * 2, STAT_MAX_BACKOFF)
+            await asyncio.sleep(delay)
 
     async def collect(self) -> None:
         listed = await self._core.list_pod_for_all_namespaces(
-            label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY},{LABEL_KERNEL_ID}"
+            label_selector=f"{LABEL_MANAGED_BY}={MANAGED_BY},{LABEL_KERNEL_ID}",
+            _request_timeout=KUBELET_TIMEOUT,
         )
         pods = [self._api.sanitize_for_serialization(p) for p in listed.items]
         by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -262,20 +350,22 @@ class StatBridge:
             if node and pod["status"].get("phase") == "Running":
                 by_node[node].append(pod)
         updates: dict[str, bytes] = {}
+        endpoints = await self._kubelet_endpoints(by_node)
         for node, node_pods in by_node.items():
-            text = await self._core.connect_get_node_proxy_with_path(node, "metrics/resource")
-            samples = parse_resource_metrics(text)
+            if (endpoint := endpoints.get(node)) is None:
+                continue
+            try:
+                samples = parse_stats_summary(await self._kubelet.summary(endpoint))
+            except (aiohttp.ClientError, TimeoutError, ValueError) as e:
+                log.warning("kubelet stats unavailable", node_name=node, exc_info=e)
+                continue
             for pod in node_pods:
                 key = (pod["metadata"]["namespace"], pod["metadata"]["name"])
-                if _CPU_SAMPLE not in samples.get(key, {}):
+                if (sample := samples.get(key)) is None:
                     continue
-                cpu_seconds, sampled_at = samples[key][_CPU_SAMPLE]
-                mem_bytes, _ = samples[key].get(_MEM_SAMPLE, (Decimal(0), 0))
                 kernel_id = pod["metadata"]["labels"][LABEL_KERNEL_ID]
                 stats = self._kernels.setdefault(kernel_id, KernelStats())
-                if not stats.update(
-                    ContainerSample(cpu_seconds * 1000, mem_bytes, sampled_at), _mem_limit(pod)
-                ):
+                if not stats.update(sample, _mem_limit(pod)):
                     continue
                 updates[kernel_id] = stats.packed()
                 self._metrics.observe(pod["metadata"]["labels"], kernel_id, stats.raw)
@@ -283,6 +373,22 @@ class StatBridge:
         if updates:
             await self._valkey.set_multiple_keys(updates)
         log.debug("kernel stats written", kernels=len(updates))
+
+    async def _kubelet_endpoints(self, nodes: Iterable[str]) -> dict[str, str]:
+        wanted = set(nodes)
+        if not wanted:
+            return {}
+        listed = await self._core.list_node(_request_timeout=KUBELET_TIMEOUT)
+        endpoints = {}
+        for node in listed.items:
+            raw = self._api.sanitize_for_serialization(node)
+            name = raw["metadata"]["name"]
+            if name in wanted and (endpoint := kubelet_endpoint(raw)) is not None:
+                endpoints[name] = endpoint
+        return endpoints
+
+    async def close(self) -> None:
+        await self._kubelet.close()
 
     def _forget(self, live: Iterable[str]) -> None:
         """Drop the moving statistics of kernels that are gone; their last values stay in Valkey."""

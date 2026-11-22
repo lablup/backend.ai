@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, override
+from typing import override
 
 import pytest
 
@@ -158,26 +158,65 @@ class TestKernelLogs:
         await StatusReporter(producer, logs).report(workload, [_status(SessionPhase.RUNNING)])
         assert logs.synced == []
 
-    async def test_pods_about_to_be_deleted_hand_over_their_logs(
+    async def test_a_deleted_session_hands_over_the_log_once(
         self, producer: RecordingProducer, workload: SessionWorkload
     ) -> None:
         logs = RecordingLogs()
+        reporter = StatusReporter(producer, logs)
+        status = _status(SessionPhase.RUNNING, SessionPhase.RUNNING)
+        status.pod_name = "s-1-main1"
+        [reported] = await reporter.report(workload, [status], deleting=True)
+        assert reported.reported_phase == SessionPhase.TERMINATED
+        await reporter.report(workload, [reported], deleting=True)
+        assert logs.synced == [("s-1-main1", "cid")]
+        assert _names(producer.sent) == ["kernel_terminated"]
 
-        def pod(name: str, deleting: bool) -> dict[str, Any]:
-            meta: dict[str, Any] = {"name": name, "labels": {"backend.ai/kernel-id": KERNEL_ID}}
-            if deleting:
-                meta["deletionTimestamp"] = "2026-01-01T00:00:00Z"
-            return {
-                "metadata": meta,
-                "spec": {"nodeName": "n1"},
-                "status": {
-                    "containerStatuses": [
-                        {"name": "kernel", "containerID": f"containerd://{name}-cid", "state": {}}
-                    ]
-                },
-            }
 
-        await StatusReporter(producer, logs).hand_over_logs(
-            workload, [pod("a", False), pod("b", True)]
-        )
-        assert logs.synced == [("a", "a-cid")]
+class TestCancelledKernels:
+    async def test_terminating_pod_does_not_advance_the_progress(
+        self, reporter: StatusReporter, producer: RecordingProducer, workload: SessionWorkload
+    ) -> None:
+        [status] = await reporter.report(workload, [_status(SessionPhase.TERMINATING)])
+        assert producer.sent == [] and status.reported_phase is None
+
+    async def test_deleting_a_never_started_kernel_sends_only_terminated(
+        self, reporter: StatusReporter, producer: RecordingProducer, workload: SessionWorkload
+    ) -> None:
+        await reporter.report(workload, [_status(SessionPhase.TERMINATING)], deleting=True)
+        assert _names(producer.sent) == ["kernel_terminated"]
+
+
+class FailingProducer(RecordingProducer):
+    """Fails the send after `fail_after` events."""
+
+    fail_after: int
+
+    def __init__(self, fail_after: int) -> None:
+        super().__init__()
+        self.fail_after = fail_after
+
+    @override
+    async def anycast_event(
+        self, event: AbstractAnycastEvent, source_override: AgentId | None = None
+    ) -> None:
+        if len(self.sent) >= self.fail_after:
+            raise ConnectionError("valkey down")
+        await super().anycast_event(event, source_override)
+
+
+class TestPersist:
+    async def test_each_sent_event_is_recorded_before_the_next(
+        self, workload: SessionWorkload
+    ) -> None:
+        persisted: list[SessionPhase | None] = []
+
+        async def persist(status: KernelStatus) -> None:
+            persisted.append(status.reported_phase)
+
+        producer = FailingProducer(fail_after=1)
+        with pytest.raises(ConnectionError):
+            await StatusReporter(producer).report(
+                workload, [_status(SessionPhase.RUNNING)], persist
+            )
+        assert _names(producer.sent) == ["kernel_pulling"]
+        assert persisted == [SessionPhase.PULLING]

@@ -18,11 +18,18 @@ ANNOTATION_POD_GROUP: Final = "scheduling.backend.ai/pod-group"
 ANNOTATION_DEVICES: Final = "scheduling.backend.ai/devices"  # {"<DRA driver>/<slot>": <count>}
 # {"<DRA driver>": <count>} of devices the Pod takes a share of; the node must have them.
 ANNOTATION_SHARED_DEVICES: Final = "scheduling.backend.ai/shared-devices"
+# The kernel's uid and gid (decimal), set when known; the gateway reads them.
+ANNOTATION_KERNEL_UID: Final = "backend.ai/kernel-uid"
+ANNOTATION_KERNEL_GID: Final = "backend.ai/kernel-gid"
 HOSTNAME_LABEL: Final = "kubernetes.io/hostname"
+# Binder mode: sokovan places Pods only on nodes with this taint; kernel Pods tolerate it.
+SOKOVAN_DEDICATED_TAINT: Final = "sokovan.backend.ai/dedicated"
 SOKOVAN_SCHEDULER: Final = "sokovan"
 SOKOVAN_GATE: Final = "scheduling.backend.ai/sokovan"
 
 FINALIZER: Final = "backend.ai/session-controller"
+# RFC 3339 time set on a SessionWorkload by sokovan: recreate the session's kernel Pods.
+ANNOTATION_REQUEUE: Final = "sokovan.backend.ai/requeue"
 
 KERNEL_CONTAINER: Final = "kernel"
 KRUNNER_CONTAINER: Final = "krunner"

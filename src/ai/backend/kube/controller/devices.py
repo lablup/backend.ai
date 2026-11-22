@@ -1,13 +1,21 @@
-"""The request translator: a kernel's device slots → ResourceClaims, by DeviceProfile (suggestion 4.8)."""
+"""The request translator: a kernel's device slots → ResourceClaims, by DeviceProfile (suggestion 4.8).
+
+Fraction slots (`cuda.shares`) are absolute shares: `s` becomes a `shares: round(s * 100)`
+capacity request, split across devices when no single device holds it (suggestion 5.3, 5.4).
+"""
 
 from __future__ import annotations
 
 import json
+import math
 import re
-from collections.abc import Mapping, Sequence
+from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final
+
+from kubernetes.utils.quantity import parse_quantity
 
 from ai.backend.kube.controller.naming import (
     ANNOTATION_DEVICES,
@@ -15,28 +23,77 @@ from ai.backend.kube.controller.naming import (
     kernel_labels,
     kernel_pod_name,
 )
-from ai.backend.kube.crd.device import DeviceProfileSpec, SharingMode
+from ai.backend.kube.crd.device import (
+    DeviceProfileSpec,
+    FractionStrategy,
+    GPUAllocationPolicy,
+    SharingMode,
+)
 from ai.backend.kube.crd.session import KernelSpec, SessionWorkload
 from ai.backend.kube.errors import InvalidSessionWorkloadError
 
 INTRINSIC_SLOTS: Final = ("cpu", "mem")
+SHARES_CAPACITY: Final = "shares"  # a bare key: in the domain of the device's driver
+SHARES_CAPACITY_QUALIFIED: Final = "dra.backend.ai/shares"
+SHARE_UNITS_PER_SHARE: Final = 100
+PCI_BUS_ID_ATTRIBUTE: Final = "resource.kubernetes.io/pciBusID"
+_SLOT_NAME_ATTRIBUTES: Final = ("slotName", "dra.backend.ai/slotName")
 _RX_NAME: Final = re.compile(r"[^a-z0-9-]+")
 
 
 @dataclass(frozen=True)
+class DeviceRequest:
+    """One request of a claim."""
+
+    name: str
+    count: int = 1
+    shares: int | None = None  # 0.01-share units per device, for a fraction request
+    # Share capacities of the devices to try in order (`firstAvailable`), for a split request
+    # in a pool of devices of different capacities.
+    alternatives: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True)
 class DeviceClaim:
-    """One slot of one kernel, satisfied by one ResourceClaim."""
+    """One slot of one kernel: a ResourceClaim, or an extended resource of a device plugin."""
 
     slot_name: str
-    name: str  # the Pod's claim name and the request name
+    name: str  # the Pod's claim name
     profile: DeviceProfileSpec
-    count: int
-    capacity: Mapping[str, str] = field(default_factory=dict)  # per device, for a shared one
+    requests: tuple[DeviceRequest, ...]
+    shares_capacity: str = SHARES_CAPACITY
+    extended_resource: str | None = None  # set: a container limit instead of a claim
+
+    @property
+    def count(self) -> int:
+        return sum(r.count for r in self.requests)
+
+    @property
+    def is_fraction(self) -> bool:
+        return any(r.shares is not None for r in self.requests)
 
     @property
     def whole_devices(self) -> int:
         """Devices the claim holds alone; a share of a device is not counted."""
-        return 0 if self.capacity else self.count
+        return 0 if self.is_fraction else self.count
+
+    @property
+    def shared_devices(self) -> int:
+        """Distinct devices the claim takes a share of."""
+        return len(self.requests) if self.is_fraction else 0
+
+
+@dataclass(frozen=True)
+class SharePool:
+    """Share capacities (0.01-share units) of the devices of one fraction profile, by node."""
+
+    capacities: Mapping[str, tuple[int, ...]] = field(default_factory=dict)
+    capacity_name: str = SHARES_CAPACITY
+
+    @property
+    def distinct(self) -> tuple[int, ...]:
+        """Distinct capacities, largest first."""
+        return tuple(sorted({c for caps in self.capacities.values() for c in caps}, reverse=True))
 
 
 def claim_name(slot_name: str) -> str:
@@ -52,7 +109,64 @@ def device_slots(kernel: KernelSpec) -> dict[str, Decimal]:
     }
 
 
-def translate(kernel: KernelSpec, profiles: Mapping[str, DeviceProfileSpec]) -> list[DeviceClaim]:
+def needs_share_pools(
+    kernels: Iterable[KernelSpec], profiles: Mapping[str, DeviceProfileSpec]
+) -> bool:
+    return any(
+        (p := profiles.get(slot)) is not None and p.sharing_mode == SharingMode.FRACTION
+        for k in kernels
+        for slot in device_slots(k)
+    )
+
+
+def _attribute(device: Mapping[str, Any], names: Sequence[str]) -> Any:
+    attrs: Mapping[str, Mapping[str, Any]] = device.get("attributes") or {}
+    for name in names:
+        if (value := attrs.get(name)) is not None:
+            return next(iter(value.values()), None)
+    return None
+
+
+def share_pools(
+    resource_slices: Iterable[Mapping[str, Any]], profiles: Iterable[DeviceProfileSpec]
+) -> dict[str, SharePool]:
+    """Slot name → the share capacities its driver publishes in ResourceSlices."""
+    pools: dict[str, SharePool] = {}
+    for profile in profiles:
+        if profile.sharing_mode != SharingMode.FRACTION:
+            continue
+        by_node: dict[str, list[int]] = defaultdict(list)
+        capacity_name = SHARES_CAPACITY
+        for rs in resource_slices:
+            spec = rs.get("spec") or {}
+            if spec.get("driver") != profile.driver_name:
+                continue
+            node = spec.get("nodeName") or (spec.get("pool") or {}).get("name") or ""
+            for raw in spec.get("devices") or []:
+                device = raw.get("basic", raw)  # v1beta1 nests the device under `basic`
+                slot = _attribute(device, _SLOT_NAME_ATTRIBUTES)
+                if slot is not None and slot != profile.slot_name:
+                    continue
+                capacity: Mapping[str, Mapping[str, Any]] = device.get("capacity") or {}
+                for name in (SHARES_CAPACITY, SHARES_CAPACITY_QUALIFIED):
+                    if name in capacity:
+                        value = capacity[name].get("value", capacity[name])
+                        by_node[node].append(int(parse_quantity(value)))
+                        capacity_name = name
+                        break
+        pools[profile.slot_name] = SharePool(
+            {node: tuple(sorted(caps, reverse=True)) for node, caps in by_node.items()},
+            capacity_name,
+        )
+    return pools
+
+
+def translate(
+    kernel: KernelSpec,
+    profiles: Mapping[str, DeviceProfileSpec],
+    policy: GPUAllocationPolicy = GPUAllocationPolicy.DRA,
+    pools: Mapping[str, SharePool] | None = None,
+) -> list[DeviceClaim]:
     claims = []
     unsupported = []
     for slot, amount in sorted(device_slots(kernel).items()):
@@ -60,7 +174,8 @@ def translate(kernel: KernelSpec, profiles: Mapping[str, DeviceProfileSpec]) -> 
         if profile is None:
             unsupported.append(slot)
             continue
-        claims.append(_claim(kernel, slot, amount, profile))
+        pool = (pools or {}).get(slot, SharePool())
+        claims.append(_claim(kernel, slot, amount, profile, policy, pool))
     if unsupported:
         raise InvalidSessionWorkloadError(
             f"kernel {kernel.kernel_id}: no DeviceProfile for slots {', '.join(unsupported)}"
@@ -69,26 +184,70 @@ def translate(kernel: KernelSpec, profiles: Mapping[str, DeviceProfileSpec]) -> 
 
 
 def _claim(
-    kernel: KernelSpec, slot: str, amount: Decimal, profile: DeviceProfileSpec
+    kernel: KernelSpec,
+    slot: str,
+    amount: Decimal,
+    profile: DeviceProfileSpec,
+    policy: GPUAllocationPolicy,
+    pool: SharePool,
 ) -> DeviceClaim:
+    name = claim_name(slot)
     whole = amount == amount.to_integral_value()
+    if policy == GPUAllocationPolicy.DEVICE_PLUGIN:
+        if profile.sharing_mode == SharingMode.FRACTION:
+            raise InvalidSessionWorkloadError(
+                f"kernel {kernel.kernel_id}: {slot} is a fraction of a device, which the"
+                " device-plugin GPU allocation policy does not support"
+            )
+        if profile.extended_resource_name:
+            if profile.sharing_mode != SharingMode.EXCLUSIVE:
+                raise InvalidSessionWorkloadError(
+                    f"kernel {kernel.kernel_id}: {slot} names an extended resource but its"
+                    f" sharing mode is {profile.sharing_mode}, not exclusive"
+                )
+            if not whole:
+                raise InvalidSessionWorkloadError(
+                    f"kernel {kernel.kernel_id}: {slot} {amount} is not a whole number of devices"
+                )
+            return DeviceClaim(
+                slot,
+                name,
+                profile,
+                (DeviceRequest(name, int(amount)),),
+                extended_resource=profile.extended_resource_name,
+            )
     match profile.sharing_mode:
         case SharingMode.EXCLUSIVE | SharingMode.PARTITION if whole:
-            return DeviceClaim(slot, claim_name(slot), profile, int(amount))
-        case SharingMode.FRACTION if whole:
-            # Whole devices of a shared kind: the capacity's default takes all of each.
-            return DeviceClaim(slot, claim_name(slot), profile, int(amount))
-        case SharingMode.FRACTION if amount < 1 and profile.capacity_conversions:
-            capacity = {
-                c.capacity: str(int(amount * Decimal(str(c.factor))))
-                for c in profile.capacity_conversions
-            }
-            return DeviceClaim(slot, claim_name(slot), profile, 1, capacity)
-        case SharingMode.EXCLUSIVE | SharingMode.PARTITION | SharingMode.FRACTION:
+            return DeviceClaim(slot, name, profile, (DeviceRequest(name, int(amount)),))
+        case SharingMode.EXCLUSIVE | SharingMode.PARTITION:
             raise InvalidSessionWorkloadError(
-                f"kernel {kernel.kernel_id}: {slot} {amount} is neither whole devices nor a part"
-                " of one device"
+                f"kernel {kernel.kernel_id}: {slot} {amount} is not a whole number of devices"
             )
+        case SharingMode.FRACTION:
+            units = int((amount * SHARE_UNITS_PER_SHARE).to_integral_value(rounding=ROUND_HALF_UP))
+            if units < 1:
+                raise InvalidSessionWorkloadError(
+                    f"kernel {kernel.kernel_id}: {slot} {amount} is less than 0.01 shares"
+                )
+            parts = plan_shares(units, pool, profile.fraction_strategy)
+            if parts is None:
+                raise InvalidSessionWorkloadError(
+                    f"kernel {kernel.kernel_id}: {slot} {amount} exceeds the shares of every node"
+                )
+            if len(parts) == 1:
+                requests: tuple[DeviceRequest, ...] = (DeviceRequest(name, 1, parts[0]),)
+            else:
+                distinct = pool.distinct
+                requests = tuple(
+                    DeviceRequest(
+                        f"{name}-{idx}",
+                        1,
+                        part,
+                        tuple(c for c in distinct if c >= part) if len(distinct) > 1 else (),
+                    )
+                    for idx, part in enumerate(parts)
+                )
+            return DeviceClaim(slot, name, profile, requests, pool.capacity_name)
         case _:
             raise InvalidSessionWorkloadError(
                 f"kernel {kernel.kernel_id}: {slot} uses sharing mode {profile.sharing_mode},"
@@ -96,8 +255,60 @@ def _claim(
             )
 
 
+def plan_shares(units: int, pool: SharePool, strategy: FractionStrategy | str) -> list[int] | None:
+    """Per-device parts of `units`, or None when no node holds them.
+
+    One part when a device holds it (or the pool is unknown); otherwise the plan of the node
+    that needs the fewest devices.
+    """
+    if not pool.capacities or units <= max(pool.distinct):
+        return [units]
+    plans = []
+    for node, caps in sorted(pool.capacities.items()):
+        plan = (
+            _evenly(units, caps)
+            if FractionStrategy(strategy) == FractionStrategy.EVENLY
+            else _fill(units, caps)
+        )
+        if plan is not None:
+            plans.append(plan)
+    return min(plans, key=len) if plans else None
+
+
+def _fill(units: int, caps: Sequence[int]) -> list[int] | None:
+    """The largest devices first, each as full as it goes."""
+    parts = []
+    remaining = units
+    for cap in sorted(caps, reverse=True):
+        if remaining <= 0:
+            break
+        take = min(cap, remaining)
+        parts.append(take)
+        remaining -= take
+    return parts if remaining <= 0 else None
+
+
+def _evenly(units: int, caps: Sequence[int]) -> list[int] | None:
+    """Equal parts on the fewest devices; the last part takes the rounding remainder."""
+    ordered = sorted(caps, reverse=True)
+    for n in range(max(1, math.ceil(units / ordered[0])), len(ordered) + 1):
+        base = units // n
+        parts = [base] * (n - 1) + [units - base * (n - 1)]
+        if all(p <= c for p, c in zip(sorted(parts, reverse=True), ordered, strict=False)):
+            return parts
+    return None
+
+
 def slot_selector(profile: DeviceProfileSpec) -> str:
     return f'device.attributes["{profile.driver_name}"].slotName == "{profile.slot_name}"'
+
+
+def capacity_selector(profile: DeviceProfileSpec, capacity_name: str, value: int) -> str:
+    domain, _, name = capacity_name.rpartition("/")
+    return (
+        f'device.capacity["{domain or profile.driver_name}"].{name}'
+        f'.compareTo(quantity("{value}")) == 0'
+    )
 
 
 def device_key(profile: DeviceProfileSpec) -> str:
@@ -109,32 +320,62 @@ def resource_claim_name(workload: SessionWorkload, kernel: KernelSpec, claim: De
     return f"{kernel_pod_name(workload, kernel)}-{claim.name}"
 
 
+def _request_body(
+    claim: DeviceClaim, request: DeviceRequest, capacity: int | None = None
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "deviceClassName": claim.profile.device_class_name,
+        "allocationMode": "ExactCount",
+        "count": request.count,
+    }
+    selectors = []
+    if claim.profile.sharing_mode in (SharingMode.EXCLUSIVE, SharingMode.PARTITION):
+        # A whole GPU and a MIG instance of one driver differ by the slot they serve.
+        selectors.append({"cel": {"expression": slot_selector(claim.profile)}})
+    if request.shares is not None:
+        body["capacity"] = {"requests": {claim.shares_capacity: str(request.shares)}}
+    if capacity is not None:
+        selectors.append({
+            "cel": {"expression": capacity_selector(claim.profile, claim.shares_capacity, capacity)}
+        })
+    if selectors:
+        body["selectors"] = selectors
+    return body
+
+
 def build_resource_claim(
     workload: SessionWorkload,
     kernel: KernelSpec,
     claim: DeviceClaim,
     owner: Mapping[str, Any],
 ) -> dict[str, Any]:
-    request: dict[str, Any] = {
-        "deviceClassName": claim.profile.device_class_name,
-        "allocationMode": "ExactCount",
-        "count": claim.count,
-    }
-    if claim.capacity:
-        request["capacity"] = {"requests": dict(claim.capacity)}
-    if claim.profile.sharing_mode in (SharingMode.EXCLUSIVE, SharingMode.PARTITION):
-        # A whole GPU and a MIG instance of one driver differ by the slot they serve.
-        request["selectors"] = [{"cel": {"expression": slot_selector(claim.profile)}}]
-    spec: dict[str, Any] = {"devices": {"requests": [{"name": claim.name, "exactly": request}]}}
+    requests: list[dict[str, Any]] = []
+    for request in claim.requests:
+        if request.alternatives:
+            requests.append({
+                "name": request.name,
+                "firstAvailable": [
+                    {"name": f"cap-{capacity}", **_request_body(claim, request, capacity)}
+                    for capacity in request.alternatives
+                ],
+            })
+        else:
+            requests.append({"name": request.name, "exactly": _request_body(claim, request)})
+    names = [r.name for r in claim.requests]
+    constraints: list[dict[str, Any]] = []
+    if len(claim.requests) > 1:
+        constraints.append({"requests": names, "distinctAttribute": PCI_BUS_ID_ATTRIBUTE})
     if claim.profile.match_attributes and claim.count > 1:
-        spec["devices"]["constraints"] = [
-            {"requests": [claim.name], "matchAttribute": attr}
-            for attr in claim.profile.match_attributes
+        constraints += [
+            {"requests": names, "matchAttribute": attr} for attr in claim.profile.match_attributes
         ]
+    spec: dict[str, Any] = {"devices": {"requests": requests}}
+    if constraints:
+        spec["devices"]["constraints"] = constraints
     if claim.profile.opaque_config:
         spec["devices"]["config"] = [
             {
-                "requests": [claim.name],
+                "requests": names,
                 "opaque": {
                     "driver": claim.profile.driver_name,
                     "parameters": claim.profile.opaque_config,
@@ -154,30 +395,41 @@ def build_resource_claim(
     }
 
 
+@dataclass(frozen=True)
+class PodDeviceParts:
+    pod_claims: list[dict[str, Any]]  # the Pod's `resourceClaims`
+    container_claims: list[dict[str, str]]  # the kernel container's `resources.claims`
+    extended_resources: dict[str, str]  # device plugin resource → count, limits and requests
+    annotations: dict[str, str]
+
+
 def pod_device_parts(
     workload: SessionWorkload, kernel: KernelSpec, claims: Sequence[DeviceClaim]
-) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, str]]:
-    """The Pod's `resourceClaims`, the kernel container's `resources.claims` and annotations."""
-    if not claims:
-        return [], [], {}
+) -> PodDeviceParts:
     whole: dict[str, int] = {}
     shared: dict[str, int] = {}
+    extended: dict[str, int] = {}
     for c in claims:
-        if c.whole_devices:
+        if c.extended_resource is not None:
+            extended[c.extended_resource] = extended.get(c.extended_resource, 0) + c.count
+        elif c.whole_devices:
             key = device_key(c.profile)
-            whole[key] = whole.get(key, 0) + c.count
+            whole[key] = whole.get(key, 0) + c.whole_devices
         else:
-            shared[c.profile.driver_name] = shared.get(c.profile.driver_name, 0) + c.count
+            driver = c.profile.driver_name
+            shared[driver] = shared.get(driver, 0) + c.shared_devices
     annotations = {}
     if whole:
         annotations[ANNOTATION_DEVICES] = json.dumps(whole, sort_keys=True)
     if shared:
         annotations[ANNOTATION_SHARED_DEVICES] = json.dumps(shared, sort_keys=True)
-    return (
-        [
+    dra = [c for c in claims if c.extended_resource is None]
+    return PodDeviceParts(
+        pod_claims=[
             {"name": c.name, "resourceClaimName": resource_claim_name(workload, kernel, c)}
-            for c in claims
+            for c in dra
         ],
-        [{"name": c.name} for c in claims],
-        annotations,
+        container_claims=[{"name": c.name} for c in dra],
+        extended_resources={k: str(v) for k, v in extended.items()},
+        annotations=annotations,
     )
