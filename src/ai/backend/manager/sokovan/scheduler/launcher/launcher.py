@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 import async_timeout
+from callosum.rpc import RPCUserError
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -52,6 +53,9 @@ from ai.backend.manager.sokovan.data import (
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# The agent rejects a kernel it is already creating with this error; the agent is not at fault.
+_KERNEL_CREATION_IN_PROGRESS_ERROR = "KernelCreationInProgress"
 
 
 @dataclass
@@ -426,11 +430,26 @@ class SessionLauncher:
 
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
+<<<<<<< HEAD
                 failed_agent_ids = [
                     aid
                     for aid, result in zip(agent_ids_ordered, results, strict=True)
                     if isinstance(result, BaseException)
                 ]
+=======
+                failed_agent_ids: list[AgentId] = []
+                for aid, result in zip(agent_ids_ordered, results, strict=True):
+                    if not isinstance(result, BaseException):
+                        continue
+                    if (
+                        isinstance(result, RPCUserError)
+                        and result.name == _KERNEL_CREATION_IN_PROGRESS_ERROR
+                    ):
+                        log.debug("kernel creation already in progress on agent", agent_id=aid)
+                        continue
+                    log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
+                    failed_agent_ids.append(aid)
+>>>>>>> 9170c380b (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
                 if failed_agent_ids:
                     log.warning(
                         log_fmt + "recording failed agents: {}",

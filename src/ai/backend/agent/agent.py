@@ -66,6 +66,7 @@ from ai.backend.agent.errors import (
     InvalidChunkSizeError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.resources import KernelCreationInProgress
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
@@ -2573,8 +2574,13 @@ class AbstractAgent[
         # Track kernel creation for health monitoring
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
+<<<<<<< HEAD
                 log.debug("Kernel {} is already being created, skipping", kernel_id)
                 raise ResourceError("Kernel creation already in progress")
+=======
+                log.debug("kernel creation already in progress")
+                raise KernelCreationInProgress("Kernel creation already in progress")
+>>>>>>> 9170c380b (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
             if not restarting and kernel_id in self.kernel_registry:
                 # Replacing the registered object would orphan its runner, which keeps
                 # reconnecting to the address and steals the replies of whoever gets it next.
