@@ -34,14 +34,11 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEnti
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-<<<<<<< HEAD
 from ai.backend.common.data.entity.fair_share import (
     DomainFairShareFieldType,
     ProjectFairShareFieldType,
     UserFairShareFieldType,
 )
-=======
->>>>>>> 8afffbf6 (fix(BA-9055): answer an entity share addressed to a project as that project (#17162))
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
@@ -232,11 +229,6 @@ from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupEntityLabelOwnerAction,
 )
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
-<<<<<<< HEAD
-from ai.backend.manager.services.entity_share.processors import (
-    EntityShareProcessors,
-)
-=======
 from ai.backend.manager.services.entity_share.actions.answer import (
     AcceptEntityShareAction,
     LeaveEntityShareAction,
@@ -246,7 +238,6 @@ from ai.backend.manager.services.entity_share.actions.lookup_answering_scope imp
     LookupEntityShareAnsweringScopeAction,
 )
 from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
->>>>>>> 8afffbf6 (fix(BA-9055): answer an entity share addressed to a project as that project (#17162))
 from ai.backend.manager.services.export.actions.get_report import GetReportAction
 from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors

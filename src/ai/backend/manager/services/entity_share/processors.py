@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-<<<<<<< HEAD
-=======
-from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
->>>>>>> 8afffbf6 (fix(BA-9055): answer an entity share addressed to a project as that project (#17162))
 from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     ScopedBatchOpsResult,

@@ -5,12 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import EntityShareData
-from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
@@ -50,52 +48,7 @@ class SeedVFolderShare(SeedRowFromThree[UserData, VFolderData, UserData, EntityS
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
 class SeedShareTaken(SeedShareAcceptance[EntityShareData]):
-=======
-class TestSeedVFolderShareToProject(
-    TestSeedRowFromThree[UserData, VFolderData, ProjectData, EntityShareData]
-):
-    """The person offers the folder to the project, under ``cap``."""
-
-    cap: Permission | None = None
-    name_hint: str = "project-share"
-
-    @override
-    def kind(self) -> str:
-        return Says("프로젝트에 보낸 vfolder 공유 제안", english="vfolder share offer to a project")
-
-    @override
-    def detail(self) -> str:
-        if self.cap is None:
-            return Says(
-                "권한 상한 없이 제안되었고, 아직 응답하지 않았습니다",
-                english="offered with no ceiling on the permissions, not answered yet",
-            )
-        return Says(
-            f"{self.cap.name} 권한으로 제안되었고, 아직 응답하지 않았습니다",
-            english=f"offered under the {self.cap.name} permission, not answered yet",
-        )
-
-    @override
-    def name(self, naming: Naming) -> str:
-        return naming(self.name_hint)
-
-    @override
-    def seed(
-        self, name: str, first: UserData, second: VFolderData, third: ProjectData
-    ) -> EntityShareCreator:
-        return EntityShareCreator(
-            sharer_user_id=UserID(first.id),
-            target=VFolderUUID(second.id),
-            recipient=ProjectID(third.id),
-            permission_cap=self.cap,
-        )
-
-
-@dataclass(frozen=True)
-class TestSeedShareTaken(TestSeedShareAcceptance[EntityShareData]):
->>>>>>> 8afffbf6 (fix(BA-9055): answer an entity share addressed to a project as that project (#17162))
     """The recipient the offer names takes it."""
 
     @override
