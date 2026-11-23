@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 import async_timeout
+from callosum.rpc import RPCUserError
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -53,6 +54,9 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# The agent rejects a kernel it is already creating with this error; the agent is not at fault.
+_KERNEL_CREATION_IN_PROGRESS_ERROR = "KernelCreationInProgress"
 
 
 @dataclass
@@ -432,6 +436,10 @@ class SessionLauncher:
                     aid
                     for aid, result in zip(agent_ids_ordered, results, strict=True)
                     if isinstance(result, BaseException)
+                    and not (
+                        isinstance(result, RPCUserError)
+                        and result.name == _KERNEL_CREATION_IN_PROGRESS_ERROR
+                    )
                 ]
                 if failed_agent_ids:
                     log.warning(
