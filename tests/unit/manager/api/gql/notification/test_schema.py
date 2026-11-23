@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from graphql import GraphQLObjectType
+from graphql import GraphQLObjectType, GraphQLResolveInfo
 
 from ai.backend.common.dto.manager.v2.notification.response import NotificationChannelNode
 from ai.backend.common.dto.manager.v2.notification.types import (
@@ -68,4 +69,6 @@ class TestChannelSpecResolvesToItsImplementor:
 
         assert isinstance(spec, WebhookSpecGQL)
         assert spec.url == "https://hooks.example.com/demo"
-        assert _object_type("WebhookSpec").is_type_of is not None
+        is_type_of = _object_type("WebhookSpec").is_type_of
+        assert is_type_of is not None
+        assert is_type_of(spec, MagicMock(spec=GraphQLResolveInfo))

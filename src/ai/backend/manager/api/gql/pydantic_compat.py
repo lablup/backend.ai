@@ -273,19 +273,19 @@ class PydanticInputMixin[T_DTO: BaseModel]:
 
 
 def _convert_to_implementor(field_type: type, value: BaseModel) -> Any | None:
-    """Convert ``value`` with the implementor of the pydantic-backed GQL interface ``field_type``.
+    """Convert ``value`` with the implementor of interface ``field_type`` built from its DTO type.
 
-    An interface's own ``from_pydantic`` builds the interface itself, which GraphQL cannot
-    resolve to an object type, so a DTO sub-type goes to the implementor built from it.
-    Returns ``None`` when no implementor is built from ``type(value)``.
+    The interface's own ``from_pydantic`` builds the interface, which GraphQL cannot resolve.
     """
-    pending: list[type] = list(field_type.__subclasses__())
-    while pending:
-        candidate = pending.pop()
-        if getattr(candidate, "_pydantic_type", None) is type(value):
-            return cast(Any, candidate).from_pydantic(value)
-        pending.extend(candidate.__subclasses__())
+    implementor = getattr(type(value), "_strawberry_type", None)
+    if isinstance(implementor, type) and issubclass(implementor, field_type):
+        return cast(Any, implementor).from_pydantic(value)
     return None
+
+
+def _is_interface(field_type: type) -> bool:
+    definition = getattr(field_type, "__strawberry_definition__", None)
+    return definition is not None and definition.is_interface
 
 
 def _convert_value(value: Any, type_hint: Any) -> Any:
@@ -330,8 +330,7 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
             and isinstance(field_type, type)
             and hasattr(field_type, "from_pydantic")
         ):
-            definition = getattr(field_type, "__strawberry_definition__", None)
-            if definition is not None and definition.is_interface:
+            if _is_interface(field_type):
                 converted = _convert_to_implementor(field_type, value)
                 if converted is not None:
                     return converted
@@ -348,6 +347,11 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
                 and isinstance(item_type, type)
                 and hasattr(item_type, "from_pydantic")
             ):
+                if _is_interface(item_type):
+                    return [
+                        _convert_to_implementor(item_type, item) or item_type.from_pydantic(item)
+                        for item in value
+                    ]
                 return [item_type.from_pydantic(item) for item in value]
         elif item_type is not None and isinstance(item_type, type) and issubclass(item_type, Enum):
             # list[Enum] or list[str/int] → list[GQL enum]

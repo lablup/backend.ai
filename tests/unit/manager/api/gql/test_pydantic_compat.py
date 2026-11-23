@@ -405,6 +405,20 @@ class TestInterfaceFieldConversion:
         assert isinstance(spec, BlueGreenStrategySpecGQL)
         assert spec.promote_delay_seconds == 30
 
+    def test_a_list_of_strategy_dtos_converts_each_to_its_implementor(self) -> None:
+        specs = _convert_value(
+            [
+                BlueGreenStrategySpecInfo(
+                    strategy=DeploymentStrategy.BLUE_GREEN,
+                    auto_promote=False,
+                    promote_delay_seconds=0,
+                )
+            ],
+            list[DeploymentStrategySpecGQL],
+        )
+
+        assert [type(spec) for spec in specs] == [BlueGreenStrategySpecGQL]
+
     def test_a_dto_no_implementor_matches_stays_the_interface(self) -> None:
         spec = _convert_value(
             DeploymentStrategySpecInfo(strategy=DeploymentStrategy.ROLLING),
