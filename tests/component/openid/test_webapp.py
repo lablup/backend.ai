@@ -269,28 +269,48 @@ class TestWebAppLogin:
 
         assert kwargs["redirect_uri"] == "https://guest.example.com/func/openid/redirect"
 
-    @pytest.mark.parametrize(
-        ("allowed_redirect_hosts", "redirect_to"),
-        [
-            (None, "https://coredev.example.com/dashboard"),
-            ("guest.example.com", "https://evil.example.com/dashboard"),
-            ("guest.example.com", None),
-        ],
-    )
-    async def test_login_calls_back_on_login_uri_unless_host_allowed(
+    async def test_login_calls_back_on_login_uri_without_allowed_hosts(
         self,
         plugin_config: dict[str, Any],
         login_request: MagicMock,
         mock_oauth2_client: MagicMock,
-        allowed_redirect_hosts: str | None,
-        redirect_to: str | None,
     ) -> None:
-        config = dict(plugin_config)
-        if allowed_redirect_hosts is not None:
-            config["allowed_redirect_hosts"] = allowed_redirect_hosts
-        plugin = OIDCWebAppPlugin(config, local_config={})
-        post_data = {} if redirect_to is None else {"redirect_to": redirect_to}
-        login_request.post = AsyncMock(return_value=post_data)
+        plugin = OIDCWebAppPlugin(plugin_config, local_config={})
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://coredev.example.com/dashboard"}
+        )
+
+        kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
+
+        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+
+    async def test_login_calls_back_on_login_uri_from_disallowed_host(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
+        )
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://evil.example.com/dashboard"}
+        )
+
+        kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
+
+        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+
+    async def test_login_calls_back_on_login_uri_without_redirect_to(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
+        )
+        login_request.post = AsyncMock(return_value={})
 
         kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
 
