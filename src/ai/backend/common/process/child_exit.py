@@ -9,11 +9,13 @@ import os
 import signal
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass, field
 from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.synchronize import Event as MPEvent
 from typing import Final
+
+import aiotools
 
 from ai.backend.logging.structured import StructuredLogger
 
@@ -94,6 +96,20 @@ class ChildExitMonitor:
             daemon=True,
         )
         self._thread.start()
+
+    def main_context(self) -> Callable[[], aiotools.ServerMainContextManager[None]]:
+        """Pass as `aiotools.start_server(main_ctxmgr=...)` to watch the children while
+        the server runs."""
+
+        @aiotools.main_context
+        def _watch_children() -> Generator[None, signal.Signals]:
+            self.start()
+            try:
+                yield
+            finally:
+                self.disarm()
+
+        return _watch_children
 
     def raise_system_exit(self) -> None:
         """Fail the process unless every child ran its shutdown routines. Call this once

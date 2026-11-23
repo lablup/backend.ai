@@ -18,7 +18,6 @@ from collections.abc import (
     AsyncIterator,
     Callable,
     Coroutine,
-    Generator,
     Iterable,
     Mapping,
     Sequence,
@@ -1881,17 +1880,6 @@ def main(
                 child_statuses = tuple(ChildStatus() for _ in range(_NUM_WORKERS))
                 child_exit_monitor = ChildExitMonitor(child_statuses)
 
-                @aiotools.main_context
-                def server_main_ctx() -> Generator[None, signal.Signals]:
-                    """Tear the supervisor down when a worker dies outside the shutdown
-                    path, so that the service manager sees a failed unit instead of a
-                    supervisor with no worker."""
-                    child_exit_monitor.start()
-                    try:
-                        yield
-                    finally:
-                        child_exit_monitor.disarm()
-
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
@@ -1906,7 +1894,7 @@ def main(
                         runner = asyncio.run
                 aiotools.start_server(
                     server_main_logwrapper,
-                    main_ctxmgr=server_main_ctx,
+                    main_ctxmgr=child_exit_monitor.main_context(),
                     num_workers=_NUM_WORKERS,
                     args=(server_config, log_endpoint, child_statuses),
                     wait_timeout=5.0,

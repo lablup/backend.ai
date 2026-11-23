@@ -114,6 +114,7 @@ from ai.backend.common.middlewares.exception import client_closed_response, is_c
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.types import (
     AgentId,
@@ -1115,6 +1116,8 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: proxy-coordinator worker-{pidx}")
+    child_status: ChildStatus = _args[3][pidx]
+    child_status.publish_pid()
     local_config: ServerConfig = _args[0]
     log_endpoint: str = _args[1]
     logger = Logger(
@@ -1130,6 +1133,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -1213,14 +1217,18 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                child_statuses = (ChildStatus(),)
+                child_exit_monitor = ChildExitMonitor(child_statuses)
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=1,
-                        args=(server_config, log_endpoint, config_path),
+                        main_ctxmgr=child_exit_monitor.main_context(),
+                        args=(server_config, log_endpoint, config_path, child_statuses),
                         wait_timeout=5.0,
                         runner=runner,
                     )
+                    child_exit_monitor.raise_system_exit()
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated")
