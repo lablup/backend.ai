@@ -34,11 +34,14 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEnti
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
+<<<<<<< HEAD
 from ai.backend.common.data.entity.fair_share import (
     DomainFairShareFieldType,
     ProjectFairShareFieldType,
     UserFairShareFieldType,
 )
+=======
+>>>>>>> 8afffbf6 (fix(BA-9055): answer an entity share addressed to a project as that project (#17162))
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
@@ -229,9 +232,21 @@ from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupEntityLabelOwnerAction,
 )
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
+<<<<<<< HEAD
 from ai.backend.manager.services.entity_share.processors import (
     EntityShareProcessors,
 )
+=======
+from ai.backend.manager.services.entity_share.actions.answer import (
+    AcceptEntityShareAction,
+    LeaveEntityShareAction,
+    RejectEntityShareAction,
+)
+from ai.backend.manager.services.entity_share.actions.lookup_answering_scope import (
+    LookupEntityShareAnsweringScopeAction,
+)
+from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
+>>>>>>> 8afffbf6 (fix(BA-9055): answer an entity share addressed to a project as that project (#17162))
 from ai.backend.manager.services.export.actions.get_report import GetReportAction
 from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
@@ -1146,6 +1161,29 @@ def test_vfolder_allowed_types_read_is_public() -> None:
         ActionKind.GLOBAL,
         ActionGate.PUBLIC,
     )
+
+
+def test_entity_share_answers_are_checked_in_the_scope_the_lookup_resolved() -> None:
+    """Resolving the answering scope costs READ on it; each answer is then checked there."""
+    registry = _ops_registry()
+    EntityShareProcessors(registry.group(GroupMeta(EntityShareEntityType())), MagicMock())
+
+    judged = {
+        LookupEntityShareAnsweringScopeAction: (
+            EntityShareEntityType(),
+            ActionKind.LOOKUP,
+            ActionGate.PERMISSION,
+        ),
+        AcceptEntityShareAction: (EntityShareEntityType(), ActionKind.SCOPE, ActionGate.PERMISSION),
+        RejectEntityShareAction: (EntityShareEntityType(), ActionKind.SCOPE, ActionGate.PERMISSION),
+        LeaveEntityShareAction: (EntityShareEntityType(), ActionKind.SCOPE, ActionGate.PERMISSION),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
 
 
 def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:

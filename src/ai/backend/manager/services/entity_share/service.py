@@ -15,6 +15,10 @@ from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
     CreateEntityShareActionResult,
 )
+from ai.backend.manager.services.entity_share.actions.lookup_answering_scope import (
+    LookupEntityShareAnsweringScopeAction,
+    LookupEntityShareAnsweringScopeActionResult,
+)
 
 __all__ = ("EntityShareService",)
 
@@ -34,6 +38,12 @@ class EntityShareService:
         """Write the offer, or restate what already stands for the same pair."""
         data = await self._repository.create(action.creator)
         return CreateEntityShareActionResult(data=data)
+
+    async def lookup_answering_scope(
+        self, action: LookupEntityShareAnsweringScopeAction
+    ) -> LookupEntityShareAnsweringScopeActionResult:
+        answering_scope = await self._repository.answering_scope(action.share_id)
+        return LookupEntityShareAnsweringScopeActionResult(answering_scope=answering_scope)
 
     async def accept(self, action: AcceptEntityShareAction) -> EntityShareAnswerResult:
         data = await self._repository.accept(action.share_id, action.answering_scope)
