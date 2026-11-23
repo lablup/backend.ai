@@ -11,17 +11,19 @@ from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 
 from ai.backend.common.api_handlers import BodyParam, PathParam
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.template.request import (
     CreateSessionTemplateRequest,
     TemplatePathParam,
     UpdateSessionTemplateRequest,
 )
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.api.rest.session_template.handler import SessionTemplateHandler
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
+    ResolveProjectIdByNameActionResult,
+)
 from ai.backend.manager.services.template.actions.create_task_template import (
     CreatedTaskTemplateItem,
     CreateTaskTemplateActionResult,
@@ -43,8 +45,8 @@ INVALID_PAYLOADS = [
 @pytest.fixture
 def mock_processors() -> MagicMock:
     mock_processors = MagicMock()
-    mock_processors.project.lookup.run = AsyncMock(
-        return_value=LookupOpsResult(resolved_entity_id=ProjectID(uuid.uuid4()))
+    mock_processors.group.resolve_project_id_by_name.wait_for_complete = AsyncMock(
+        return_value=ResolveProjectIdByNameActionResult(project_id=ProjectID(uuid.uuid4()))
     )
     return mock_processors
 
@@ -52,7 +54,7 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> SessionTemplateHandler:
     return SessionTemplateHandler(
-        template=mock_processors.template, project=mock_processors.project
+        template=mock_processors.template, group=mock_processors.group
     )
 
 
@@ -132,14 +134,14 @@ class TestCreateSessionTemplate:
         payload: str,
     ) -> None:
         created = CreatedTaskTemplateItem(id=str(uuid.uuid4()), user=str(user_ctx.user_uuid))
-        mock_processors.template.create_task.run = AsyncMock(
+        mock_processors.template.create_task.wait_for_complete = AsyncMock(
             return_value=CreateTaskTemplateActionResult(created=[created])
         )
 
         response = await handler.create(_create_body(payload), user_ctx, req_ctx)
 
         assert response.status_code == HTTPStatus.OK
-        action = mock_processors.template.create_task.run.call_args.args[0]
+        action = mock_processors.template.create_task.wait_for_complete.call_args.args[0]
         assert action.items[0].name == "t1"
 
 
@@ -162,7 +164,7 @@ class TestUpdateSessionTemplate:
         user_ctx: UserContext,
         req_ctx: RequestCtx,
     ) -> None:
-        mock_processors.template.update_task.run = AsyncMock(
+        mock_processors.template.update_task.wait_for_complete = AsyncMock(
             return_value=UpdateTaskTemplateActionResult()
         )
         payload = json.dumps([{"template": TEMPLATE, "name": "t1"}])
@@ -170,5 +172,5 @@ class TestUpdateSessionTemplate:
         response = await handler.update(_template_path(), _update_body(payload), user_ctx, req_ctx)
 
         assert response.status_code == HTTPStatus.OK
-        action = mock_processors.template.update_task.run.call_args.args[0]
+        action = mock_processors.template.update_task.wait_for_complete.call_args.args[0]
         assert action.items[0].name == "t1"
