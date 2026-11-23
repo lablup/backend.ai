@@ -10,7 +10,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    override,
 )
 from uuid import UUID
 
@@ -18,14 +17,12 @@ import aiotools
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
     foreign,
     joinedload,
-    load_only,
     mapped_column,
     noload,
     relationship,
@@ -53,7 +50,6 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
@@ -94,18 +90,6 @@ from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryF
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac import (
-    AbstractPermissionContext,
-    AbstractPermissionContextBuilder,
-    DomainScope,
-    ProjectScope,
-    ScopeType,
-    get_predefined_roles_in_scope,
-)
-from ai.backend.manager.models.rbac import (
-    UserScope as UserRBACScope,
-)
-from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -1258,281 +1242,3 @@ DEFAULT_SESSION_ORDERING = [
         )
     ),
 ]
-
-
-ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
-    perm for perm in ComputeSessionPermission
-])
-OWNER_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
-ADMIN_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
-MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
-    ComputeSessionPermission.READ_ATTRIBUTE,
-    ComputeSessionPermission.UPDATE_ATTRIBUTE,
-})
-PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
-MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
-
-type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
-
-
-class ComputeSessionPermissionContext(
-    AbstractPermissionContext[ComputeSessionPermission, SessionRow, SessionId]
-):
-    @property
-    def query_condition(self) -> WhereClauseType | None:
-        cond: WhereClauseType | None = None
-
-        def _OR_coalesce(
-            base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression[Any],
-        ) -> WhereClauseType:
-            return base_cond | _cond if base_cond is not None else _cond
-
-        if self.user_id_to_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.user_uuid.in_(self.user_id_to_permission_map.keys())
-            )
-        if self.project_id_to_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.group_id.in_(self.project_id_to_permission_map.keys())
-            )
-        if self.domain_name_to_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.domain_name.in_(self.domain_name_to_permission_map.keys())
-            )
-        if self.object_id_to_additional_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.id.in_(self.object_id_to_additional_permission_map.keys())
-            )
-        if self.object_id_to_overriding_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.id.in_(self.object_id_to_overriding_permission_map.keys())
-            )
-        return cond
-
-    @override
-    async def build_query(self) -> sa.sql.Select[Any] | None:
-        cond = self.query_condition
-        if cond is None:
-            return None
-        return sa.select(SessionRow).where(cond)
-
-    @override
-    async def calculate_final_permission(
-        self, rbac_obj: SessionRow
-    ) -> frozenset[ComputeSessionPermission]:
-        session_row = rbac_obj
-        session_id = session_row.id
-        permissions: frozenset[ComputeSessionPermission] = frozenset()
-
-        if (
-            overriding_perm := self.object_id_to_overriding_permission_map.get(session_id)
-        ) is not None:
-            permissions = overriding_perm
-        else:
-            permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
-            permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
-            permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
-            permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
-        return permissions
-
-
-class ComputeSessionPermissionContextBuilder(
-    AbstractPermissionContextBuilder[ComputeSessionPermission, ComputeSessionPermissionContext]
-):
-    db_session: SASession
-
-    def __init__(self, db_session: SASession) -> None:
-        self.db_session = db_session
-
-    @override
-    async def calculate_permission(
-        self,
-        ctx: ClientContext,
-        target_scope: ScopeType,
-    ) -> frozenset[ComputeSessionPermission]:
-        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        return await self._calculate_permission_by_predefined_roles(roles)
-
-    @override
-    async def build_ctx_in_system_scope(
-        self,
-        ctx: ClientContext,
-    ) -> ComputeSessionPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
-
-        perm_ctx = ComputeSessionPermissionContext()
-        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
-        for row in await self.db_session.scalars(_domain_query_stmt):
-            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
-            perm_ctx.merge(to_be_merged)
-        return perm_ctx
-
-    @override
-    async def build_ctx_in_domain_scope(
-        self,
-        ctx: ClientContext,
-        scope: DomainScope,
-    ) -> ComputeSessionPermissionContext:
-        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
-        _user_perm_ctx = await self._build_at_user_scope_in_domain(
-            ctx, ctx.user_id, scope.domain_name
-        )
-        permission_ctx.merge(_user_perm_ctx)
-        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
-        permission_ctx.merge(_project_perm_ctx)
-        return permission_ctx
-
-    @override
-    async def build_ctx_in_project_scope(
-        self,
-        ctx: ClientContext,
-        scope: ProjectScope,
-    ) -> ComputeSessionPermissionContext:
-        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
-        _user_perm_ctx = await self._build_at_user_scope_in_project(
-            ctx, ctx.user_id, scope.project_id
-        )
-        permission_ctx.merge(_user_perm_ctx)
-        return permission_ctx
-
-    @override
-    async def build_ctx_in_user_scope(
-        self,
-        ctx: ClientContext,
-        scope: UserRBACScope,
-    ) -> ComputeSessionPermissionContext:
-        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
-
-    async def _build_at_domain_scope_non_recursively(
-        self,
-        ctx: ClientContext,
-        domain_name: str,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
-        return ComputeSessionPermissionContext(
-            domain_name_to_permission_map={domain_name: permissions}
-        )
-
-    async def _build_at_user_scope_in_domain(
-        self,
-        ctx: ClientContext,
-        user_id: UUID,
-        domain_name: str,
-    ) -> ComputeSessionPermissionContext:
-        # For Superadmin and monitor who can create objects in multiple different domains.
-        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
-
-        _vfolder_stmt = (
-            sa.select(SessionRow)
-            .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
-            .options(load_only(SessionRow.id))
-        )
-        own_folder_map = {
-            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
-        }
-        return ComputeSessionPermissionContext(
-            object_id_to_additional_permission_map=own_folder_map
-        )
-
-    async def _build_at_user_scope_in_project(
-        self,
-        ctx: ClientContext,
-        user_id: UUID,
-        project_id: UUID,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
-
-        _vfolder_stmt = (
-            sa.select(SessionRow)
-            .where((SessionRow.user_uuid == user_id) & (SessionRow.group_id == project_id))
-            .options(load_only(SessionRow.id))
-        )
-        own_folder_map = {
-            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
-        }
-        return ComputeSessionPermissionContext(
-            object_id_to_additional_permission_map=own_folder_map
-        )
-
-    async def _build_at_project_scopes_in_domain(
-        self,
-        ctx: ClientContext,
-        domain_name: str,
-    ) -> ComputeSessionPermissionContext:
-        result = ComputeSessionPermissionContext()
-
-        _project_stmt = (
-            sa.select(ProjectRow)
-            .where(ProjectRow.domain_name == domain_name)
-            .options(load_only(ProjectRow.id))
-        )
-        for row in await self.db_session.scalars(_project_stmt):
-            _row = row
-            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
-            result.merge(_project_perm_ctx)
-        return result
-
-    async def _build_at_project_scope_non_recursively(
-        self,
-        ctx: ClientContext,
-        project_id: UUID,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
-        return ComputeSessionPermissionContext(
-            project_id_to_permission_map={project_id: permissions}
-        )
-
-    async def _build_at_user_scope_non_recursively(
-        self,
-        ctx: ClientContext,
-        user_id: UUID,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
-        return ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
-
-    @override
-    @classmethod
-    async def _permission_for_owner(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return OWNER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_admin(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return ADMIN_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_monitor(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return MONITOR_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_privileged_member(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return PRIVILEGED_MEMBER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_member(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return MEMBER_PERMISSIONS
-
-
-async def get_permission_ctx(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: ScopeType,
-    requested_permission: ComputeSessionPermission,
-) -> ComputeSessionPermissionContext:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        builder = ComputeSessionPermissionContextBuilder(db_session)
-        return await builder.build(ctx, target_scope, requested_permission)
