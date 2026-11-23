@@ -272,6 +272,22 @@ class PydanticInputMixin[T_DTO: BaseModel]:
         return cast(T_DTO, dto_cls(**kwargs))
 
 
+def _convert_to_implementor(field_type: type, value: BaseModel) -> Any | None:
+    """Convert ``value`` with the implementor of the pydantic-backed GQL interface ``field_type``.
+
+    An interface's own ``from_pydantic`` builds the interface itself, which GraphQL cannot
+    resolve to an object type, so a DTO sub-type goes to the implementor built from it.
+    Returns ``None`` when no implementor is built from ``type(value)``.
+    """
+    pending: list[type] = list(field_type.__subclasses__())
+    while pending:
+        candidate = pending.pop()
+        if getattr(candidate, "_pydantic_type", None) is type(value):
+            return cast(Any, candidate).from_pydantic(value)
+        pending.extend(candidate.__subclasses__())
+    return None
+
+
 def _convert_value(value: Any, type_hint: Any) -> Any:
     """Convert a single value from Pydantic domain to Strawberry domain."""
     if value is None:
@@ -314,6 +330,11 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
             and isinstance(field_type, type)
             and hasattr(field_type, "from_pydantic")
         ):
+            definition = getattr(field_type, "__strawberry_definition__", None)
+            if definition is not None and definition.is_interface:
+                converted = _convert_to_implementor(field_type, value)
+                if converted is not None:
+                    return converted
             return field_type.from_pydantic(value)
         return value
 

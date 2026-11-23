@@ -20,8 +20,13 @@ from pydantic import BaseModel, Field
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     ContainerRegistryNode,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    BlueGreenStrategySpecInfo,
+    DeploymentStrategySpecInfo,
 )
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.registry import Adapters
@@ -29,7 +34,11 @@ from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,
     ContainerRegistryTypeGQL,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.deployment.types.policy import (
+    BlueGreenStrategySpecGQL,
+    DeploymentStrategySpecGQL,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, _convert_value
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 
 # ---- Test fixtures: Pydantic DTOs ----
@@ -378,3 +387,28 @@ class TestAdaptersRegistry:
             session_lifecycle_handlers=(),
         )
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)
+
+
+class TestInterfaceFieldConversion:
+    """A sub-model under an interface-typed field becomes the implementor whose DTO it is."""
+
+    def test_a_strategy_dto_converts_to_its_implementor(self) -> None:
+        spec = _convert_value(
+            BlueGreenStrategySpecInfo(
+                strategy=DeploymentStrategy.BLUE_GREEN,
+                auto_promote=True,
+                promote_delay_seconds=30,
+            ),
+            DeploymentStrategySpecGQL,
+        )
+
+        assert isinstance(spec, BlueGreenStrategySpecGQL)
+        assert spec.promote_delay_seconds == 30
+
+    def test_a_dto_no_implementor_matches_stays_the_interface(self) -> None:
+        spec = _convert_value(
+            DeploymentStrategySpecInfo(strategy=DeploymentStrategy.ROLLING),
+            DeploymentStrategySpecGQL,
+        )
+
+        assert type(spec) is DeploymentStrategySpecGQL

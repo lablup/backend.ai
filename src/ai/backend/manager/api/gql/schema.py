@@ -160,6 +160,10 @@ from ai.backend.manager.api.gql.deployment.resolver.route import (
     routes,
     update_route_traffic_status,
 )
+from ai.backend.manager.api.gql.deployment.types.policy import (
+    BlueGreenStrategySpecGQL,
+    RollingUpdateStrategySpecGQL,
+)
 from ai.backend.manager.api.gql.domain_v2.resolver.mutation import (
     admin_create_domain_v2,
     admin_delete_domain_v2,
@@ -375,6 +379,7 @@ from ai.backend.manager.api.gql.notification.resolver import (
     validate_notification_channel,
     validate_notification_rule,
 )
+from ai.backend.manager.api.gql.notification.types import EmailSpecGQL, WebhookSpecGQL
 from ai.backend.manager.api.gql.project_v2.resolver.mutation import (
     admin_create_project_v2,
     admin_delete_project_v2,
@@ -1654,6 +1659,12 @@ schema = CustomizedSchema(
         _NetworkNodeStub,
         _ModelCardStub,
         _ContainerRegistryNodeStub,
+        # Interface implementors no field names directly: a field typed with the interface
+        # alone leaves them out of the schema, so their own fields cannot be queried.
+        WebhookSpecGQL,
+        EmailSpecGQL,
+        RollingUpdateStrategySpecGQL,
+        BlueGreenStrategySpecGQL,
     ],
     extensions=[
         GQLLoggingExtension,

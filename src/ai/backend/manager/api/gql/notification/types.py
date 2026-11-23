@@ -15,10 +15,9 @@ from strawberry.relay import NodeID
 from ai.backend.common.data.entity.notification import NotificationChannelID, NotificationRuleID
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 
-# NOTE: NotificationChannelSpecGQL uses @gql_pydantic_interface so Strawberry
-# dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
-# EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
-# NotificationChannel.
+# NOTE: NotificationChannel.spec is typed with the interface; PydanticNodeMixin converts the
+# spec DTO to the implementor (WebhookSpecGQL / EmailSpecGQL) whose DTO matches, and the
+# schema lists both implementors so their fields can be queried.
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput as CreateNotificationChannelInputDTO,
 )
