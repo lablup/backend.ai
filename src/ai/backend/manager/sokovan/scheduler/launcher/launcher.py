@@ -230,7 +230,6 @@ class SessionLauncher:
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
         """
-        log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
         log_args = (
             session.session_id,
             session.session_type,
@@ -238,7 +237,9 @@ class SessionLauncher:
             session.access_key,
             session.cluster_mode,
         )
-        log.debug(log_fmt + "try-starting", *log_args)
+        log.debug(
+            "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): try-starting", *log_args
+        )
 
         try:
             # Ensure we have kernels to start
@@ -430,29 +431,18 @@ class SessionLauncher:
 
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
-<<<<<<< HEAD
                 failed_agent_ids = [
                     aid
                     for aid, result in zip(agent_ids_ordered, results, strict=True)
                     if isinstance(result, BaseException)
-                ]
-=======
-                failed_agent_ids: list[AgentId] = []
-                for aid, result in zip(agent_ids_ordered, results, strict=True):
-                    if not isinstance(result, BaseException):
-                        continue
-                    if (
+                    and not (
                         isinstance(result, RPCUserError)
                         and result.name == _KERNEL_CREATION_IN_PROGRESS_ERROR
-                    ):
-                        log.debug("kernel creation already in progress on agent", agent_id=aid)
-                        continue
-                    log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
-                    failed_agent_ids.append(aid)
->>>>>>> 9170c380b (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
+                    )
+                ]
                 if failed_agent_ids:
                     log.warning(
-                        log_fmt + "recording failed agents: {}",
+                        "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): recording failed agents: {}",
                         *log_args,
                         failed_agent_ids,
                     )
@@ -462,17 +452,23 @@ class SessionLauncher:
                         )
                     except Exception:
                         log.warning(
-                            log_fmt + "failed to record failed agents in Valkey",
+                            "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): failed to record failed agents in Valkey",
                             *log_args,
                             exc_info=True,
                         )
 
-            log.info(log_fmt + "started", *log_args)
+            log.info(
+                "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): started", *log_args
+            )
 
         except Exception as e:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
-            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
+            log.warning(
+                "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): failed-starting",
+                *log_args,
+                exc_info=True,
+            )
             # Update error info in status_data without changing status
             # Session will be handled by timeout detection in Coordinator
             await self._repository.update_session_error_info(session.session_id, error_info)

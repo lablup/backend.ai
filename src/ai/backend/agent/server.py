@@ -56,16 +56,7 @@ from ai.backend.agent.errors import (
     InvalidAgentConfigError,
     ResourceError,
 )
-<<<<<<< HEAD
-=======
-from ai.backend.agent.errors.agent import (
-    AgentAlreadyRunningError,
-    ImagePullFailedError,
-    ImagePullTimeoutError,
-    KernelNotFoundError,
-)
 from ai.backend.agent.errors.resources import KernelCreationInProgress
->>>>>>> 9170c380b (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -605,16 +596,14 @@ class AgentRPCServer(aobject):
                 if "kernel-uid" in container_etcd_config_raw:
                     container_updates["kernel_uid"] = container_etcd_config_raw["kernel-uid"]
                     log.info(
-                        "etcd: container-config: kernel-uid={}".format(
-                            container_etcd_config_raw["kernel-uid"]
-                        )
+                        "etcd: container-config: kernel-uid={}",
+                        container_etcd_config_raw["kernel-uid"],
                     )
                 if "kernel-gid" in container_etcd_config_raw:
                     container_updates["kernel_gid"] = container_etcd_config_raw["kernel-gid"]
                     log.info(
-                        "etcd: container-config: kernel-gid={}".format(
-                            container_etcd_config_raw["kernel-gid"]
-                        )
+                        "etcd: container-config: kernel-gid={}",
+                        container_etcd_config_raw["kernel-gid"],
                     )
 
                 self.local_config.update(container_update=container_updates)

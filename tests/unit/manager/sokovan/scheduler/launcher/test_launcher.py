@@ -184,6 +184,50 @@ class TestSessionLauncherKernelCreation:
         kernel_ids = call_args[0][1]  # Second positional arg
         assert len(kernel_ids) == 1
 
+    async def test_creation_in_progress_on_agent_is_not_recorded_as_failed(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
+            "KernelCreationInProgress",
+            "KernelCreationInProgress('Kernel creation already in progress')",
+            "",
+        )
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
+
+    async def test_another_resource_error_on_agent_is_recorded_as_failed(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
+            "ResourceError", "ResourceError('Kernel already created')", ""
+        )
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+
     async def test_multi_kernel_cluster_session(
         self,
         launcher: SessionLauncher,
@@ -293,113 +337,6 @@ class TestSessionLauncherKernelCreation:
         assert [c["auto_pull"] for c in kernel_configs] == [auto_pull]
         assert [c["image"]["auto_pull"] for c in kernel_configs] == [auto_pull]
 
-<<<<<<< HEAD
-=======
-    async def test_agent_kernel_creation_failure_logged_at_error(
-        self,
-        launcher: SessionLauncher,
-        mock_agent_client_pool: MagicMock,
-        mock_valkey_schedule: AsyncMock,
-        session_for_start_single_kernel: SessionDataForStart,
-        image_config_default: dict[UUID, ImageConfigData],
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Kernel creation fails on one agent -> that exception is logged at error."""
-        error = RuntimeError("agent refused kernel creation")
-        mock_agent_client_pool._mock_client.create_kernels.side_effect = error
-
-        session_ids = [session_for_start_single_kernel.session_id]
-        with RecorderContext.scope("test", entity_ids=session_ids):
-            await launcher.start_sessions_for_handler(
-                [session_for_start_single_kernel],
-                image_config_default,
-            )
-
-        (record,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
-        assert record.__dict__["log_tag_agent_id"] == "agent-1"
-        assert record.__dict__["log_tag_session_id"] == str(
-            session_for_start_single_kernel.session_id
-        )
-        assert record.exc_info is not None
-        assert record.exc_info[1] is error
-        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
-
-    async def test_creation_in_progress_on_agent_is_neither_logged_at_error_nor_recorded(
-        self,
-        launcher: SessionLauncher,
-        mock_agent_client_pool: MagicMock,
-        mock_valkey_schedule: AsyncMock,
-        session_for_start_single_kernel: SessionDataForStart,
-        image_config_default: dict[UUID, ImageConfigData],
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
-            "KernelCreationInProgress",
-            "KernelCreationInProgress('Kernel creation already in progress')",
-            "",
-        )
-
-        session_ids = [session_for_start_single_kernel.session_id]
-        with RecorderContext.scope("test", entity_ids=session_ids):
-            await launcher.start_sessions_for_handler(
-                [session_for_start_single_kernel],
-                image_config_default,
-            )
-
-        assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
-        mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
-
-    async def test_another_resource_error_on_agent_is_logged_at_error_and_recorded(
-        self,
-        launcher: SessionLauncher,
-        mock_agent_client_pool: MagicMock,
-        mock_valkey_schedule: AsyncMock,
-        session_for_start_single_kernel: SessionDataForStart,
-        image_config_default: dict[UUID, ImageConfigData],
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
-            "ResourceError", "ResourceError('Kernel already created')", ""
-        )
-
-        session_ids = [session_for_start_single_kernel.session_id]
-        with RecorderContext.scope("test", entity_ids=session_ids):
-            await launcher.start_sessions_for_handler(
-                [session_for_start_single_kernel],
-                image_config_default,
-            )
-
-        (record,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
-        assert record.__dict__["log_tag_agent_id"] == "agent-1"
-        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
-
-    async def test_system_session_environ_overrides_the_session_environ(
-        self,
-        launcher: SessionLauncher,
-        mock_agent_client_pool: MagicMock,
-        session_name_bound_to_key_a: None,
-        session_for_start_with_user_environ: SessionDataForStart,
-        image_config_default: dict[UUID, ImageConfigData],
-    ) -> None:
-        """A system session environ value wins over the session's own entry under its key.
-
-        Given: The session's environ sets A and U; a public row binds the session name to A
-        When: Start session
-        Then: The kernel's environ has the session name under A and the session's U
-        """
-        session_ids = [session_for_start_with_user_environ.session_id]
-        with RecorderContext.scope("test", entity_ids=session_ids):
-            await launcher.start_sessions_for_handler(
-                [session_for_start_with_user_environ],
-                image_config_default,
-            )
-
-        kernel_configs = mock_agent_client_pool._mock_client.create_kernels.call_args[0][2]
-        environ = kernel_configs[0]["environ"]
-        assert environ["A"] == "test-session"
-        assert environ["U"] == "mine"
-
->>>>>>> 9170c380b (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
 
 # =============================================================================
 # TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-013)
