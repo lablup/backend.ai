@@ -53,6 +53,16 @@ from ai.backend.agent.errors import (
     AgentInitializationError,
     ResourceError,
 )
+<<<<<<< HEAD
+=======
+from ai.backend.agent.errors.agent import (
+    AgentAlreadyRunningError,
+    ImagePullFailedError,
+    ImagePullTimeoutError,
+    KernelNotFoundError,
+)
+from ai.backend.agent.errors.resources import KernelCreationInProgress
+>>>>>>> 9170c380 (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -857,8 +867,9 @@ class AgentRPCServer(aobject):
                         "scaling_group": result["scaling_group"],
                     })
         if errors:
-            # Raise up the first error.
-            if len(errors) == 1:
+            # Raise up the first error. The manager tells a creation in progress apart by
+            # its name, so kernels that are all being created answer with one of them.
+            if len(errors) == 1 or all(isinstance(e, KernelCreationInProgress) for e in errors):
                 raise errors[0]
             raise aiotools.TaskGroupError("agent.create_kernels() failed", errors)
         return raw_results

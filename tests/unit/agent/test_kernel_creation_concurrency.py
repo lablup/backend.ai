@@ -5,11 +5,167 @@ import uuid
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
+import aiotools
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
+<<<<<<< HEAD
 from ai.backend.agent.errors.resources import ResourceError
 from ai.backend.common.types import KernelId, SessionId
+=======
+from ai.backend.agent.errors.resources import KernelCreationInProgress, ResourceError
+from ai.backend.agent.server import AgentRPCServer
+from ai.backend.common.types import AgentId, KernelId, SessionId
+
+
+class _CreationTracker:
+    """Stands in for `AbstractAgent.create_kernel`, recording how many creations overlap."""
+
+    active: int
+    peak: int
+    finished: int
+    semas: list[asyncio.Semaphore]
+
+    def __init__(self) -> None:
+        self.active = 0
+        self.peak = 0
+        self.finished = 0
+        self.semas = []
+
+    async def create_kernel(
+        self,
+        ownership_data: Any,
+        kernel_image: Any,
+        kernel_config: Any,
+        cluster_info: Any,
+        *,
+        throttle_sema: asyncio.Semaphore,
+    ) -> dict[str, Any]:
+        self.semas.append(throttle_sema)
+        async with throttle_sema:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+            await asyncio.sleep(0.01)
+            self.active -= 1
+        self.finished += 1
+        return {
+            "id": ownership_data.kernel_id,
+            "kernel_host": "127.0.0.1",
+            "repl_in_port": 2000,
+            "repl_out_port": 2001,
+            "stdin_port": 2002,
+            "stdout_port": 2003,
+            "service_ports": [],
+            "container_id": "c",
+            "resource_spec": {},
+            "attached_devices": {},
+            "agent_addr": "tcp://127.0.0.1:6001",
+            "scaling_group": "default",
+        }
+
+
+def _agent(concurrency: int, tracker: _CreationTracker) -> MagicMock:
+    agent = MagicMock()
+    agent.id = AgentId("i-test")
+    agent.local_config.agent.kernel_creation_concurrency = concurrency
+    agent.kernel_creation_sema = asyncio.Semaphore(concurrency)
+    agent.create_kernel = tracker.create_kernel
+    agent.produce_error_event = AsyncMock()
+    return agent
+
+
+def _server(agent: MagicMock) -> AgentRPCServer:
+    server = MagicMock()
+    server.runtime.get_agent.return_value = agent
+    server.error_monitor.capture_exception = AsyncMock()
+    return cast(AgentRPCServer, server)
+
+
+async def _create_kernels(server: AgentRPCServer, num_kernels: int) -> Any:
+    kernel_ids = [uuid.uuid4() for _ in range(num_kernels)]
+    image_ref = MagicMock()
+    image_ref.canonical = "cr.backend.ai/stable/python:latest"
+    args: tuple[Any, ...] = (
+        str(uuid.uuid4()),
+        [str(k) for k in kernel_ids],
+        [{} for _ in kernel_ids],
+        {},
+        dict.fromkeys(kernel_ids, image_ref),
+    )
+    request = RPCMessage(
+        None,
+        RPCMessageTypes.FUNCTION,
+        "create_kernels",
+        "",
+        0,
+        None,
+        {"args": args, "kwargs": {}},
+    )
+    return await AgentRPCServer.create_kernels(server, request)
+
+
+@pytest.fixture
+def tracker() -> _CreationTracker:
+    return _CreationTracker()
+
+
+class TestKernelCreationConcurrency:
+    async def test_concurrent_requests_share_the_agent_bound(
+        self, tracker: _CreationTracker
+    ) -> None:
+        server = _server(_agent(2, tracker))
+
+        await asyncio.gather(_create_kernels(server, 2), _create_kernels(server, 2))
+
+        assert tracker.finished == 4
+        assert tracker.peak == 2
+
+    async def test_every_creation_is_throttled_by_the_agents_own_semaphore(
+        self, tracker: _CreationTracker
+    ) -> None:
+        agent = _agent(2, tracker)
+        server = _server(agent)
+
+        await asyncio.gather(_create_kernels(server, 3), _create_kernels(server, 1))
+
+        assert len(tracker.semas) == 4
+        assert all(sema is agent.kernel_creation_sema for sema in tracker.semas)
+        assert not agent.kernel_creation_sema.locked()
+>>>>>>> 9170c380 (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
+
+
+def _agent_rejecting_with(*errors: Exception) -> MagicMock:
+    agent = _agent(len(errors), _CreationTracker())
+    agent.create_kernel = AsyncMock(side_effect=list(errors))
+    return agent
+
+
+class TestCreateKernelsErrors:
+    async def test_kernels_all_being_created_answer_with_one_creation_in_progress(
+        self,
+    ) -> None:
+        server = _server(
+            _agent_rejecting_with(
+                KernelCreationInProgress("Kernel creation already in progress"),
+                KernelCreationInProgress("Kernel creation already in progress"),
+            )
+        )
+
+        with pytest.raises(KernelCreationInProgress):
+            await _create_kernels(server, 2)
+
+    async def test_a_creation_in_progress_mixed_with_another_failure_is_a_task_group_error(
+        self,
+    ) -> None:
+        server = _server(
+            _agent_rejecting_with(
+                KernelCreationInProgress("Kernel creation already in progress"),
+                ResourceError("Kernel already created"),
+            )
+        )
+
+        with pytest.raises(aiotools.TaskGroupError):
+            await _create_kernels(server, 2)
 
 
 class _CreateWentAhead(Exception):
@@ -52,6 +208,15 @@ class TestCreateForARegisteredKernel:
             await self._create(agent, kernel_id, restarting=False)
 
         assert agent.kernel_registry[kernel_id] is live_kernel
+        agent.init_kernel_context.assert_not_called()
+
+    async def test_a_create_for_a_kernel_being_created_raises_creation_in_progress(
+        self, agent: MagicMock, kernel_id: KernelId
+    ) -> None:
+        with agent.track_create(kernel_id, SessionId(uuid.uuid4())):
+            with pytest.raises(KernelCreationInProgress):
+                await self._create(agent, kernel_id, restarting=False)
+
         agent.init_kernel_context.assert_not_called()
 
     async def test_a_restart_goes_ahead_over_the_kernel_it_restarts(
