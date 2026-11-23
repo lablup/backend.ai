@@ -10,14 +10,6 @@ from typing import TYPE_CHECKING
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
-<<<<<<< HEAD
-=======
-from ai.backend.manager.errors.notification import (
-    NotificationProcessingFailure,
-    NotificationTemplateRenderingFailure,
-    WebhookConnectionFailure,
-)
->>>>>>> 38769923 (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
 from ai.backend.manager.notification.types import ProcessRuleParams
 
 from .actions import (
@@ -198,26 +190,6 @@ class NotificationService:
             errors=result.errors,
         )
 
-<<<<<<< HEAD
-=======
-    def _is_user_side_failure(
-        self, channel_type: NotificationChannelType, error: BaseException
-    ) -> bool:
-        if isinstance(error, NotificationTemplateRenderingFailure):
-            return True
-        if channel_type == NotificationChannelType.WEBHOOK:
-            return isinstance(
-                error,
-                (
-                    NotificationProcessingFailure,
-                    WebhookConnectionFailure,
-                    aiohttp.ClientError,
-                    TimeoutError,
-                ),
-            )
-        return False
-
->>>>>>> 38769923 (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
     async def _process_rules(
         self,
         matches: Sequence[MatchingNotificationRuleData],

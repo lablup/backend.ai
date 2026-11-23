@@ -11,16 +11,11 @@ import aiohttp
 from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.common.data.notification.types import WebhookSpec
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
-=======
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.notification import (
     NotificationProcessingFailure,
     WebhookConnectionFailure,
 )
->>>>>>> 38769923 (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
@@ -83,32 +78,6 @@ class WebhookChannel(AbstractNotificationChannel):
         headers = self._webhook_spec.headers.copy()
         headers["Content-Type"] = self._webhook_spec.content_type
 
-<<<<<<< HEAD
-        async with http_session.post(
-            path,
-            data=message.message,
-            headers=headers,
-            timeout=timeout,
-        ) as response:
-            if response.status in self._webhook_spec.success_status_codes:
-                log.info(
-                    "Webhook sent successfully to {} (status: {})",
-                    webhook_url,
-                    response.status,
-                )
-                return SendResult(
-                    message=f"Webhook sent successfully (status: {response.status})",
-                )
-            response_text = await response.text()
-            log.warning(
-                "Webhook request failed with status {}: {}",
-                response.status,
-                response_text[:200],
-            )
-            raise NotificationProcessingFailure(
-                f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
-            )
-=======
         try:
             async with http_session.post(
                 path,
@@ -117,15 +86,20 @@ class WebhookChannel(AbstractNotificationChannel):
                 timeout=timeout,
             ) as response:
                 if response.status in self._webhook_spec.success_status_codes:
-                    log.trace(
-                        "webhook notification sent",
-                        webhook_url=webhook_url,
-                        status_code=response.status,
+                    log.info(
+                        "Webhook sent successfully to {} (status: {})",
+                        webhook_url,
+                        response.status,
                     )
                     return SendResult(
                         message=f"Webhook sent successfully (status: {response.status})",
                     )
                 response_text = await response.text()
+                log.warning(
+                    "Webhook request failed with status {}: {}",
+                    response.status,
+                    response_text[:200],
+                )
                 raise NotificationProcessingFailure(
                     f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
                 )
@@ -133,4 +107,3 @@ class WebhookChannel(AbstractNotificationChannel):
             raise WebhookConnectionFailure(
                 f"Failed to connect to the webhook URL: {type(e).__name__}"
             ) from e
->>>>>>> 38769923 (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
