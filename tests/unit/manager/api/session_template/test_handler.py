@@ -53,9 +53,7 @@ def mock_processors() -> MagicMock:
 
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> SessionTemplateHandler:
-    return SessionTemplateHandler(
-        template=mock_processors.template, group=mock_processors.group
-    )
+    return SessionTemplateHandler(template=mock_processors.template, group=mock_processors.group)
 
 
 @pytest.fixture
