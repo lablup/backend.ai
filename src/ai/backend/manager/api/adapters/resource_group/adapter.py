@@ -29,6 +29,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    CreateResourceGroupSchedulerOptionsConfigInput,
+    CreateResourceGroupSchedulerOptionsInput,
     PartialBulkPurgeResourceGroupsInput,
     PartialBulkUpdateResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
@@ -122,7 +124,10 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
-from ai.backend.manager.models.resource_group.types import NUM_RETRIES_TO_SKIP_CONFIG_KEY
+from ai.backend.manager.models.resource_group.types import (
+    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
+    ResourceGroupOpts,
+)
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
@@ -499,6 +504,16 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic payload containing the created resource group node.
         """
+        scheduler_options = (
+            input.scheduler_options
+            if input.scheduler_options is not None
+            else CreateResourceGroupSchedulerOptionsInput()
+        )
+        scheduler_options_config = (
+            scheduler_options.config
+            if scheduler_options.config is not None
+            else CreateResourceGroupSchedulerOptionsConfigInput()
+        )
         creator = ResourceGroupCreator(
             name=input.name,
             # ResourceGroupCreator requires a driver field which is not exposed in
@@ -509,6 +524,22 @@ class ResourceGroupAdapter(BaseAdapter):
             is_active=input.is_active,
             is_public=input.is_public,
             is_default=input.is_default,
+            scheduler_opts=ResourceGroupOpts(
+                allowed_session_types=scheduler_options.allowed_session_types,
+                pending_timeout=timedelta(seconds=scheduler_options.pending_timeout),
+                config=(
+                    {}
+                    if scheduler_options_config.num_retries_to_skip is None
+                    else {
+                        NUM_RETRIES_TO_SKIP_CONFIG_KEY: scheduler_options_config.num_retries_to_skip
+                    }
+                ),
+                agent_selection_strategy=scheduler_options.agent_selection_strategy,
+                allow_fractional_resource_fragmentation=(
+                    scheduler_options.allow_fractional_resource_fragmentation
+                ),
+                route_cleanup_target_statuses=scheduler_options.route_cleanup_target_statuses,
+            ),
         )
         action_result = await self._resource_group.create_resource_group.run(
             CreateResourceGroupAction(creator=creator)
