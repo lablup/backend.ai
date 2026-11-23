@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import errno
 import logging
 import smtplib
 import socket
+import ssl
 from email.mime.text import MIMEText
 from functools import partial
 from typing import override
@@ -22,6 +24,23 @@ from ai.backend.manager.notification.types import NotificationMessage, SendResul
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _DEFAULT_NOTIFICATION_SUBJECT = "Notification from Backend.AI"
+
+
+_UNREACHABLE_ERRNOS = frozenset({
+    errno.EHOSTUNREACH,
+    errno.ENETUNREACH,
+    errno.EHOSTDOWN,
+    errno.ENETDOWN,
+})
+
+
+def _is_smtp_destination_failure(error: OSError) -> bool:
+    """Whether the SMTP host could not be reached or presented a certificate that fails to verify."""
+    if isinstance(
+        error, (socket.gaierror, ConnectionError, TimeoutError, ssl.SSLCertVerificationError)
+    ):
+        return True
+    return error.errno in _UNREACHABLE_ERRNOS
 
 
 class EmailChannel(AbstractNotificationChannel):
@@ -99,8 +118,9 @@ class EmailChannel(AbstractNotificationChannel):
             raise NotificationDeliveryFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
             raise NotificationDeliveryFailure(f"Email delivery failed: {e!s}") from e
-        except (socket.gaierror, ConnectionError, TimeoutError) as e:
-            # A refused, unresolvable or timed-out SMTP host raises these, not SMTPConnectError.
+        except OSError as e:
+            if not _is_smtp_destination_failure(e):
+                raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
             raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except Exception as e:
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

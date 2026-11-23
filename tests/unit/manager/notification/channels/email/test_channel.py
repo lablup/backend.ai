@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import errno
 import smtplib
+import ssl
 from unittest.mock import MagicMock
 
 import pytest
@@ -55,8 +57,10 @@ class TestEmailChannelSend:
             (smtplib.SMTPRecipientsRefused({}), "Email delivery failed"),
             (ConnectionRefusedError("refused"), "SMTP connection failed"),
             (TimeoutError("timed out"), "SMTP connection failed"),
+            (OSError(errno.EHOSTUNREACH, "No route to host"), "SMTP connection failed"),
+            (ssl.SSLCertVerificationError("certificate has expired"), "SMTP connection failed"),
         ],
-        ids=["auth", "smtp-error", "connection-refused", "timeout"],
+        ids=["auth", "smtp-error", "connection-refused", "timeout", "no-route", "bad-certificate"],
     )
     async def test_an_smtp_failure_is_a_client_visible_delivery_failure(
         self,
