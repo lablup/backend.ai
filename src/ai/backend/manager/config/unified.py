@@ -147,13 +147,6 @@ Alias keys are also URL-quoted in the same way.
    + manager
      - {instance-id}: "up"
      ...
-   # etcd.get("config/redis/addr") is not None => single redis node
-   # etcd.get("config/redis/sentinel") is not None => redis sentinel
-   + redis:
-     - addr: "tcp://redis:6379"
-     - sentinel: {comma-seperated list of sentinel addresses}
-     - service_name: "mymanager"
-     - password: {redis-auth-password}
    + agents
      + {instance-id}: {"starting","running"}  # ConfigScopes.NODE
        - ip: {"127.0.0.1"}

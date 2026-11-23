@@ -13,6 +13,7 @@
   - The 26.9 and 26.4 patch releases that include this change require the same step.
 * The manager, the agent and the storage proxy no longer read the Valkey config from etcd.
   - The agent and the storage proxy no longer read `config/redis`. The manager ignores it and logs a warning when it is set.
+  - The agent and the storage proxy do not warn about `config/redis`. They fail to start when their TOML file has no `[redis]` table.
   - Before the upgrade, copy the keys under `config/redis` to the `[redis]` table of `manager.toml`, `agent.toml` and `storage-proxy.toml`.
   - Then delete `config/redis` from etcd.
 
