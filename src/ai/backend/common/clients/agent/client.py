@@ -221,6 +221,11 @@ class AgentClient(BackendAIClient):
         """Assign a host port on the agent."""
         return cast(int, await self._peer.call.assign_port(agent_id=self.agent_id))
 
+    @agent_client_resilience.apply()
+    async def release_port(self, port_no: int) -> None:
+        """Release a host port assigned on the agent."""
+        await self._peer.call.release_port(port_no, agent_id=self.agent_id)
+
     # Kernel management methods
     @agent_client_resilience.apply()
     async def create_kernels(
