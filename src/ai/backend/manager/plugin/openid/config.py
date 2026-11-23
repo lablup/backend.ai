@@ -104,7 +104,9 @@ class OIDCWebAppConfig(BackendAISchema):
         description=(
             "Comma-separated hostnames a sign-in may return to, in addition to the login_uri host. "
             "When set, a sign-in started from any other host returns to login_uri. "
-            "When unset, any return address is accepted."
+            "When set, the IdP calls back on the accepted host, so register its callback URI "
+            "(`/func/openid/redirect`) with the IdP. "
+            "When unset, any return address is accepted and the IdP calls back on login_uri."
         ),
     )
 

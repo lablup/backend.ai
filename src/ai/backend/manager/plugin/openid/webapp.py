@@ -328,7 +328,8 @@ class OIDCWebAppPlugin(WebappPlugin):
 
     async def login(self, request: web.Request) -> web.Response:
         post_data = await request.post()
-        redirect_to = post_data.get("redirect_to", None)
+        redirect_to_field = post_data.get("redirect_to")
+        redirect_to = redirect_to_field if isinstance(redirect_to_field, str) else None
         force = post_data.get("force", "false")
         authorization_endpoint = request.app["openid.authorization_endpoint"]
 
@@ -346,7 +347,7 @@ class OIDCWebAppPlugin(WebappPlugin):
                 "force": force,
             }),
             code_verifier=code_verifier,
-            redirect_uri=self._callback_uri(),
+            redirect_uri=self._callback_uri(redirect_to),
         )
 
         response = web.Response(
@@ -368,6 +369,7 @@ class OIDCWebAppPlugin(WebappPlugin):
 
     async def redirect(self, request: web.Request) -> web.Response:
         state = urllib.parse.parse_qs(request.query.get("state", ""))
+        # parse_qs maps each key to a list; take the `redirect` login put in, or None if absent.
         redirect_uri = self._return_uri(state.get("redirect", [None])[0])
         cookie_name: str | None = None
         try:
@@ -386,13 +388,21 @@ class OIDCWebAppPlugin(WebappPlugin):
             response.del_cookie(cookie_name, path=_SESSION_COOKIE_PATH)
         return response
 
-    def _callback_uri(self) -> str:
-        return str(yarl.URL(self._config.login_uri).with_path(_CALLBACK_PATH))
+    def _callback_uri(self, redirect_to: str | None) -> str:
+        """Call back on the host the sign-in returns to, so the browser sends its session cookie.
 
-    def _return_uri(self, candidate: object) -> yarl.URL:
+        Only a host ``allowed_redirect_hosts`` accepts qualifies; otherwise ``login_uri`` is used.
+        """
+        if self._config.allowed_redirect_hosts is None:
+            base = yarl.URL(self._config.login_uri)
+        else:
+            base = self._return_uri(redirect_to)
+        return str(base.with_path(_CALLBACK_PATH))
+
+    def _return_uri(self, candidate: str | None) -> yarl.URL:
         """Return ``candidate`` unless ``allowed_redirect_hosts`` rejects its host."""
         login_uri = yarl.URL(self._config.login_uri)
-        if not isinstance(candidate, str) or not candidate:
+        if not candidate:
             return login_uri
         uri = yarl.URL(candidate)
         if self._config.allowed_redirect_hosts is None:
@@ -492,7 +502,8 @@ class OIDCWebAppPlugin(WebappPlugin):
                 token_endpoint,
                 authorization_response=str(request.url),
                 code_verifier=code_verifier,
-                redirect_uri=self._callback_uri(),
+                # Same `redirect` login built its callback from, so the IdP sees a matching URI.
+                redirect_uri=self._callback_uri(state.get("redirect", [None])[0]),
             )
         except OAuthError as e:
             raise self._provider_error(e) from e
