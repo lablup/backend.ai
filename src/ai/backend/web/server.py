@@ -1189,6 +1189,7 @@ async def server_main(
 ) -> AsyncIterator[Any]:
     config: WebServerUnifiedConfig = args[0]
     web_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await web_init_stack.__aenter__()
     try:
         app = web.Application(
@@ -1253,14 +1254,17 @@ async def server_main(
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
         log.info("started the web gateway service")
-    except Exception:
+    except Exception as e:
         log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
     try:
         yield
     finally:
         log.info("shutting down")
         await web_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @click.command()

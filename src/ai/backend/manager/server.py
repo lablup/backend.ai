@@ -265,6 +265,7 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
     loop.set_debug(boostrap_config.debug.asyncio)
     manager_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     drain_notifier = ServerDrainNotifier()
 
     @asynccontextmanager
@@ -478,9 +479,10 @@ async def server_main(
             log.info("changed the process uid and gid", uid=uid, gid=gid)
 
         log.info("started the manager service")
-    except Exception:
+    except Exception as e:
         log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
 
     try:
         yield
@@ -488,6 +490,8 @@ async def server_main(
         _error_monitor_ref = None
         log.info("shutting down")
         await manager_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @aiotools.server_context

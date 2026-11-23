@@ -325,6 +325,7 @@ async def server_main(
     loop.set_debug(args.local_config.debug.asyncio)
 
     storage_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await storage_init_stack.__aenter__()
     try:
         monitor = await storage_init_stack.enter_async_context(
@@ -417,14 +418,17 @@ async def server_main(
             log.info("process uid and gid changed", uid=uid, gid=gid)
 
         log.info("storage-proxy started")
-    except Exception:
+    except Exception as e:
         log.exception("server initialization failed, shutting down")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
     try:
         yield
     finally:
         log.info("storage-proxy shutting down")
         await storage_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @click.group(invoke_without_command=True)
