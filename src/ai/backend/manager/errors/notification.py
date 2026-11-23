@@ -1,5 +1,7 @@
 """Notification-related error definitions."""
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -95,9 +97,6 @@ class NotificationTemplateRenderingFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-<<<<<<< HEAD
-class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
-=======
 class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
     """Raised when the webhook URL cannot be reached or does not respond in time."""
 
@@ -113,8 +112,7 @@ class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidNotificationChannelType(EntityError, web.HTTPBadRequest):
->>>>>>> 38769923f (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
+class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-notification-channel-type"
     error_title = "Invalid notification channel type."
 
