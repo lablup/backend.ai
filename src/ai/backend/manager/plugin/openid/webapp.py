@@ -369,6 +369,7 @@ class OIDCWebAppPlugin(WebappPlugin):
 
     async def redirect(self, request: web.Request) -> web.Response:
         state = urllib.parse.parse_qs(request.query.get("state", ""))
+        # parse_qs maps each key to a list; take the `redirect` login put in, or None if absent.
         redirect_uri = self._return_uri(state.get("redirect", [None])[0])
         cookie_name: str | None = None
         try:
@@ -501,6 +502,7 @@ class OIDCWebAppPlugin(WebappPlugin):
                 token_endpoint,
                 authorization_response=str(request.url),
                 code_verifier=code_verifier,
+                # Same `redirect` login built its callback from, so the IdP sees a matching URI.
                 redirect_uri=self._callback_uri(state.get("redirect", [None])[0]),
             )
         except OAuthError as e:
