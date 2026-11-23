@@ -19,6 +19,7 @@ __all__ = (
     "NotificationRuleConflict",
     "NotificationRuleNotFound",
     "NotificationTemplateRenderingFailure",
+    "WebhookConnectionFailure",
 )
 
 
@@ -94,7 +95,26 @@ class NotificationTemplateRenderingFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
+<<<<<<< HEAD
 class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
+=======
+class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
+    """Raised when the webhook URL cannot be reached or does not respond in time."""
+
+    error_type = "https://api.backend.ai/probs/webhook-connection-failure"
+    error_title = "Failed to connect to the webhook URL."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidNotificationChannelType(EntityError, web.HTTPBadRequest):
+>>>>>>> 38769923f (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
     error_type = "https://api.backend.ai/probs/invalid-notification-channel-type"
     error_title = "Invalid notification channel type."
 

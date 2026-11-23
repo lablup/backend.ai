@@ -8,7 +8,18 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
+=======
+from ai.backend.common.data.notification.types import NotificationChannelType
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
+from ai.backend.manager.errors.notification import (
+    NotificationProcessingFailure,
+    NotificationTemplateRenderingFailure,
+    WebhookConnectionFailure,
+)
+>>>>>>> 38769923f (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
 from ai.backend.manager.notification.types import ProcessRuleParams
 from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
@@ -182,6 +193,7 @@ class NotificationService:
 
         Raises:
             NotificationChannelNotFound: If the channel does not exist
+            WebhookConnectionFailure: If the webhook URL cannot be reached or times out
             NotificationProcessingFailure: If sending the test message fails
         """
         channel_data = await self._repository.get_channel_by_id(action.channel_id)
@@ -205,6 +217,8 @@ class NotificationService:
             NotificationRuleNotFound: If the rule does not exist
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
+            WebhookConnectionFailure: If the webhook URL cannot be reached or times out
+            NotificationProcessingFailure: If sending the rendered message fails
         """
         # Fetch the rule to know its rule_type
         rule = await self._repository.get_rule_by_id(action.rule_id)
@@ -336,6 +350,26 @@ class NotificationService:
             errors=result.errors,
         )
 
+<<<<<<< HEAD
+=======
+    def _is_user_side_failure(
+        self, channel_type: NotificationChannelType, error: BaseException
+    ) -> bool:
+        if isinstance(error, NotificationTemplateRenderingFailure):
+            return True
+        if channel_type == NotificationChannelType.WEBHOOK:
+            return isinstance(
+                error,
+                (
+                    NotificationProcessingFailure,
+                    WebhookConnectionFailure,
+                    aiohttp.ClientError,
+                    TimeoutError,
+                ),
+            )
+        return False
+
+>>>>>>> 38769923f (fix(BAI-395): answer 400 when a notification webhook cannot be reached (#17272))
     async def _process_rules(
         self,
         rules: Sequence[NotificationRuleData],

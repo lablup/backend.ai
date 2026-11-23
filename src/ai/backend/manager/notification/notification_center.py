@@ -144,6 +144,7 @@ class NotificationCenter:
             SendResult indicating success
 
         Raises:
+            WebhookConnectionFailure: If the webhook URL cannot be reached or times out
             NotificationProcessingFailure: If validation fails
         """
         # Create notification message from provided test message
