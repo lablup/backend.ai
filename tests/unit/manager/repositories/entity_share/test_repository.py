@@ -9,6 +9,7 @@ conflict is: everything else about it is a plain entity insert.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -31,6 +32,7 @@ from ai.backend.manager.data.entity_share.types import (
     EntityShareStatus,
 )
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.entity_share import (
     EntityShareNotFound,
     ShareToAPersonalProject,
@@ -541,6 +543,72 @@ class TestAddressedByEmail:
         assert created.recipient is None
         data = await repository.accept(created.id, _INVITEE_ID)
         assert data.recipient == RuntimeEntityID(UserEntityType(), _INVITEE_ID)
+
+
+@dataclass(frozen=True)
+class _RecipientCase:
+    addressed_by: str
+    creator: EntityShareCreator
+    expected_recipient: EntityIdentifier
+
+
+@pytest.fixture
+async def offered_share_id(
+    repository: EntityShareRepository, case: _RecipientCase
+) -> EntityShareID:
+    return (await repository.create(case.creator)).id
+
+
+@pytest.fixture
+async def share_to_an_address_no_account_holds(
+    repository: EntityShareRepository,
+) -> EntityShareID:
+    return (await repository.create(_creator(email="nobody@example.com"))).id
+
+
+class TestAnsweringScope:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RecipientCase(
+                addressed_by="project",
+                creator=_creator_to(_TEAM_PROJECT_ID),
+                expected_recipient=_TEAM_PROJECT_ID,
+            ),
+            _RecipientCase(
+                addressed_by="user",
+                creator=_creator_to(_INVITEE_ID),
+                expected_recipient=_INVITEE_ID,
+            ),
+            _RecipientCase(
+                addressed_by="email",
+                creator=_creator(),
+                expected_recipient=_INVITEE_ID,
+            ),
+        ],
+        ids=lambda case: case.addressed_by,
+    )
+    async def test_is_the_scope_the_share_is_addressed_to(
+        self,
+        repository: EntityShareRepository,
+        offered_share_id: EntityShareID,
+        case: _RecipientCase,
+    ) -> None:
+        assert await repository.answering_scope(offered_share_id) == case.expected_recipient
+
+    async def test_an_address_no_account_holds_is_a_lookup_miss(
+        self,
+        repository: EntityShareRepository,
+        share_to_an_address_no_account_holds: EntityShareID,
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.answering_scope(share_to_an_address_no_account_holds)
+
+    async def test_a_share_that_was_never_there_is_a_lookup_miss(
+        self, repository: EntityShareRepository
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.answering_scope(EntityShareID(uuid4()))
 
 
 class TestRevoke:
