@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -33,6 +33,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.types import (
+    ModelDeploymentData,
     RevisionServingState,
     RevisionVFolderReference,
     ServingRevisionRef,
@@ -662,71 +663,49 @@ class VfolderRepository:
         """Every active reference to the vfolder, in the order of
         :data:`VFOLDER_REFERENCE_CHECKS`. Deployments the current user cannot see are
         counted, not named."""
-        hits: list[_VFolderReferenceHit] = []
+        folder_uuid = VFolderUUID(vfolder_id.folder_id)
+        hits = [
+            await self._live_session_reference_hit(r, vfolder_id),
+            await self._live_kernel_reference_hit(r, folder_uuid),
+            await self._revision_reference_hit(r, folder_uuid),
+        ]
+        return [hit for hit in hits if hit is not None]
+
+    async def _live_session_reference_hit(
+        self, r: V2ReadOps, vfolder_id: VFolderID
+    ) -> _VFolderReferenceHit | None:
         live_sessions = await r.search_in_global(
             LiveSessionsMountingVFolderSearcher(pagination=NoPagination(), vfolder_id=vfolder_id)
         )
-        if live_sessions.items:
-            hits.append(
-                _VFolderReferenceHit(
-                    describe="mounted on live session(s)",
-                    shown=[str(session_id) for session_id in live_sessions.items],
-                )
-            )
-        folder_uuid = VFolderUUID(vfolder_id.folder_id)
-        live_kernels = await r.search_in_global(
-            LiveKernelsMountingVFolderSearcher(pagination=NoPagination(), vfolder_id=folder_uuid)
+        if not live_sessions.items:
+            return None
+        return _VFolderReferenceHit(
+            describe="mounted on live session(s)",
+            shown=[str(session_id) for session_id in live_sessions.items],
         )
-        if live_kernels.items:
-            hits.append(
-                _VFolderReferenceHit(
-                    describe="mounted on live kernel(s)",
-                    shown=[str(kernel_id) for kernel_id in live_kernels.items],
-                )
-            )
-        for reference, describe in (
-            (
-                RevisionVFolderReference.MODEL,
-                "referenced as the model by serving or deploying revision(s)",
-            ),
-            (
-                RevisionVFolderReference.EXTRA_MOUNT,
-                "mounted as an extra mount by serving or deploying revision(s)",
-            ),
-        ):
-            revisions: list[ServingRevisionRef] = []
-            for state in RevisionServingState:
-                found = await r.search_in_global(
-                    ServingRevisionsReferencingVFolderSearcher(
-                        pagination=NoPagination(),
-                        vfolder_id=folder_uuid,
-                        reference=reference,
-                        state=state,
-                    )
-                )
-                revisions.extend(found.items)
-            if revisions:
-                hits.append(await self._revision_reference_hit(r, describe, revisions))
-        return hits
+
+    async def _live_kernel_reference_hit(
+        self, r: V2ReadOps, vfolder_id: VFolderUUID
+    ) -> _VFolderReferenceHit | None:
+        live_kernels = await r.search_in_global(
+            LiveKernelsMountingVFolderSearcher(pagination=NoPagination(), vfolder_id=vfolder_id)
+        )
+        if not live_kernels.items:
+            return None
+        return _VFolderReferenceHit(
+            describe="mounted on live kernel(s)",
+            shown=[str(kernel_id) for kernel_id in live_kernels.items],
+        )
 
     async def _revision_reference_hit(
-        self, r: V2ReadOps, describe: str, revisions: Sequence[ServingRevisionRef]
-    ) -> _VFolderReferenceHit:
-        conditions = [
-            DeploymentSearchableFields.own.entity_id.filter.in_(
-                UUIDInMatchSpec(
-                    values=list({revision.deployment_id for revision in revisions}),
-                    negated=False,
-                )
-            ),
-        ]
-        viewer = current_user()
-        if viewer is not None and not viewer.is_superadmin:
-            conditions.append(_deployment_visible_to(viewer))
-        deployments = await r.search_in_global(
-            DeploymentSearcher(pagination=NoPagination(), conditions=conditions)
+        self, r: V2ReadOps, vfolder_id: VFolderUUID
+    ) -> _VFolderReferenceHit | None:
+        revisions = await self._serving_revisions_referencing(r, vfolder_id)
+        if not revisions:
+            return None
+        visible = await self._deployments_visible_to_current_user(
+            r, {revision.deployment_id for revision in revisions}
         )
-        visible = {deployment.id: deployment for deployment in deployments.items}
         shown = [
             f"deployment '{deployment.metadata.name}' (id: {deployment.id}, project: "
             f"{deployment.metadata.project_id}) revision #{revision.revision_number} "
@@ -738,8 +717,44 @@ class VfolderRepository:
             if (deployment := visible.get(revision.deployment_id)) is not None
         ]
         return _VFolderReferenceHit(
-            describe=describe, shown=shown, hidden_count=len(revisions) - len(shown)
+            describe="mounted on deployment(s)",
+            shown=shown,
+            hidden_count=len(revisions) - len(shown),
         )
+
+    async def _serving_revisions_referencing(
+        self, r: V2ReadOps, vfolder_id: VFolderUUID
+    ) -> list[ServingRevisionRef]:
+        revisions: dict[uuid.UUID, ServingRevisionRef] = {}
+        for reference in RevisionVFolderReference:
+            for state in RevisionServingState:
+                found = await r.search_in_global(
+                    ServingRevisionsReferencingVFolderSearcher(
+                        pagination=NoPagination(),
+                        vfolder_id=vfolder_id,
+                        reference=reference,
+                        state=state,
+                    )
+                )
+                for revision in found.items:
+                    revisions.setdefault(revision.revision_id, revision)
+        return list(revisions.values())
+
+    async def _deployments_visible_to_current_user(
+        self, r: V2ReadOps, deployment_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, ModelDeploymentData]:
+        conditions = [
+            DeploymentSearchableFields.own.entity_id.filter.in_(
+                UUIDInMatchSpec(values=list(deployment_ids), negated=False)
+            ),
+        ]
+        viewer = current_user()
+        if viewer is not None and not viewer.is_superadmin:
+            conditions.append(_deployment_visible_to(viewer))
+        deployments = await r.search_in_global(
+            DeploymentSearcher(pagination=NoPagination(), conditions=conditions)
+        )
+        return {deployment.id: deployment for deployment in deployments.items}
 
     @vfolder_repository_resilience.apply()
     async def delete_vfolders_forever(
