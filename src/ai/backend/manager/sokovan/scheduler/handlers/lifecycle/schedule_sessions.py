@@ -14,6 +14,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.types.session import PendingSessions
 from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -132,11 +133,13 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         handed_session_ids = {session.session_info.identity.id for session in sessions}
         scheduling_data = dataclasses.replace(
             scheduling_data,
-            workloads=[
-                workload
-                for workload in scheduling_data.workloads
-                if workload.meta.session_id in handed_session_ids
-            ],
+            pending_sessions=PendingSessions(
+                sessions=[
+                    pending
+                    for pending in scheduling_data.pending_sessions.sessions
+                    if pending.id in handed_session_ids
+                ]
+            ),
         )
 
         # Delegate to Provisioner with pre-fetched data

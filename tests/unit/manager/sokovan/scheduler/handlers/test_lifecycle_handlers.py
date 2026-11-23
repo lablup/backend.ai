@@ -11,19 +11,18 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-<<<<<<< HEAD
-=======
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
 from ai.backend.manager.repositories.scheduler.types.session import (
+    PendingSessions,
     TerminatingSessionData,
 )
 from ai.backend.manager.sokovan.data import (
@@ -44,25 +43,11 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions impo
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
-<<<<<<< HEAD
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 if TYPE_CHECKING:
     pass
 
-=======
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult, SchedulingSkip
-from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
-from ai.backend.manager.views.sokovan.lifecycle import (
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-)
-from ai.backend.manager.views.sokovan.scheduling import SchedulingData
-from ai.backend.manager.views.sokovan.session import (
-    TerminatingSessionData,
-)
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
 
 # =============================================================================
 # ScheduleSessionsLifecycleHandler Tests (SC-SS-001 ~ SC-SS-005)
@@ -89,15 +74,21 @@ class TestScheduleSessionsLifecycleHandler:
         )
 
     @pytest.fixture
-    def scheduling_data_without_workloads(self) -> SchedulingData:
-        return SchedulingData(resource_group=MagicMock(), workloads=[], system_snapshot=MagicMock())
+    def scheduling_data_without_sessions(self) -> SchedulingData:
+        return SchedulingData(
+            scaling_group=MagicMock(),
+            pending_sessions=PendingSessions(sessions=[]),
+            agents=[],
+            snapshot_data=None,
+            spec=MagicMock(),
+        )
 
     async def test_all_sessions_scheduled_successfully(
         self,
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
-        scheduling_data_without_workloads: SchedulingData,
+        scheduling_data_without_sessions: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
         schedule_result_success_factory: Callable[..., ScheduleResult],
     ) -> None:
@@ -108,13 +99,8 @@ class TestScheduleSessionsLifecycleHandler:
         Then: All sessions appear in result.successes with reason
         """
         # Arrange
-<<<<<<< HEAD
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_sessions
         mock_provisioner.schedule_scaling_group.return_value = schedule_result_success_factory(
-=======
-        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
-        mock_provisioner.schedule_resource_group.return_value = schedule_result_success_factory(
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
             pending_sessions_multiple
         )
 
@@ -136,7 +122,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
-        scheduling_data_without_workloads: SchedulingData,
+        scheduling_data_without_sessions: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-002: Partial scheduling - some sessions skipped.
@@ -147,13 +133,8 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange - Only first session is scheduled
         first_session = pending_sessions_multiple[0]
-<<<<<<< HEAD
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_sessions
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-=======
-        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
-        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
             scheduled_session_ids=[first_session.session_info.identity.id],
             scheduling_failures=[],
         )
@@ -176,7 +157,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
-        scheduling_data_without_workloads: SchedulingData,
+        scheduling_data_without_sessions: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-003: Non-attempted sessions are marked as skipped (not failures).
@@ -187,13 +168,8 @@ class TestScheduleSessionsLifecycleHandler:
         Then: All sessions appear in result.skipped with reason
         """
         # Arrange - No sessions scheduled, no failures reported
-<<<<<<< HEAD
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_sessions
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-=======
-        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
-        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
             scheduled_session_ids=[],
             scheduling_failures=[],
         )
@@ -215,7 +191,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
-        scheduling_data_without_workloads: SchedulingData,
+        scheduling_data_without_sessions: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-006: Sessions reported as scheduling failures appear in result.failures.
@@ -226,13 +202,8 @@ class TestScheduleSessionsLifecycleHandler:
         Then: All sessions appear in result.failures with reason from the failure msg
         """
         # Arrange - All sessions fail scheduling
-<<<<<<< HEAD
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_sessions
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-=======
-        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
-        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
             scheduled_session_ids=[],
             scheduling_failures=[
                 SchedulingFailure(
@@ -258,7 +229,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
-        scheduling_data_without_workloads: SchedulingData,
+        scheduling_data_without_sessions: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-007: Scheduled, failed, and non-attempted sessions are categorized.
@@ -270,13 +241,8 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange
         scheduled_session, failed_session, *rest = pending_sessions_multiple
-<<<<<<< HEAD
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_sessions
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-=======
-        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
-        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
             scheduled_session_ids=[scheduled_session.session_info.identity.id],
             scheduling_failures=[
                 SchedulingFailure(
@@ -301,59 +267,6 @@ class TestScheduleSessionsLifecycleHandler:
         for skipped in result.skipped:
             assert skipped.message == "not-scheduled-this-cycle"
 
-<<<<<<< HEAD
-=======
-    async def test_unattempted_sessions_reported_as_skipped(
-        self,
-        handler: ScheduleSessionsLifecycleHandler,
-        mock_provisioner: AsyncMock,
-        mock_repository: AsyncMock,
-        scheduling_data_without_workloads: SchedulingData,
-        pending_sessions_multiple: list[SessionWithKernels],
-    ) -> None:
-        """SC-SS-008: Sessions left unattempted behind a blocked one are skipped.
-
-        Given: Multiple PENDING sessions in the scaling group
-        When: Provisioner fails the first on exhausted resources and reports
-              the rest as skips
-        Then: Only the attempted session is a failure; the rest are skipped
-              with the provisioner's reason (no retry pressure charged)
-        """
-        # Arrange
-        blocked_session, *rest = pending_sessions_multiple
-        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
-        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
-            scheduled_session_ids=[],
-            scheduling_failures=[
-                SchedulingFailure(
-                    session_id=blocked_session.session_info.identity.id,
-                    msg="no agents can be allocated",
-                )
-            ],
-            reserved_session_ids=[],
-            preemption_plan=[],
-            scheduling_skips=[
-                SchedulingSkip(
-                    session_id=session.session_info.identity.id,
-                    msg="not attempted: resources exhausted",
-                )
-                for session in rest
-            ],
-        )
-
-        # Act
-        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
-
-        # Assert
-        assert len(result.successes) == 0
-        assert [f.session_id for f in result.failures] == [blocked_session.session_info.identity.id]
-        assert {s.session_id for s in result.skipped} == {
-            session.session_info.identity.id for session in rest
-        }
-        for skipped in result.skipped:
-            assert skipped.message == "not attempted: resources exhausted"
-
->>>>>>> 2bfa03491 (fix(BAI-393): schedule only the sessions handed to the schedule handler (#17268))
     async def test_empty_session_list_returns_empty_result(
         self,
         handler: ScheduleSessionsLifecycleHandler,
@@ -417,24 +330,25 @@ class TestScheduleSessionsLifecycleHandler:
         pending_sessions_multiple: list[SessionWithKernels],
         schedule_result_success_factory: Callable[..., ScheduleResult],
     ) -> None:
-        handed_workloads = [
-            MagicMock(meta=MagicMock(session_id=session.session_info.identity.id))
-            for session in pending_sessions_multiple
+        handed = [
+            MagicMock(id=session.session_info.identity.id) for session in pending_sessions_multiple
         ]
-        late_workload = MagicMock(meta=MagicMock(session_id=SessionId(uuid.uuid4())))
+        late = MagicMock(id=SessionId(uuid.uuid4()))
         mock_repository.get_scheduling_data.return_value = SchedulingData(
-            resource_group=MagicMock(),
-            workloads=[*handed_workloads, late_workload],
-            system_snapshot=MagicMock(),
+            scaling_group=MagicMock(),
+            pending_sessions=PendingSessions(sessions=[*handed, late]),
+            agents=[],
+            snapshot_data=None,
+            spec=MagicMock(),
         )
-        mock_provisioner.schedule_resource_group.return_value = schedule_result_success_factory(
+        mock_provisioner.schedule_scaling_group.return_value = schedule_result_success_factory(
             pending_sessions_multiple
         )
 
-        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
+        result = await handler.execute("default", pending_sessions_multiple)
 
-        (scheduling_data,) = mock_provisioner.schedule_resource_group.await_args.args
-        assert scheduling_data.workloads == handed_workloads
+        scheduling_data = mock_provisioner.schedule_scaling_group.await_args.args[1]
+        assert scheduling_data.pending_sessions.sessions == handed
         assert {s.session_id for s in result.successes} == {
             session.session_info.identity.id for session in pending_sessions_multiple
         }
