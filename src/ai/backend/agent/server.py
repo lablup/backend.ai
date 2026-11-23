@@ -53,16 +53,7 @@ from ai.backend.agent.errors import (
     AgentInitializationError,
     ResourceError,
 )
-<<<<<<< HEAD
-=======
-from ai.backend.agent.errors.agent import (
-    AgentAlreadyRunningError,
-    ImagePullFailedError,
-    ImagePullTimeoutError,
-    KernelNotFoundError,
-)
 from ai.backend.agent.errors.resources import KernelCreationInProgress
->>>>>>> 9170c380 (fix(BAI-396): keep a kernel creation in progress out of the error log and the failed agents (#17267))
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
