@@ -5,10 +5,10 @@ Request DTOs for resource group DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Any
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, NonNegativeFloat, NonNegativeInt, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
@@ -156,7 +156,7 @@ class PreemptionConfigInputDTO(BaseRequestModel):
 class UpdateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
     """Input for updating the ``config`` section of a resource group's scheduler options."""
 
-    num_retries_to_skip: Annotated[int, Field(ge=0)] | None | Unset = Field(
+    num_retries_to_skip: NonNegativeInt | None | Unset = Field(
         default=UNSET,
         description=(
             "Number of scheduling retries before a pending session is skipped."
@@ -176,7 +176,7 @@ class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
             f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
-    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
+    pending_timeout: NonNegativeFloat | None | Unset = Field(
         default=UNSET,
         description=(
             "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
