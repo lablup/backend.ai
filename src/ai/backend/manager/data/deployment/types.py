@@ -1170,6 +1170,30 @@ class PresetAttributionData:
     values: list[RuntimeVariantPresetValueData]
 
 
+class RevisionVFolderReference(enum.StrEnum):
+    """Where a revision references a vfolder."""
+
+    MODEL = "model"
+    EXTRA_MOUNT = "extra_mount"
+
+
+class RevisionServingState(enum.StrEnum):
+    """A revision that serves traffic or is being rolled out."""
+
+    CURRENT = "current"
+    DEPLOYING = "deploying"
+
+
+@dataclass(frozen=True)
+class ServingRevisionRef:
+    """A revision in ``RevisionServingState``, named by its ids and number."""
+
+    revision_id: DeploymentRevisionID
+    revision_number: int
+    deployment_id: DeploymentID
+    state: RevisionServingState
+
+
 @dataclass
 class ModelRevisionData(FieldData):
     # Identity

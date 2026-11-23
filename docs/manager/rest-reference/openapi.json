@@ -26135,16 +26135,6 @@
         "title": "CreateResourceGroupInput",
         "type": "object"
       },
-      "AgentSelectionStrategy": {
-        "enum": [
-          "dispersed",
-          "concentrated",
-          "roundrobin",
-          "legacy"
-        ],
-        "title": "AgentSelectionStrategy",
-        "type": "string"
-      },
       "NonEmptyList_PartialBulkUpdateResourceGroupItemInput_": {
         "items": {
           "$ref": "#/components/schemas/PartialBulkUpdateResourceGroupItemInput"
