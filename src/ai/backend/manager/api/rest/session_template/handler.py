@@ -93,6 +93,22 @@ class SessionTemplateHandler:
         )
         return ProjectID(result.entity_id())
 
+    @staticmethod
+    def _to_template_items(payload: object) -> list[TaskTemplateItemInput]:
+        if not isinstance(payload, list) or not all(
+            isinstance(st, dict) and "template" in st for st in payload
+        ):
+            raise InvalidAPIParameters("Payload must be a list of objects with a template key")
+        return [
+            TaskTemplateItemInput(
+                template=st["template"],
+                name=st.get("name"),
+                group_id=st.get("group_id"),
+                user_uuid=st.get("user_uuid"),
+            )
+            for st in payload
+        ]
+
     async def create(
         self,
         body: BodyParam[CreateSessionTemplateRequest],
@@ -107,19 +123,11 @@ class SessionTemplateHandler:
             payload = load_json(params.payload)
         except json.JSONDecodeError:
             try:
-                payload = yaml.safe_load_all(params.payload)
+                payload = list(yaml.safe_load_all(params.payload))
             except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
                 raise InvalidAPIParameters("Malformed payload") from e
 
-        items = [
-            TaskTemplateItemInput(
-                template=st["template"],
-                name=st.get("name"),
-                group_id=st.get("group_id"),
-                user_uuid=st.get("user_uuid"),
-            )
-            for st in payload
-        ]
+        items = self._to_template_items(payload)
 
         project_id = await self._resolve_project_id(domain, params.group)
         action = CreateTaskTemplateAction(
@@ -227,15 +235,7 @@ class SessionTemplateHandler:
             except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
                 raise InvalidAPIParameters("Malformed payload") from e
 
-        items = [
-            TaskTemplateItemInput(
-                template=st["template"],
-                name=st.get("name"),
-                group_id=st.get("group_id"),
-                user_uuid=st.get("user_uuid"),
-            )
-            for st in payload
-        ]
+        items = self._to_template_items(payload)
 
         project_id = await self._resolve_project_id(domain, params.group)
         action = UpdateTaskTemplateAction(
