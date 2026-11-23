@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
@@ -13,6 +14,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.types.session import PendingSessions
 from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -125,6 +127,20 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                 for session in sessions
             )
             return result
+
+        # Sessions enqueued after the coordinator's query have no recorder in this
+        # cycle; they are scheduled in the next one.
+        handed_session_ids = {session.session_info.identity.id for session in sessions}
+        scheduling_data = dataclasses.replace(
+            scheduling_data,
+            pending_sessions=PendingSessions(
+                sessions=[
+                    pending
+                    for pending in scheduling_data.pending_sessions.sessions
+                    if pending.id in handed_session_ids
+                ]
+            ),
+        )
 
         # Delegate to Provisioner with pre-fetched data
         provision_time = await self._repository.get_db_now()
