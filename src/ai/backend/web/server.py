@@ -1207,7 +1207,7 @@ async def server_main(
             ReadableCIDR(raw) for raw in config.service.trusted_proxies
         ]
         if config.service.trusted_proxies:
-            log.info(
+            log.debug(
                 "trusting the forwarding headers set by proxies",
                 trusted_proxies=", ".join(config.service.trusted_proxies),
             )
