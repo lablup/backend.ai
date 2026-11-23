@@ -623,6 +623,7 @@ class Context(metaclass=ABCMeta):
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
+<<<<<<< HEAD
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
@@ -656,6 +657,134 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-retention-policies.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+=======
+    def _halfstack_compose_cmd(self) -> list[str]:
+        compose_path = self.install_info.base_path / "docker-compose.halfstack.current.yml"
+        return [*self.docker_sudo, "docker", "compose", "-f", str(compose_path)]
+
+    async def _enable_etcd_auth(self) -> None:
+        """Create the halfstack etcd root user and enable authentication, unless already enabled."""
+        halfstack = self.install_info.halfstack_config
+        # The etcd image has no shell, so etcdctl runs through `docker compose exec`.
+        etcdctl = [*self._halfstack_compose_cmd(), "exec", "-T", "backendai-half-etcd", "etcdctl"]
+        proc = await asyncio.create_subprocess_exec(
+            *etcdctl,
+            "auth",
+            "status",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await proc.communicate()
+        if b"Authentication Status: false" not in stdout:
+            return
+        self.log_header("Enabling etcd authentication...")
+        # The root user remains from an earlier run that stopped before `auth enable`.
+        await self.run_exec([
+            *etcdctl,
+            "user",
+            "add",
+            halfstack.etcd_user,
+            f"--new-user-password={halfstack.etcd_password}",
+        ])
+        exit_code = await self.run_exec([*etcdctl, "auth", "enable"])
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to enable etcd authentication (exit {exit_code})")
+
+    async def load_seeds(self) -> None:
+        with (
+            self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds,
+            self.resource_path("ai.backend.install.seeds", "examples/manager") as example_seeds,
+            self.resource_path(
+                "ai.backend.install.seeds", "examples/domain_admin"
+            ) as domain_admin_seeds,
+        ):
+            await self.run_manager_cli([
+                "mgr",
+                "seed",
+                "apply",
+                str(manager_seeds),
+                str(example_seeds),
+            ])
+            # Rows that carry this installation's addresses and secrets, rewritten on a re-run.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                self.write_install_seeds(manager_seeds, Path(tmpdir))
+                await self.run_manager_cli(["mgr", "seed", "apply", "--overwrite", tmpdir])
+            await self.run_manager_cli([
+                "mgr",
+                "permissions",
+                "provision",
+                "--seeds",
+                str(manager_seeds),
+            ])
+            # The example domain admins are granted roles that provisioning creates.
+            await self.run_manager_cli(["mgr", "seed", "apply", str(domain_admin_seeds)])
+
+    def read_seed_items(self, root: Path, kind: str) -> list[dict[str, Any]]:
+        yaml = YAML(typ="safe")
+        items: list[dict[str, Any]] = []
+        for path in sorted(root.rglob("*.yaml")):
+            document = yaml.load(path.read_text(encoding="utf8"))
+            if isinstance(document, dict) and document.get("kind") == kind:
+                items.extend(document["items"])
+        return items
+
+    def read_default_domain_id(self, manager_seeds: Path) -> str:
+        return str(
+            next(
+                item["id"]
+                for item in self.read_seed_items(manager_seeds, "domain")
+                if item["name"] == "default"
+            )
+        )
+
+    def write_seed_file(self, path: Path, kind: str, items: Sequence[dict[str, Any]]) -> None:
+        with path.open("w", encoding="utf8") as fp:
+            YAML(typ="safe").dump({"kind": kind, "version": 1, "items": list(items)}, fp)
+
+    def write_install_seeds(self, manager_seeds: Path, out_dir: Path) -> None:
+        """Write the default resource group pointed at the app-proxy coordinator, and the SFTP
+        resource group allowed to the default domain when ``--with-sftp-agent`` is given."""
+        service = self.install_info.service_config
+        wsproxy_addr = (
+            f"http://{service.appproxy_coordinator_addr.face.host}"
+            f":{service.appproxy_coordinator_addr.face.port}"
+        )
+        resource_groups = [
+            {
+                **item,
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": service.appproxy_api_secret,
+            }
+            for item in self.read_seed_items(manager_seeds, "resource_group")
+            if item["name"] == "default"
+        ]
+        sftp = service.sftp_agent
+        if sftp is not None:
+            self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
+            resource_group_id = str(
+                uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
+            )
+            default_domain_id = self.read_default_domain_id(manager_seeds)
+            resource_groups.append({
+                "id": resource_group_id,
+                "name": sftp.scaling_group,
+                "description": "Scaling group dedicated to SFTP upload sessions",
+                "is_active": True,
+                "driver": "static",
+                "driver_opts": {},
+                "scheduler": "fifo",
+                "scheduler_opts": {},
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": service.appproxy_api_secret,
+            })
+            self.write_seed_file(
+                out_dir / "resource_group_for_domain.yaml",
+                "resource_group_for_domain",
+                [{"domain_id": default_domain_id, "resource_group_id": resource_group_id}],
+            )
+        self.write_seed_file(out_dir / "resource_group.yaml", "resource_group", resource_groups)
+>>>>>>> c4ddef8d (fix(BA-9064): relate the installer's local Harbor registry to the default domain (#17274))
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -1861,12 +1990,35 @@ class Context(metaclass=ABCMeta):
                     "password": harbor.admin_password,
                     "ssl_verify": False,
                 }
+<<<<<<< HEAD
             ]
         }
         fixture_path = self.install_info.base_path / "harbor" / "container-registry-fixture.json"
         fixture_path.write_text(json.dumps(fixture, indent=2))
         self.log_header("Registering local Harbor as a Backend.AI container registry...")
         await self.run_manager_cli(["mgr", "fixture", "populate", str(fixture_path)])
+=======
+            ],
+        )
+        with self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds:
+            default_domain_id = self.read_default_domain_id(manager_seeds)
+        relation_seed_path = (
+            self.install_info.base_path / "harbor" / "domain-container-registry-seed.yaml"
+        )
+        self.write_seed_file(
+            relation_seed_path,
+            "domain_container_registry",
+            [{"domain_id": default_domain_id, "registry_id": registry_id}],
+        )
+        self.log_header("Registering local Harbor as a Backend.AI container registry...")
+        await self.run_manager_cli([
+            "mgr",
+            "seed",
+            "apply",
+            str(seed_path),
+            str(relation_seed_path),
+        ])
+>>>>>>> c4ddef8d (fix(BA-9064): relate the installer's local Harbor registry to the default domain (#17274))
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
