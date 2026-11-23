@@ -40,6 +40,7 @@ from ai.backend.manager.data.notification.types import (
     NotificationRuleData,
 )
 from ai.backend.manager.errors.notification import (
+    NotificationDeliveryFailure,
     NotificationProcessingFailure,
     WebhookConnectionFailure,
 )
@@ -286,8 +287,18 @@ class TestRuleFailureLogLevel:
                 _TRACE_LEVEL,
             ),
             (
+                NotificationChannelType.WEBHOOK,
+                NotificationDeliveryFailure("Webhook delivery failed with status 404"),
+                _TRACE_LEVEL,
+            ),
+            (
                 NotificationChannelType.EMAIL,
-                NotificationProcessingFailure("SMTP authentication failed"),
+                NotificationProcessingFailure("Email delivery failed"),
+                logging.ERROR,
+            ),
+            (
+                NotificationChannelType.EMAIL,
+                NotificationDeliveryFailure("SMTP authentication failed"),
                 logging.ERROR,
             ),
             (NotificationChannelType.WEBHOOK, RuntimeError("bug"), logging.ERROR),

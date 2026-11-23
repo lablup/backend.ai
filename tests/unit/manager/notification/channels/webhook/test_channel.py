@@ -9,7 +9,7 @@ import pytest
 from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.data.notification.types import WebhookSpec
 from ai.backend.manager.errors.notification import (
-    NotificationProcessingFailure,
+    NotificationDeliveryFailure,
     WebhookConnectionFailure,
 )
 from ai.backend.manager.notification.channels.webhook.channel import WebhookChannel
@@ -93,13 +93,15 @@ class TestWebhookChannelSend:
         assert exc_info.value.__cause__ is outcome
 
     @pytest.mark.parametrize("outcome", [_FakeResponse(500, "boom")], ids=["status-500"])
-    async def test_a_failed_response_status_stays_a_processing_failure(
+    async def test_a_failed_response_status_is_a_client_visible_delivery_failure(
         self,
         channel: WebhookChannel,
         message: NotificationMessage,
     ) -> None:
-        with pytest.raises(NotificationProcessingFailure, match="status 500"):
+        with pytest.raises(NotificationDeliveryFailure, match="status 500: boom") as exc_info:
             await channel.send(message)
+
+        assert exc_info.value.is_client_error()
 
     async def test_a_success_status_returns_a_result(
         self,

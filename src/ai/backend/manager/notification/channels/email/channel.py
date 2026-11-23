@@ -11,7 +11,10 @@ from typing import override
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
+from ai.backend.manager.errors.notification import (
+    NotificationDeliveryFailure,
+    NotificationProcessingFailure,
+)
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
@@ -41,7 +44,8 @@ class EmailChannel(AbstractNotificationChannel):
             SendResult indicating success
 
         Raises:
-            NotificationProcessingFailure: If email delivery fails
+            NotificationDeliveryFailure: If the SMTP server cannot be reached or rejects the message
+            NotificationProcessingFailure: If email delivery fails for any other reason
         """
         # Determine subject (priority: spec template > first line of message)
         if self._spec.message.subject_template:
@@ -89,10 +93,13 @@ class EmailChannel(AbstractNotificationChannel):
                     to_addrs=msg.to_emails,
                 )
         except smtplib.SMTPConnectError as e:
-            raise NotificationProcessingFailure(f"SMTP connection failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except smtplib.SMTPAuthenticationError as e:
-            raise NotificationProcessingFailure(f"SMTP authentication failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
-            raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"Email delivery failed: {e!s}") from e
+        except OSError as e:
+            # A refused, unresolvable or timed-out SMTP host raises OSError, not SMTPConnectError.
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except Exception as e:
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

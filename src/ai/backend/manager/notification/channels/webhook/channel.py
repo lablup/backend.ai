@@ -13,7 +13,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.common.data.notification.types import WebhookSpec
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.notification import (
-    NotificationProcessingFailure,
+    NotificationDeliveryFailure,
     WebhookConnectionFailure,
 )
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
@@ -57,7 +57,7 @@ class WebhookChannel(AbstractNotificationChannel):
 
         Raises:
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If the webhook responds with a failure status
+            NotificationDeliveryFailure: If the webhook responds with a failure status
         """
         webhook_url = self._webhook_spec.url
 
@@ -95,7 +95,7 @@ class WebhookChannel(AbstractNotificationChannel):
                         message=f"Webhook sent successfully (status: {response.status})",
                     )
                 response_text = await response.text()
-                raise NotificationProcessingFailure(
+                raise NotificationDeliveryFailure(
                     f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
                 )
         except (aiohttp.ClientError, TimeoutError) as e:
