@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
+from callosum.rpc import RPCUserError
 
 from ai.backend.common.types import AutoPullBehavior
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
@@ -320,6 +321,55 @@ class TestSessionLauncherKernelCreation:
         )
         assert record.exc_info is not None
         assert record.exc_info[1] is error
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+
+    async def test_creation_in_progress_on_agent_is_neither_logged_at_error_nor_recorded(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
+            "KernelCreationInProgress",
+            "KernelCreationInProgress('Kernel creation already in progress')",
+            "",
+        )
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
+        mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
+
+    async def test_another_resource_error_on_agent_is_logged_at_error_and_recorded(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
+            "ResourceError", "ResourceError('Kernel already created')", ""
+        )
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        (record,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert record.__dict__["log_tag_agent_id"] == "agent-1"
         mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
 
     async def test_system_session_environ_overrides_the_session_environ(
