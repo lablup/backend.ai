@@ -8,6 +8,7 @@ from pydantic import Field
 from ai.backend.agent.kernel import KernelOwnershipData
 from ai.backend.agent.proxy import DomainSocketPathPair
 from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServicePort, SessionTypes
 
@@ -42,6 +43,13 @@ class KernelRecoveryData(BackendAISchema):
     domain_socket_proxies: list[DomainSocketPathPair] = Field(
         description="List of domain socket path pairs associated with the kernel"
     )
+    service_interpolation: ServiceArgumentInterpolation | None = Field(
+        default=None,
+        description=(
+            "Variable syntax of the service arguments, fixed on the session. "
+            "None on records written before it was kept; their services use the legacy syntax."
+        ),
+    )
     service_ports: list[ServicePort] = Field(
         description="List of service port mappings exposed by the kernel"
     )
@@ -70,6 +78,7 @@ class KernelRecoveryData(BackendAISchema):
             environ=kernel.environ,
             block_service_ports=kernel.data.get("block_service_ports", False),
             domain_socket_proxies=kernel.data.get("domain_socket_proxies", []),
+            service_interpolation=kernel.data.get("service_interpolation"),
             repl_in_port=kernel.data["repl_in_port"],
             repl_out_port=kernel.data["repl_out_port"],
         )
@@ -92,5 +101,10 @@ class KernelRecoveryData(BackendAISchema):
                 "repl_out_port": self.repl_out_port,
                 "block_service_ports": self.block_service_ports,
                 "domain_socket_proxies": self.domain_socket_proxies,
+                "service_interpolation": (
+                    self.service_interpolation.model_dump()
+                    if self.service_interpolation is not None
+                    else None
+                ),
             },
         )

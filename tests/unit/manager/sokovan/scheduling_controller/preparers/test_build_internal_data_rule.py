@@ -7,6 +7,7 @@ Verifies the session-level overlay onto per-kernel ``internal_data``:
     are added only when their input values are present
   * caller-pre-populated keys on a kernel's ``internal_data`` survive
     unless the overlay explicitly sets the same key (legacy precedence)
+  * the session's service argument interpolation lands as ``service_interpolation``
   * empty inputs result in a no-op
 """
 
@@ -17,6 +18,10 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.config import (
+    ServiceArgumentInterpolation,
+    ServiceArgumentInterpolationDelimiter,
+)
 from ai.backend.manager.data.dotfile.types import (
     DotfileBundle,
     DotfileEntry,
@@ -27,6 +32,7 @@ from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
     ResourceSpecDraft,
+    SessionOptionsDraft,
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
@@ -78,9 +84,13 @@ def _draft(
     sudo_session_enabled: bool = False,
     model_definition_path: str | None = None,
     model_definition: Mapping[str, Any] | None = None,
+    interpolation: ServiceArgumentInterpolation | None = None,
 ) -> SessionResourceSpecDraft:
     return SessionResourceSpecDraft(
-        resource=ResourceSpecDraft(kernel_specs=kernels),
+        resource=ResourceSpecDraft(
+            kernel_specs=kernels,
+            options=SessionOptionsDraft(interpolation=interpolation),
+        ),
         internal_data_extras=InternalDataExtras(
             sudo_session_enabled=sudo_session_enabled,
             model_definition_path=model_definition_path,
@@ -169,3 +179,21 @@ class TestBuildInternalDataRule:
         result = await rule.prepare(draft, _context())
         for k in result.resource.kernel_specs:
             assert k.internal_data["sudo_session_enabled"] is True
+
+    async def test_overlay_service_interpolation_on_every_kernel(
+        self, rule: BuildInternalDataRule
+    ) -> None:
+        """The session's interpolation reaches each kernel as ``service_interpolation``."""
+        interpolation = ServiceArgumentInterpolation(
+            delimiters=[ServiceArgumentInterpolationDelimiter(start="<<", end=">>")]
+        )
+        draft = _draft(
+            KernelSpecDraft(cluster_role="main"),
+            KernelSpecDraft(cluster_role="worker"),
+            interpolation=interpolation,
+        )
+        result = await rule.prepare(draft, _context())
+        for k in result.resource.kernel_specs:
+            assert k.internal_data["service_interpolation"] == {
+                "delimiters": [{"start": "<<", "end": ">>"}],
+            }

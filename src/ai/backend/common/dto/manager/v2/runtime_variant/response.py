@@ -10,9 +10,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
-    ServiceArgumentInterpolationInfoDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class RuntimeVariantModelHealthCheckInfo(BaseResponseModel):
@@ -44,13 +42,6 @@ class RuntimeVariantModelServiceConfigInfo(BaseResponseModel):
     port: int | None = Field(default=None, description="Model service port.")
     health_check: RuntimeVariantModelHealthCheckInfo | None = Field(
         default=None, description="Default model service health-check settings."
-    )
-    interpolation: ServiceArgumentInterpolationInfoDTO | None = Field(
-        default=None,
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Default variable syntax of the service "
-            "arguments. Null when the runtime variant leaves it unset."
-        ),
     )
 
 
