@@ -172,8 +172,7 @@ class TestCreateUserIfNotExists:
             conn = await sess.connection()
             count = (
                 await conn.execute(
-                    sa
-                    .select(sa.func.count())
+                    sa.select(sa.func.count())
                     .select_from(keypairs)
                     .where(keypairs.c.user == user_id1)
                 )
