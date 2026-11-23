@@ -25,6 +25,7 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.server import AgentRPCServer
 from ai.backend.agent.types import AgentBackend, ContainerLifecycleEvent, LifecycleEvent
 from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.events.event_types.kernel.anycast import KernelTerminatedAnycastEvent
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.typed_validators import HostPortPair
@@ -102,6 +103,52 @@ class TestAgentConfigReading:
 
         assert agent_rpc_server.local_config.container.kernel_gid.real == expected_gid
         assert agent_rpc_server.local_config.container.kernel_uid.real == expected_uid
+
+    @pytest.fixture
+    def etcd_get_prefix(self, agent_rpc_server: AgentRPCServer, mocker: Any) -> AsyncMock:
+        """Mock etcd get_prefix() on the server's etcd; only config/redis has data."""
+
+        async def get_prefix(key: str, **kwargs: Any) -> dict[str, Any]:
+            if key == "config/redis":
+                return {"addr": {"host": "etcd-redis", "port": "6379"}}
+            return {}
+
+        mock = AsyncMock(side_effect=get_prefix)
+        mocker.patch.object(agent_rpc_server.etcd, "get_prefix", new=mock)
+        return mock
+
+    async def test_redis_config_read_from_etcd_when_not_in_local_config(
+        self,
+        agent_rpc_server: AgentRPCServer,
+        etcd_get_prefix: AsyncMock,
+    ) -> None:
+        """Test that redis config is read from etcd when the local config has no [redis]."""
+        await agent_rpc_server.read_agent_config()
+
+        assert agent_rpc_server.local_config.redis is not None
+        assert agent_rpc_server.local_config.redis.addr is not None
+        assert agent_rpc_server.local_config.redis.addr.address == "etcd-redis:6379"
+        assert "config/redis" in [call.args[0] for call in etcd_get_prefix.call_args_list]
+
+    async def test_local_redis_config_wins_over_etcd_across_repeated_reads(
+        self,
+        agent_rpc_server: AgentRPCServer,
+        base_agent_config: AgentUnifiedConfig,
+        etcd_get_prefix: AsyncMock,
+    ) -> None:
+        """Test that a local [redis] section is kept when read_agent_config() runs twice."""
+        local_redis_config = RedisConfig.model_validate({"addr": "local-redis:6390"})
+        base_agent_config.redis = local_redis_config
+        server = AgentRPCServer(
+            etcd=agent_rpc_server.etcd, local_config=base_agent_config, skip_detect_manager=True
+        )
+
+        # read_agent_config() runs twice at startup (also from service_discovery_ctx).
+        await server.read_agent_config()
+        await server.read_agent_config()
+
+        assert server.local_config.redis is local_redis_config
+        assert "config/redis" not in [call.args[0] for call in etcd_get_prefix.call_args_list]
 
 
 class TestALifecycleReasonNeverBreaksTheCleanHandler:
