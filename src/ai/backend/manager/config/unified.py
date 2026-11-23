@@ -55,9 +55,6 @@ Alias keys are also URL-quoted in the same way.
      + docker
        + image
          - auto_pull: "digest" (default) | "tag" | "none"
-     + redis
-       - addr: "{redis-host}:{redis-port}"
-       - password: {password}
      + idle
        - enabled: "timeout,utilization"      # comma-separated list of checker names
        - app-streaming-packet-timeout: "5m"  # in seconds; idleness of app-streaming TCP connections
