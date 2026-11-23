@@ -104,7 +104,7 @@ class NotificationDeliveryFailure(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.NOTIFICATION,
             operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

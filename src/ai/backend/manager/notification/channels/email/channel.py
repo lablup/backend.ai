@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
+import socket
 from email.mime.text import MIMEText
 from functools import partial
 from typing import override
@@ -98,8 +99,8 @@ class EmailChannel(AbstractNotificationChannel):
             raise NotificationDeliveryFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
             raise NotificationDeliveryFailure(f"Email delivery failed: {e!s}") from e
-        except OSError as e:
-            # A refused, unresolvable or timed-out SMTP host raises OSError, not SMTPConnectError.
+        except (socket.gaierror, ConnectionError, TimeoutError) as e:
+            # A refused, unresolvable or timed-out SMTP host raises these, not SMTPConnectError.
             raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except Exception as e:
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

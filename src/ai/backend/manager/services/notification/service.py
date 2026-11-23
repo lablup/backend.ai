@@ -7,15 +7,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-import aiohttp
-
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.common.data.notification.types import NotificationChannelType
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.errors.notification import (
     NotificationDeliveryFailure,
-    NotificationProcessingFailure,
     NotificationTemplateRenderingFailure,
     WebhookConnectionFailure,
 )
@@ -211,16 +208,7 @@ class NotificationService:
         if isinstance(error, NotificationTemplateRenderingFailure):
             return True
         if channel_type == NotificationChannelType.WEBHOOK:
-            return isinstance(
-                error,
-                (
-                    NotificationDeliveryFailure,
-                    NotificationProcessingFailure,
-                    WebhookConnectionFailure,
-                    aiohttp.ClientError,
-                    TimeoutError,
-                ),
-            )
+            return isinstance(error, (NotificationDeliveryFailure, WebhookConnectionFailure))
         return False
 
     async def _process_rules(

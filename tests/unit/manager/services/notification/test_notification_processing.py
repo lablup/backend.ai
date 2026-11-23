@@ -15,7 +15,6 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import aiohttp
 import pytest
 
 from ai.backend.common.contexts.user import with_user_context
@@ -274,8 +273,6 @@ class TestRuleFailureLogLevel:
     @pytest.mark.parametrize(
         ("channel_type", "error", "log_level"),
         [
-            (NotificationChannelType.WEBHOOK, aiohttp.ClientConnectionError(), _TRACE_LEVEL),
-            (NotificationChannelType.WEBHOOK, TimeoutError(), _TRACE_LEVEL),
             (
                 NotificationChannelType.WEBHOOK,
                 WebhookConnectionFailure("Failed to connect to the webhook URL"),
@@ -283,13 +280,13 @@ class TestRuleFailureLogLevel:
             ),
             (
                 NotificationChannelType.WEBHOOK,
-                NotificationProcessingFailure("Webhook delivery failed with status 500"),
+                NotificationDeliveryFailure("Webhook delivery failed with status 404"),
                 _TRACE_LEVEL,
             ),
             (
                 NotificationChannelType.WEBHOOK,
-                NotificationDeliveryFailure("Webhook delivery failed with status 404"),
-                _TRACE_LEVEL,
+                NotificationProcessingFailure("internal"),
+                logging.ERROR,
             ),
             (
                 NotificationChannelType.EMAIL,

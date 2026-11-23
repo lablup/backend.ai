@@ -74,13 +74,19 @@ class TestEmailChannelSend:
         assert exc_info.value.is_client_error()
         assert exc_info.value.__cause__ is error
 
+    @pytest.mark.parametrize(
+        "error",
+        [RuntimeError("bug"), OSError(24, "Too many open files")],
+        ids=["bug", "local-os-error"],
+    )
     async def test_an_unexpected_error_stays_a_processing_failure(
         self,
         channel: EmailChannel,
         message: NotificationMessage,
         monkeypatch: pytest.MonkeyPatch,
+        error: BaseException,
     ) -> None:
-        monkeypatch.setattr(smtplib, "SMTP", _smtp_raising(RuntimeError("bug")))
+        monkeypatch.setattr(smtplib, "SMTP", _smtp_raising(error))
 
         with pytest.raises(NotificationProcessingFailure):
             await channel.send(message)

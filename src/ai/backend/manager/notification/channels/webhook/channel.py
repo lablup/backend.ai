@@ -21,6 +21,9 @@ from ai.backend.manager.notification.types import NotificationMessage, SendResul
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+# How much of a failed response's body is read and quoted in the error.
+_FAILURE_BODY_LIMIT = 200
+
 __all__ = ("WebhookChannel",)
 
 
@@ -94,9 +97,12 @@ class WebhookChannel(AbstractNotificationChannel):
                     return SendResult(
                         message=f"Webhook sent successfully (status: {response.status})",
                     )
-                response_text = await response.text()
+                # Bounded, and decoded leniently: a body in another charset must not escape
+                # as a decoding error.
+                body = await response.content.read(_FAILURE_BODY_LIMIT)
                 raise NotificationDeliveryFailure(
-                    f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
+                    f"Webhook delivery failed with status {response.status}: "
+                    f"{body.decode('utf-8', errors='replace')}"
                 )
         except (aiohttp.ClientError, TimeoutError) as e:
             raise WebhookConnectionFailure(
