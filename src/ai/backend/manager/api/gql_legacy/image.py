@@ -393,10 +393,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
 
     @property
     def is_customized_image(self) -> bool:
-        for label in self.labels:
-            if label.key == LabelName.CUSTOMIZED_OWNER.value:
-                return True
-        return False
+        return any(label.key == LabelName.CUSTOMIZED_OWNER.value for label in self.labels)
 
 
 class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]
