@@ -405,7 +405,9 @@ class VFolderAdapter(BaseAdapter):
         """
         action_result = await self._vfolder.scoped_search.run(
             self._scoped_search_action(
-                [ProjectVFolderTarget(project_id=ProjectID(project_id))], input
+                [ProjectVFolderTarget(project_id=ProjectID(project_id))],
+                input.usage,
+                self._build_vfolder_searcher(input),
             )
         )
         return SearchVFoldersPayload(
@@ -447,14 +449,14 @@ class VFolderAdapter(BaseAdapter):
     def _scoped_search_action(
         self,
         scopes: Sequence[ScopeTarget],
-        input: SearchVFoldersInput,
-        mount_permission_conditions: Sequence[QueryCondition] = (),
+        usage: VFolderUsage | None,
+        searcher: VFolderSearcher,
     ) -> ScopedSearchVFoldersAction:
         return ScopedSearchVFoldersAction(
             searcher=ScopedSearcher(
                 scopes=scopes,
-                used_by=self._usage(input.usage),
-                searcher=self._build_vfolder_searcher(input, mount_permission_conditions),
+                used_by=self._usage(usage),
+                searcher=searcher,
             )
         )
 
@@ -467,17 +469,19 @@ class VFolderAdapter(BaseAdapter):
 
         ``user_id`` is whose mount policy ``input.mount_permission`` selects by.
         """
-        mount_permission_conditions: list[QueryCondition] = []
+        conditions: list[QueryCondition] = []
         if input.mount_permission is not None:
             if user_id is None:
                 raise UnreachableError("mount_permission is given without the user it is read for")
-            mount_permission_conditions = self.apply_enum_filter(
+            conditions = self.apply_enum_filter(
                 input.mount_permission,
                 VFolderSearchableFields.linked.mount_permission.of_user(user_id),
             )
         action_result = await self._vfolder.scoped_search.run(
             self._scoped_search_action(
-                self._scope_targets(input.scope), input, mount_permission_conditions
+                self._scope_targets(input.scope),
+                input.usage,
+                self._build_vfolder_searcher(input, conditions),
             )
         )
         return SearchVFoldersPayload(
@@ -490,13 +494,13 @@ class VFolderAdapter(BaseAdapter):
     def _build_vfolder_searcher(
         self,
         input: SearchVFoldersInput,
-        mount_permission_conditions: Sequence[QueryCondition] = (),
+        conditions: Sequence[QueryCondition] = (),
     ) -> VFolderSearcher:
         return self._build_searcher(
             VFolderSearcher,
             conditions=[
                 *(self._convert_vfolder_filter(input.filter) if input.filter else []),
-                *mount_permission_conditions,
+                *conditions,
             ],
             orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
