@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     ScopedBatchOpsResult,
@@ -25,6 +26,10 @@ from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareActionResult,
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
+from ai.backend.manager.services.entity_share.actions.lookup_answering_scope import (
+    LookupEntityShareAnsweringScopeAction,
+    LookupEntityShareAnsweringScopeActionResult,
+)
 from ai.backend.manager.services.entity_share.actions.search import (
     SearchEntitySharesAction,
 )
@@ -33,7 +38,7 @@ from ai.backend.manager.services.entity_share.service import EntityShareService
 
 class EntityShareProcessors:
     """Creating and reading run against ops; the three answers keep a service, each
-    settling a row behind a guard.
+    settling a row behind a guard, and so does resolving the scope that answers.
 
     One search for every side: which side a read comes in through is a value, and the
     scope it is answered for travels with the rows it selects."""
@@ -42,6 +47,9 @@ class EntityShareProcessors:
     get: SingleEntityActionProcessor[GetEntityShareAction, EntityOpsResult[EntityShareData]]
     bulk_get: PartialBulkActionProcessor[BulkGetEntitySharesAction, EntityShareData]
     search: ScopeActionProcessor[SearchEntitySharesAction, ScopedBatchOpsResult[EntityShareData]]
+    lookup_answering_scope: LookupActionProcessor[
+        LookupEntityShareAnsweringScopeAction, LookupEntityShareAnsweringScopeActionResult
+    ]
     accept: ScopeActionProcessor[AcceptEntityShareAction, EntityShareAnswerResult]
     reject: ScopeActionProcessor[RejectEntityShareAction, EntityShareAnswerResult]
     cancel: SingleEntityActionProcessor[CancelEntityShareAction, CancelEntityShareActionResult]
@@ -57,6 +65,9 @@ class EntityShareProcessors:
         self.get = group.single_get_ops(GetEntityShareAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetEntitySharesAction)
         self.search = group.scoped_search_ops(SearchEntitySharesAction)
+        self.lookup_answering_scope = group.lookup(
+            LookupEntityShareAnsweringScopeAction, service.lookup_answering_scope
+        )
         self.accept = group.scope(AcceptEntityShareAction, service.accept)
         self.reject = group.scope(RejectEntityShareAction, service.reject)
         self.cancel = group.single_entity(CancelEntityShareAction, service.cancel)

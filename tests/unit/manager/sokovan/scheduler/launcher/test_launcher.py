@@ -19,6 +19,7 @@ from callosum.rpc import RPCUserError
 
 from ai.backend.common.types import AutoPullBehavior
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.recorder.types import StepStatus
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -242,7 +243,7 @@ class TestSessionLauncherKernelCreation:
         self,
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
-        session_for_start_single_kernel: SessionDataForStart,
+        sessions_for_concurrent_start: list[SessionDataForStart],
         image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-008: Multiple sessions started concurrently.
@@ -251,7 +252,7 @@ class TestSessionLauncherKernelCreation:
         When: Start sessions
         Then: All sessions started concurrently (using gather)
         """
-        sessions = [session_for_start_single_kernel, session_for_start_single_kernel]
+        sessions = sessions_for_concurrent_start
         session_ids = [s.session_id for s in sessions]
         with RecorderContext.scope("test", entity_ids=session_ids):
             await launcher.start_sessions_for_handler(
@@ -328,6 +329,7 @@ class TestSessionLauncherKernelCreation:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         mock_valkey_schedule: AsyncMock,
+        mock_repository: AsyncMock,
         session_for_start_single_kernel: SessionDataForStart,
         image_config_default: dict[UUID, ImageConfigData],
         caplog: pytest.LogCaptureFixture,
@@ -347,6 +349,40 @@ class TestSessionLauncherKernelCreation:
 
         assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
         mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_not_awaited()
+
+    async def test_agent_error_is_recorded_in_session_status_data_and_history(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        error_repr = "ContainerCreationFailedError('bind source path does not exist')"
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
+            "ContainerCreationFailedError", error_repr, ""
+        )
+
+        session_id = session_for_start_single_kernel.session_id
+        with RecorderContext.scope("test", entity_ids=[session_id]) as pool:
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        mock_repository.update_session_error_info.assert_awaited_once()
+        recorded_id, error_info = mock_repository.update_session_error_info.await_args.args
+        assert recorded_id == session_id
+        assert error_info["error"]["name"] == "KernelCreationFailedOnAgents"
+        assert error_repr in error_info["error"]["repr"]
+        (phase,) = [
+            p for p in pool.build_all_records()[session_id].phases if p.name == "kernel_creation"
+        ]
+        (step,) = phase.steps
+        assert step.status == StepStatus.FAILED
+        assert step.detail is not None
+        assert error_repr in step.detail
 
     async def test_another_resource_error_on_agent_is_logged_at_error_and_recorded(
         self,

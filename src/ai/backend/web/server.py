@@ -78,6 +78,7 @@ from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -111,6 +112,7 @@ from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_poli
 
 from . import __version__, user_agent
 from .auth import (
+    TRUSTED_PROXY_NETWORKS_KEY,
     build_forwarding_headers,
     fill_forwarding_hdrs_to_api_session,
     get_api_session,
@@ -1206,6 +1208,14 @@ async def server_main(
                 0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
             )
         app["config"] = config
+        app[TRUSTED_PROXY_NETWORKS_KEY] = [
+            ReadableCIDR(raw) for raw in config.service.trusted_proxies
+        ]
+        if config.service.trusted_proxies:
+            log.debug(
+                "trusting the forwarding headers set by proxies",
+                trusted_proxies=", ".join(config.service.trusted_proxies),
+            )
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         app["manager_pool"] = await web_init_stack.enter_async_context(
             manager_pool_ctx(config, app)

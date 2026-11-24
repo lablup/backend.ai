@@ -26135,16 +26135,6 @@
         "title": "CreateResourceGroupInput",
         "type": "object"
       },
-      "AgentSelectionStrategy": {
-        "enum": [
-          "dispersed",
-          "concentrated",
-          "roundrobin",
-          "legacy"
-        ],
-        "title": "AgentSelectionStrategy",
-        "type": "string"
-      },
       "NonEmptyList_PartialBulkUpdateResourceGroupItemInput_": {
         "items": {
           "$ref": "#/components/schemas/PartialBulkUpdateResourceGroupItemInput"
@@ -42772,6 +42762,166 @@
           "public_key"
         ],
         "title": "MyUploadSSHKeyInput",
+        "type": "object"
+      },
+      "SSHKeyFilter": {
+        "description": "Filter for SSH keys.",
+        "properties": {
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether sessions use the SSH key.",
+            "title": "Is Default"
+          }
+        },
+        "title": "SSHKeyFilter",
+        "type": "object"
+      },
+      "SSHKeyOrder": {
+        "description": "Order specification for SSH keys.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/SSHKeyOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Order direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "SSHKeyOrder",
+        "type": "object"
+      },
+      "SSHKeyOrderField": {
+        "description": "Fields available for ordering SSH keys.",
+        "enum": [
+          "is_default"
+        ],
+        "title": "SSHKeyOrderField",
+        "type": "string"
+      },
+      "MySearchSSHKeysInput": {
+        "description": "Search the caller's own SSH keys.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SSHKeyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SSHKeyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "MySearchSSHKeysInput",
         "type": "object"
       },
       "CreateVFSStorageInput": {
@@ -69782,6 +69932,64 @@
         },
         "parameters": [],
         "description": "Upload a public key to the current user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/ssh-keys/my/search": {
+      "post": {
+        "operationId": "v2/ssh-keys.my_search",
+        "tags": [
+          "v2/ssh-keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MySearchSSHKeysInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the current user's own SSH keys.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/ssh-keys/{ssh_key_id}": {
+      "get": {
+        "operationId": "v2/ssh-keys.get",
+        "tags": [
+          "v2/ssh-keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ssh_key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Read one SSH key.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/ssh-keys/{ssh_key_id}/switch-default": {

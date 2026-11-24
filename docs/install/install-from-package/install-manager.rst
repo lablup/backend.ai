@@ -139,13 +139,16 @@ To list a specific key from Etcd, for example, ``config`` key:
 
    $ backend.ai mgr etcd get --prefix config
 
-Now, configure Valkey access information. This should be accessible from all
-nodes.
+Now, configure Valkey access information in the local config file of each
+component (``manager.toml``, ``agent.toml`` and ``storage-proxy.toml``), not in
+Etcd. The address should be accessible from all nodes. The components ignore
+the Valkey settings stored in Etcd:
 
-.. code-block:: console
+.. code-block:: toml
 
-   $ backend.ai mgr etcd put config/redis/addr "bai-m1:8110"
-   $ backend.ai mgr etcd put config/redis/password "develove"
+   [redis]
+   addr = "bai-m1:8110"
+   password = "develove"
 
 Also, populate the Storage Proxy configuration to the Etcd:
 

@@ -298,6 +298,24 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
 }
 
 
+@dataclass(frozen=True)
+class VFolderMountAvailability:
+    """The vfolders among those asked about that cannot be mounted, by the reason."""
+
+    missing: frozenset[VFolderUUID]
+    """No row: the vfolder was purged."""
+    trashed: frozenset[VFolderUUID]
+    """In the trash (``DELETE_PENDING``); restoring it makes it mountable again."""
+    deleted: frozenset[VFolderUUID]
+    """Being deleted or deleted from storage (``DELETE_ONGOING`` and later)."""
+    not_ready: frozenset[VFolderUUID]
+    """Any other status outside ``MOUNTABLE`` (``CREATING``, ``ERROR``)."""
+
+    @property
+    def all_mountable(self) -> bool:
+        return not (self.missing or self.trashed or self.deleted or self.not_ready)
+
+
 @dataclass
 class VFolderData(EntityData):
     """

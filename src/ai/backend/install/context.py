@@ -354,6 +354,41 @@ class Context(metaclass=ABCMeta):
         path.write_text(content)
 
     @staticmethod
+    def set_toml_values(path: Path, table_keys: Sequence[str], values: dict[str, Any]) -> None:
+        """Set `values` in the table at `table_keys` of the TOML file, creating missing tables."""
+        with path.open("r") as fp:
+            data = tomlkit.load(fp)
+        table: Any = data
+        for key in table_keys:
+            if key not in table:
+                table[key] = tomlkit.table()
+            table = table[key]
+        table.update(values)
+        with path.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+    def set_redis_config(self, toml_path: Path) -> None:
+        """Write the Redis config of the halfstack to the `[redis]` table of the TOML file."""
+        halfstack = self.install_info.halfstack_config
+        values: dict[str, Any]
+        if halfstack.ha_setup:
+            if not halfstack.redis_sentinel_addrs:
+                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
+            values = {
+                "sentinel": ",".join(
+                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
+                ),
+                "service_name": "mymaster",
+            }
+        else:
+            if not halfstack.redis_addr:
+                raise RuntimeError("redis_addr must be configured")
+            values = {"addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"}
+        if halfstack.redis_password:
+            values["password"] = halfstack.redis_password
+        self.set_toml_values(toml_path, ["redis"], values)
+
+    @staticmethod
     def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern[str], str]]) -> None:
         content = path.read_text()
         for pattern, replacement in subs:
@@ -953,40 +988,12 @@ class Context(metaclass=ABCMeta):
                 service.sftp_agent.scaling_group
             )
         await self.etcd_put_json("", data)
+        self.set_redis_config(toml_path)
         data = {}
         # TODO: in dev-mode, enable these.
         data["api"] = {}
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
-        if halfstack.ha_setup:
-            if not halfstack.redis_sentinel_addrs:
-                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
-            data["redis"] = {
-                "sentinel": ",".join(
-                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
-                ),
-                "service_name": "mymaster",
-                "helper": {
-                    "socket_timeout": 5.0,
-                    "socket_connect_timeout": 2.0,
-                    "reconnect_poll_timeout": 0.3,
-                },
-            }
-            if halfstack.redis_password:
-                data["redis"]["password"] = halfstack.redis_password
-        else:
-            if not halfstack.redis_addr:
-                raise RuntimeError("redis_addr must be configured")
-            data["redis"] = {
-                "addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}",
-                "helper": {
-                    "socket_timeout": 5.0,
-                    "socket_connect_timeout": 2.0,
-                    "reconnect_poll_timeout": 0.3,
-                },
-            }
-            if halfstack.redis_password:
-                data["redis"]["password"] = halfstack.redis_password
         (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.etcd_put_json("config", data)
         public_addr = self.install_variable.public_facing_address
@@ -1044,6 +1051,7 @@ class Context(metaclass=ABCMeta):
             ],
         )
         self._ensure_agent_var_base_path()
+        self.set_redis_config(toml_path)
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
@@ -1255,6 +1263,7 @@ class Context(metaclass=ABCMeta):
             data["volume"]["volume1"]["path"] = service.vfolder_relpath
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
+        self.set_redis_config(toml_path)
         if self.install_variable.otel_endpoint:
             self.sed_in_place(
                 toml_path,
@@ -2525,6 +2534,10 @@ class DockerContext(Context):
     # fails fast when the share is not mounted). Covered by the
     # SYSTEM_STATE_PATH mount of the agent.
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
+    # In-container target of the <base_path>/alembic.ini mount on manager and
+    # manager-cli; /app is the image WORKDIR, so `mgr schema` finds it with
+    # the default `-f alembic.ini` inside the manager container.
+    ALEMBIC_INI_MOUNT = "/app/alembic.ini"
     # Compose service DNS names of the halfstack members (same project via
     # the include: in the services compose file); bridge services address
     # them with the CONTAINER-side ports, not the host-published ones.
@@ -2548,8 +2561,8 @@ class DockerContext(Context):
         )
         service = info.service_config
         # The redis address is consumed from BOTH network profiles — the
-        # host-network manager/agent read it from etcd (config/redis/addr)
-        # and the bridge services from their generated configs — so its face
+        # host-network manager/agent and the bridge services read it from
+        # their generated configs — so its face
         # must be reachable from both: the host's public IP with the
         # host-published port.
         halfstack = info.halfstack_config
@@ -2907,8 +2920,9 @@ class DockerContext(Context):
 
         # Manager schema must exist before seeds and the app-proxy DB step
         # update scaling_groups (mirrors the PackageContext.configure() order).
+        # Use the compose mount explicitly rather than manager-cli's working_dir.
         self.log_header("Initializing manager database schema...")
-        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+        await self.run_manager_cli(["mgr", "schema", "oneshot", "-f", self.ALEMBIC_INI_MOUNT])
 
         self.log_header("Configuring agent...")
         await self.configure_agent()

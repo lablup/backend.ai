@@ -10,6 +10,9 @@ sources:
 generated:
   by: claude-code/fable-5
   at: 2026-08-10
+updated:
+  by: claude-code/opus-5-5
+  at: 2026-11-23
 status: stable
 ---
 
@@ -29,8 +32,8 @@ two sources (files and etcd) and what to update when adding a key.
 
 | Source | Holds | Change propagation |
 |---|---|---|
-| TOML file (per component) | Node/process-local settings | Read only at boot: restart required |
-| etcd | Cluster-global settings (shared resources, volumes, redis connection, etc.) | Watched; on change the whole config is re-validated (hot reload) |
+| TOML file (per component) | Node/process-local settings, the Valkey connection | Read only at boot: restart required |
+| etcd | Cluster-global settings (shared resources, volumes, etc.) | Watched; on change the whole config is re-validated (hot reload) |
 
 - Both sources merge into one pydantic unified config (`config/unified.py`): what code reads is always the unified config.
 - Deciding where a key belongs: file if it differs per node, etcd if the cluster shares it.
