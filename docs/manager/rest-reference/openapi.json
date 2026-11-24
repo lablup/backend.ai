@@ -41599,6 +41599,80 @@
         "title": "SearchVFoldersInput",
         "type": "object"
       },
+      "VFolderMountPermissionFilter": {
+        "description": "Filter for the mount policy of one user on a vfolder.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderMountPermissionFilter",
+        "type": "object"
+      },
+      "VFolderPermissionField": {
+        "enum": [
+          "none",
+          "ro",
+          "rw",
+          "wd",
+          "wd"
+        ],
+        "title": "VFolderPermissionField",
+        "type": "string"
+      },
       "VFolderScope": {
         "description": "Scope for the scoped vfolder query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
         "properties": {
@@ -41778,223 +41852,24 @@
           "scope": {
             "$ref": "#/components/schemas/VFolderScope",
             "description": "Scope (OR across all items)."
+          },
+          "mount_permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderMountPermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the caller's mount policy on the vfolder. wd matches rw."
           }
         },
         "required": [
           "scope"
         ],
         "title": "ScopedSearchVFoldersInput",
-        "type": "object"
-      },
-      "VFolderMountPermissionFilter": {
-        "description": "Filter for the level one user mounts a vfolder at.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderPermissionField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderPermissionField"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided values.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderPermissionField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude an exact match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderPermissionField"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided values.",
-            "title": "Not In"
-          }
-        },
-        "title": "VFolderMountPermissionFilter",
-        "type": "object"
-      },
-      "VFolderPermissionField": {
-        "enum": [
-          "none",
-          "ro",
-          "rw",
-          "wd",
-          "wd"
-        ],
-        "title": "VFolderPermissionField",
-        "type": "string"
-      },
-      "ScopedSearchVFoldersByMountPermissionInput": {
-        "description": "Input for searching the vfolders the named scopes reach by the level one user mounts them at.",
-        "properties": {
-          "usage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderUsage"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
-          },
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter conditions."
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderOrder"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Order specifications.",
-            "title": "Order"
-          },
-          "first": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor pagination: number of items.",
-            "title": "First"
-          },
-          "after": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor pagination: after cursor.",
-            "title": "After"
-          },
-          "last": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor pagination: last N items.",
-            "title": "Last"
-          },
-          "before": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor pagination: before cursor.",
-            "title": "Before"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Offset pagination: maximum items.",
-            "title": "Limit"
-          },
-          "offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Offset pagination: number to skip.",
-            "title": "Offset"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/VFolderScope",
-            "description": "Scope (OR across all items)."
-          },
-          "mount_permission": {
-            "$ref": "#/components/schemas/VFolderMountPermissionFilter",
-            "description": "Added in 26.10.0. Filter by the level the user mounts the vfolder at. wd matches rw."
-          }
-        },
-        "required": [
-          "scope",
-          "mount_permission"
-        ],
-        "title": "ScopedSearchVFoldersByMountPermissionInput",
         "type": "object"
       },
       "CreateVFolderInput": {
@@ -68945,35 +68820,6 @@
         },
         "parameters": [],
         "description": "Search the vfolders the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/vfolders/scoped/by-mount-permission": {
-      "post": {
-        "operationId": "v2/vfolders.scoped_search_by_mount_permission",
-        "tags": [
-          "v2/vfolders"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScopedSearchVFoldersByMountPermissionInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Search the vfolders the named scopes reach by the level the current user mounts them at.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolders/projects/{project_id}/search": {

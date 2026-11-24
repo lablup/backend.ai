@@ -16976,27 +16976,11 @@ type Query {
     Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
-    filter: VFolderFilter = null
-    orderBy: [VFolderOrderBy!] = null
-    before: String = null
-    after: String = null
-    first: Int = null
-    last: Int = null
-    limit: Int = null
-    offset: Int = null
-  ): VFolderConnection
-
-  """
-  Added in 26.10.0. Page through the virtual folders the named scopes reach, selected by the level the current user mounts them at (`VFolder.mountPermission`).
-  """
-  scopedVFoldersByMountPermission(
-    scope: VFolderScope!
-    mountPermission: VFolderMountPermissionFilter!
 
     """
-    Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.10.0. Filter by the mount policy of the current user on the vfolder (`VFolder.mountPermission`).
     """
-    usage: VFolderUsage = null
+    mountPermission: VFolderMountPermissionFilter = null
     filter: VFolderFilter = null
     orderBy: [VFolderOrderBy!] = null
     before: String = null
@@ -25282,7 +25266,7 @@ enum VFolderMountPermission {
 }
 
 """
-Added in 26.10.0. Filter for the level the current user mounts a vfolder at. RW_DELETE matches READ_WRITE.
+Added in 26.10.0. Filter for the mount policy of the current user on a vfolder. RW_DELETE matches READ_WRITE.
 """
 input VFolderMountPermissionFilter {
   """Exact match."""
