@@ -102,7 +102,15 @@ class UserVFolderMountGQL(PydanticNodeMixin[UserVFolderMountNode]):
         raise NotImplementedAPI("User vfolder mount node resolution is not implemented.")
 
 
-UserVFolderMountEdgeGQL = Edge[UserVFolderMountGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One mount policy of a user within a connection.",
+    ),
+    name="UserVFolderMountEdge",
+)
+class UserVFolderMountEdgeGQL(Edge[UserVFolderMountGQL]):
+    pass
 
 
 @gql_connection_type(
@@ -113,6 +121,11 @@ UserVFolderMountEdgeGQL = Edge[UserVFolderMountGQL]
     name="UserVFolderMountConnection",
 )
 class UserVFolderMountConnectionGQL(Connection[UserVFolderMountGQL]):
+    # Restated so the schema's edge type is the described one above rather than the
+    # one Strawberry would generate from the generic, which carries no version.
+    edges: list[UserVFolderMountEdgeGQL] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
     count: int = gql_field(description="Total number of pairs matching the query criteria.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
