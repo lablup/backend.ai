@@ -11,7 +11,6 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
@@ -27,6 +26,7 @@ __all__ = (
     "FileEntryType",
     "OrderDirection",
     "VFolderInvitationState",
+    "UserVFolderScope",
     "VFolderMetadataInfo",
     "VFolderMountPermissionFilter",
     "VFolderOperationStatusField",
@@ -80,9 +80,7 @@ class VFolderUsageModeFilter(EnumFilter[VFolderUsageMode]):
 
 
 class VFolderMountPermissionFilter(EnumFilter[VFolderPermissionField]):
-    """Filter for the mount policy of one user on a vfolder."""
-
-    user_id: UserID = Field(description="The user whose mount policy is compared.")
+    """Filter for the mount policy of a user on a vfolder."""
 
 
 class VFolderMetadataInfo(BaseResponseModel):
@@ -180,3 +178,22 @@ class VFolderScope(BaseRequestModel):
                 "VFolderScope requires a non-empty value for 'domain', 'project' or 'user'"
             )
         return self
+
+
+class UserVFolderScope(BaseRequestModel):
+    """Scope for the scoped user vfolder query: one user, and the vfolders paired with them.
+
+    The vfolders of the user, the domains and the projects are combined with OR.
+    """
+
+    user: list[UUIDScope] = Field(
+        min_length=1,
+        max_length=1,
+        description="The user paired with each vfolder, exactly one. Their vfolders are read too.",
+    )
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose vfolders are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose vfolders are being read"
+    )

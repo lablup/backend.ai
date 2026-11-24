@@ -11,7 +11,7 @@ from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
-from ai.backend.manager.data.vfolder.types import VFolderData
+from ai.backend.manager.data.vfolder.types import UserVFolderData, VFolderData
 from ai.backend.manager.errors.storage import (
     VFolderMountPolicyNotApplicable,
     VFolderMountPolicyTooWide,
@@ -28,6 +28,10 @@ from ai.backend.manager.services.vfolder.actions.mount_policy import (
     SetVFolderMountPolicyActionResult,
     UnsetVFolderMountPolicyAction,
     UnsetVFolderMountPolicyActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolders import (
+    ScopedSearchUserVFoldersAction,
+    ScopedSearchUserVFoldersActionResult,
 )
 
 
@@ -79,6 +83,36 @@ class VFolderMountPolicyService:
     ) -> ListVFolderMountPoliciesActionResult:
         policies = await self._vfolder_repository.list_user_mount_policies(action.vfolder_uuid)
         return ListVFolderMountPoliciesActionResult(policies=policies)
+
+    async def scoped_search_user_vfolders(
+        self, action: ScopedSearchUserVFoldersAction
+    ) -> ScopedSearchUserVFoldersActionResult:
+        found = await self._vfolder_repository.scoped_search_user_vfolders(
+            action.searcher, action.user_id
+        )
+        vfolders = found.page.items
+        held = await self._permission_check.held_permissions(
+            action.user_id, [vfolder.id for vfolder in vfolders]
+        )
+        return ScopedSearchUserVFoldersActionResult(
+            items=[
+                UserVFolderData(
+                    user_id=action.user_id,
+                    vfolder_id=vfolder.id,
+                    mount_permission=resolve_mount_policy(
+                        action.user_id,
+                        owner_user_id=vfolder.user,
+                        default_mount_permission=vfolder.default_mount_permission,
+                        held=held.get(vfolder.id, Permission.NONE),
+                        user_policy=found.policies.get(vfolder.id),
+                    ),
+                )
+                for vfolder in vfolders
+            ],
+            total_count=found.page.total_count,
+            has_next_page=found.page.has_next_page,
+            has_previous_page=found.page.has_previous_page,
+        )
 
     async def _ceiling_of(
         self, requester: UserData, vfolder: VFolderData

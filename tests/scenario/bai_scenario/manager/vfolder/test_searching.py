@@ -10,7 +10,6 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -22,9 +21,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.response import SearchVFoldersPayload
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
-    VFolderMountPermissionFilter,
     VFolderOrderField,
-    VFolderPermissionField,
     VFolderScope,
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -122,7 +119,7 @@ class SearchingMyOwnScope(When[AFolderAndItsReader, VFolderAdapter, SearchVFolde
 class SearchingByFragmentInOrder(
     When[AReaderAndFoldersToSearch, VFolderAdapter, SearchVFoldersPayload]
 ):
-    """자기가 rw로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로, 크기만큼만 훑는다."""
+    """이름 조각으로 걸러 이름 오름차순으로, 크기만큼만 훑는다."""
 
     fragment: str
     limit: int
@@ -134,13 +131,11 @@ class SearchingByFragmentInOrder(
     @override
     def describe(self, laid: AReaderAndFoldersToSearch) -> str:
         return Says(
-            f"{laid.caller.username}이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw로 "
-            f"마운트하고 이름에 {self.fragment}가 든 vfolder 를 이름 오름차순으로 "
-            f"{self.limit}개까지 조회합니다",
+            f"{laid.caller.username}이 자기 범위에서 이름에 {self.fragment}가 든 vfolder 를 "
+            f"이름 오름차순으로 {self.limit}개까지 조회합니다",
             english=(
-                f"{laid.caller.username} searches their own scope and another user's personal "
-                f"project for vfolders they mount as rw whose name holds {self.fragment}, ordered "
-                f"by name ascending, up to {self.limit}"
+                f"{laid.caller.username} searches their own scope for vfolders whose name holds "
+                f"{self.fragment}, ordered by name ascending, up to {self.limit}"
             ),
         )
 
@@ -151,17 +146,8 @@ class SearchingByFragmentInOrder(
         with ActingAs(laid.caller):
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
-                    scope=VFolderScope(
-                        project=[UUIDScope(value=laid.other_project_id)],
-                        user=[UUIDScope(value=laid.caller.id)],
-                    ),
-                    filter=VFolderFilter(
-                        name=StringFilter(contains=self.fragment),
-                        mount_permission=VFolderMountPermissionFilter(
-                            user_id=UserID(laid.caller.id),
-                            equals=VFolderPermissionField.READ_WRITE,
-                        ),
-                    ),
+                    scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)]),
+                    filter=VFolderFilter(name=StringFilter(contains=self.fragment)),
                     order=[
                         VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
                     ],
@@ -376,14 +362,13 @@ class ASearchNarrowsOrdersAndPages(
     @override
     def describe(self) -> str:
         return Says(
-            "자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 "
-            "rw로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 "
-            "자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다",
+            "자기 스코프에서 vfolder 읽기 권한을 받은 사용자가 이름 조각으로 걸러 이름 오름차순으로 "
+            "한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 "
+            "옵니다",
             english=(
-                "when a user granted vfolder read in their own scope and another user's personal "
-                "project searches the vfolders they mount as rw by a name fragment, ordered by "
-                "name ascending and limited to one page, one page holding only their two matching "
-                "vfolders in name order comes back"
+                "when a user granted vfolder read in their own scope searches by a name fragment, "
+                "ordered by name ascending and limited to one page, one page holding only their "
+                "two matching vfolders in name order comes back"
             ),
         )
 

@@ -8,10 +8,12 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import VFolderScanData
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderMountPolicyData
 from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.vfolder.searchable_fields import (
     VFolderMountPolicySearchableFields,
@@ -26,6 +28,23 @@ class VFolderSearcher(Searcher[VFolderRow, VFolderData]):
     @override
     def build_select(self) -> sa.sql.Select[Any]:
         return sa.select(VFolderRow)
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return VFolderSearchableFields.own.to_data(row)
+
+
+@dataclass
+class UserVFolderSearcher(Searcher[VFolderRow, VFolderData]):
+    """The vfolders of the pairs of one user; a condition may read the user's row."""
+
+    user_id: UserID = field(kw_only=True)
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(VFolderRow).select_from(
+            sa.join(VFolderRow, UserRow, UserRow.uuid == self.user_id)
+        )
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:

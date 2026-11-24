@@ -1057,18 +1057,18 @@ class AReaderAndFoldersToSearch:
 
     first: VFolderData
     second: VFolderData
-    excluded_by_name: VFolderData
-    excluded_by_mount_policy: VFolderData
+    excluded: VFolderData
     outside: VFolderData
-    other_project_id: ProjectID
     caller: UserData
 
 
 @dataclass(frozen=True)
 class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
-    """자기 스코프와 다른 사용자의 개인 프로젝트에서 검색하는 사용자와, 필터가 가려낼 폴더들.
+    """자기 스코프에서 검색하는 사용자와, 필터가 가려낼 폴더들.
 
-    모든 폴더가 남에게 ``ro``로 마운트되므로, 그 사용자는 자기 폴더만 ``rw``로 마운트한다."""
+    자기 폴더 둘의 이름에는 ``fragment``가 들고, 자기 폴더 하나에는 들지 않는다. 남의 폴더
+    하나의 이름에는 ``fragment``가 들지만, 그 사람의 스코프 밖이라 검색 결과에 들 수 없다.
+    """
 
     permissions: tuple[Permission, ...] = (Permission.READ,)
     fragment: str = "match"
@@ -1077,21 +1077,96 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
     def describe(self) -> str:
         names = ", ".join(permission.name or "" for permission in self.permissions)
         return Says(
-            f"자기 스코프와 자기, 다른 사용자 한 명의 개인 프로젝트에서 vfolder {names} 권한을 받은 "
-            f"사용자 한 명. 모든 vfolder 는 남에게 ro로 마운트되며, 이름에 {self.fragment}가 든 "
-            f"자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 {self.fragment}가 "
-            "든 그 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나",
+            f"이름에 {self.fragment}가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder "
+            f"하나, 그리고 이름에 {self.fragment}가 들지만 남의 것인 개인 vfolder 하나를 가진, "
+            f"자기 스코프에서 vfolder {names} 권한을 받은 사용자 한 명",
             english=(
-                f"one user granted the {names} permission on vfolders in their own scope, their own "
-                f"personal project and one other user's personal project. Every vfolder is mounted for others as ro: two "
-                f"personal vfolders of the user whose names hold {self.fragment}, one whose name "
-                f"does not, one of that other user and one of a third user whose names hold "
+                f"one user granted the {names} permission on vfolders in their own scope, with "
+                f"two personal vfolders whose names hold {self.fragment}, one personal vfolder "
+                f"whose name does not, and one other user's personal vfolder whose name holds "
                 f"{self.fragment}"
             ),
         )
 
     @override
     async def lay(self, seeding: Any) -> AReaderAndFoldersToSearch:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        first = await seeding.creating_from(
+            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint=self.fragment), caller
+        )
+        second = await seeding.creating_from(
+            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint=self.fragment), caller
+        )
+        excluded = await seeding.creating_from(
+            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint="other"), caller
+        )
+        outside = await seeding.creating_from(
+            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint=self.fragment), other
+        )
+        if self.permissions:
+            await seeding.within(SomeoneHoldingFolderPermissions(caller, self.permissions))
+        return AReaderAndFoldersToSearch(
+            first=seeding.made(first),
+            second=seeding.made(second),
+            excluded=seeding.made(excluded),
+            outside=seeding.made(outside),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class AReaderAndFoldersToMount:
+    """마운트 레벨로 검색하는 사람과, 걸러질 폴더들."""
+
+    first: VFolderData
+    second: VFolderData
+    excluded_by_name: VFolderData
+    excluded_by_mount_policy: VFolderData
+    outside: VFolderData
+    other_project_id: ProjectID
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class SomeoneWithFoldersToMount(Given[Any, AReaderAndFoldersToMount]):
+    """자기 스코프와 다른 사용자의 개인 프로젝트에서 검색하는 사용자와, 필터가 가려낼 폴더들.
+
+    모든 폴더가 남에게 ``ro``로 마운트되므로, 그 사용자는 자기 폴더만 ``rw``로 마운트한다."""
+
+    granted: bool
+    fragment: str = "match"
+
+    @override
+    def describe(self) -> str:
+        grant_ko = (
+            "자기 스코프와 자기, 다른 사용자 한 명의 개인 프로젝트에서 vfolder 를 읽을 수 있는"
+            if self.granted
+            else "아무 권한도 받지 않은"
+        )
+        grant_en = (
+            "who can read vfolders in their own scope, their own personal project and one other "
+            "user's personal project"
+            if self.granted
+            else "holding no permission"
+        )
+        return Says(
+            f"{grant_ko} 사용자 한 명. 모든 vfolder 는 남에게 ro로 마운트되며, 이름에 "
+            f"{self.fragment}가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 "
+            f"{self.fragment}가 든 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder "
+            "하나",
+            english=(
+                f"one user {grant_en}. Every vfolder is mounted for others as ro: two personal "
+                f"vfolders of the user whose names hold {self.fragment}, one whose name does not, "
+                f"one of another user and one of a third user whose names hold {self.fragment}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AReaderAndFoldersToMount:
         domain = await seeding.creating(
             TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
@@ -1110,15 +1185,13 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
         outside = await seeding.creating_from(matching, third)
         own_project = await seeding.personal_project_of(caller)
         other_project = await seeding.personal_project_of(other)
-        if self.permissions:
-            await seeding.within(SomeoneHoldingFolderPermissions(caller, self.permissions))
+        if self.granted:
+            await seeding.within(SomeoneHoldingFolderPermissions(caller, (Permission.READ,)))
             for project in (own_project, other_project):
                 await seeding.within(
-                    SomeoneGrantedOnFoldersIn(
-                        project, lambda p: ProjectID(p.id), caller, self.permissions
-                    )
+                    SomeoneReadingFoldersIn(project, lambda p: ProjectID(p.id), caller)
                 )
-        return AReaderAndFoldersToSearch(
+        return AReaderAndFoldersToMount(
             first=seeding.made(first),
             second=seeding.made(second),
             excluded_by_name=seeding.made(excluded_by_name),

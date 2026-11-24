@@ -111,6 +111,7 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user.lookups import UserEmailLookup
 from ai.backend.manager.models.user.queries import joined_project_ids_query
@@ -180,6 +181,7 @@ from ai.backend.manager.repositories.vfolder.quota_scope import (
 )
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
+    UserVFolderPage,
     VFolderPurgeFailure,
 )
 from ai.backend.manager.views.user import UserResourceInfo
@@ -1949,6 +1951,23 @@ class VfolderRepository:
                 VFolderUserMountPolicySearcher(pagination=NoPagination(), vfolder_id=vfolder_id)
             )
             return result.items
+
+    @vfolder_repository_resilience.apply()
+    async def scoped_search_user_vfolders(
+        self, scoped: ScopedSearcher[VFolderRow, VFolderData], user_id: UserID
+    ) -> UserVFolderPage:
+        """A page of the vfolders the scopes reach, with the mount policy rows the user
+        holds on them."""
+        async with self._v2_ops.read_ops() as r:
+            page = await r.scoped_search(scoped)
+            rows = await r.query_owned_fields(
+                VFolderUserMountPolicyQuerier(user_id=user_id),
+                [vfolder.id for vfolder in page.items],
+            )
+            return UserVFolderPage(
+                page=page,
+                policies={vfolder_id: data.permission for vfolder_id, data in rows.items()},
+            )
 
     @vfolder_repository_resilience.apply()
     async def user_mount_policies_of(

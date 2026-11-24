@@ -93,18 +93,18 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 |---|---|---|
 | own | 엔티티 자신의 column | 엔티티의 field cap |
 | nested | 엔티티가 소유하는 다른 테이블의 row | 엔티티의 field cap(path `labels.key`) |
-| linked | 외래 키가 다른 엔티티 쪽에 있는 연결, 계산된 관계, 사용자 한 명 기준으로 계산한 값 | 스코프, 다른 엔티티의 권한 |
+| linked | 외래 키가 다른 엔티티 쪽에 있는 연결, 계산된 관계 | 스코프, 다른 엔티티의 권한 |
 
 - 나누는 기준은 소유이지 테이블이 아니다. label 은 다른 테이블에 있지만 vfolder 의 data 다.
 - 외래 키가 search 대상 row 에 있으면 own, 소유한 row 에 있으면 nested 의 filter 다. 다른 엔티티 쪽에 있을 때만 linked 다.
 - 진입점이 하나이므로 sweep test 와 권한 검사가 한 곳에서 시작한다. 뒤의 class 는 이름으로 참조하지
   않으므로 private 이다.
 
-## 사용자 한 명 기준으로 계산한 값은 filter 가 사용자를 지정한다
+## 두 엔티티가 함께 정하는 값은 그 쌍에서 search 한다
 
-- 사용자의 vfolder 마운트 정책에는 column 이 없다. SQL 이 그 사용자의 역할과 정책 row 로 계산한다. 계산에 사용하는 값이 모두 query 가 읽을 수 있는 row 이므로 filter 로 둘 수 있다.
-- filter 가 사용자를 지정하므로 결과는 요청만으로 정해지고, global search 를 포함해 filter DTO 를 받는 모든 search 가 같은 방식으로 동작한다.
-- row 는 호출자의 권한을 검사한 스코프 안에 있다. vfolder 의 사용자별 정책은 그 vfolder 의 READ 권한으로 모두 읽을 수 있으므로, 이 filter 로 더 알 수 있는 것은 지정한 사용자가 그 vfolder 를 읽을 수 있는지뿐이다.
+- 사용자의 vfolder 마운트 정책은 어느 한 엔티티의 값이 아니다. SQL 이 그 사용자의 역할과 정책 row, vfolder 의 column 으로 계산한다. resource group 과 사용자의 fair share 값도 같은 방식으로 search 한다.
+- vfolder 의 filter DTO 는 사용자를 지정하지 않는 global search 도 받는다. 이 값을 그 DTO 에 두면 결과가 호출한 superadmin 에 따라 달라진다.
+- 스코프가 사용자를 지정하고, validator 가 읽기 전에 그 스코프에 대한 호출자의 권한을 검사한다.
 
 ## 다른 테이블의 field 는 펼치지 않고 nested 로 둔다
 

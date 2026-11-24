@@ -14,6 +14,7 @@ from ai.backend.client.cli.v2.helpers import (
     entity_label_filter_options,
     entity_label_relations,
     load_v2_config,
+    parse_order_options,
     print_result,
 )
 
@@ -88,6 +89,94 @@ def project_search(
             )
             result = await registry.vfolder.project_search(UUID(project_id), request)
             print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.group(name="user-vfolder")
+def user_vfolder() -> None:
+    """Pairs of a user and a vfolder."""
+
+
+@user_vfolder.command(name="scoped-search")
+@click.argument("user_id", type=click.UUID)
+@click.option(
+    "--project", "projects", multiple=True, type=click.UUID, help="Project ID (repeatable)."
+)
+@click.option("--domain", "domains", multiple=True, type=click.UUID, help="Domain ID (repeatable).")
+@click.option(
+    "--mount-permission",
+    "mount_permissions",
+    multiple=True,
+    type=click.Choice(["none", "ro", "rw"]),
+    help="Filter by the mount policy of the user (repeatable).",
+)
+@click.option("--name-contains", default=None, help="Filter by vfolder name substring.")
+@click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
+@click.option("--offset", type=int, default=0, help="Number of items to skip.")
+@click.option(
+    "--order-by", multiple=True, help="Order by field:direction (e.g., name:asc, created_at:desc)."
+)
+def scoped_search_user_vfolders(
+    user_id: UUID,
+    projects: tuple[UUID, ...],
+    domains: tuple[UUID, ...],
+    mount_permissions: tuple[str, ...],
+    name_contains: str | None,
+    limit: int,
+    offset: int,
+    order_by: tuple[str, ...],
+) -> None:
+    """Search the vfolders of a user, and of the named projects and domains, with the mount
+    policy of the user on each."""
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        ScopedSearchUserVFoldersInput,
+        UserVFolderFilter,
+        UserVFolderOrder,
+        VFolderFilter,
+    )
+    from ai.backend.common.dto.manager.v2.vfolder.types import (
+        UserVFolderScope,
+        VFolderMountPermissionFilter,
+        VFolderOrderField,
+        VFolderPermissionField,
+    )
+
+    request = ScopedSearchUserVFoldersInput(
+        scope=UserVFolderScope(
+            user=[UUIDScope(value=user_id)],
+            project=[UUIDScope(value=project_id) for project_id in projects] or None,
+            domain=[UUIDScope(value=domain_id) for domain_id in domains] or None,
+        ),
+        filter=UserVFolderFilter(
+            mount_permission=(
+                VFolderMountPermissionFilter(
+                    in_=[VFolderPermissionField(level) for level in mount_permissions]
+                )
+                if mount_permissions
+                else None
+            ),
+            vfolder=(
+                VFolderFilter(name=StringFilter(contains=name_contains))
+                if name_contains is not None
+                else None
+            ),
+        ),
+        order=(
+            parse_order_options(order_by, VFolderOrderField, UserVFolderOrder) if order_by else None
+        ),
+        limit=limit,
+        offset=offset,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            print_result(await registry.vfolder.scoped_search_user_vfolders(request))
         finally:
             await registry.close()
 
