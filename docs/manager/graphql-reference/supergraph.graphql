@@ -22716,7 +22716,7 @@ type Query
     usage: VFolderUsage = null
 
     """
-    Added in 26.10.0. Filter by the mount policy of the current user on the vfolder (`VFolder.mountPermission`).
+    Added in 26.10.0. Filter by the mount policy of the user in `scope.user` on the vfolder. `scope.user` must name exactly one user.
     """
     mountPermission: VFolderMountPermissionFilter = null
     filter: VFolderFilter = null
@@ -32756,7 +32756,7 @@ enum VFolderMountPermission
 }
 
 """
-Added in 26.10.0. Filter for the mount policy of the current user on a vfolder. RW_DELETE matches READ_WRITE.
+Added in 26.10.0. Filter for the mount policy of the scope user on a vfolder. RW_DELETE matches READ_WRITE.
 """
 input VFolderMountPermissionFilter
   @join__type(graph: STRAWBERRY)

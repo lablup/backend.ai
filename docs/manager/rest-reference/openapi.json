@@ -41863,7 +41863,7 @@
               }
             ],
             "default": null,
-            "description": "Added in 26.10.0. Filter by the caller's mount policy on the vfolder. wd matches rw."
+            "description": "Added in 26.10.0. Filter by the mount policy of the scope user on the vfolder. The scope must name exactly one user. wd matches rw."
           }
         },
         "required": [
