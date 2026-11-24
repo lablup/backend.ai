@@ -16976,11 +16976,6 @@ type Query {
     Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
-
-    """
-    Added in 26.10.0. Filter by the mount policy of the user in `scope.user` on the vfolder. `scope.user` must name exactly one user.
-    """
-    mountPermission: VFolderMountPermissionFilter = null
     filter: VFolderFilter = null
     orderBy: [VFolderOrderBy!] = null
     before: String = null
@@ -25189,6 +25184,11 @@ input VFolderFilter {
 
   """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
   autoMounts: VFolderAutoMountNestedFilter = null
+
+  """
+  Added in 26.10.0. Filter by the mount policy of the scope user on the vfolder. Only a search whose scope names exactly one user takes it: `scopedVFoldersV2` with one `scope.user`, and `myVfolders`. Other searches reject it.
+  """
+  mountPermission: VFolderMountPermissionFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

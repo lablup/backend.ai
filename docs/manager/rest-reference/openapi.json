@@ -41164,6 +41164,18 @@
             "default": null,
             "description": "Added in 26.10.0. Filter by vfolder ID."
           },
+          "mount_permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderMountPermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the mount policy of the scope user on the vfolder. A search whose scope does not name exactly one user rejects it. wd matches rw."
+          },
           "AND": {
             "anyOf": [
               {
@@ -41216,6 +41228,69 @@
         "title": "VFolderFilter",
         "type": "object"
       },
+      "VFolderMountPermissionFilter": {
+        "description": "Filter for the mount policy of one user on a vfolder.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderMountPermissionFilter",
+        "type": "object"
+      },
       "VFolderOperationStatusField": {
         "enum": [
           "ready",
@@ -41259,6 +41334,17 @@
           "host"
         ],
         "title": "VFolderOrderField",
+        "type": "string"
+      },
+      "VFolderPermissionField": {
+        "enum": [
+          "none",
+          "ro",
+          "rw",
+          "wd",
+          "wd"
+        ],
+        "title": "VFolderPermissionField",
         "type": "string"
       },
       "VFolderStatusFilter": {
@@ -41599,80 +41685,6 @@
         "title": "SearchVFoldersInput",
         "type": "object"
       },
-      "VFolderMountPermissionFilter": {
-        "description": "Filter for the mount policy of one user on a vfolder.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderPermissionField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderPermissionField"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided values.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderPermissionField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude an exact match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VFolderPermissionField"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided values.",
-            "title": "Not In"
-          }
-        },
-        "title": "VFolderMountPermissionFilter",
-        "type": "object"
-      },
-      "VFolderPermissionField": {
-        "enum": [
-          "none",
-          "ro",
-          "rw",
-          "wd",
-          "wd"
-        ],
-        "title": "VFolderPermissionField",
-        "type": "string"
-      },
       "VFolderScope": {
         "description": "Scope for the scoped vfolder query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
         "properties": {
@@ -41852,18 +41864,6 @@
           "scope": {
             "$ref": "#/components/schemas/VFolderScope",
             "description": "Scope (OR across all items)."
-          },
-          "mount_permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VFolderMountPermissionFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Added in 26.10.0. Filter by the mount policy of the scope user on the vfolder. The scope must name exactly one user. wd matches rw."
           }
         },
         "required": [
