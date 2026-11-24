@@ -11,7 +11,7 @@ import re
 import shutil
 import subprocess
 import textwrap
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from importlib.resources import files
 from pathlib import Path, PurePosixPath
 from typing import Any, Final, cast, override
@@ -23,7 +23,7 @@ from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
-from ai.backend.agent.defs import KRUNNER_ENTRYPOINT_GROUP
+from ai.backend.agent.defs import GLIBC_STUB_CONTAINER_DIR, KRUNNER_ENTRYPOINT_GROUP
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessStreamError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
@@ -48,6 +48,9 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 # literally and writes it into cgroup v2 `pids.max`, allowing a single process.
 # Pass an explicit limit so the extractor can fork.
 _KRUNNER_EXTRACTOR_PIDS_LIMIT: Final = 2048
+
+# The exit status of a process whose shared libraries cannot be loaded.
+_SHARED_LIBRARY_LOAD_FAILURE: Final = 127
 
 
 class DockerKernel(AbstractKernel):
@@ -426,23 +429,31 @@ class DockerKernel(AbstractKernel):
         print(json.dumps(files))
         """
         )
-        proc = await asyncio.create_subprocess_exec(
-            *[
-                "docker",
-                "exec",
+        python_command = ["/opt/backend.ai/bin/python", "-c", code, str(container_abspath)]
+        returncode, out, err = await self._docker_exec(container_id, python_command)
+        if returncode == _SHARED_LIBRARY_LOAD_FAILURE:
+            # `docker exec` does not inherit the LD_LIBRARY_PATH set by entrypoint.sh.
+            _, out, err = await self._docker_exec(
                 container_id,
-                "/opt/backend.ai/bin/python",
-                "-c",
-                code,
-                str(container_abspath),
-            ],
+                python_command,
+                environ={"LD_LIBRARY_PATH": GLIBC_STUB_CONTAINER_DIR},
+            )
+        return {"files": out, "errors": err, "abspath": str(container_path)}
+
+    async def _docker_exec(
+        self,
+        container_id: str,
+        command: Sequence[str],
+        environ: Mapping[str, str] | None = None,
+    ) -> tuple[int | None, str, str]:
+        environ_options = [f"--env={name}={value}" for name, value in (environ or {}).items()]
+        proc = await asyncio.create_subprocess_exec(
+            *["docker", "exec", *environ_options, container_id, *command],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
         raw_out, raw_err = await proc.communicate()
-        out = raw_out.decode("utf-8")
-        err = raw_err.decode("utf-8")
-        return {"files": out, "errors": err, "abspath": str(container_path)}
+        return proc.returncode, raw_out.decode("utf-8"), raw_err.decode("utf-8")
 
     @override
     async def notify_event(self, evdata: AgentEventData) -> None:
