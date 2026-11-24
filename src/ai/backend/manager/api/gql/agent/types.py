@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
@@ -19,6 +20,8 @@ from ai.backend.common.dto.manager.v2.agent.request import (
     UpdateAgentResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
+    AgentGPUDeviceInfo,
+    AgentGPUKernelAllocationInfo,
     AgentNetworkInfoGQLDTO,
     AgentNode,
     AgentResourceGQLDTO,
@@ -396,6 +399,45 @@ class AgentNetworkInfoGQL:
     addr: strawberry.auto
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The share of one GPU device that one kernel holds.",
+    ),
+    model=AgentGPUKernelAllocationInfo,
+    name="AgentGPUKernelAllocation",
+)
+class AgentGPUKernelAllocationGQL(PydanticOutputMixin[AgentGPUKernelAllocationInfo]):
+    kernel_id: UUID = gql_field(description="ID of the kernel holding the device.")
+    session_id: UUID = gql_field(description="ID of the session the kernel belongs to.")
+    allocated_ratio: Decimal = gql_field(
+        description="Ratio of the device capacity allocated to the kernel (0 to 1)."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A GPU device of an agent and the kernels it is allocated to.",
+    ),
+    model=AgentGPUDeviceInfo,
+    name="AgentGPUDevice",
+)
+class AgentGPUDeviceGQL(PydanticOutputMixin[AgentGPUDeviceInfo]):
+    device_id: str = gql_field(
+        description="Device ID the compute plugin reports, such as the GPU UUID."
+    )
+    device_index: int | None = gql_field(
+        description="Index of the device on the node. Null if the compute plugin does not report it."
+    )
+    allocated_ratio: Decimal = gql_field(
+        description="Ratio of the device capacity allocated to all kernels (0 to 1). 0 if the device is not allocated."
+    )
+    kernel_allocations: list[AgentGPUKernelAllocationGQL] = gql_field(
+        description="Kernels holding the device. Empty if the device is not allocated."
+    )
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
@@ -486,6 +528,21 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         Get the container count for a specific agent.
         """
         return await info.context.data_loaders.container_count_loader.load(AgentId(self.id))
+
+    @gql_added_resolver(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "GPU devices of this agent as of the last GPU allocation map rescan, in the order "
+                "of the device index (superadmin only). Null if the agent has no scan result."
+            ),
+        )
+    )
+    async def gpu_devices(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> list[AgentGPUDeviceGQL] | None:
+        return await info.context.data_loaders.agent_gpu_devices_loader.load(AgentId(self.id))
 
     @gql_added_resolver(
         BackendAIGQLMeta(

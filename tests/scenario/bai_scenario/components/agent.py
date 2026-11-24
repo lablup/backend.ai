@@ -20,6 +20,8 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.agent.response import (
     AdminSearchAgentsPayload,
+    AgentGPUDeviceInfo,
+    AgentGPUDevicesPayload,
     AgentNode,
     UpdateAgentResourceGroupPayload,
 )
@@ -614,4 +616,51 @@ class TheTotalResources(Then[AgentsAndACaller, TotalResourceData]):
             Same("total_capacity_slots", total.total_capacity_slots.to_json(), capacity),
             Same("total_used_slots", total.total_used_slots.to_json(), used),
             Same("total_free_slots", total.total_free_slots.to_json(), free),
+        ]
+
+
+@dataclass(frozen=True)
+class NoGPUDevicesComeBackPerAgent(Then[AgentsAndACaller, list[list[AgentGPUDeviceInfo] | None]]):
+    """스캔한 적이 없는 에이전트마다 빈 값이 입력 순서대로 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "GPU 를 스캔한 적이 없는 에이전트 자리는 빈 값으로 옵니다",
+            english="the entry of an agent whose GPUs were never scanned comes back as an empty value",
+        )
+
+    @override
+    def look(
+        self,
+        laid: AgentsAndACaller,
+        answered: Answered[list[list[AgentGPUDeviceInfo] | None]],
+    ) -> list[Verdict]:
+        loaded = answered.response
+        if loaded is None:
+            return [MissingResponse(answered.raised)]
+        return [Same("gpu_devices", loaded, [None] * len(laid.agents))]
+
+
+@dataclass(frozen=True)
+class NoGPUDevicesComeBack(Then[AgentsAndACaller, AgentGPUDevicesPayload]):
+    """스캔한 적이 없는 에이전트의 응답이 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "GPU 를 스캔한 적이 없는 에이전트의 GPU 는 빈 값으로 옵니다",
+            english="the GPUs of an agent that was never scanned come back as an empty value",
+        )
+
+    @override
+    def look(
+        self, laid: AgentsAndACaller, answered: Answered[AgentGPUDevicesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        return [
+            Same("agent_id", payload.agent_id, laid.agents[0].agent_id),
+            Same("gpu_devices", payload.gpu_devices, None),
         ]

@@ -46,6 +46,10 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
 )
+from ai.backend.manager.services.agent.actions.global_load_gpu_devices import (
+    GlobalLoadAgentGPUDevicesAction,
+    GlobalLoadAgentGPUDevicesActionResult,
+)
 from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
     LoadContainerCountsActionResult,
@@ -306,3 +310,9 @@ class AgentService:
             agent_ids=action.agent_ids
         )
         return LoadContainerCountsActionResult(container_counts=container_counts)
+
+    async def global_load_gpu_devices(
+        self, action: GlobalLoadAgentGPUDevicesAction
+    ) -> GlobalLoadAgentGPUDevicesActionResult:
+        gpu_devices = await self._agent_repository.load_gpu_devices(action.agent_ids)
+        return GlobalLoadAgentGPUDevicesActionResult(gpu_devices=gpu_devices)

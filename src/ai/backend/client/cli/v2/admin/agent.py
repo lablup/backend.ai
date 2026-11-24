@@ -184,3 +184,19 @@ def total_resources() -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@agent.command(name="gpu-devices")
+@click.argument("agent_id")
+def gpu_devices(agent_id: str) -> None:
+    """Get the GPU devices of an agent and the kernels holding them (superadmin only)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.agent.admin_get_gpu_devices(agent_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

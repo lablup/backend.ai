@@ -9,7 +9,9 @@ Scenario: complete
   - batch_load_by_ids: success present 2 · rejection present 1 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_by_uuids: success present 1 · rejection present 2 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_container_counts: success present 2 · rejection present 1 (partial_bulk, partial_bulk_get_ops)
-- direct implementation (3)
+- direct implementation (5)
+  - batch_load_gpu_devices: success present 1 · rejection present 1 (global_scope)
+  - get_gpu_devices: success present 1 · rejection present 1 (global_scope)
   - get_total_resources: success present 1 · rejection present 1 (global_scope)
   - update_resource_group: success present 1 · rejection present 2 (global_scope)
   - update_resource_group_from_body: success present 1 · rejection present 1 (global_scope)
@@ -44,6 +46,20 @@ Scenario: complete
 | [when a user who can read the agents of the resource group counts containers, zero comes back because nothing runs on the agent](#batch_loading-a-user-reading-the-group-counts-no-container-on-the-agent) | answered |
 | [the container count of a name nothing answers to comes back as zero](#batch_loading-an-unknown-agent-name-counts-no-container) | answered |
 | [when a user granted nothing counts containers, the entry is rejected for lack of permission](#batch_loading-a-user-granted-nothing-gets-a-denial-for-the-container-count) | rejected |
+
+**batch_load_gpu_devices**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin loads the GPUs of several agents at once, the entries of the agents never scanned come back as empty values](#reading_gpu_devices-the-superadmin-loads-an-empty-value-for-the-agents-never-scanned) | answered |
+| [the read is open to the superadmin alone, so even a regular user who can read the agents of the group is rejected for lack of privilege](#reading_gpu_devices-a-user-reading-the-group-may-not-load-gpu-devices) | rejected |
+
+**get_gpu_devices**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin reads the GPUs of an agent never scanned, an empty value comes back](#reading_gpu_devices-the-superadmin-gets-an-empty-value-for-an-agent-never-scanned) | answered |
+| [the read is open to the superadmin alone, so even a regular user who can read the agents of the group is rejected for lack of privilege](#reading_gpu_devices-a-user-reading-the-group-may-not-get-gpu-devices) | rejected |
 
 **get_total_resources**
 
@@ -528,6 +544,128 @@ Then
 - the entry of an agent the caller may not read is rejected for lack of permission
   - length = 1
   - rejected: NotEnoughPermission
+
+### batch_load_gpu_devices
+
+<a id="reading_gpu_devices-the-superadmin-loads-an-empty-value-for-the-agents-never-scanned"></a>
+
+#### [the-superadmin-loads-an-empty-value-for-the-agents-never-scanned](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+when the superadmin loads the GPUs of several agents at once, the entries of the agents never scanned come back as empty values
+
+Given
+
+- 2 agents and one superadmin
+  - Resource group mine-1: uses the fifo scheduler
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-2: alive, and has not reported any slot yet
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- AgentAdapter.batch_load_gpu_devices: user-1 loads the GPUs of 2 agents at once
+
+Then
+
+- the entry of an agent whose GPUs were never scanned comes back as an empty value
+  - gpu_devices = [None, None]
+
+<a id="reading_gpu_devices-a-user-reading-the-group-may-not-load-gpu-devices"></a>
+
+#### [a-user-reading-the-group-may-not-load-gpu-devices](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+the read is open to the superadmin alone, so even a regular user who can read the agents of the group is rejected for lack of privilege
+
+Given
+
+- 1 agents and one the regular user granted permission to read the agents of the group
+  - Resource group mine-1: uses the fifo scheduler
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Domain home-1
+  - Prepare a user granted permission to read agents in the resource group
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role agent-reader-1: applies only within the scope it is granted in
+    - Role agent-reader-1: READ allowed on every agent
+    - regular user user-1: holds Role agent-reader-1
+
+When
+
+- AgentAdapter.batch_load_gpu_devices: user-1 loads the GPUs of 1 agents at once
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### get_gpu_devices
+
+<a id="reading_gpu_devices-the-superadmin-gets-an-empty-value-for-an-agent-never-scanned"></a>
+
+#### [the-superadmin-gets-an-empty-value-for-an-agent-never-scanned](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+when the superadmin reads the GPUs of an agent never scanned, an empty value comes back
+
+Given
+
+- 1 agents and one superadmin
+  - Resource group mine-1: uses the fifo scheduler
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- AgentAdapter.get_gpu_devices: user-1 reads the GPUs of agent agent-1
+
+Then
+
+- the GPUs of an agent that was never scanned come back as an empty value
+  - agent_id = 'agent-1'
+  - gpu_devices = None
+
+<a id="reading_gpu_devices-a-user-reading-the-group-may-not-get-gpu-devices"></a>
+
+#### [a-user-reading-the-group-may-not-get-gpu-devices](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+the read is open to the superadmin alone, so even a regular user who can read the agents of the group is rejected for lack of privilege
+
+Given
+
+- 1 agents and one the regular user granted permission to read the agents of the group
+  - Resource group mine-1: uses the fifo scheduler
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Domain home-1
+  - Prepare a user granted permission to read agents in the resource group
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role agent-reader-1: applies only within the scope it is granted in
+    - Role agent-reader-1: READ allowed on every agent
+    - regular user user-1: holds Role agent-reader-1
+
+When
+
+- AgentAdapter.get_gpu_devices: user-1 reads the GPUs of agent agent-1
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### get_total_resources
 

@@ -105,7 +105,10 @@ from ai.backend.common.types import AgentId
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
-    from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.agent.types import (  # pants: no-infer-dep
+        AgentGPUDeviceGQL,
+        AgentV2GQL,
+    )
     from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
         AppConfigAllowListGQL,
     )
@@ -839,6 +842,27 @@ class DataLoaders:
 
         async def load_fn(agent_ids: list[AgentId]) -> list[int | Exception]:
             return await adapter.batch_load_container_counts(agent_ids)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def agent_gpu_devices_loader(
+        self,
+    ) -> DataLoader[AgentId, list[AgentGPUDeviceGQL] | None]:
+        adapter = self._adapters.agent
+
+        async def load_fn(agent_ids: list[AgentId]) -> list[list[AgentGPUDeviceGQL] | None]:
+            from ai.backend.manager.api.gql.agent.types import (  # pants: no-infer-dep
+                AgentGPUDeviceGQL as AGD,
+            )
+
+            loaded_gpu_devices = await adapter.batch_load_gpu_devices(agent_ids)
+            return [
+                None
+                if gpu_devices is None
+                else [AGD.from_pydantic(gpu_device) for gpu_device in gpu_devices]
+                for gpu_devices in loaded_gpu_devices
+            ]
 
         return DataLoader(load_fn=load_fn)
 

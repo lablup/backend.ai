@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.v2.agent.request import (
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
     AdminSearchAgentsPayload,
+    AgentGPUDevicesPayload,
     AgentResourceStatsPayload,
     UpdateAgentResourceGroupPayload,
 )
@@ -50,4 +51,12 @@ class V2AgentClient(BaseDomainClient):
             "GET",
             f"{_PATH}/total-resources",
             response_model=AgentResourceStatsPayload,
+        )
+
+    async def admin_get_gpu_devices(self, agent_id: str) -> AgentGPUDevicesPayload:
+        """Get the GPU devices of an agent as of the last rescan (superadmin only)."""
+        return await self._client.typed_request(
+            "GET",
+            f"{_PATH}/{agent_id}/gpu-devices",
+            response_model=AgentGPUDevicesPayload,
         )

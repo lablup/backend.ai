@@ -420,6 +420,7 @@ class CUDAPlugin(AbstractComputePlugin):
                 numa_node=node,
                 memory_size=raw_info.total_global_mem,
                 processing_units=raw_info.multiprocessor_count,
+                device_index=int(dev_id),
                 model_name=raw_info.name,
                 uuid=dev_uuid,
             )

@@ -9,7 +9,9 @@
   - batch_load_by_ids: 성공 있음 2 · 거부 있음 1 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_by_uuids: 성공 있음 1 · 거부 있음 2 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_container_counts: 성공 있음 2 · 거부 있음 1 (partial_bulk, partial_bulk_get_ops)
-- 직접 구현 (3)
+- 직접 구현 (5)
+  - batch_load_gpu_devices: 성공 있음 1 · 거부 있음 1 (global_scope)
+  - get_gpu_devices: 성공 있음 1 · 거부 있음 1 (global_scope)
   - get_total_resources: 성공 있음 1 · 거부 있음 1 (global_scope)
   - update_resource_group: 성공 있음 1 · 거부 있음 2 (global_scope)
   - update_resource_group_from_body: 성공 있음 1 · 거부 있음 1 (global_scope)
@@ -44,6 +46,20 @@
 | [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 컨테이너 수를 조회하면 아무것도 돌지 않는 에이전트이므로 0 이 옵니다](#batch_loading-a-user-reading-the-group-counts-no-container-on-the-agent) | 성공 |
 | [없는 이름의 컨테이너 수는 0 으로 옵니다](#batch_loading-an-unknown-agent-name-counts-no-container) | 성공 |
 | [아무 권한도 없는 사용자가 컨테이너 수를 조회하면 권한 부족으로 옵니다](#batch_loading-a-user-granted-nothing-gets-a-denial-for-the-container-count) | 거부 |
+
+**batch_load_gpu_devices**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 여러 에이전트의 GPU 를 한 번에 조회하면, 스캔한 적이 없는 에이전트 자리는 빈 값으로 옵니다](#reading_gpu_devices-the-superadmin-loads-an-empty-value-for-the-agents-never-scanned) | 성공 |
+| [superadmin 만 부를 수 있는 조회라, 그 그룹의 에이전트를 읽을 수 있는 일반 사용자라도 권한 부족으로 거부됩니다](#reading_gpu_devices-a-user-reading-the-group-may-not-load-gpu-devices) | 거부 |
+
+**get_gpu_devices**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 스캔한 적이 없는 에이전트의 GPU 를 조회하면 빈 값이 옵니다](#reading_gpu_devices-the-superadmin-gets-an-empty-value-for-an-agent-never-scanned) | 성공 |
+| [superadmin 만 부를 수 있는 조회라, 그 그룹의 에이전트를 읽을 수 있는 일반 사용자라도 권한 부족으로 거부됩니다](#reading_gpu_devices-a-user-reading-the-group-may-not-get-gpu-devices) | 거부 |
 
 **get_total_resources**
 
@@ -528,6 +544,128 @@ Then
 - 읽을 수 없는 에이전트 자리는 권한 부족으로 옵니다
   - length = 1
   - 거부: NotEnoughPermission
+
+### batch_load_gpu_devices
+
+<a id="reading_gpu_devices-the-superadmin-loads-an-empty-value-for-the-agents-never-scanned"></a>
+
+#### [the-superadmin-loads-an-empty-value-for-the-agents-never-scanned](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+superadmin 이 여러 에이전트의 GPU 를 한 번에 조회하면, 스캔한 적이 없는 에이전트 자리는 빈 값으로 옵니다
+
+Given
+
+- 에이전트 2개와, superadmin 한 명
+  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- AgentAdapter.batch_load_gpu_devices: user-1이 에이전트 2개의 GPU 를 한 번에 조회합니다
+
+Then
+
+- GPU 를 스캔한 적이 없는 에이전트 자리는 빈 값으로 옵니다
+  - gpu_devices = [None, None]
+
+<a id="reading_gpu_devices-a-user-reading-the-group-may-not-load-gpu-devices"></a>
+
+#### [a-user-reading-the-group-may-not-load-gpu-devices](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+superadmin 만 부를 수 있는 조회라, 그 그룹의 에이전트를 읽을 수 있는 일반 사용자라도 권한 부족으로 거부됩니다
+
+Given
+
+- 에이전트 1개와, 그 그룹의 에이전트를 읽을 수 있는 일반 사용자 한 명
+  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 도메인 home-1
+  - 리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 agent-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 agent-reader-1: agent 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 agent-reader-1 보유
+
+When
+
+- AgentAdapter.batch_load_gpu_devices: user-1이 에이전트 1개의 GPU 를 한 번에 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
+
+### get_gpu_devices
+
+<a id="reading_gpu_devices-the-superadmin-gets-an-empty-value-for-an-agent-never-scanned"></a>
+
+#### [the-superadmin-gets-an-empty-value-for-an-agent-never-scanned](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+superadmin 이 스캔한 적이 없는 에이전트의 GPU 를 조회하면 빈 값이 옵니다
+
+Given
+
+- 에이전트 1개와, superadmin 한 명
+  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- AgentAdapter.get_gpu_devices: user-1이 에이전트 agent-1의 GPU 를 조회합니다
+
+Then
+
+- GPU 를 스캔한 적이 없는 에이전트의 GPU 는 빈 값으로 옵니다
+  - agent_id = 'agent-1'
+  - gpu_devices = None
+
+<a id="reading_gpu_devices-a-user-reading-the-group-may-not-get-gpu-devices"></a>
+
+#### [a-user-reading-the-group-may-not-get-gpu-devices](/tests/scenario/bai_scenario/manager/agent/test_reading_gpu_devices.py): pass
+
+superadmin 만 부를 수 있는 조회라, 그 그룹의 에이전트를 읽을 수 있는 일반 사용자라도 권한 부족으로 거부됩니다
+
+Given
+
+- 에이전트 1개와, 그 그룹의 에이전트를 읽을 수 있는 일반 사용자 한 명
+  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 도메인 home-1
+  - 리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 agent-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 agent-reader-1: agent 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 agent-reader-1 보유
+
+When
+
+- AgentAdapter.get_gpu_devices: user-1이 에이전트 agent-1의 GPU 를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
 
 ### get_total_resources
 

@@ -69,6 +69,7 @@ from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import collect_device_capacities, scan_gpu_alloc_map
 from ai.backend.agent.rpc.context import with_rpc_context, with_rpc_trace
+from ai.backend.agent.rpc.gpu.registry import register_gpu_domain
 from ai.backend.agent.rpc.health.registry import register_health_domain
 from ai.backend.agent.rpc.hwinfo.registry import register_hwinfo_domain
 from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
@@ -513,6 +514,7 @@ class AgentRPCServer(aobject):
         register_kernel_domain(self._rpc_registry)
         register_health_domain(self._rpc_registry, health_probe=self.health_probe)
         register_hwinfo_domain(self._rpc_registry)
+        register_gpu_domain(self._rpc_registry)
         self._rpc_registry.bind_to_rpc(self.rpc_server)
 
     async def status_snapshot_request_handler(

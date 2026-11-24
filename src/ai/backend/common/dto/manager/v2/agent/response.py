@@ -8,6 +8,7 @@ plus Payload models for search/detail/stats responses.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -15,14 +16,19 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
-from ai.backend.common.types import AgentId
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import AgentId, DeviceId
 
 __all__ = (
     "AdminSearchAgentsPayload",
+    "AgentGPUDeviceInfo",
+    "AgentGPUDevicesPayload",
+    "AgentGPUKernelAllocationInfo",
     "AgentNetworkInfo",
     "AgentNetworkInfoGQLDTO",
     "AgentNode",
@@ -142,6 +148,52 @@ class AgentNetworkInfo(BaseResponseModel):
     )
 
 
+class AgentGPUKernelAllocationInfo(BaseResponseModel):
+    """The share of one GPU device that one kernel holds."""
+
+    kernel_id: KernelID = Field(
+        description=f"ID of the kernel holding the device. Added in {NEXT_RELEASE_VERSION}."
+    )
+    session_id: SessionID = Field(
+        description=f"ID of the session the kernel belongs to. Added in {NEXT_RELEASE_VERSION}."
+    )
+    allocated_ratio: Decimal = Field(
+        description=(
+            "Ratio of the device capacity allocated to the kernel (0 to 1). "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+
+
+class AgentGPUDeviceInfo(BaseResponseModel):
+    """A GPU device of an agent and the kernels it is allocated to."""
+
+    device_id: DeviceId = Field(
+        description=(
+            "Device ID the compute plugin reports, such as the GPU UUID. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    device_index: int | None = Field(
+        description=(
+            "Index of the device on the node. Null if the compute plugin does not report it. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    allocated_ratio: Decimal = Field(
+        description=(
+            "Ratio of the device capacity allocated to all kernels (0 to 1). "
+            f"0 if the device is not allocated. Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+    kernel_allocations: list[AgentGPUKernelAllocationInfo] = Field(
+        description=(
+            "Kernels holding the device. Empty if the device is not allocated. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Node model
 # ---------------------------------------------------------------------------
@@ -225,6 +277,18 @@ class UpdateAgentResourceGroupPayload(BaseResponseModel):
             "IDs of the conflicting sessions that were actually transitioned to "
             "TERMINATING by the applied policy. Their container cleanup proceeds "
             "asynchronously."
+        )
+    )
+
+
+class AgentGPUDevicesPayload(BaseResponseModel):
+    """Payload for the GPU devices of an agent."""
+
+    agent_id: AgentId = Field(description=f"ID of the agent. Added in {NEXT_RELEASE_VERSION}.")
+    gpu_devices: list[AgentGPUDeviceInfo] | None = Field(
+        description=(
+            "GPU devices as of the last GPU allocation map rescan, in the order of the device "
+            f"index. Null if the agent has no scan result. Added in {NEXT_RELEASE_VERSION}."
         )
     )
 

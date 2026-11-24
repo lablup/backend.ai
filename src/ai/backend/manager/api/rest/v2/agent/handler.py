@@ -59,3 +59,11 @@ class V2AgentHandler:
             total_capacity_slots=dict(data.total_capacity_slots.to_json()),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def admin_get_gpu_devices(
+        self,
+        path: PathParam[AgentIdPathParam],
+    ) -> APIResponse:
+        """Retrieve the scanned GPU devices of an agent (superadmin only)."""
+        result = await self._adapter.get_gpu_devices(AgentId(path.parsed.agent_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

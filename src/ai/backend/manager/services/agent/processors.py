@@ -34,6 +34,10 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
 )
+from ai.backend.manager.services.agent.actions.global_load_gpu_devices import (
+    GlobalLoadAgentGPUDevicesAction,
+    GlobalLoadAgentGPUDevicesActionResult,
+)
 from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
     LoadContainerCountsActionResult,
@@ -109,6 +113,9 @@ class AgentProcessors:
     load_container_counts: GlobalActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
+    global_load_gpu_devices: GlobalActionProcessor[
+        GlobalLoadAgentGPUDevicesAction, GlobalLoadAgentGPUDevicesActionResult
+    ]
 
     def __init__(
         self,
@@ -160,4 +167,7 @@ class AgentProcessors:
         self.search_agents = group.global_searcher_ops(SearchAgentsAction)
         self.load_container_counts = group.global_scope(
             LoadContainerCountsAction, service.load_container_counts
+        )
+        self.global_load_gpu_devices = group.global_scope(
+            GlobalLoadAgentGPUDevicesAction, service.global_load_gpu_devices
         )

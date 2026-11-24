@@ -6,6 +6,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import assert_never
 
+from ai.backend.common.data.agent.types import GPUDeviceAllocation
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -18,6 +19,9 @@ from ai.backend.common.dto.manager.v2.agent.request import (
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
     AdminSearchAgentsPayload,
+    AgentGPUDeviceInfo,
+    AgentGPUDevicesPayload,
+    AgentGPUKernelAllocationInfo,
     AgentNetworkInfo,
     AgentNode,
     AgentResourceInfo,
@@ -65,6 +69,9 @@ from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgen
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
+)
+from ai.backend.manager.services.agent.actions.global_load_gpu_devices import (
+    GlobalLoadAgentGPUDevicesAction,
 )
 from ai.backend.manager.services.agent.actions.scoped_search_resources import (
     ScopedSearchAgentResourcesAction,
@@ -229,6 +236,33 @@ class AgentAdapter(BaseAdapter):
                 continue
             answers.append(counts.get(uuid, 0))
         return answers
+
+    async def batch_load_gpu_devices(
+        self, agent_ids: Sequence[AgentId]
+    ) -> list[list[AgentGPUDeviceInfo] | None]:
+        """Batch load the scanned GPU devices by agent name for DataLoader use (superadmin).
+
+        One answer per name in the given order: the devices, or ``None`` for an agent
+        without a scan result.
+        """
+        if not agent_ids:
+            return []
+        loaded = await self._agent.global_load_gpu_devices.run(
+            GlobalLoadAgentGPUDevicesAction(agent_ids=agent_ids)
+        )
+        return [
+            [self._gpu_device_to_dto(device) for device in loaded.gpu_devices[agent_id]]
+            if agent_id in loaded.gpu_devices
+            else None
+            for agent_id in agent_ids
+        ]
+
+    # ------------------------------------------------------------------ get
+
+    async def get_gpu_devices(self, agent_id: AgentId) -> AgentGPUDevicesPayload:
+        """Read the scanned GPU devices of an agent (superadmin)."""
+        [gpu_devices] = await self.batch_load_gpu_devices([agent_id])
+        return AgentGPUDevicesPayload(agent_id=agent_id, gpu_devices=gpu_devices)
 
     # ------------------------------------------------------------------ search
 
@@ -408,6 +442,22 @@ class AgentAdapter(BaseAdapter):
             GetTotalResourcesAction()
         )
         return action_result.total_resources
+
+    @staticmethod
+    def _gpu_device_to_dto(device: GPUDeviceAllocation) -> AgentGPUDeviceInfo:
+        return AgentGPUDeviceInfo(
+            device_id=device.device_id,
+            device_index=device.device_index,
+            allocated_ratio=device.allocated_ratio,
+            kernel_allocations=[
+                AgentGPUKernelAllocationInfo(
+                    kernel_id=allocation.kernel_id,
+                    session_id=allocation.session_id,
+                    allocated_ratio=allocation.allocated_ratio,
+                )
+                for allocation in device.kernel_allocations
+            ],
+        )
 
     @staticmethod
     def _data_to_dto(detail: AgentDetailData) -> AgentNode:

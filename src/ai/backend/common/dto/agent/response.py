@@ -5,6 +5,7 @@ from typing import Any, Self, TypeVar, override
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.data.agent.types import GPUDeviceAllocation
 from ai.backend.common.dto.internal.health import ConnectivityCheckResponse, HealthStatus
 from ai.backend.common.types import BackendAISchema
 
@@ -82,6 +83,14 @@ class GatherHwinfoResp(BaseAgentResponseModel):
 
     devices: list[DeviceHardwareInfo] = Field(
         description="Hardware info collected from every registered compute plugin",
+    )
+
+
+class ScanGPUDevicesResp(BaseAgentResponseModel):
+    """Agent RPC v3 response for the ``scan_gpu_devices`` method."""
+
+    devices: list[GPUDeviceAllocation] = Field(
+        description="Every GPU device of the agent, including the unallocated ones",
     )
 
 

@@ -29,4 +29,10 @@ def register_v2_agent_routes(
     reg.add(
         "GET", "/total-resources", handler.get_total_resources, middlewares=[superadmin_required]
     )
+    reg.add(
+        "GET",
+        "/{agent_id}/gpu-devices",
+        handler.admin_get_gpu_devices,
+        middlewares=[superadmin_required],
+    )
     return reg

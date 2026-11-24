@@ -39,6 +39,9 @@ from ai.backend.agent.errors.resources import (
     ResourceOverAllocatedError,
 )
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.data.agent.types import GPUDeviceAllocation, KernelGPUAllocation
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -54,6 +57,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    SessionId,
     SlotName,
     SlotTypes,
     aobject,
@@ -314,6 +318,7 @@ class AbstractComputeDevice:
     processing_units: int  # number of processing units (e.g., cores, SMP)
     _device_name: DeviceName | None
     numa_node: int | None  # NUMA node ID (None if not applicable)
+    device_index: int | None  # index among the devices of the node (None if not reported)
 
     def __init__(
         self,
@@ -323,6 +328,7 @@ class AbstractComputeDevice:
         processing_units: int,
         numa_node: int | None = None,
         device_name: DeviceName | None = None,
+        device_index: int | None = None,
     ) -> None:
         self.device_id = device_id
         self.hw_location = hw_location
@@ -330,6 +336,7 @@ class AbstractComputeDevice:
         self.processing_units = processing_units
         self._device_name = device_name
         self.numa_node = numa_node
+        self.device_index = device_index
 
     @property
     def device_name(self) -> DeviceName:
@@ -958,6 +965,38 @@ def _normalize_device_alloc(
     return alloc / capacity
 
 
+async def _read_kernel_gpu_alloc_ratios(
+    kernel_id: KernelId,
+    scratch_root: Path,
+    device_capacities: DeviceCapacityMap,
+) -> dict[DeviceId, Decimal]:
+    """
+    Read the ratio (0 to 1) of each gpu device allocated to the kernel from its ``resource.txt``.
+    """
+    path = scratch_root / str(kernel_id) / "config" / "resource.txt"
+    alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
+
+    try:
+        content = await run_in_executor_with_context(None, path.read_text)
+        resource_spec = KernelResourceSpec.read_from_string(content)
+
+        if cuda := resource_spec.allocations.get(DeviceName("cuda")):
+            for slot_name, per_device_alloc in cuda.items():
+                for device_id, alloc in per_device_alloc.items():
+                    alloc_map[device_id] += _normalize_device_alloc(
+                        device_capacities, slot_name, device_id, Decimal(alloc)
+                    )
+
+    except FileNotFoundError:
+        return {}
+
+    except Exception as e:
+        setattr(e, "kernel_id", kernel_id)
+        raise
+
+    return alloc_map
+
+
 async def scan_gpu_alloc_map(
     kernel_ids: Sequence[KernelId],
     scratch_root: Path,
@@ -967,34 +1006,9 @@ async def scan_gpu_alloc_map(
     Fetch the current allocated ratio (0 to 1) of each gpu device from
     ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
     """
-
-    async def _read_kernel_resource_spec(kernel_id: KernelId) -> dict[DeviceId, Decimal]:
-        path = scratch_root / str(kernel_id) / "config" / "resource.txt"
-        alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
-
-        try:
-            content = await run_in_executor_with_context(None, path.read_text)
-            resource_spec = KernelResourceSpec.read_from_string(content)
-
-            if cuda := resource_spec.allocations.get(DeviceName("cuda")):
-                for slot_name, per_device_alloc in cuda.items():
-                    for device_id, alloc in per_device_alloc.items():
-                        alloc_map[device_id] += _normalize_device_alloc(
-                            device_capacities, slot_name, device_id, Decimal(alloc)
-                        )
-
-        except FileNotFoundError:
-            return {}
-
-        except Exception as e:
-            setattr(e, "kernel_id", kernel_id)
-            raise
-
-        return alloc_map
-
     tasks = [
         asyncio.create_task(
-            _read_kernel_resource_spec(kernel_id),
+            _read_kernel_gpu_alloc_ratios(kernel_id, scratch_root, device_capacities),
         )
         for kernel_id in kernel_ids
     ]
@@ -1016,6 +1030,67 @@ async def scan_gpu_alloc_map(
         device_id: alloc.quantize(_GPU_ALLOC_RATIO_PRECISION)
         for device_id, alloc in gpu_alloc_map.items()
     }
+
+
+async def scan_gpu_devices(
+    kernel_session_ids: Mapping[KernelId, SessionId],
+    scratch_root: Path,
+    gpu_devices: Collection[AbstractComputeDevice],
+    device_capacities: DeviceCapacityMap,
+) -> list[GPUDeviceAllocation]:
+    """
+    List every gpu device in the order of its index, with the kernels it is allocated to.
+
+    A device that kernels still hold is listed even when the plugin no longer reports it.
+    """
+    kernel_ids = list(kernel_session_ids)
+    ratios_or_errors = await asyncio.gather(
+        *(
+            _read_kernel_gpu_alloc_ratios(kernel_id, scratch_root, device_capacities)
+            for kernel_id in kernel_ids
+        ),
+        return_exceptions=True,
+    )
+
+    device_indexes: dict[DeviceId, int | None] = {
+        device.device_id: device.device_index for device in gpu_devices
+    }
+    kernel_ratios_by_device: dict[DeviceId, dict[KernelId, Decimal]] = {
+        device_id: {} for device_id in device_indexes
+    }
+    for kernel_id, ratios_or_error in zip(kernel_ids, ratios_or_errors, strict=True):
+        if isinstance(ratios_or_error, BaseException):
+            log.error("gpu device scan failed", kernel_id=str(kernel_id), exc_info=ratios_or_error)
+            continue
+        for device_id, ratio in ratios_or_error.items():
+            kernel_ratios_by_device.setdefault(device_id, {})[kernel_id] = ratio
+
+    devices = [
+        GPUDeviceAllocation(
+            device_id=device_id,
+            device_index=device_indexes.get(device_id),
+            allocated_ratio=sum(kernel_ratios.values(), Decimal(0)).quantize(
+                _GPU_ALLOC_RATIO_PRECISION
+            ),
+            kernel_allocations=[
+                KernelGPUAllocation(
+                    kernel_id=KernelID(kernel_id),
+                    session_id=SessionID(kernel_session_ids[kernel_id]),
+                    allocated_ratio=ratio.quantize(_GPU_ALLOC_RATIO_PRECISION),
+                )
+                for kernel_id, ratio in kernel_ratios.items()
+            ],
+        )
+        for device_id, kernel_ratios in kernel_ratios_by_device.items()
+    ]
+    return sorted(
+        devices,
+        key=lambda device: (
+            device.device_index is None,
+            device.device_index or 0,
+            device.device_id,
+        ),
+    )
 
 
 def allocate(

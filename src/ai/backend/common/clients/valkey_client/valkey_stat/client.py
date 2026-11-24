@@ -22,6 +22,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
+from ai.backend.common.data.agent.types import GPUDeviceAllocation
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -34,7 +35,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import AgentId, ValkeyTarget
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -59,6 +60,7 @@ _KERNEL_COMMIT_PREFIX: Final[str] = "kernel"
 _KERNEL_COMMIT_SUFFIX: Final[str] = "commit"
 _ABUSE_REPORT_HASH: Final[str] = "abuse_report"
 _CONTAINER_COUNT_PREFIX: Final[str] = "container_count"
+_GPU_DEVICES_PREFIX: Final[str] = "gpu_devices"
 _MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
 _INFERENCE_PREFIX: Final[str] = "inference"
 _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
@@ -198,6 +200,57 @@ class ValkeyStatClient:
             await conn.set(key, value, expiry=ExpirySet(ExpiryType.SEC, ttl))
 
     @valkey_stat_resilience.apply()
+    async def get_gpu_devices_batch(
+        self, agent_ids: Sequence[AgentId]
+    ) -> list[list[GPUDeviceAllocation] | None]:
+        """
+        Get the scanned GPU devices of multiple agents.
+
+        :param agent_ids: The agent IDs.
+        :return: GPU devices in the order of the agent IDs, with None for an agent that has no scan result.
+        """
+        if not agent_ids:
+            return []
+        results = await self._get_multiple_keys([
+            self._get_gpu_devices_key(agent_id) for agent_id in agent_ids
+        ])
+        gpu_devices: list[list[GPUDeviceAllocation] | None] = []
+        for agent_id, result in zip(agent_ids, results, strict=True):
+            if result is None:
+                gpu_devices.append(None)
+                continue
+            try:
+                gpu_devices.append([
+                    GPUDeviceAllocation.model_validate(device) for device in load_json(result)
+                ])
+            except (ValueError, BackendAIError):
+                log.warning(
+                    "gpu devices decode failed",
+                    agent_id=agent_id,
+                    raw_value=result.decode("utf-8", errors="replace"),
+                )
+                gpu_devices.append(None)
+        return gpu_devices
+
+    @valkey_stat_resilience.apply()
+    async def set_gpu_devices(
+        self, agent_id: AgentId, gpu_devices: Sequence[GPUDeviceAllocation]
+    ) -> None:
+        """
+        Set the scanned GPU devices of an agent with 24-hour TTL.
+
+        :param agent_id: The agent ID.
+        :param gpu_devices: GPU devices to store.
+        """
+        value = dump_json_str([device.model_dump(mode="json") for device in gpu_devices])
+        async with self._client.client() as conn:
+            await conn.set(
+                self._get_gpu_devices_key(agent_id),
+                value,
+                expiry=ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION),
+            )
+
+    @valkey_stat_resilience.apply()
     async def get_kernel_statistics(self, kernel_id: str) -> dict[str, Any] | None:
         """
         Get kernel utilization statistics.
@@ -227,6 +280,15 @@ class ValkeyStatClient:
         :return: The generated key.
         """
         return f"{_KERNEL_COMMIT_PREFIX}.{kernel_id}.{_KERNEL_COMMIT_SUFFIX}"
+
+    def _get_gpu_devices_key(self, agent_id: AgentId) -> str:
+        """
+        Generate GPU devices key for an agent.
+
+        :param agent_id: The agent ID.
+        :return: The generated key.
+        """
+        return f"{_GPU_DEVICES_PREFIX}.{agent_id}"
 
     def _get_container_count_key(self, agent_id: str) -> str:
         """

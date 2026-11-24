@@ -7,11 +7,17 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast, override
 from pydantic import ConfigDict
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.request import BaseAgentRequestModel, GatherHwinfoReq, HealthReq
+from ai.backend.common.dto.agent.request import (
+    BaseAgentRequestModel,
+    GatherHwinfoReq,
+    HealthReq,
+    ScanGPUDevicesReq,
+)
 from ai.backend.common.dto.agent.response import (
     BaseAgentResponseModel,
     GatherHwinfoResp,
     HealthResp,
+    ScanGPUDevicesResp,
 )
 from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -181,6 +187,18 @@ class AgentClient(BackendAIClient):
         """Scan GPU allocation map from the agent."""
         return cast(
             Mapping[str, Any], await self._peer.call.scan_gpu_alloc_map(agent_id=self.agent_id)
+        )
+
+    @agent_client_resilience.apply()
+    async def scan_gpu_devices(self) -> ScanGPUDevicesResp:
+        """Scan the GPU devices of the agent and their allocations (v3, pydantic-typed)."""
+        return await self._call_v3(
+            AgentRPCCall(
+                method="scan_gpu_devices",
+                agent_id=self.agent_id,
+                payload=ScanGPUDevicesReq(),
+            ),
+            ScanGPUDevicesResp,
         )
 
     # Image management methods

@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.agent.types import GPUDeviceAllocation
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.image.types import ScannedImage
@@ -285,3 +286,17 @@ class AgentRepository:
             [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
         ):
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
+
+    @agent_repository_resilience.apply()
+    async def update_gpu_devices(
+        self, agent_id: AgentId, gpu_devices: Sequence[GPUDeviceAllocation]
+    ) -> None:
+        """Update the scanned GPU devices in cache."""
+        await self._cache_source.update_gpu_devices(agent_id, gpu_devices)
+
+    @agent_repository_resilience.apply()
+    async def load_gpu_devices(
+        self, agent_ids: Sequence[AgentId]
+    ) -> Mapping[AgentId, list[GPUDeviceAllocation]]:
+        """The scanned GPU devices of each agent; an agent without a scan result is absent."""
+        return await self._cache_source.read_gpu_devices(agent_ids)

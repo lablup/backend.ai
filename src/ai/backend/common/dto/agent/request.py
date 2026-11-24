@@ -31,3 +31,7 @@ class HealthReq(BaseAgentRequestModel):
 
 class GatherHwinfoReq(BaseAgentRequestModel):
     """Empty request payload for the ``gather_hwinfo_v2`` RPC method."""
+
+
+class ScanGPUDevicesReq(BaseAgentRequestModel):
+    """Empty request payload for the ``scan_gpu_devices`` RPC method."""

@@ -4,6 +4,7 @@ import textwrap
 import unittest.mock
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -23,19 +24,25 @@ from ai.backend.agent.alloc_map import (
 from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
 from ai.backend.agent.errors import FractionalResourceFragmented, InsufficientResource
 from ai.backend.agent.resources import (
+    AbstractComputeDevice,
     AbstractComputePlugin,
     ComputerContext,
     align_memory,
     collect_device_capacities,
     scan_gpu_alloc_map,
+    scan_gpu_devices,
     scan_resource_usage_per_slot,
 )
 from ai.backend.agent.vendor import linux
+from ai.backend.common.data.agent.types import GPUDeviceAllocation, KernelGPUAllocation
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     KernelId,
     ResourceSlot,
+    SessionId,
     SlotName,
     SlotTypes,
 )
@@ -671,3 +678,192 @@ class TestScanGPUAllocMap:
 
     async def test_returns_an_empty_map_without_kernels(self, scratch_root: Path) -> None:
         assert await scan_gpu_alloc_map([], scratch_root, {}) == {}
+
+
+_FIRST_KERNEL_ID = uuid.UUID(int=1)
+_SECOND_KERNEL_ID = uuid.UUID(int=2)
+_THIRD_KERNEL_ID = uuid.UUID(int=3)
+_SESSION_ID = uuid.UUID(int=9)
+
+
+@dataclass(frozen=True)
+class _GPUDeviceScanCase:
+    name: str
+    device_indexes: Mapping[DeviceId, int | None]
+    device_capacity: Decimal
+    cuda_shares_by_kernel: Mapping[uuid.UUID, str]
+    expected_devices: list[GPUDeviceAllocation]
+
+
+@dataclass(frozen=True)
+class _GPUDeviceScan:
+    kernel_session_ids: Mapping[KernelId, SessionId]
+    scratch_root: Path
+    gpu_devices: list[AbstractComputeDevice]
+    device_capacities: Mapping[tuple[SlotName, DeviceId], Decimal]
+
+
+class TestScanGPUDevices:
+    @pytest.fixture
+    def gpu_device_scan(
+        self,
+        case: _GPUDeviceScanCase,
+        scratch_root: Path,
+        write_resource_spec: WriteResourceSpec,
+    ) -> _GPUDeviceScan:
+        for kernel_id, cuda_shares in case.cuda_shares_by_kernel.items():
+            write_resource_spec(KernelId(kernel_id), {"CUDA.SHARES_SHARES": cuda_shares})
+        return _GPUDeviceScan(
+            kernel_session_ids={
+                KernelId(kernel_id): SessionId(_SESSION_ID)
+                for kernel_id in case.cuda_shares_by_kernel
+            },
+            scratch_root=scratch_root,
+            gpu_devices=[
+                AbstractComputeDevice(device_id, "0000:99:00.0", 1024, 1, device_index=device_index)
+                for device_id, device_index in case.device_indexes.items()
+            ],
+            device_capacities={
+                (SlotName("cuda.shares"), device_id): case.device_capacity
+                for device_id in case.device_indexes
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _GPUDeviceScanCase(
+                name="unallocated device is listed with no kernel",
+                device_indexes={DeviceId("gpu-a"): 0},
+                device_capacity=Decimal(1),
+                cuda_shares_by_kernel={},
+                expected_devices=[
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-a"),
+                        device_index=0,
+                        allocated_ratio=Decimal(0),
+                        kernel_allocations=[],
+                    ),
+                ],
+            ),
+            _GPUDeviceScanCase(
+                name="shared device sums the ratios before rounding them",
+                device_indexes={DeviceId("gpu-a"): 0},
+                device_capacity=Decimal(3),
+                cuda_shares_by_kernel={
+                    _FIRST_KERNEL_ID: "gpu-a:1",
+                    _SECOND_KERNEL_ID: "gpu-a:1",
+                    _THIRD_KERNEL_ID: "gpu-a:1",
+                },
+                expected_devices=[
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-a"),
+                        device_index=0,
+                        allocated_ratio=Decimal("1.0000"),
+                        kernel_allocations=[
+                            KernelGPUAllocation(
+                                kernel_id=KernelID(_FIRST_KERNEL_ID),
+                                session_id=SessionID(_SESSION_ID),
+                                allocated_ratio=Decimal("0.3333"),
+                            ),
+                            KernelGPUAllocation(
+                                kernel_id=KernelID(_SECOND_KERNEL_ID),
+                                session_id=SessionID(_SESSION_ID),
+                                allocated_ratio=Decimal("0.3333"),
+                            ),
+                            KernelGPUAllocation(
+                                kernel_id=KernelID(_THIRD_KERNEL_ID),
+                                session_id=SessionID(_SESSION_ID),
+                                allocated_ratio=Decimal("0.3333"),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            _GPUDeviceScanCase(
+                name="devices are ordered by index and the ones without an index come last",
+                device_indexes={
+                    DeviceId("gpu-a"): None,
+                    DeviceId("gpu-b"): 10,
+                    DeviceId("gpu-c"): 2,
+                },
+                device_capacity=Decimal(1),
+                cuda_shares_by_kernel={},
+                expected_devices=[
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-c"),
+                        device_index=2,
+                        allocated_ratio=Decimal(0),
+                        kernel_allocations=[],
+                    ),
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-b"),
+                        device_index=10,
+                        allocated_ratio=Decimal(0),
+                        kernel_allocations=[],
+                    ),
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-a"),
+                        device_index=None,
+                        allocated_ratio=Decimal(0),
+                        kernel_allocations=[],
+                    ),
+                ],
+            ),
+            _GPUDeviceScanCase(
+                name="device the plugin no longer reports is listed while a kernel holds it",
+                device_indexes={},
+                device_capacity=Decimal(1),
+                cuda_shares_by_kernel={_FIRST_KERNEL_ID: "gpu-a:1"},
+                expected_devices=[
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-a"),
+                        device_index=None,
+                        allocated_ratio=Decimal(1),
+                        kernel_allocations=[
+                            KernelGPUAllocation(
+                                kernel_id=KernelID(_FIRST_KERNEL_ID),
+                                session_id=SessionID(_SESSION_ID),
+                                allocated_ratio=Decimal(1),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            _GPUDeviceScanCase(
+                name="kernel with a broken resource spec does not hide the other kernels",
+                device_indexes={DeviceId("gpu-a"): 0},
+                device_capacity=Decimal(1),
+                cuda_shares_by_kernel={
+                    _FIRST_KERNEL_ID: "gpu-a:broken",
+                    _SECOND_KERNEL_ID: "gpu-a:0.5",
+                },
+                expected_devices=[
+                    GPUDeviceAllocation(
+                        device_id=DeviceId("gpu-a"),
+                        device_index=0,
+                        allocated_ratio=Decimal("0.5"),
+                        kernel_allocations=[
+                            KernelGPUAllocation(
+                                kernel_id=KernelID(_SECOND_KERNEL_ID),
+                                session_id=SessionID(_SESSION_ID),
+                                allocated_ratio=Decimal("0.5"),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_lists_every_device_with_the_kernels_holding_it(
+        self, case: _GPUDeviceScanCase, gpu_device_scan: _GPUDeviceScan
+    ) -> None:
+        devices = await scan_gpu_devices(
+            gpu_device_scan.kernel_session_ids,
+            gpu_device_scan.scratch_root,
+            gpu_device_scan.gpu_devices,
+            gpu_device_scan.device_capacities,
+        )
+
+        assert devices == case.expected_devices
