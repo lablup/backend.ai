@@ -25,6 +25,7 @@ from ai.backend.common.configs import (
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
     CompositeType,
@@ -34,6 +35,7 @@ from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
 )
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.web.clients.endpoint_pool import EndpointSelectionPolicy
 
@@ -97,6 +99,26 @@ class ServiceConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="8080", prod="8080"),
+        ),
+    ]
+    trusted_proxies: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("trusted-proxies", "trusted_proxies"),
+            serialization_alias="trusted-proxies",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "List of trusted reverse proxy IP addresses or CIDR ranges in front of the "
+                "webserver. The X-Forwarded-For header is honored only when the request comes "
+                "from one of these proxies, and the client IP is the first address that is not "
+                "one of them when walking the chain inwards from the peer of the connection. "
+                "If empty (default), the first X-Forwarded-For entry is taken as the client IP, "
+                "as the manager does, which is deprecated."
+            ),
+            added_version="26.9.9",
+            example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
         ),
     ]
     wsproxy: Annotated[
@@ -693,6 +715,16 @@ class ServiceConfig(BaseConfigSchema):
     @classmethod
     def resolve_static_path(cls, v: Path) -> Path:
         return v.resolve()
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def validate_trusted_proxies(cls, proxies: list[str]) -> list[str]:
+        for proxy in proxies:
+            try:
+                ReadableCIDR(proxy)
+            except InvalidIpAddressValue as e:
+                raise ValueError(f"Invalid trusted proxy: {proxy!r}") from e
+        return proxies
 
 
 class CSPConfig(BaseConfigSchema):
