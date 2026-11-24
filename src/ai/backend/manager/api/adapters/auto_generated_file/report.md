@@ -104,8 +104,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - a role assignment granting the READ permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
@@ -161,8 +161,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - a role assignment granting the READ permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
     - Role config-file-role-1: READ allowed on every auto_generated_file
@@ -194,8 +194,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - Role config-file-reader-1: applies only within the scope it is granted in
   - Role config-file-reader-1: READ allowed on every auto_generated_file
@@ -226,8 +226,8 @@ Given
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
   - Project project-1
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - Role config-file-reader-1: applies only within the scope it is granted in
   - Role config-file-reader-1: READ allowed on every auto_generated_file
@@ -257,11 +257,11 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
-  - Auto-generated file .bashrc: permission 644
-  - Auto-generated file .bashrc: has one revision whose content is 'export EDITOR=vim\n'
+  - Auto-generated file .bashrc: not set as default
+  - Auto-generated file .bashrc: has one revision whose content is 'export EDITOR=vim\n' and permission 644
   - a role assignment granting the READ permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
     - Role config-file-role-1: READ allowed on every auto_generated_file
@@ -316,8 +316,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - Role config-file-reader-1: applies only within the scope it is granted in
   - Role config-file-reader-1: READ allowed on every domain
@@ -349,8 +349,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - a role assignment granting the HARD_DELETE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
     - Role config-file-role-1: HARD_DELETE allowed on every auto_generated_file
@@ -380,8 +380,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
 
 When
 
@@ -407,8 +407,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - a role assignment granting the HARD_DELETE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
@@ -441,8 +441,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
@@ -499,8 +499,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - a role assignment granting the READ, HARD_DELETE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
     - Role config-file-role-1: READ allowed on every auto_generated_file
@@ -536,16 +536,16 @@ Given
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions
     - regular user user-2: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
-  - Auto-generated file .bashrc: permission 644
-  - Auto-generated file .bashrc: has one revision whose content is 'export EDITOR=vim\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
+  - Auto-generated file .bashrc: not set as default
+  - Auto-generated file .bashrc: has one revision whose content is 'export EDITOR=vim\n' and permission 644
   - Default auto-generated file .bashrc: set as the default of its path
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - a role assignment granting the READ permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
@@ -568,7 +568,6 @@ Then
   - items[0].scope_type = 'user'
   - items[0].scope_id: same as the owner's id
   - items[0].path = '.bashrc'
-  - items[0].permission = '644'
   - items[0].is_default = True
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
@@ -577,7 +576,6 @@ Then
   - items[1].scope_type = 'user'
   - items[1].scope_id: same as the owner's id
   - items[1].path = '.vimrc'
-  - items[1].permission = '644'
   - items[1].is_default = True
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
@@ -597,8 +595,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
 
 When
@@ -627,8 +625,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
   - a role assignment granting the READ, UPDATE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
@@ -687,8 +685,8 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - a role assignment granting the READ, UPDATE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
     - Role config-file-role-1: READ allowed on every auto_generated_file
@@ -738,7 +736,6 @@ Then
   - scope_type = 'user'
   - scope_id: same as the owner's id
   - path = '.vimrc'
-  - permission = '644'
   - is_default = False
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
@@ -844,11 +841,11 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - a role assignment granting the UPDATE permissions on their own auto-generated files
     - Role config-file-role-1: applies only within the scope it is granted in
     - Role config-file-role-1: UPDATE allowed on every auto_generated_file
@@ -866,7 +863,6 @@ Then
   - scope_type = 'user'
   - scope_id: same as the owner's id
   - path = '.vimrc'
-  - permission = '644'
   - is_default = True
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
@@ -886,11 +882,11 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
   - Default auto-generated file .vimrc: set as the default of its path
-  - Auto-generated file .vimrc: permission 644
-  - Auto-generated file .vimrc: has one revision whose content is 'set number\n'
+  - Auto-generated file .vimrc: not set as default
+  - Auto-generated file .vimrc: has one revision whose content is 'set number\n' and permission 644
 
 When
 

@@ -104,8 +104,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 자기 auto-generated file READ 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
@@ -161,8 +161,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - 자기 auto-generated file READ 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
@@ -194,8 +194,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 역할 config-file-reader-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 config-file-reader-1: auto_generated_file 전체에 READ 허용
@@ -226,8 +226,8 @@ Given
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 project-1
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 역할 config-file-reader-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 config-file-reader-1: auto_generated_file 전체에 READ 허용
@@ -257,11 +257,11 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
-  - auto-generated file .bashrc: 권한 644
-  - auto-generated file .bashrc: 내용이 'export EDITOR=vim\n' 인 revision 하나를 갖습니다
+  - auto-generated file .bashrc: default 로 지정되지 않은 파일
+  - auto-generated file .bashrc: 내용이 'export EDITOR=vim\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - 자기 auto-generated file READ 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
@@ -316,8 +316,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 역할 config-file-reader-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 config-file-reader-1: domain 전체에 READ 허용
@@ -349,8 +349,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - 자기 auto-generated file HARD_DELETE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 config-file-role-1: auto_generated_file 전체에 HARD_DELETE 허용
@@ -380,8 +380,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
 
 When
 
@@ -407,8 +407,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 자기 auto-generated file HARD_DELETE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
@@ -441,8 +441,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 자기 auto-generated file READ, HARD_DELETE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
@@ -499,8 +499,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - 자기 auto-generated file READ, HARD_DELETE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
@@ -536,16 +536,16 @@ Given
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
-  - auto-generated file .bashrc: 권한 644
-  - auto-generated file .bashrc: 내용이 'export EDITOR=vim\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
+  - auto-generated file .bashrc: default 로 지정되지 않은 파일
+  - auto-generated file .bashrc: 내용이 'export EDITOR=vim\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .bashrc: 그 경로의 default 로 지정됩니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 자기 auto-generated file READ 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
@@ -568,7 +568,6 @@ Then
   - items[0].scope_type = 'user'
   - items[0].scope_id: 파일 주인의 id 와 같다
   - items[0].path = '.bashrc'
-  - items[0].permission = '644'
   - items[0].is_default = True
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
@@ -577,7 +576,6 @@ Then
   - items[1].scope_type = 'user'
   - items[1].scope_id: 파일 주인의 id 와 같다
   - items[1].path = '.vimrc'
-  - items[1].permission = '644'
   - items[1].is_default = True
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
@@ -597,8 +595,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
 
 When
@@ -627,8 +625,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
   - 자기 auto-generated file READ, UPDATE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
@@ -687,8 +685,8 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - 자기 auto-generated file READ, UPDATE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 config-file-role-1: auto_generated_file 전체에 READ 허용
@@ -738,7 +736,6 @@ Then
   - scope_type = 'user'
   - scope_id: 파일 주인의 id 와 같다
   - path = '.vimrc'
-  - permission = '644'
   - is_default = False
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
@@ -844,11 +841,11 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - 자기 auto-generated file UPDATE 권한을 부여한 역할 배정
     - 역할 config-file-role-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 config-file-role-1: auto_generated_file 전체에 UPDATE 허용
@@ -866,7 +863,6 @@ Then
   - scope_type = 'user'
   - scope_id: 파일 주인의 id 와 같다
   - path = '.vimrc'
-  - permission = '644'
   - is_default = True
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
@@ -886,11 +882,11 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
   - default auto-generated file .vimrc: 그 경로의 default 로 지정됩니다
-  - auto-generated file .vimrc: 권한 644
-  - auto-generated file .vimrc: 내용이 'set number\n' 인 revision 하나를 갖습니다
+  - auto-generated file .vimrc: default 로 지정되지 않은 파일
+  - auto-generated file .vimrc: 내용이 'set number\n' 이고 권한이 644 인 revision 하나를 갖습니다
 
 When
 

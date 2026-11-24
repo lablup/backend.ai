@@ -3390,7 +3390,7 @@
             "type": "string"
           },
           "permission": {
-            "description": "Unix file permission in octal.",
+            "description": "Unix file permission in octal, of the first revision.",
             "pattern": "^[0-7]{3}$",
             "title": "Permission",
             "type": "string"
