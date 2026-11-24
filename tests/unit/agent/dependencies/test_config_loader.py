@@ -25,7 +25,7 @@ class TestAgentConfigLoaderDependency:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that config loader can load a valid config file."""
-        # BACKEND_NAMESPACE overrides the file and the manager suite sets it process-wide.
+        # BACKEND_NAMESPACE overrides the file.
         monkeypatch.delenv("BACKEND_NAMESPACE", raising=False)
         config_path = tmp_path / "agent.toml"
         config_path.write_text(f"""

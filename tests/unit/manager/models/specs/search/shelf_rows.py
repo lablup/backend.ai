@@ -53,6 +53,15 @@ class ZoneEntityType(EntityType):
         return "test_search_zone"
 
 
+class CartEntityType(EntityType):
+    """The type the graph records a cart under."""
+
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_search_cart"
+
+
 class ShelfID(EntityIdentifier):
     """The id a shelf is read by."""
 
@@ -74,7 +83,7 @@ class CartID(EntityIdentifier):
 
     @override
     def entity_type(self) -> EntityType:
-        return EntityType("test_search_cart")
+        return CartEntityType()
 
 
 class CategoryRow(Base):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import secrets
 
 import pytest
@@ -19,6 +18,4 @@ def test_id() -> str:
 
 @pytest.fixture(scope="session", autouse=True)
 def test_ns(test_id: str) -> str:
-    ret = f"testing-ns-{test_id}"
-    os.environ["BACKEND_NAMESPACE"] = ret
-    return ret
+    return f"testing-ns-{test_id}"
