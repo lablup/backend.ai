@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.kernel.request import (
 )
 from ai.backend.common.dto.manager.v2.kernel.response import (
     AdminSearchKernelsPayload,
+    KernelAttachedDeviceInfo,
     KernelClusterInfoGQLDTO,
     KernelLifecycleInfoGQLDTO,
     KernelNetworkInfoGQLDTO,
@@ -1812,6 +1813,19 @@ class SessionAdapter(BaseAdapter):
             if info.resource.resource_opts
             else None
         )
+        attached_devices: list[KernelAttachedDeviceInfo] = []
+        for device_name, devices in info.resource.attached_devices.items():
+            for device in devices:
+                # The intrinsic slots (cpu, mem) are stored with an empty model name.
+                if not device["model_name"]:
+                    continue
+                attached_devices.append(
+                    KernelAttachedDeviceInfo(
+                        device_name=device_name,
+                        device_id=str(device["device_id"]),
+                        model_name=device["model_name"],
+                    )
+                )
         return KernelNode(
             id=info.id,
             field_id=info.id,
@@ -1847,6 +1861,7 @@ class SessionAdapter(BaseAdapter):
                 allocation=allocation,
                 shares=shares,
                 resource_opts=resource_opts,
+                attached_devices=attached_devices,
             ),
             lifecycle=KernelLifecycleInfoGQLDTO(
                 status=_fold_kernel_status(info.lifecycle.status),
