@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-Scenario: incomplete 14 / 17
+Scenario: incomplete 13 / 17
 
 - built from ops (10)
   - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
@@ -12,7 +12,7 @@ Scenario: incomplete 14 / 17
   - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - restore: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - scoped_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search: representative success ✓ · representative rejection ✓
   - search_by_domain_name: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - search_by_user: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - ops + direct implementation (4)
@@ -37,6 +37,14 @@ Scenario: incomplete 14 / 17
 | scenario | verdict |
 |---|---|
 | [when several soft-deleted projects are restored in one call, all come back active](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
+
+**scoped_search**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted the project read role in a resource group scope searches in that scope, the same projects as the superadmin sees come back](#scoped_searching_by_resource_group-a-user-granted-read-in-the-group-searches-its-projects) | answered |
+| [when the superadmin searches in a resource group scope, only the projects that can use the group come back](#scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group) | answered |
+| [when a user granted nothing searches in a resource group scope, the call is rejected for lack of permission](#scoped_searching_by_resource_group-a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group) | rejected |
 
 **assign_users**
 
@@ -221,6 +229,111 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].modified_at: the time this run wrote
   - failed = []
+
+### scoped_search
+
+<a id="scoped_searching_by_resource_group-a-user-granted-read-in-the-group-searches-its-projects"></a>
+
+#### [a-user-granted-read-in-the-group-searches-its-projects](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
+
+when a user granted the project read role in a resource group scope searches in that scope, the same projects as the superadmin sees come back
+
+Given
+
+- one resource group, two projects that can use it and one that cannot, and the user granted the project read role in the resource group scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project linked-1
+  - Project linked-2
+  - Project unlinked-1
+  - Project linked-1 whose sessions can use Resource group resource-group-1
+  - Project linked-2 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the project read role in the resource group scope
+    - Role project-reader-1: applies only within the scope it is granted in
+    - Role project-reader-1: READ allowed on every project
+    - regular user user-1: holds Role project-reader-1
+
+When
+
+- ProjectAdapter.scoped_search: user-1 searches in the resource group resource-group-1
+
+Then
+
+- only the projects that can use the group are left
+  - items = ['linked-1', 'linked-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group"></a>
+
+#### [the-superadmin-searches-the-projects-of-a-resource-group](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
+
+when the superadmin searches in a resource group scope, only the projects that can use the group come back
+
+Given
+
+- one resource group, two projects that can use it and one that cannot, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project linked-1
+  - Project linked-2
+  - Project unlinked-1
+  - Project linked-1 whose sessions can use Resource group resource-group-1
+  - Project linked-2 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ProjectAdapter.scoped_search: user-1 searches in the resource group resource-group-1
+
+Then
+
+- only the projects that can use the group are left
+  - items = ['linked-1', 'linked-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_resource_group-a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group"></a>
+
+#### [a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
+
+when a user granted nothing searches in a resource group scope, the call is rejected for lack of permission
+
+Given
+
+- one resource group, two projects that can use it and one that cannot, and one user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Project linked-1
+  - Project linked-2
+  - Project unlinked-1
+  - Project linked-1 whose sessions can use Resource group resource-group-1
+  - Project linked-2 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ProjectAdapter.scoped_search: user-1 searches in the resource group resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### assign_users
 

@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-시나리오: 미완성 14 / 17
+시나리오: 미완성 13 / 17
 
 - ops 구성 (10)
   - admin_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
@@ -12,7 +12,7 @@
   - partial_bulk_delete: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - partial_bulk_restore: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - restore: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - scoped_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - search_by_domain_name: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
   - search_by_user: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
 - ops + 직접 구현 (4)
@@ -37,6 +37,14 @@
 | 시나리오 | 판정 |
 |---|---|
 | [soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 옵니다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+
+**scoped_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [리소스 그룹 범위에서 프로젝트 읽기 역할을 받은 사용자가 그 범위에서 search 하면, superadmin 과 같은 프로젝트들이 응답으로 옵니다](#scoped_searching_by_resource_group-a-user-granted-read-in-the-group-searches-its-projects) | 성공 |
+| [superadmin 이 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 프로젝트만 응답으로 옵니다](#scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group) | 성공 |
+| [아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부됩니다](#scoped_searching_by_resource_group-a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group) | 거부 |
 
 **assign_users**
 
@@ -221,6 +229,111 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
   - failed = []
+
+### scoped_search
+
+<a id="scoped_searching_by_resource_group-a-user-granted-read-in-the-group-searches-its-projects"></a>
+
+#### [a-user-granted-read-in-the-group-searches-its-projects](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
+
+리소스 그룹 범위에서 프로젝트 읽기 역할을 받은 사용자가 그 범위에서 search 하면, superadmin 과 같은 프로젝트들이 응답으로 옵니다
+
+Given
+
+- 리소스 그룹 하나, 그 그룹을 쓸 수 있는 프로젝트 둘과 쓸 수 없는 하나, 그리고 그 그룹 범위의 프로젝트 읽기 역할을 받은 user 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 프로젝트 linked-1
+  - 프로젝트 linked-2
+  - 프로젝트 unlinked-1
+  - 프로젝트 linked-1 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 프로젝트 linked-2 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 리소스 그룹 범위의 프로젝트 읽기 역할을 받은 사용자 준비
+    - 역할 project-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 project-reader-1: project 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 project-reader-1 보유
+
+When
+
+- ProjectAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 search 합니다
+
+Then
+
+- 그 그룹을 쓸 수 있는 프로젝트만 남습니다
+  - items = ['linked-1', 'linked-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group"></a>
+
+#### [the-superadmin-searches-the-projects-of-a-resource-group](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
+
+superadmin 이 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 프로젝트만 응답으로 옵니다
+
+Given
+
+- 리소스 그룹 하나, 그 그룹을 쓸 수 있는 프로젝트 둘과 쓸 수 없는 하나, 그리고 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 프로젝트 linked-1
+  - 프로젝트 linked-2
+  - 프로젝트 unlinked-1
+  - 프로젝트 linked-1 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 프로젝트 linked-2 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ProjectAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 search 합니다
+
+Then
+
+- 그 그룹을 쓸 수 있는 프로젝트만 남습니다
+  - items = ['linked-1', 'linked-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_resource_group-a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group"></a>
+
+#### [a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
+
+아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 리소스 그룹 하나, 그 그룹을 쓸 수 있는 프로젝트 둘과 쓸 수 없는 하나, 그리고 user 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 프로젝트 linked-1
+  - 프로젝트 linked-2
+  - 프로젝트 unlinked-1
+  - 프로젝트 linked-1 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 프로젝트 linked-2 의 세션이 사용할 수 있는 자원 그룹 resource-group-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ProjectAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 search 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### assign_users
 
