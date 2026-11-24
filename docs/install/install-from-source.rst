@@ -22,13 +22,12 @@ Updating manager configuration for multi-nodes
 
 Since ``scripts/install-dev.sh`` assumes a single-node all-in-one setup, it configures the etcd and Valkey addresses to be ``127.0.0.1``.
 
-You need to update the etcd configuration of the Valkey address so that additional agent nodes can connect to the Valkey server using the address advertised via etcd:
+You need to update the Valkey address in the ``[redis]`` table of ``agent.toml`` on each additional agent node so that it can connect to the Valkey server:
 
-.. code-block:: console
+.. code-block:: toml
 
-   $ ./backend.ai mgr etcd get config/redis/addr
-   127.0.0.1:xxxx
-   $ ./backend.ai mgr etcd put config/redis/addr MANAGER_IP:xxxx  # use the port number read above
+   [redis]
+   addr = "MANAGER_IP:xxxx"  # use the port number in manager.toml
 
 where ``MANAGER_IP`` is an IP address of the manager node accessible from other agent nodes.
 

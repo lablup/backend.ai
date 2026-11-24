@@ -14748,7 +14748,7 @@ type Mutation
   modify_service_config(
     """Added in 25.8.0."""
     input: ModifyServiceConfigNodeInput!
-  ): ModifyServiceConfigNodePayload @join__field(graph: GRAPHENE)
+  ): ModifyServiceConfigNodePayload @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. The manager no longer reads the config it writes to etcd.")
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup @join__field(graph: GRAPHENE)
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup @join__field(graph: GRAPHENE)
   delete_scaling_group(name: String!): DeleteScalingGroup @join__field(graph: GRAPHENE)

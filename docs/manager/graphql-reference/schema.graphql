@@ -2435,7 +2435,7 @@ type Mutation {
   modify_service_config(
     """Added in 25.8.0."""
     input: ModifyServiceConfigNodeInput!
-  ): ModifyServiceConfigNodePayload
+  ): ModifyServiceConfigNodePayload @deprecated(reason: "Deprecated since 26.10.0. The manager no longer reads the config it writes to etcd.")
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup

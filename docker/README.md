@@ -240,7 +240,8 @@ address the deployment. Its contract:
   Their generated configs get the DB, etcd and apollo-router addresses
   rewritten to compose service DNS names (container-side ports). Valkey is
   addressed by the host public IP and published port everywhere, because both
-  network profiles share it through the etcd `config/redis/addr`. The manager
+  network profiles read the same address from the `[redis]` table of their
+  generated configs. The manager
   API is rewritten to the host's public-facing address (the host-network
   manager binds 0.0.0.0), and bind addresses are forced to `0.0.0.0`, while
   announce and advertised addresses stay untouched.
