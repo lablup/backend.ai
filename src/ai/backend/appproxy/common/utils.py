@@ -81,7 +81,7 @@ def calculate_permit_hash(config: PermitHashConfig, user_id: UUID) -> str:
 
 def is_permit_valid(config: PermitHashConfig, user_id: UUID, hash: str) -> bool:
     valid_hash = calculate_permit_hash(config, user_id)
-    return hmac.compare_digest(valid_hash.encode(), hash.encode())
+    return hmac.compare_digest(valid_hash.encode(), hash.encode("utf-8", "surrogateescape"))
 
 
 def strip_permit_cookie(cookie_header: str) -> str | None:

@@ -129,6 +129,7 @@ def test_is_permit_valid_accepts_matching_permit(permit_hash_config: PermitHashC
         "",
         "not-a-permit",
         "\u00e9",
+        "\udcff",
     ],
 )
 def test_is_permit_valid_rejects_wrong_permit(
