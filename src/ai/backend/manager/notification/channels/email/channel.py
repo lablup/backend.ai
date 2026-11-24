@@ -48,8 +48,8 @@ class EmailChannel(AbstractNotificationChannel):
             subject = self._spec.message.subject_template
         else:
             # Fallback: use first line of message as subject
-            lines = message.message.split("\n", 1)
-            subject = lines[0] if lines else _DEFAULT_NOTIFICATION_SUBJECT
+            first_line = message.message.partition("\n")[0].strip()
+            subject = first_line or _DEFAULT_NOTIFICATION_SUBJECT
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
@@ -87,11 +87,13 @@ class EmailChannel(AbstractNotificationChannel):
                     server.starttls()
                 if auth and auth.username and auth.password:
                     server.login(auth.username, auth.password)
-                server.send_message(
+                rejected_recipients = server.send_message(
                     email_msg,
                     from_addr=msg.from_email,
                     to_addrs=msg.to_emails,
                 )
+                if rejected_recipients:
+                    raise smtplib.SMTPRecipientsRefused(rejected_recipients)
         except smtplib.SMTPConnectError as e:
             log.error(
                 "Failed to connect to SMTP server {}:{}: {}",
