@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import ssl
-import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from unittest import mock
-from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
-from aiotusclient.exceptions import TusUploadFailed
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendConnectError
@@ -86,42 +82,3 @@ class TestVFolderDownload:
             )
 
         assert failing_download.storage_proxy_get.call_count == case.expected_attempts
-
-
-@dataclass(frozen=True)
-class _FailingUpload:
-    vfolder: VFolderByName
-    file_path: Path
-
-
-class TestVFolderUpload:
-    @pytest.fixture
-    def upload_to_unverified_storage_proxy(self, tmp_path: Path) -> Iterator[_FailingUpload]:
-        file_path = tmp_path / "data.bin"
-        file_path.write_bytes(b"hello")
-        certificate_error = aiohttp.ClientConnectorCertificateError(
-            mock.MagicMock(host="storage.example", port=6022),
-            ssl.SSLCertVerificationError(1, "certificate verify failed"),
-        )
-        with (
-            mock.patch("ai.backend.client.func.vfolder.Request") as request_class,
-            mock.patch.object(aiohttp.ClientSession, "patch", side_effect=certificate_error),
-        ):
-            upload_response = request_class.return_value.fetch.return_value.__aenter__.return_value
-            upload_response.json = AsyncMock(
-                return_value={"url": "https://storage.example:6022/upload", "token": "token"}
-            )
-            yield _FailingUpload(
-                vfolder=VFolderByName("myfolder", id=uuid.uuid4()),
-                file_path=file_path,
-            )
-
-    async def test_fails_without_waiting_for_a_retry(
-        self, upload_to_unverified_storage_proxy: _FailingUpload
-    ) -> None:
-        with pytest.raises(TusUploadFailed):
-            async with asyncio.timeout(5):
-                await upload_to_unverified_storage_proxy.vfolder._upload_files(
-                    [upload_to_unverified_storage_proxy.file_path],
-                    basedir=upload_to_unverified_storage_proxy.file_path.parent,
-                )

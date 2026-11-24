@@ -539,9 +539,6 @@ class VFolderByName(BaseFunction):
                 url=upload_url,
                 upload_checksum=False,
                 chunk_size=chunk_size,
-                # The default is 10 retries, 300 seconds apart, and a retry never succeeds:
-                # get_offset() of aiotusclient raises AttributeError on any response.
-                retries=0,
             )
             await uploader.upload()
             input_file.close()
