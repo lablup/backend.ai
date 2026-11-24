@@ -393,10 +393,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
 
     @property
     def is_customized_image(self) -> bool:
-        for label in self.labels:
-            if label.key == LabelName.CUSTOMIZED_OWNER.value:
-                return True
-        return False
+        return any(label.key == LabelName.CUSTOMIZED_OWNER.value for label in self.labels)
 
 
 class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]
@@ -885,18 +882,19 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
-            PurgeImageByIdAction(
-                image_id=ImageID(image_uuid),
-            )
-        )
-
+        # The untag reads the image row, so it runs while the row still exists.
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.wait_for_complete(
                 UntagImageFromRegistryAction(
                     image_id=ImageID(image_uuid),
                 )
             )
+
+        result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+            PurgeImageByIdAction(
+                image_id=ImageID(image_uuid),
+            )
+        )
 
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
