@@ -295,9 +295,10 @@ async def my_vfolders(
             "Page through the virtual folders the named scopes reach, selected by the level the "
             "current user mounts them at (`VFolder.mountPermission`)."
         ),
-    )
+    ),
+    name="scopedVFoldersByMountPermission",
 )
-async def my_vfolders_by_mount_permission(
+async def scoped_vfolders_by_mount_permission(
     info: Info[StrawberryGQLContext],
     scope: VFolderScopeGQL,
     mount_permission: VFolderMountPermissionFilterGQL,

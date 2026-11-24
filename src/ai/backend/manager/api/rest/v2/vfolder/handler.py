@@ -72,7 +72,7 @@ class V2VFolderHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def my_search_by_mount_permission(
+    async def scoped_search_by_mount_permission(
         self,
         user_ctx: UserContext,
         body: BodyParam[ScopedSearchVFoldersByMountPermissionInput],
