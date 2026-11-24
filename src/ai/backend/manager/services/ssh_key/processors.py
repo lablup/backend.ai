@@ -5,11 +5,14 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
-from ai.backend.manager.actions.v2.ops.result import ScopedFieldsOpsResult
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.services.ssh_key.actions.bulk_get import BulkGetSSHKeysAction
+from ai.backend.manager.services.ssh_key.actions.get import GetSSHKeyAction
 from ai.backend.manager.services.ssh_key.actions.lookup_owner import (
     LookupBulkSSHKeypairOwnerAction,
     LookupSSHKeypairOwnerAction,
@@ -32,6 +35,8 @@ class SSHKeyProcessors:
     owning user answers."""
 
     fields: LookupFieldGroup[SSHKeypairData]
+    bulk_get_ids: PartialBulkFieldActionProcessor[BulkGetSSHKeysAction, SSHKeypairData]
+    get: SingleFieldActionProcessor[GetSSHKeyAction, EntityOpsResult[SSHKeypairData]]
     scoped_search: BulkActionProcessor[
         ScopedSearchSSHKeypairsAction, ScopedFieldsOpsResult[SSHKeypairData]
     ]
@@ -47,6 +52,8 @@ class SSHKeyProcessors:
             LookupSSHKeypairOwnerAction,
             LookupBulkSSHKeypairOwnerAction,
         )
+        self.bulk_get_ids = self.fields.partial_bulk_get_ops(BulkGetSSHKeysAction)
+        self.get = self.fields.get_ops(GetSSHKeyAction)
         self.scoped_search = self.fields.atomic_bulk_scoped_search_ops(
             ScopedSearchSSHKeypairsAction
         )
