@@ -18,7 +18,8 @@ from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.correlation import ToOneCorrelation
+from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 
 
 class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapScriptData]):
@@ -82,6 +83,20 @@ class _UserDefaultBootstrapScriptOwnFields(
         )
 
 
+class _BootstrapScriptNestedFields:
+    """The user default row pointing at the script; it exists only for the default script."""
+
+    user_default = NestedSearchableField(
+        _UserDefaultBootstrapScriptOwnFields(),
+        ToOneCorrelation(
+            UserDefaultBootstrapScriptRow,
+            BootstrapScriptRow,
+            UserDefaultBootstrapScriptRow.script_id == BootstrapScriptRow.id,
+        ),
+    )
+
+
 class BootstrapScriptSearchableFields:
     own = _BootstrapScriptOwnFields()
     user_default = _UserDefaultBootstrapScriptOwnFields()
+    nested = _BootstrapScriptNestedFields

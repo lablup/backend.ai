@@ -18,9 +18,9 @@ from ai.backend.manager.models.scopes import OperationScope
 class ScopedSearchBootstrapScriptsAction(
     OperationScopeOpsAction[BootstrapScriptRow, BootstrapScriptData]
 ):
-    """Page through the bootstrap scripts set on one user."""
+    """Page through the bootstrap scripts set on the named users, OR'd across them."""
 
-    user_id: UserID
+    user_ids: Sequence[UserID]
     searcher: BootstrapScriptSearcher
 
     @override
@@ -31,12 +31,12 @@ class ScopedSearchBootstrapScriptsAction(
     @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.user_id,)
+        return tuple(self.user_ids)
 
     @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (UserBootstrapScriptTarget(user_id=self.user_id),)
+        return tuple(UserBootstrapScriptTarget(user_id=user_id) for user_id in self.user_ids)
 
     @override
     def to_searcher(self) -> BootstrapScriptSearcher:
