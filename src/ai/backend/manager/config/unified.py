@@ -470,7 +470,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Together with tcp-keepalive-interval and tcp-keepalive-count, "
                 "it detects a database member that stopped responding while a query is running."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="10", prod="10"),
         ),
     ]
@@ -484,7 +484,7 @@ class DatabaseConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=("Seconds between TCP keepalive probes of a database connection."),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="5", prod="5"),
         ),
     ]
@@ -501,7 +501,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Number of unanswered TCP keepalive probes after which "
                 "a database connection is closed."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="3", prod="3"),
         ),
     ]
@@ -521,7 +521,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "as the connection is closed by this value instead of the keepalive count. "
                 "0 uses the system default. Applied on Linux only."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="25", prod="25"),
         ),
     ]
@@ -539,7 +539,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "When it expires, the connection is terminated and the pool connects again. "
                 "Applies when pool-pre-ping is enabled."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="5", prod="5"),
         ),
     ]
