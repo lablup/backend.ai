@@ -10,7 +10,6 @@ import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.models.bootstrap_script.row import (
     BootstrapScriptRow,
@@ -27,9 +26,7 @@ from ai.backend.manager.models.specs.searcher import Searcher
 class DefaultBootstrapScriptRevisionSearcher(
     Searcher[BootstrapScriptRevisionRow, BootstrapScriptRevisionData]
 ):
-    """Revisions of the live script the user's default points at."""
-
-    user_id: UserID
+    """Revisions of live scripts that are their owner's default. The scope names the user."""
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
@@ -38,12 +35,12 @@ class DefaultBootstrapScriptRevisionSearcher(
             .join(BootstrapScriptRow, BootstrapScriptRow.id == BootstrapScriptRevisionRow.script_id)
             .join(
                 UserDefaultBootstrapScriptRow,
-                UserDefaultBootstrapScriptRow.script_id == BootstrapScriptRow.id,
+                sa.and_(
+                    UserDefaultBootstrapScriptRow.script_id == BootstrapScriptRow.id,
+                    UserDefaultBootstrapScriptRow.user_id == BootstrapScriptRow.entity_id,
+                ),
             )
-            .where(
-                UserDefaultBootstrapScriptRow.user_id == self.user_id,
-                BootstrapScriptRow.deleted_at.is_(None),
-            )
+            .where(BootstrapScriptRow.deleted_at.is_(None))
         )
 
     @override

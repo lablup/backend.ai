@@ -129,6 +129,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.bootstrap_script.scopes import UserBootstrapScriptTarget
 from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
     BootstrapScriptRevisionSearchableFields,
 )
@@ -695,12 +696,12 @@ class AgentRegistry:
         if not bootstrap_script:
             revision = BootstrapScriptRevisionSearchableFields.own
             async with self._ops_provider.read_ops() as r:
-                revisions = await r.search_in_global(
+                revisions = await r.search_with_scopes(
+                    [UserBootstrapScriptTarget(user_id=UserID(user_scope.user_uuid))],
                     DefaultBootstrapScriptRevisionSearcher(
-                        user_id=UserID(user_scope.user_uuid),
                         pagination=OffsetPagination(limit=1),
                         orders=[revision.revision_number.order.apply(ascending=False)],
-                    )
+                    ),
                 )
             bootstrap_script = revisions.items[0].script if revisions.items else ""
 
