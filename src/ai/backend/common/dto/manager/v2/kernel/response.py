@@ -277,6 +277,16 @@ class ResourceAllocationGQLDTO(BaseResponseModel):
     )
 
 
+class KernelAttachedDeviceInfo(BaseResponseModel):
+    """A device (GPU, NPU and so on) attached to a kernel."""
+
+    device_name: str = Field(
+        description="The name of the compute device the device belongs to (e.g., 'cuda')."
+    )
+    device_id: str = Field(description="The ID of the device on the agent.")
+    model_name: str = Field(description="The model name of the device.")
+
+
 class KernelResourceInfoGQLDTO(BaseResponseModel):
     """GQL-specific DTO for KernelV2ResourceInfoGQL.
 
@@ -310,6 +320,10 @@ class KernelResourceInfoGQLDTO(BaseResponseModel):
             "Additional resource options and configurations. "
             "Typed as Any because this field holds a nested GQL type (ResourceOptsGQL)."
         ),
+    )
+    attached_devices: list[KernelAttachedDeviceInfo] = Field(
+        default_factory=list,
+        description=f"Added in {NEXT_RELEASE_VERSION}. The devices attached to this kernel.",
     )
 
 
