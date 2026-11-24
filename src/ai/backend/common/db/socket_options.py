@@ -49,8 +49,4 @@ class TCPOptions:
             try:
                 sock.setsockopt(level, name, value)
             except OSError as e:
-                log.warning(
-                    "database socket option not set",
-                    option=name,
-                    failure_reason=repr(e),
-                )
+                log.warning("database socket option not set (option: {}, reason: {!r})", name, e)
