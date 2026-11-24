@@ -15,7 +15,8 @@
   A bare string has the convention applied to it again and is exempt from truncation, so it
   either disagrees with the name `mgr schema oneshot` produces or trips the 63-character limit
   with `IdentifierError`. Autogenerate already renders these wrapped. A constraint the Row
-  declaration names explicitly is not wrapped (rule: `models/AGENTS.md`).
+  declaration names explicitly is not wrapped (rule: `models/AGENTS.md`). An unreleased migration
+  is checked (flake8 `BAI303`, on or off in `tools/flake8-plugins/README.md`).
 
 ## Diverged heads
 

@@ -12,6 +12,9 @@ Repository rules that ruff cannot express. The `lint` group of `pyproject.toml` 
 | `BAI202` | A class under `common/dto/manager/v2` does not inherit `BackendAISchema` directly | No |
 | `BAI203` | A class under `common/dto/manager/v2` has no `to_*` or `from_*` method | No |
 | `BAI204` | A module under `client/cli/v2` imports `ai.backend.common.dto` only inside a function or under `if TYPE_CHECKING:` | No |
+| `BAI301` | A public method of a class in `manager/repositories` `repository.py` or `repositories.py` returns no Row, also inside a generic or a union | No |
+| `BAI302` | A Row class under `manager/models` holds only `to_*`/`from_*` methods and dunder methods | No |
+| `BAI303` | A migration with `# Part of: NEXT_RELEASE_VERSION` wraps in `op.f()` a constraint name equal to the naming convention of `manager/models/base.py` (`op.create_*` calls and constraints in `op.create_table`) | No |
 | `BAI401` | The module file and top-level name a `LazyGroup` `import_name` points at exist (read from source, not imported) | Yes |
 | `BAI402` | A decorated `admin_*` resolver under `manager/api/gql` calls `check_admin_only()` first | No |
 | `BAI403` | Storage `api/` has no module-level `async def` handler taking only a `Request` | No |

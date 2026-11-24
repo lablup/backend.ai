@@ -1,5 +1,5 @@
 import ast
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 from flake8_bai.rules.action_frozen import ActionFrozenRule
 from flake8_bai.rules.action_pair import ActionPairRule
@@ -13,6 +13,9 @@ from flake8_bai.rules.dto_dataclass import DtoDataclassRule
 from flake8_bai.rules.dto_schema_base import DtoSchemaBaseRule
 from flake8_bai.rules.init_import import InitImportRule
 from flake8_bai.rules.lazy_group_target import LazyGroupTargetRule
+from flake8_bai.rules.migration_constraint_name import MigrationConstraintNameRule
+from flake8_bai.rules.row_method import RowMethodRule
+from flake8_bai.rules.row_return import RowReturnRule
 from flake8_bai.rules.storage_module_handler import StorageModuleHandlerRule
 
 
@@ -28,6 +31,9 @@ class Plugin:
         DtoSchemaBaseRule,
         DtoConversionRule,
         CliDtoImportRule,
+        RowReturnRule,
+        RowMethodRule,
+        MigrationConstraintNameRule,
         LazyGroupTargetRule,
         AdminResolverCheckRule,
         StorageModuleHandlerRule,
@@ -37,9 +43,9 @@ class Plugin:
     _tree: ast.Module
     _path: SourcePath
 
-    def __init__(self, tree: ast.Module, filename: str) -> None:
+    def __init__(self, tree: ast.Module, filename: str, lines: Sequence[str]) -> None:
         self._tree = tree
-        self._path = SourcePath(filename)
+        self._path = SourcePath(filename, lines)
 
     def run(self) -> Iterator[tuple[int, int, str, type["Plugin"]]]:
         for rule_type in self.rule_types:
