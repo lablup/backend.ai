@@ -6,7 +6,6 @@ name: test-record
 on:
   push:
     branches: [main]
-  pull_request:
 
 # A running job finishes; of the waiting ones only the latest runs.
 concurrency:
