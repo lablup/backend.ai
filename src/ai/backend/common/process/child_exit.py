@@ -14,13 +14,9 @@ from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.synchronize import Event as MPEvent
 from typing import Final
 
-<<<<<<< HEAD
-from ai.backend.logging.utils import BraceStyleAdapter
-=======
 import aiotools
 
-from ai.backend.logging.structured import StructuredLogger
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+from ai.backend.logging.utils import BraceStyleAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

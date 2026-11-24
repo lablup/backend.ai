@@ -1135,15 +1135,9 @@ async def server_main(
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)
 
-<<<<<<< HEAD
         log.info("Started the app-proxy coordinator service.")
-    except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
-=======
-        log.info("started the app-proxy coordinator service")
     except Exception as e:
-        log.exception("server initialization failed; triggering shutdown")
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+        log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
         init_error = e
     try:
@@ -1162,7 +1156,7 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: proxy-coordinator worker-{pidx}")
-    child_status: ChildStatus = _args[3][pidx]
+    child_status: ChildStatus = _args[2][pidx]
     child_status.publish_pid()
     local_config: ServerConfig = _args[0]
     log_endpoint: str = _args[1]
@@ -1269,12 +1263,8 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=1,
-<<<<<<< HEAD
-                        args=(server_config, log_endpoint),
-=======
                         main_ctxmgr=child_exit_monitor.main_context(),
-                        args=(server_config, log_endpoint, config_path, child_statuses),
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+                        args=(server_config, log_endpoint, child_statuses),
                         wait_timeout=5.0,
                         runner=runner,
                     )

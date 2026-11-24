@@ -1229,15 +1229,9 @@ async def server_main(
 
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
-<<<<<<< HEAD
         log.info("Started the web gateway service.")
-    except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
-=======
-        log.info("started the web gateway service")
     except Exception as e:
-        log.exception("server initialization failed; triggering shutdown")
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+        log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
         init_error = e
     try:

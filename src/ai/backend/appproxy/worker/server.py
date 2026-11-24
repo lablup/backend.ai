@@ -932,15 +932,9 @@ async def server_main(
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)
 
-<<<<<<< HEAD
         log.info("Started the app-proxy worker service.")
-    except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
-=======
-        log.info("started the app-proxy worker service")
     except Exception as e:
-        log.exception("server initialization failed; triggering shutdown")
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+        log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
         init_error = e
     try:

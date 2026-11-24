@@ -46,12 +46,8 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-<<<<<<< HEAD
 from ai.backend.common.plugin import load_configured_wheelhouse
-=======
-from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -253,11 +249,7 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
     loop.set_debug(boostrap_config.debug.asyncio)
     manager_init_stack = AsyncExitStack()
-<<<<<<< HEAD
-=======
     init_error: Exception | None = None
-    drain_notifier = ServerDrainNotifier()
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
 
     @asynccontextmanager
     async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
@@ -443,15 +435,9 @@ async def server_main(
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)
 
-<<<<<<< HEAD
         log.info("Started the manager service.")
-    except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
-=======
-        log.info("started the manager service")
     except Exception as e:
-        log.exception("server initialization failed; triggering shutdown")
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+        log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
         init_error = e
 
@@ -574,10 +560,6 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
-<<<<<<< HEAD
-                        args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
-                        wait_timeout=5.0,
-=======
                         main_ctxmgr=child_exit_monitor.main_context(),
                         args=(
                             bootstrap_cfg,
@@ -586,10 +568,7 @@ def main(
                             log_level,
                             child_statuses,
                         ),
-                        wait_timeout=(
-                            bootstrap_cfg.manager.shutdown_grace_period + SHUTDOWN_CLEANUP_MARGIN
-                        ),
->>>>>>> e68240b7c (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+                        wait_timeout=5.0,
                         runner=runner,
                     )
                     child_exit_monitor.raise_system_exit()
