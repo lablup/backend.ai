@@ -310,6 +310,14 @@ DEAD_STATUS_SET = ContainerStatus.dead_set()
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
+# The glibc build ("all-smi") needs glibc 2.34 or newer, but only it can load libnvidia-ml.so.1.
+_ALL_SMI_BUILD_PER_DISTRO: Final[Mapping[str, str]] = {
+    "alpine3.8": "all-smi.musl",
+    "centos7.6": "all-smi.musl",
+    "centos9.0": "all-smi",
+    "ubuntu18.04": "all-smi.musl",
+    "ubuntu22.04": "all-smi",
+}
 
 P = ParamSpec("P")
 KernelIdContainerPair = tuple[KernelId, Container]
@@ -670,7 +678,8 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary(f"etty.{arch}.bin", "/opt/kernel/etty")
         mount_static_binary(f"ttyd_linux.{arch}.bin", "/opt/kernel/ttyd")
         mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
-        mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
+        _, all_smi_build = match_distro_data(_ALL_SMI_BUILD_PER_DISTRO, distro)
+        mount_static_binary(f"{all_smi_build}.{arch}.bin", "/usr/local/bin/all-smi")
         mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
         mount_static_binary(f"bssh.{arch}.bin", "/usr/local/bin/bssh")
         mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)

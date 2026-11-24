@@ -12,7 +12,8 @@ download_github_release() {
     local repo=$1
     local binary_name=$2
     local asset_suffix=$3
-    local tag=$4
+    local target_name=$4
+    local tag=$5
 
     if [ -z "$tag" ]; then
         echo "Fetching latest release tag for ${repo}..."
@@ -27,25 +28,27 @@ download_github_release() {
         echo "  ${ARCH}: ${url}"
         curl -fL -o "${extract_dir}/archive.tar.gz" "$url"
         tar -xzf "${extract_dir}/archive.tar.gz" -C "${extract_dir}"
-        mv "${extract_dir}/${binary_name}" "${TARGET_DIR}/${binary_name}.${ARCH}.bin"
-        chmod +x "${TARGET_DIR}/${binary_name}.${ARCH}.bin"
+        mv "${extract_dir}/${binary_name}" "${TARGET_DIR}/${target_name}.${ARCH}.bin"
+        chmod +x "${TARGET_DIR}/${target_name}.${ARCH}.bin"
         # Move manpage if exists
         if [ -f "${extract_dir}/${binary_name}.1" ]; then
             mv "${extract_dir}/${binary_name}.1" "${TARGET_DIR}/"
         fi
     done
 
-    echo "  Updated ${binary_name} to ${tag}"
+    echo "  Updated ${target_name} to ${tag}"
 }
 
 echo "=== Updating external tool binaries ==="
 
 # bssh (SSH server for Backend.AI)
-download_github_release "lablup/bssh" "bssh" "-musl" "${BSSH_VERSION:-}"
+download_github_release "lablup/bssh" "bssh" "-musl" "bssh" "${BSSH_VERSION:-}"
 
 # all-smi (GPU monitoring tool)
-# The glibc build has no suffix. The static musl build cannot dlopen libnvidia-ml.so.1.
-download_github_release "lablup/all-smi" "all-smi" "" "${ALL_SMI_VERSION:-}"
+# The glibc build has no suffix. The static musl build cannot dlopen libnvidia-ml.so.1,
+# and is for the images the glibc build does not run on.
+download_github_release "lablup/all-smi" "all-smi" "" "all-smi" "${ALL_SMI_VERSION:-}"
+download_github_release "lablup/all-smi" "all-smi" "-musl" "all-smi.musl" "${ALL_SMI_VERSION:-}"
 
 echo "=== All external tools updated ==="
 git add "${TARGET_DIR}"/*.bin "${TARGET_DIR}"/*.1 2>/dev/null || true
