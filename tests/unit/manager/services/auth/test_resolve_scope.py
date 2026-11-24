@@ -6,9 +6,11 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.auth.types import DelegationTarget
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user.row import UserRole
@@ -56,6 +58,7 @@ def auth_service(
 REQUESTER_AK = "AKIAIOSFODNN7EXAMPLE"
 OWNER_AK = "AKIAI44QH8DHBEXAMPLE"
 REQUESTER_UUID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+OTHER_USER_UUID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 DOMAIN_ID = DomainID(uuid.UUID("33333333-3333-3333-3333-333333333333"))
 
 
@@ -98,15 +101,33 @@ class TestResolveAccessKeyScope:
             result = await auth_service.resolve_access_key_scope(action)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
 
+    async def test_regular_user_reaches_another_keypair_of_their_own(
+        self,
+        auth_service: AuthService,
+        mock_auth_repository: AsyncMock,
+        default_keypair: None,
+    ) -> None:
+        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+            user_id=UserID(REQUESTER_UUID),
+            domain_name="default",
+            role=UserRole.USER,
+        )
+        action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
+        with with_user_context(acting_user(UserRole.USER)):
+            result = await auth_service.resolve_access_key_scope(action)
+        assert result.requester_access_key == AccessKey(REQUESTER_AK)
+        assert result.owner_access_key == AccessKey(OWNER_AK)
+
     async def test_regular_user_delegation_raises_forbidden(
         self,
         auth_service: AuthService,
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "default",
-            UserRole.ADMIN,
+        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+            user_id=UserID(OTHER_USER_UUID),
+            domain_name="default",
+            role=UserRole.ADMIN,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
         with with_user_context(acting_user(UserRole.USER)):
@@ -133,9 +154,10 @@ class TestResolveAccessKeyScope:
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "other-domain",
-            UserRole.USER,
+        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+            user_id=UserID(OTHER_USER_UUID),
+            domain_name="other-domain",
+            role=UserRole.USER,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
         with with_user_context(acting_user(UserRole.ADMIN)):
@@ -149,9 +171,10 @@ class TestResolveAccessKeyScope:
         default_keypair: None,
     ) -> None:
         """A super admin acting as a regular user (BEP-1058) may not delegate."""
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "default",
-            UserRole.USER,
+        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+            user_id=UserID(OTHER_USER_UUID),
+            domain_name="default",
+            role=UserRole.USER,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
         with with_user_context(acting_user(UserRole.USER)):

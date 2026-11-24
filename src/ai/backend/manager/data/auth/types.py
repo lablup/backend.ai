@@ -92,6 +92,15 @@ class KeyPairSigningMaterial:
 
 
 @dataclass(frozen=True)
+class DelegationTarget:
+    """The owner of an access key a request names, as the delegation check reads it."""
+
+    user_id: UserID
+    domain_name: str
+    role: UserRole
+
+
+@dataclass(frozen=True)
 class AuthorizingUser:
     """The user record the authorize flow reads, and hands to its POST_AUTHORIZE plugins.
 
