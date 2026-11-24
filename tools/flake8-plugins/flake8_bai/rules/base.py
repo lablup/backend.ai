@@ -17,10 +17,16 @@ class Violation:
 class SourcePath:
     """The checked file's path, matched by its position under the repository root."""
 
+    _filename: str
     _parts: tuple[str, ...]
 
     def __init__(self, filename: str) -> None:
+        self._filename = filename
         self._parts = PurePath(filename).parts
+
+    @property
+    def filename(self) -> str:
+        return self._filename
 
     @property
     def name(self) -> str:
@@ -34,6 +40,11 @@ class SourcePath:
 
 
 class Rule(ABC):
+    _path: SourcePath
+
+    def __init__(self, path: SourcePath) -> None:
+        self._path = path
+
     @abstractmethod
     def applies_to(self, path: SourcePath) -> bool:
         raise NotImplementedError
