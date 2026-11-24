@@ -293,3 +293,18 @@ class IdlePolicyNotFound(ObjectNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class KernelCreationFailedOnAgents(BackendAIError, web.HTTPInternalServerError):
+    """Raised when agents fail to create the kernels of a session."""
+
+    error_type = "https://api.backend.ai/probs/kernel-creation-failed"
+    error_title = "Kernel creation failed on agents."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
