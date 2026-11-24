@@ -17,14 +17,11 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    ScopedSearchVFoldersByMountPermissionInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     VFolderFilter,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
-    VFolderMountPermissionFilter,
-    VFolderPermissionField,
     VFolderScope,
     VFolderUsage,
     VFolderUsedBy,
@@ -62,8 +59,8 @@ class TestVFolderAdapterUserScopedSearch:
     """Tests for VFolderAdapter.scoped_search() with a user scope."""
 
     @pytest.fixture
-    def user_id(self) -> uuid.UUID:
-        return uuid4()
+    def user_id(self) -> UserID:
+        return UserID(uuid4())
 
     @pytest.fixture
     def vfolder_data(self) -> VFolderData:
@@ -110,12 +107,13 @@ class TestVFolderAdapterUserScopedSearch:
         self,
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
-        user_id: uuid.UUID,
+        user_id: UserID,
     ) -> None:
         await adapter.scoped_search(
             ScopedSearchVFoldersInput(
                 scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
-            )
+            ),
+            user_id,
         )
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
@@ -126,7 +124,7 @@ class TestVFolderAdapterUserScopedSearch:
         self,
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
-        user_id: uuid.UUID,
+        user_id: UserID,
     ) -> None:
         session_id = uuid4()
 
@@ -136,7 +134,8 @@ class TestVFolderAdapterUserScopedSearch:
                 usage=VFolderUsage(used_by=VFolderUsedBy(session=[session_id])),
                 limit=10,
                 offset=0,
-            )
+            ),
+            user_id,
         )
 
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
@@ -145,55 +144,19 @@ class TestVFolderAdapterUserScopedSearch:
     async def test_user_scope_returns_payload(
         self,
         adapter: VFolderAdapter,
-        user_id: uuid.UUID,
+        user_id: UserID,
     ) -> None:
         result = await adapter.scoped_search(
             ScopedSearchVFoldersInput(
                 scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
-            )
+            ),
+            user_id,
         )
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-
-
-class TestVFolderAdapterScopedSearchByMountPermission:
-    """Tests for VFolderAdapter.scoped_search_by_mount_permission()."""
-
-    @pytest.fixture
-    def user_id(self) -> UserID:
-        return UserID(uuid4())
-
-    @pytest.fixture
-    def scoped_search_run(self) -> AsyncMock:
-        return AsyncMock(return_value=_scoped_result([]))
-
-    @pytest.fixture
-    def adapter(self, scoped_search_run: AsyncMock) -> VFolderAdapter:
-        vfolder_processors = MagicMock()
-        vfolder_processors.scoped_search.run = scoped_search_run
-        return VFolderAdapter(
-            vfolder_processors, MagicMock(), MagicMock(), MagicMock(), MagicMock()
-        )
-
-    async def test_rw_delete_matches_read_write(
-        self, adapter: VFolderAdapter, scoped_search_run: AsyncMock, user_id: UserID
-    ) -> None:
-        for level in (VFolderPermissionField.RW_DELETE, VFolderPermissionField.READ_WRITE):
-            await adapter.scoped_search_by_mount_permission(
-                user_id,
-                ScopedSearchVFoldersByMountPermissionInput(
-                    scope=VFolderScope(user=[UUIDScope(value=user_id)]),
-                    mount_permission=VFolderMountPermissionFilter(equals=level),
-                ),
-            )
-
-        [rw_delete], [read_write] = (
-            call.args[0].searcher.searcher.conditions for call in scoped_search_run.call_args_list
-        )
-        assert rw_delete().compile().params == read_write().compile().params
 
 
 class TestVFolderAdapterProjectSearch:

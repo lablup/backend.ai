@@ -38,7 +38,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
-    ScopedSearchVFoldersByMountPermissionInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
@@ -125,7 +124,6 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.scopes import ScopeTarget
-from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.vfolder.creators import (
@@ -133,7 +131,6 @@ from ai.backend.manager.models.vfolder.creators import (
     ProjectVFolderCreator,
     VFolderBaseCreator,
 )
-from ai.backend.manager.models.vfolder.queries import mount_permission_of_user
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import (
     DomainVFolderTarget,
@@ -464,31 +461,19 @@ class VFolderAdapter(BaseAdapter):
     async def scoped_search(
         self,
         input: ScopedSearchVFoldersInput,
-    ) -> SearchVFoldersPayload:
-        """Search the vfolders the named scopes reach, combined with OR."""
-        action_result = await self._vfolder.scoped_search.run(
-            self._scoped_search_action(self._scope_targets(input.scope), input)
-        )
-        return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def scoped_search_by_mount_permission(
-        self,
         user_id: UserID,
-        input: ScopedSearchVFoldersByMountPermissionInput,
     ) -> SearchVFoldersPayload:
-        """Search the vfolders the named scopes reach by the level the user mounts them at."""
+        """Search the vfolders the named scopes reach, combined with OR.
+
+        ``user_id`` is whose mount policy ``input.mount_permission`` selects by.
+        """
         action_result = await self._vfolder.scoped_search.run(
             self._scoped_search_action(
                 self._scope_targets(input.scope),
                 input,
                 self.apply_enum_filter(
                     input.mount_permission,
-                    EnumConditions(mount_permission_of_user(user_id), VFolderMountPolicy),
+                    VFolderSearchableFields.linked.mount_permission.of_user(user_id),
                 ),
             )
         )

@@ -25,7 +25,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
-    ScopedSearchVFoldersByMountPermissionInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
@@ -68,27 +67,18 @@ class V2VFolderHandler:
                 before=body.parsed.before,
                 limit=body.parsed.limit,
                 offset=body.parsed.offset,
-            )
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
-    async def scoped_search_by_mount_permission(
-        self,
-        user_ctx: UserContext,
-        body: BodyParam[ScopedSearchVFoldersByMountPermissionInput],
-    ) -> APIResponse:
-        """Search the vfolders the named scopes reach by the level the current user mounts them at."""
-        result = await self._adapter.scoped_search_by_mount_permission(
-            UserID(user_ctx.user_uuid), body.parsed
+            ),
+            UserID(user_ctx.user_uuid),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(
         self,
+        user_ctx: UserContext,
         body: BodyParam[ScopedSearchVFoldersInput],
     ) -> APIResponse:
         """Search the vfolders the named scopes reach, combined with OR."""
-        result = await self._adapter.scoped_search(body.parsed)
+        result = await self._adapter.scoped_search(body.parsed, UserID(user_ctx.user_uuid))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

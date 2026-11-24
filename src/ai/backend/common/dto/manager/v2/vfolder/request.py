@@ -484,16 +484,12 @@ class ScopedSearchVFoldersInput(SearchVFoldersInput):
     """Input for searching the vfolders the named scopes reach."""
 
     scope: VFolderScope = Field(description="Scope (OR across all items).")
-
-
-class ScopedSearchVFoldersByMountPermissionInput(ScopedSearchVFoldersInput):
-    """Input for searching the vfolders the named scopes reach by the level one user mounts them at."""
-
-    mount_permission: VFolderMountPermissionFilter = Field(
+    mount_permission: VFolderMountPermissionFilter | None = Field(
+        default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Filter by the level the user mounts the vfolder "
-            "at. wd matches rw."
-        )
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the caller's mount policy on the "
+            "vfolder. wd matches rw."
+        ),
     )
 
 

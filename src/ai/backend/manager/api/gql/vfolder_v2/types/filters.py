@@ -79,7 +79,7 @@ class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=(
-            "Filter for the level the current user mounts a vfolder at. "
+            "Filter for the mount policy of the current user on a vfolder. "
             "RW_DELETE matches READ_WRITE."
         ),
         added_version=NEXT_RELEASE_VERSION,

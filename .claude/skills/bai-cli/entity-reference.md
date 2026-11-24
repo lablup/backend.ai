@@ -31,7 +31,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 
 ## Storage
 
-- **vfolder**: user(my-search, project-search, scoped-search-by-mount-permission, admin-search, create, get, upload, download, delete, purge, ls, mkdir, mv, rm, clone, bulk-delete, bulk-purge)
+- **vfolder**: user(my-search, project-search, admin-search, create, get, upload, download, delete, purge, ls, mkdir, mv, rm, clone, bulk-delete, bulk-purge)
 - **vfs-storage**: user(create, list-all, get, update, search, delete)
 - **storage-namespace**: user(register, unregister, search, get-by-storage)
 - **object-storage**: user(create, get, update, search, delete)

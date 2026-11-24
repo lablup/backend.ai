@@ -79,7 +79,7 @@ class VFolderUsageModeFilter(EnumFilter[VFolderUsageMode]):
 
 
 class VFolderMountPermissionFilter(EnumFilter[VFolderPermissionField]):
-    """Filter for the level one user mounts a vfolder at."""
+    """Filter for the mount policy of one user on a vfolder."""
 
 
 class VFolderMetadataInfo(BaseResponseModel):

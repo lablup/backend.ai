@@ -13,7 +13,7 @@ Declares what an entity search can filter and order by. A declaration holds SQL 
 |---|---|---|
 | `own` | The entity's own columns as `SearchableField(column, filter, order)`. Implements `RowDataConverter` to build data from a row | The entity's field cap |
 | `nested` | Rows of other tables the entity owns (labels, mount policies, dangling fields), readable under the entity's own permission. `NestedSearchableField(<other entry>.own, correlation)` | The entity's field cap (`labels.key`) |
-| `linked` | Connections whose foreign key sits on the other entity (`MembershipConditions`, `UsageConditions`) | Scopes, the other entity's permission |
+| `linked` | Connections whose foreign key sits on the other entity (`MembershipConditions`, `UsageConditions`), values computed for one user (`Values computed for one user`) | Scopes, the other entity's permission |
 
 - Every data field has a `SearchableField` of the same name, and `to_data` reads every value through `self.<name>.read(row)`. The data constructor requires every field, so a missing declaration fails mypy.
 - Row classes carry no `to_data` or similar method. Callers use `{Entity}SearchableFields.own.to_data(row)`.
@@ -38,6 +38,7 @@ A slot is emptied for one of three reasons. Do not empty one for a reason that i
 | `DecimalType` (stored as VARCHAR) | Numeric cast | Numeric cast |
 | To-many child (order) | Filter with some / every / none | None |
 
+- A value computed for one user in SQL is not a derived field. See `Values computed for one user`.
 - Leave the filter empty when no shared condition class takes the column's type. Today that is interval (`retention_policies.retention_period`, `audit_logs.duration`).
 - Adding a shared condition class adds that type's scenarios to the shared declaration DB test in the same change.
 
@@ -150,6 +151,15 @@ Depth follows the permission axis, not the foreign keys.
 - Do not add nested filters on another entity's fields (`How deep a declaration nests`). Express a relation to another entity as a scope.
 - Filter by another entity only through the identifier stored in the entity's own column (`creator_id`, `domain_name`, ...). To filter by its name or status, look the other entity up first and use its id.
 - Rows that carry their own permission type (entity share, ...) do not go in `nested`. They are handled as a scope in that entity's search.
+
+## Values computed for one user
+
+A value that SQL computes from the rows of one user, such as the mount policy of a user on a vfolder.
+
+- Declare its filter under `linked`, built from the user id (`linked.mount_permission.of_user(user_id)`). Declare no order.
+- Do not put it in the filter DTO of the entity. The global search takes that DTO, so its result would depend on the caller.
+- Take it as a field of the scoped search input and an argument of the scoped query (`scopedVFoldersV2(mountPermission:)`).
+- The adapter operation takes the user id as an argument. The REST handler and GQL resolver pass the id of `current_user()`. Do not put the user id in a DTO.
 
 ## Usage between entities
 

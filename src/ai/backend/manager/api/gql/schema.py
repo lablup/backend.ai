@@ -742,7 +742,6 @@ from ai.backend.manager.api.gql.vfolder_v2.resolver.query import (
     admin_vfolders_v2,
     my_vfolders,
     project_vfolders,
-    scoped_vfolders_by_mount_permission,
     scoped_vfolders_v2,
     vfolder_mount_policies,
     vfolder_v2,
@@ -1111,7 +1110,6 @@ class Query:
     vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
     scoped_vfolders_v2 = scoped_vfolders_v2
-    scoped_vfolders_by_mount_permission = scoped_vfolders_by_mount_permission
     vfolder_mount_policies = vfolder_mount_policies
     my_vfolders = my_vfolders
 

@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
-    ScopedSearchVFoldersByMountPermissionInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
@@ -66,18 +65,6 @@ class V2VFolderClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/my/search",
-            request=request,
-            response_model=SearchVFoldersPayload,
-        )
-
-    async def scoped_search_by_mount_permission(
-        self,
-        request: ScopedSearchVFoldersByMountPermissionInput,
-    ) -> SearchVFoldersPayload:
-        """Search the vfolders the named scopes reach by the level the current user mounts them at."""
-        return await self._client.typed_request(
-            "POST",
-            f"{_PATH}/scoped/by-mount-permission",
             request=request,
             response_model=SearchVFoldersPayload,
         )

@@ -2,14 +2,13 @@
 
 [배경](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-시나리오: 미완성 5 / 31
+시나리오: 미완성 5 / 30
 
-- ops 구성 (5)
+- ops 구성 (4)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - project_search: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
-  - scoped_search_by_mount_permission: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (26)
   - batch_load_mount_permissions: 성공 있음 1 · 거부 있음 1 (partial_bulk)
   - batch_load_permissions: 성공 있음 1 · 거부 있음 1 (partial_bulk)
@@ -68,16 +67,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프에서 vfolder 읽기 권한을 받은 사용자가 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | 성공 |
+| [자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | 성공 |
 | [vfolder 를 하나도 생성하지 않은 사용자가 자기 vfolder 를 조회하면, 응답은 비어 있습니다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 범위의 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | 거부 |
-
-**scoped_search_by_mount_permission**
-
-| 시나리오 | 판정 |
-|---|---|
-| [자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 오름차순으로 한 페이지 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-selects-the-folders-the-caller-mounts-read-write) | 성공 |
-| [아무 권한도 받지 않은 사용자가 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-by-mount-level) | 거부 |
 
 **batch_load_mount_permissions**
 
@@ -723,11 +715,11 @@ Then
 
 #### [a-search-narrows-to-the-matching-folder-in-order-and-page](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
 
-자기 스코프에서 vfolder 읽기 권한을 받은 사용자가 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
+자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
 
 Given
 
-- 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 그리고 이름에 match 가 들지만 남의 것인 개인 vfolder 하나를 가진, 자기 스코프에서 vfolder READ 권한을 받은 사용자 한 명
+- 자기와 다른 사용자 한 명의 개인 프로젝트에서 vfolder READ 권한을 받은 사용자 한 명. 모든 vfolder 는 남에게 ro 로 마운트되며, 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 match 가 든 그 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -737,18 +729,25 @@ Given
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 개인 vfolder match-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 개인 vfolder match-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 개인 vfolder other-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 개인 vfolder match-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 자기 스코프에서 vfolder READ 권한을 받은 사용자 준비
-    - 역할 folder-holder-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 folder-holder-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-holder-1 보유
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 개인 vfolder match-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder other-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - vfolder 권한 부여
+    - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-writer-1 보유
+    - 역할 folder-writer-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-2: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-writer-2 보유
 
 When
 
-- VFolderAdapter.scoped_search: user-1이 자기 범위에서 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
+- VFolderAdapter.scoped_search: user-1이 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 
@@ -772,7 +771,7 @@ Then
   - items[0].unmanaged_path = None
   - items[0].metadata.usage_mode = 'general'
   - items[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
-  - items[0].access_control.permission = 'none'
+  - items[0].access_control.permission = 'ro'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
@@ -791,7 +790,7 @@ Then
   - items[1].unmanaged_path = None
   - items[1].metadata.usage_mode = 'general'
   - items[1].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
-  - items[1].access_control.permission = 'none'
+  - items[1].access_control.permission = 'ro'
   - items[1].quota.max_size = None
   - items[1].quota.max_files = 1000
   - items[1].metadata.created_at: 이 실행이 쓴 시각
@@ -850,127 +849,6 @@ Given
 When
 
 - VFolderAdapter.scoped_search: user-1이 자기 범위의 vfolder 를 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
-### scoped_search_by_mount_permission
-
-<a id="searching-a-search-selects-the-folders-the-caller-mounts-read-write"></a>
-
-#### [a-search-selects-the-folders-the-caller-mounts-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
-
-자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 오름차순으로 한 페이지 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
-
-Given
-
-- 남에게 ro 로 마운트되는 개인 vfolder 를 각각 가진 다른 사용자 두 명과, 그런 vfolder 둘을 가진, 자기와 다른 사용자 한 명의 개인 프로젝트에서 vfolder 를 읽을 수 있는 사용자 한 명
-  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - 개인 vfolder folder-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - 개인 vfolder folder-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - 개인 vfolder folder-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - vfolder 읽기 권한 부여
-    - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 folder-reader-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 역할 folder-reader-2: 부여된 스코프 안에서만 적용됩니다
-    - 역할 folder-reader-2: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-reader-2 보유
-
-When
-
-- VFolderAdapter.scoped_search_by_mount_permission: user-1이 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 이름 오름차순으로 2개까지 조회합니다
-
-Then
-
-- 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 2
-  - items[0].id: 미리 저장한 vfolder 와 같다
-  - items[0].entity_id: 응답의 id 와 같다
-  - items[0].host = 'local:volume1'
-  - items[0].status = 'ready'
-  - items[0].metadata.name = 'folder-1'
-  - items[0].metadata.cloneable = False
-  - items[0].metadata.last_used = None
-  - items[0].access_control.ownership_type = 'user'
-  - items[0].ownership.user_id: vfolder 소유자와 같다
-  - items[0].ownership.project_id: vfolder 가 놓인 프로젝트와 같다
-  - items[0].ownership.creator_id: 생성한 사용자와 같다
-  - items[0].ownership.creator_email = 'user-1@scenario.local'
-  - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode = 'general'
-  - items[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
-  - items[0].access_control.permission = 'ro'
-  - items[0].quota.max_size = None
-  - items[0].quota.max_files = 1000
-  - items[0].metadata.created_at: 이 실행이 쓴 시각
-  - items[1].id: 미리 저장한 vfolder 와 같다
-  - items[1].entity_id: 응답의 id 와 같다
-  - items[1].host = 'local:volume1'
-  - items[1].status = 'ready'
-  - items[1].metadata.name = 'folder-2'
-  - items[1].metadata.cloneable = False
-  - items[1].metadata.last_used = None
-  - items[1].access_control.ownership_type = 'user'
-  - items[1].ownership.user_id: vfolder 소유자와 같다
-  - items[1].ownership.project_id: vfolder 가 놓인 프로젝트와 같다
-  - items[1].ownership.creator_id: 생성한 사용자와 같다
-  - items[1].ownership.creator_email = 'user-1@scenario.local'
-  - items[1].unmanaged_path = None
-  - items[1].metadata.usage_mode = 'general'
-  - items[1].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
-  - items[1].access_control.permission = 'ro'
-  - items[1].quota.max_size = None
-  - items[1].quota.max_files = 1000
-  - items[1].metadata.created_at: 이 실행이 쓴 시각
-  - items ids: 걸러진 자기 vfolder 둘
-
-<a id="searching-a-user-granted-nothing-may-not-search-by-mount-level"></a>
-
-#### [a-user-granted-nothing-may-not-search-by-mount-level](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
-
-아무 권한도 받지 않은 사용자가 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다
-
-Given
-
-- 남에게 ro 로 마운트되는 개인 vfolder 를 각각 가진 다른 사용자 두 명과, 그런 vfolder 둘을 가진, 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - 개인 vfolder folder-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - 개인 vfolder folder-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-  - 개인 vfolder folder-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
-
-When
-
-- VFolderAdapter.scoped_search_by_mount_permission: user-1이 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 

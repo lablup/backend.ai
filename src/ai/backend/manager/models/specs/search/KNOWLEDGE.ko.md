@@ -93,12 +93,18 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 |---|---|---|
 | own | 엔티티 자신의 column | 엔티티의 field cap |
 | nested | 엔티티가 소유하는 다른 테이블의 row | 엔티티의 field cap(path `labels.key`) |
-| linked | 외래 키가 다른 엔티티 쪽에 있는 연결, 계산된 관계 | 스코프, 다른 엔티티의 권한 |
+| linked | 외래 키가 다른 엔티티 쪽에 있는 연결, 계산된 관계, 사용자 한 명 기준으로 계산한 값 | 스코프, 다른 엔티티의 권한 |
 
 - 나누는 기준은 소유이지 테이블이 아니다. label 은 다른 테이블에 있지만 vfolder 의 data 다.
 - 외래 키가 search 대상 row 에 있으면 own, 소유한 row 에 있으면 nested 의 filter 다. 다른 엔티티 쪽에 있을 때만 linked 다.
 - 진입점이 하나이므로 sweep test 와 권한 검사가 한 곳에서 시작한다. 뒤의 class 는 이름으로 참조하지
   않으므로 private 이다.
+
+## 사용자 한 명 기준으로 계산한 값은 filter DTO 에 두지 않는다
+
+- 사용자의 vfolder 마운트 정책에는 column 이 없다. SQL 이 그 사용자의 역할과 정책 row 로 계산한다. 계산에 쓰는 값이 모두 query 가 읽을 수 있는 row 이므로 filter 로 둘 수 있다.
+- global search 와 scoped search 는 filter DTO 하나를 함께 쓴다. 이 값을 그 DTO 에 두면 global search 의 결과가 호출한 superadmin 에 따라 달라진다.
+- DTO 에 사용자 id 를 두면 요청이 다른 사용자를 지정할 수 있고, 호출자가 그 사용자의 정책을 읽을 수 있는지 검사하는 곳이 없다. 그래서 REST handler 와 GQL resolver 가 현재 사용자를 전달한다.
 
 ## 다른 테이블의 field 는 펼치지 않고 nested 로 둔다
 
