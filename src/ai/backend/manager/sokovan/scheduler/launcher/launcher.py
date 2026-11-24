@@ -35,6 +35,7 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.errors.kernel import KernelCreationFailedOnAgents
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -431,37 +432,52 @@ class SessionLauncher:
                 create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
             if create_tasks:
-                results = await asyncio.gather(*create_tasks, return_exceptions=True)
-                failed_agent_ids = [
-                    aid
-                    for aid, result in zip(agent_ids_ordered, results, strict=True)
-                    if isinstance(result, BaseException)
-                    and not (
-                        isinstance(result, RPCUserError)
-                        and result.name == _KERNEL_CREATION_IN_PROGRESS_ERROR
-                    )
-                ]
-                if failed_agent_ids:
-                    log.warning(
-                        "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): recording failed agents: {}",
-                        *log_args,
-                        failed_agent_ids,
-                    )
-                    try:
-                        await self._valkey_schedule.record_session_failed_agents(
-                            session.session_id, failed_agent_ids
-                        )
-                    except Exception:
+                recorder = RecorderContext[SessionId].current_pool().recorder(session.session_id)
+                with (
+                    recorder.phase("kernel_creation"),
+                    recorder.step(
+                        "create_kernels_on_agents", success_detail="Kernels created on agents"
+                    ),
+                ):
+                    results = await asyncio.gather(*create_tasks, return_exceptions=True)
+                    failed_agent_ids: list[AgentId] = []
+                    agent_errors: list[str] = []
+                    for aid, result in zip(agent_ids_ordered, results, strict=True):
+                        if not isinstance(result, BaseException):
+                            continue
+                        if isinstance(result, RPCUserError):
+                            if result.name == _KERNEL_CREATION_IN_PROGRESS_ERROR:
+                                continue
+                            agent_errors.append(f"{aid}: {result.repr}")
+                        else:
+                            agent_errors.append(f"{aid}: {result!r}")
+                        failed_agent_ids.append(aid)
+                    if failed_agent_ids:
                         log.warning(
-                            "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): failed to record failed agents in Valkey",
+                            "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): recording failed agents: {}",
                             *log_args,
-                            exc_info=True,
+                            failed_agent_ids,
                         )
+                        try:
+                            await self._valkey_schedule.record_session_failed_agents(
+                                session.session_id, failed_agent_ids
+                            )
+                        except Exception:
+                            log.warning(
+                                "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): failed to record failed agents in Valkey",
+                                *log_args,
+                                exc_info=True,
+                            )
+                        raise KernelCreationFailedOnAgents("; ".join(agent_errors))
 
             log.info(
                 "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): started", *log_args
             )
 
+        except KernelCreationFailedOnAgents as e:
+            # The failed agents are already logged above.
+            error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
+            await self._repository.update_session_error_info(session.session_id, error_info)
         except Exception as e:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
