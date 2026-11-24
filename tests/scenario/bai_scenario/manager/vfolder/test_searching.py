@@ -114,8 +114,7 @@ class SearchingMyOwnScope(When[AFolderAndItsReader, VFolderAdapter, SearchVFolde
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
                     scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)])
-                ),
-                UserID(laid.caller.id),
+                )
             )
 
 

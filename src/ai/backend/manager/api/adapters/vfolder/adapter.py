@@ -461,20 +461,23 @@ class VFolderAdapter(BaseAdapter):
     async def scoped_search(
         self,
         input: ScopedSearchVFoldersInput,
-        user_id: UserID,
+        user_id: UserID | None = None,
     ) -> SearchVFoldersPayload:
         """Search the vfolders the named scopes reach, combined with OR.
 
         ``user_id`` is whose mount policy ``input.mount_permission`` selects by.
         """
+        mount_permission_conditions: list[QueryCondition] = []
+        if input.mount_permission is not None:
+            if user_id is None:
+                raise UnreachableError("mount_permission is given without the user it is read for")
+            mount_permission_conditions = self.apply_enum_filter(
+                input.mount_permission,
+                VFolderSearchableFields.linked.mount_permission.of_user(user_id),
+            )
         action_result = await self._vfolder.scoped_search.run(
             self._scoped_search_action(
-                self._scope_targets(input.scope),
-                input,
-                self.apply_enum_filter(
-                    input.mount_permission,
-                    VFolderSearchableFields.linked.mount_permission.of_user(user_id),
-                ),
+                self._scope_targets(input.scope), input, mount_permission_conditions
             )
         )
         return SearchVFoldersPayload(

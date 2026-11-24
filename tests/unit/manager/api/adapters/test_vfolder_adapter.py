@@ -12,7 +12,6 @@ import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
@@ -59,8 +58,8 @@ class TestVFolderAdapterUserScopedSearch:
     """Tests for VFolderAdapter.scoped_search() with a user scope."""
 
     @pytest.fixture
-    def user_id(self) -> UserID:
-        return UserID(uuid4())
+    def user_id(self) -> uuid.UUID:
+        return uuid4()
 
     @pytest.fixture
     def vfolder_data(self) -> VFolderData:
@@ -107,13 +106,12 @@ class TestVFolderAdapterUserScopedSearch:
         self,
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
-        user_id: UserID,
+        user_id: uuid.UUID,
     ) -> None:
         await adapter.scoped_search(
             ScopedSearchVFoldersInput(
                 scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
-            ),
-            user_id,
+            )
         )
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
@@ -124,7 +122,7 @@ class TestVFolderAdapterUserScopedSearch:
         self,
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
-        user_id: UserID,
+        user_id: uuid.UUID,
     ) -> None:
         session_id = uuid4()
 
@@ -134,8 +132,7 @@ class TestVFolderAdapterUserScopedSearch:
                 usage=VFolderUsage(used_by=VFolderUsedBy(session=[session_id])),
                 limit=10,
                 offset=0,
-            ),
-            user_id,
+            )
         )
 
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
@@ -144,13 +141,12 @@ class TestVFolderAdapterUserScopedSearch:
     async def test_user_scope_returns_payload(
         self,
         adapter: VFolderAdapter,
-        user_id: UserID,
+        user_id: uuid.UUID,
     ) -> None:
         result = await adapter.scoped_search(
             ScopedSearchVFoldersInput(
                 scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
-            ),
-            user_id,
+            )
         )
 
         assert result.total_count == 1

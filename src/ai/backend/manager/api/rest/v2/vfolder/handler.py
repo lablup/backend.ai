@@ -67,8 +67,7 @@ class V2VFolderHandler:
                 before=body.parsed.before,
                 limit=body.parsed.limit,
                 offset=body.parsed.offset,
-            ),
-            UserID(user_ctx.user_uuid),
+            )
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

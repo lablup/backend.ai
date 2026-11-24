@@ -285,8 +285,7 @@ async def my_vfolders(
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        UserID(me.user_id),
+        )
     )
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
