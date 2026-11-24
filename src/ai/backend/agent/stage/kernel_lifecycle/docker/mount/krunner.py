@@ -8,7 +8,11 @@ from typing import override
 
 from cachetools import LRUCache, cached
 
-from ai.backend.agent.defs import FALLBACK_KERNEL_PYTHON_VERSION
+from ai.backend.agent.defs import (
+    FALLBACK_KERNEL_PYTHON_VERSION,
+    GLIBC_STUB_CONTAINER_DIR,
+    GLIBC_STUB_LIBRARIES,
+)
 from ai.backend.agent.kernel import match_distro_data, read_krunner_python_version
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
 from ai.backend.agent.utils import get_arch_name
@@ -81,6 +85,7 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             *self._prepare_krunner_volume_mounts(info),
             *self._prepare_python_lib_mounts(info),
             *self._prepare_musl_mounts(info),
+            *self._prepare_glibc_stub_mounts(info),
             *self._prepare_jail_mounts(info, spec.sandbox_type),
         ]
 
@@ -130,6 +135,17 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
                 Path("/home/work/.terminfo"),
                 MountPermission.READ_ONLY,
             )
+        ]
+
+    def _prepare_glibc_stub_mounts(self, runner_info: KernelRunnerInfo) -> list[Mount]:
+        if runner_info.libc_style != LibcStyle.GLIBC:
+            return []
+        return [
+            self._parse_mount(
+                f"runner/glibc-stub.{library}.{runner_info.architecture}.so",
+                f"{GLIBC_STUB_CONTAINER_DIR}/{library}",
+            )
+            for library in GLIBC_STUB_LIBRARIES
         ]
 
     def _prepare_static_binary_mounts(self, runner_info: KernelRunnerInfo) -> list[Mount]:
