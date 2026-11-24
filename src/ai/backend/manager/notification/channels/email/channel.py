@@ -3,20 +3,43 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import logging
 import smtplib
+import socket
+import ssl
 from email.mime.text import MIMEText
 from functools import partial
 
 from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
+from ai.backend.manager.errors.notification import (
+    NotificationDeliveryFailure,
+    NotificationProcessingFailure,
+)
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_NOTIFICATION_SUBJECT = "Notification from Backend.AI"
+
+
+_UNREACHABLE_ERRNOS = frozenset({
+    errno.EHOSTUNREACH,
+    errno.ENETUNREACH,
+    errno.EHOSTDOWN,
+    errno.ENETDOWN,
+})
+
+
+def _is_smtp_destination_failure(error: OSError) -> bool:
+    """Whether the SMTP host could not be reached or presented a certificate that fails to verify."""
+    if isinstance(
+        error, (socket.gaierror, ConnectionError, TimeoutError, ssl.SSLCertVerificationError)
+    ):
+        return True
+    return error.errno in _UNREACHABLE_ERRNOS
 
 
 class EmailChannel(AbstractNotificationChannel):
@@ -39,7 +62,8 @@ class EmailChannel(AbstractNotificationChannel):
             SendResult indicating success
 
         Raises:
-            NotificationProcessingFailure: If email delivery fails
+            NotificationDeliveryFailure: If the SMTP server cannot be reached or rejects the message
+            NotificationProcessingFailure: If email delivery fails for any other reason
         """
         # Determine subject (priority: spec template > first line of message)
         if self._spec.message.subject_template:
@@ -96,16 +120,26 @@ class EmailChannel(AbstractNotificationChannel):
                 smtp.host,
                 smtp.port,
             )
-            raise NotificationProcessingFailure(f"SMTP connection failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except smtplib.SMTPAuthenticationError as e:
             log.exception(
                 "SMTP authentication failed for user {}",
                 auth.username if auth else "unknown",
             )
-            raise NotificationProcessingFailure(f"SMTP authentication failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
             log.exception("SMTP error while sending email")
-            raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"Email delivery failed: {e!s}") from e
+        except OSError as e:
+            if not _is_smtp_destination_failure(e):
+                log.exception("Unexpected error sending email")
+                raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
+            log.exception(
+                "Failed to connect to SMTP server {}:{}",
+                smtp.host,
+                smtp.port,
+            )
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except Exception as e:
             log.exception("Unexpected error sending email")
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
