@@ -15,6 +15,10 @@ Repository rules that ruff cannot express. The `lint` group of `pyproject.toml` 
 | `BAI301` | A public method of a class in `manager/repositories` `repository.py` or `repositories.py` returns no Row, also inside a generic or a union | No |
 | `BAI302` | A Row class under `manager/models` holds only `to_*`/`from_*` methods and dunder methods | No |
 | `BAI303` | A migration with `# Part of: NEXT_RELEASE_VERSION` wraps in `op.f()` a constraint name equal to the naming convention of `manager/models/base.py` (`op.create_*` calls and constraints in `op.create_table`) | No |
+| `BAI401` | The module file and top-level name a `LazyGroup` `import_name` points at exist (read from source, not imported) | Yes |
+| `BAI402` | A decorated `admin_*` resolver under `manager/api/gql` calls `check_admin_only()` first | No |
+| `BAI403` | Storage `api/` has no module-level `async def` handler taking only a `Request` | No |
+| `BAI404` | An App Proxy `mapped_column()` or `Column()` type is not `EnumType`, `ENUM` or SQLAlchemy `Enum` | No |
 
 - A rule is on when `[tool.flake8]` in `pyproject.toml` lists its code in `select`. Turn a rule on once main has no violation of it.
 - Codes: `flake8_bai/codes.py`. One module per rule: `flake8_bai/rules/`.

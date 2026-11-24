@@ -28,6 +28,10 @@ class BAICode(enum.Enum):
         "BAI303",
         "convention constraint name in a migration; wrap it in op.f()",
     )
+    LAZY_GROUP_TARGET = ("BAI401", "LazyGroup import_name points at a missing module or name")
+    ADMIN_RESOLVER_CHECK = ("BAI402", "admin_ resolver must call check_admin_only() first")
+    STORAGE_MODULE_HANDLER = ("BAI403", "storage api handler must be a handler class method")
+    APPPROXY_NATIVE_ENUM = ("BAI404", "App Proxy column must not use a native ENUM type")
 
     @property
     def code(self) -> str:

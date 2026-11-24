@@ -35,7 +35,8 @@ class MigrationConstraintNameRule(Rule):
 
     _convention: ConstraintNameConvention
 
-    def __init__(self) -> None:
+    def __init__(self, path: SourcePath) -> None:
+        super().__init__(path)
         self._convention = ConstraintNameConvention()
 
     @override
