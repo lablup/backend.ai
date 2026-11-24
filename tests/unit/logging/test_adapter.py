@@ -58,14 +58,15 @@ def test_brace_style_adapter_custom_kwargs(caplog: pytest.LogCaptureFixture) -> 
 
 
 def test_brace_style_adapter_exceptions(caplog: pytest.LogCaptureFixture) -> None:
-    logger = _adapter(logging.getLogger())
+    # Importing ai.backend.kernel.base adds a filter to the root logger that replaces the traceback.
+    logger = _adapter(logging.getLogger("tests.logging.adapter"))
     with caplog.at_level(logging.ERROR):
         try:
             _ = 1 / 0
         except ZeroDivisionError:
             logger.exception("Oops! {detail}", detail="big mistake")
 
-    assert caplog.record_tuples == [("root", logging.ERROR, "Oops! big mistake")]
+    assert caplog.record_tuples == [("tests.logging.adapter", logging.ERROR, "Oops! big mistake")]
     assert "Traceback (most recent call last):" in caplog.text
 
 

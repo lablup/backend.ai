@@ -5,11 +5,25 @@ from __future__ import annotations
 import json
 from typing import cast
 
+import pytest
 from click.testing import CliRunner
 
 from ai.backend.manager.actions.registry.types import Concern
 from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.cli import ops
 from ai.backend.manager.cli.ops import cli
+
+
+@pytest.fixture(autouse=True)
+def without_types_of_other_test_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    subclasses_in_process = ops._subclasses
+    monkeypatch.setattr(
+        ops,
+        "_subclasses",
+        lambda base: [
+            sub for sub in subclasses_in_process(base) if sub.__module__.startswith("ai.backend.")
+        ],
+    )
 
 
 def _list(*args: str) -> list[dict[str, str]]:
