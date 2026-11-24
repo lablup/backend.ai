@@ -4822,21 +4822,41 @@
         "type": "object"
       },
       "ContainerRegistryScope": {
-        "description": "Scope for the scoped container registry query. The domains are OR'd.",
+        "description": "Scope for the scoped container registry query. Every item of every list is OR'd.",
         "properties": {
           "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Domains whose related container registries are being read",
-            "items": {
-              "$ref": "#/components/schemas/UUIDScope"
-            },
-            "minItems": 1,
-            "title": "Domain",
-            "type": "array"
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Projects whose related container registries are being read",
+            "title": "Project"
           }
         },
-        "required": [
-          "domain"
-        ],
         "title": "ContainerRegistryScope",
         "type": "object"
       },
@@ -20574,6 +20594,22 @@
             "default": null,
             "description": "Resource groups whose projects are being read",
             "title": "Resource Group"
+          },
+          "container_registry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Container registries whose related projects are being read",
+            "title": "Container Registry"
           }
         },
         "title": "ProjectScope",

@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-시나리오: 미완성 13 / 17
+시나리오: 미완성 13 / 19
 
 - ops 구성 (10)
   - admin_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
@@ -20,10 +20,12 @@
   - partial_bulk_update: 성공 있음 3 · 거부 없음 (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: 성공 없음 · 거부 없음 (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: 성공 있음 2 · 거부 없음 (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
-- 직접 구현 (3)
+- 직접 구현 (5)
   - admin_create: 성공 있음 1 · 거부 있음 1 (scope)
   - admin_purge: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
   - batch_load_registries: 성공 있음 3 · 거부 있음 1 (partial_bulk)
+  - create_container_registry_relations: 성공 있음 2 · 거부 있음 2 (relation)
+  - purge_container_registry_relations: 성공 있음 3 · 거부 있음 1 (relation)
 
 **partial_bulk_delete**
 
@@ -43,8 +45,11 @@
 | 시나리오 | 판정 |
 |---|---|
 | [리소스 그룹 범위에서 프로젝트 읽기 역할을 받은 사용자가 그 범위에서 search 하면, superadmin 과 같은 프로젝트들이 응답으로 옵니다](#scoped_searching_by_resource_group-a-user-granted-read-in-the-group-searches-its-projects) | 성공 |
+| [레지스트리 범위에서 프로젝트 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 그 레지스트리와 relation 이 있는 프로젝트만 응답으로 옵니다](#scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-projects) | 성공 |
+| [relation 이 없는 레지스트리 범위에서 search 하면 빈 목록이 옵니다](#scoped_searching_by_registry-a-user-searches-the-projects-of-a-registry-with-no-relation) | 성공 |
 | [superadmin 이 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 프로젝트만 응답으로 옵니다](#scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group) | 성공 |
 | [아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부됩니다](#scoped_searching_by_resource_group-a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group) | 거부 |
+| [레지스트리 범위에서 프로젝트 읽기 역할 없이 레지스트리 읽기 역할만 받은 사용자가 search 하면 권한 부족으로 거부됩니다](#scoped_searching_by_registry-a-user-without-project-read-may-not-search-the-projects-of-a-registry) | 거부 |
 
 **assign_users**
 
@@ -84,6 +89,24 @@
 | [읽기 권한이 있으면 default 로 허용된 Container Registry 를 default 라는 표시와 함께 응답합니다](#registries-read-default-registry) | 성공 |
 | [읽기 권한이 있고 허용된 Container Registry 가 없으면 빈 목록을 응답합니다](#registries-read-no-registry) | 성공 |
 | [읽기 권한이 없으면 허용된 Container Registry 조회를 거부합니다](#registries-registries-read-requires-permission) | 거부 |
+
+**create_container_registry_relations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트와 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트와 레지스트리 사이에 relation 을 만들 수 있습니다](#creating_registry_relations-a-user-granted-on-both-scopes-creates-a-project-registry-relation) | 성공 |
+| [이미 있는 relation 을 다시 만들어도 거부되지 않고, 응답에서는 빠집니다](#creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response) | 성공 |
+| [프로젝트와 존재하지 않는 레지스트리 사이에 relation 을 만들려 하면 그 레지스트리가 없다는 이유로 거부됩니다](#creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | 거부 |
+| [레지스트리에만 권한을 받은 사용자가 프로젝트와 그 레지스트리 사이에 relation 을 만들려 하면 거부됩니다](#creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-project-registry-relation) | 거부 |
+
+**purge_container_registry_relations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트와 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트와 레지스트리 사이의 relation 을 지울 수 있습니다](#purging_registry_relations-a-user-granted-on-both-scopes-purges-a-project-registry-relation) | 성공 |
+| [없는 relation 을 지워도 거부되지 않고, 응답에서는 빠집니다](#purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response) | 성공 |
+| [프로젝트의 default 레지스트리와의 relation 도 거부되지 않고 지워집니다](#purging_registry_relations-purging-the-relation-to-the-default-registry-is-not-refused) | 성공 |
+| [레지스트리에만 권한을 받은 사용자가 프로젝트와 그 레지스트리 사이의 relation 을 지우려 하면 거부됩니다](#purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-project-registry-relation) | 거부 |
 
 ### partial_bulk_delete
 
@@ -270,6 +293,82 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+<a id="scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-projects"></a>
+
+#### [a-user-granted-read-in-the-registry-searches-its-projects](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_registry.py): pass
+
+레지스트리 범위에서 프로젝트 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 그 레지스트리와 relation 이 있는 프로젝트만 응답으로 옵니다
+
+Given
+
+- 레지스트리 하나, 그 레지스트리와 relation 이 있는 프로젝트 2개와 없는 프로젝트 하나, 그리고 그 레지스트리 범위의 프로젝트 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 related-1
+  - 프로젝트 related-2
+  - 프로젝트 related-1 가 허용한 컨테이너 레지스트리 host-1
+  - 프로젝트 related-2 가 허용한 컨테이너 레지스트리 host-1
+  - 프로젝트 unrelated-1
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 프로젝트 unrelated-1 가 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-registry 권한을 받은 사용자 준비
+    - 역할 read-in-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-registry-1: project 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-registry-1 보유
+
+When
+
+- ProjectAdapter.scoped_search: user-1이 레지스트리 host-1 범위에서 search 합니다
+
+Then
+
+- 그 레지스트리와 relation 이 있는 프로젝트만 남습니다
+  - items = ['related-1', 'related-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_registry-a-user-searches-the-projects-of-a-registry-with-no-relation"></a>
+
+#### [a-user-searches-the-projects-of-a-registry-with-no-relation](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_registry.py): pass
+
+relation 이 없는 레지스트리 범위에서 search 하면 빈 목록이 옵니다
+
+Given
+
+- 레지스트리 하나, 그 레지스트리와 relation 이 있는 프로젝트 0개와 없는 프로젝트 하나, 그리고 그 레지스트리 범위의 프로젝트 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 unrelated-1
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 프로젝트 unrelated-1 가 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-registry 권한을 받은 사용자 준비
+    - 역할 read-in-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-registry-1: project 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-registry-1 보유
+
+When
+
+- ProjectAdapter.scoped_search: user-1이 레지스트리 host-1 범위에서 search 합니다
+
+Then
+
+- 그 레지스트리와 relation 이 있는 프로젝트만 남습니다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group"></a>
 
 #### [the-superadmin-searches-the-projects-of-a-resource-group](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
@@ -329,6 +428,43 @@ Given
 When
 
 - ProjectAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 search 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="scoped_searching_by_registry-a-user-without-project-read-may-not-search-the-projects-of-a-registry"></a>
+
+#### [a-user-without-project-read-may-not-search-the-projects-of-a-registry](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_registry.py): pass
+
+레지스트리 범위에서 프로젝트 읽기 역할 없이 레지스트리 읽기 역할만 받은 사용자가 search 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 레지스트리 하나, 그 레지스트리와 relation 이 있는 프로젝트 2개와 없는 프로젝트 하나, 그리고 그 레지스트리 범위의 레지스트리 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 related-1
+  - 프로젝트 related-2
+  - 프로젝트 related-1 가 허용한 컨테이너 레지스트리 host-1
+  - 프로젝트 related-2 가 허용한 컨테이너 레지스트리 host-1
+  - 프로젝트 unrelated-1
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 프로젝트 unrelated-1 가 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-registry 권한을 받은 사용자 준비
+    - 역할 read-in-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-registry-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-registry-1 보유
+
+When
+
+- ProjectAdapter.scoped_search: user-1이 레지스트리 host-1 범위에서 search 합니다
 
 Then
 
@@ -849,5 +985,299 @@ Then
 - 요청마다 허용된 Container Registry 목록이나 권한 거부를 응답합니다
   - count = 2
   - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
+### create_container_registry_relations
+
+<a id="creating_registry_relations-a-user-granted-on-both-scopes-creates-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-creates-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+프로젝트와 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트와 레지스트리 사이에 relation 을 만들 수 있습니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1이 project-1과 그 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 새로 만든 프로젝트와 레지스트리 relation 하나가 옵니다
+  - items: 요청한 프로젝트와 레지스트리 한 쌍와 같다
+
+<a id="creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response"></a>
+
+#### [creating-an-existing-relation-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+이미 있는 relation 을 다시 만들어도 거부되지 않고, 응답에서는 빠집니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1이 project-1과 그 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 빈 목록이 옵니다
+  - items = []
+
+<a id="creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+프로젝트와 존재하지 않는 레지스트리 사이에 relation 을 만들려 하면 그 레지스트리가 없다는 이유로 거부됩니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1이 project-1과 존재하지 않는 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: ContainerRegistryNotFound
+
+<a id="creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-create-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+레지스트리에만 권한을 받은 사용자가 프로젝트와 그 레지스트리 사이에 relation 을 만들려 하면 거부됩니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1이 project-1과 그 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### purge_container_registry_relations
+
+<a id="purging_registry_relations-a-user-granted-on-both-scopes-purges-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-purges-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+프로젝트와 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트와 레지스트리 사이의 relation 을 지울 수 있습니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1이 project-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 지운 프로젝트와 레지스트리 relation 하나가 옵니다
+  - items: 요청한 프로젝트와 레지스트리 한 쌍와 같다
+
+<a id="purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response"></a>
+
+#### [purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+없는 relation 을 지워도 거부되지 않고, 응답에서는 빠집니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1이 project-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 빈 목록이 옵니다
+  - items = []
+
+<a id="purging_registry_relations-purging-the-relation-to-the-default-registry-is-not-refused"></a>
+
+#### [purging-the-relation-to-the-default-registry-is-not-refused](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+프로젝트의 default 레지스트리와의 relation 도 거부되지 않고 지워집니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 이 레지스트리를 default 로 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 가 default 컨테이너 레지스트리로 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1이 project-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 지운 프로젝트와 레지스트리 relation 하나가 옵니다
+  - items: 요청한 프로젝트와 레지스트리 한 쌍와 같다
+
+<a id="purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-purge-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+레지스트리에만 권한을 받은 사용자가 프로젝트와 그 레지스트리 사이의 relation 을 지우려 하면 거부됩니다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명, 프로젝트는 이미 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1이 project-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 거부됩니다
   - 거부: NotEnoughPermission
 

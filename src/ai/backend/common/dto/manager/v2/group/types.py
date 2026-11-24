@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "DomainProjectScopeDTO",
@@ -96,11 +97,23 @@ class ProjectScope(BaseRequestModel):
     resource_group: list[UUIDScope] | None = Field(
         default=None, description="Resource groups whose projects are being read"
     )
+    container_registry: list[UUIDScope] | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Container registries whose related projects are being read"
+        ),
+    )
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> ProjectScope:
-        if not self.domain and not self.user and not self.resource_group:
+        if (
+            not self.domain
+            and not self.user
+            and not self.resource_group
+            and not self.container_registry
+        ):
             raise ValueError(
-                "ProjectScope requires a non-empty value for 'domain', 'user' or 'resource_group'"
+                "ProjectScope requires a non-empty value for 'domain', 'user', "
+                "'resource_group' or 'container_registry'"
             )
         return self

@@ -4484,6 +4484,9 @@ type ContainerRegistryV2 implements Node
 
   """Added in 26.10.0. Domains this container registry is related to."""
   domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """Added in 26.10.0. Projects this container registry is related to."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """Added in 26.4.2. Paginated connection for container registries."""
@@ -20062,6 +20065,11 @@ input ProjectScope
 
   """Resource groups whose projects are being read."""
   resourceGroup: [UUIDScope!] = null
+
+  """
+  Added in 26.10.0. Container registries whose related projects are being read.
+  """
+  containerRegistry: [UUIDScope!] = null
 }
 
 """
@@ -20356,6 +20364,9 @@ type ProjectV2 implements Node
   Added in 26.10.0. System session environ rows registered in this project, soft-deleted ones included.
   """
   systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
+
+  """Added in 26.10.0. Container registries this project is allowed to use."""
+  containerRegistries(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection
 }
 
 """

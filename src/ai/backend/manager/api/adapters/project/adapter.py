@@ -86,6 +86,7 @@ from ai.backend.manager.models.project.deprecated_search import (
 )
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import (
+    ContainerRegistryProjectTarget,
     DomainProjectTarget,
     ProjectTarget,
     ResourceGroupProjectTarget,
@@ -462,6 +463,10 @@ class ProjectAdapter(BaseAdapter):
         targets.extend(
             ResourceGroupProjectTarget(resource_group_id=ResourceGroupID(entry.value))
             for entry in scope.resource_group or ()
+        )
+        targets.extend(
+            ContainerRegistryProjectTarget(container_registry_id=ContainerRegistryID(entry.value))
+            for entry in scope.container_registry or ()
         )
         return targets
 

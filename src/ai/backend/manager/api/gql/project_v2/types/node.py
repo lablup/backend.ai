@@ -45,6 +45,13 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.container_registry.filters import (
+        ContainerRegistryV2Filter,
+        ContainerRegistryV2OrderBy,
+    )
+    from ai.backend.manager.api.gql.container_registry.types import (
+        ContainerRegistryV2Connection,
+    )
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.model_card.types import (
         ModelCardFilterGQL,
@@ -585,6 +592,84 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             for node in nodes
         ]
         return SystemSessionEnvironConnectionGQL(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_resolver(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Container registries this project is allowed to use.",
+        )
+    )
+    async def container_registries(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ContainerRegistryV2Filter,
+            strawberry.lazy("ai.backend.manager.api.gql.container_registry.filters"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ContainerRegistryV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.container_registry.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ContainerRegistryV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.container_registry.types"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.container_registry.request import (
+            ScopedSearchContainerRegistriesInput,
+        )
+        from ai.backend.common.dto.manager.v2.container_registry.types import (
+            ContainerRegistryScope,
+        )
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.container_registry.types import (
+            ContainerRegistryGQL,
+            ContainerRegistryV2Connection,
+            ContainerRegistryV2Edge,
+        )
+
+        payload = await info.context.adapters.container_registry.scoped_search(
+            ScopedSearchContainerRegistriesInput(
+                scope=ContainerRegistryScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ContainerRegistryGQL.from_pydantic(data) for data in payload.items]
+        edges = [
+            ContainerRegistryV2Edge(node=node, cursor=encode_cursor(node.id)) for node in nodes
+        ]
+        return ContainerRegistryV2Connection(
             edges=edges,
             page_info=PageInfo(
                 has_next_page=payload.has_next_page,

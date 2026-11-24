@@ -59,7 +59,10 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryPurger,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.scopes import DomainContainerRegistryTarget
+from ai.backend.manager.models.container_registry.scopes import (
+    DomainContainerRegistryTarget,
+    ProjectContainerRegistryTarget,
+)
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
@@ -161,7 +164,8 @@ class ContainerRegistryAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchContainerRegistriesInput
     ) -> ScopedSearchContainerRegistriesPayload:
-        """Search the container registries the named domains are related to, combined with OR."""
+        """Search the container registries the named domains and projects are related to,
+        combined with OR."""
         querier = self._build_querier(
             conditions=self._convert_filter(input.filter) if input.filter else [],
             orders=self._convert_orders(input.order) if input.order else [],
@@ -177,8 +181,14 @@ class ContainerRegistryAdapter(BaseAdapter):
             ScopedSearchContainerRegistriesAction(
                 searcher=ScopedSearcher(
                     scopes=[
-                        DomainContainerRegistryTarget(DomainID(entry.value))
-                        for entry in input.scope.domain
+                        *(
+                            DomainContainerRegistryTarget(DomainID(entry.value))
+                            for entry in input.scope.domain or ()
+                        ),
+                        *(
+                            ProjectContainerRegistryTarget(ProjectID(entry.value))
+                            for entry in input.scope.project or ()
+                        ),
                     ],
                     used_by=(),
                     searcher=ContainerRegistrySearcher(

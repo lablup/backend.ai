@@ -29,8 +29,14 @@ def container_registry() -> None:
     "domain_ids",
     type=click.UUID,
     multiple=True,
-    required=True,
-    help="Domain whose related registries are read (repeatable; OR across every domain).",
+    help="Domain whose related registries are read (repeatable; OR across every scope).",
+)
+@click.option(
+    "--project",
+    "project_ids",
+    type=click.UUID,
+    multiple=True,
+    help="Project whose related registries are read (repeatable; OR across every scope).",
 )
 @click.option("--limit", type=int, default=None, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
@@ -59,6 +65,7 @@ def container_registry() -> None:
 )
 def scoped_search(
     domain_ids: tuple[UUID, ...],
+    project_ids: tuple[UUID, ...],
     limit: int | None,
     offset: int | None,
     registry_name: str | None,
@@ -66,7 +73,7 @@ def scoped_search(
     is_global: bool | None,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search the container registries the given domains are related to."""
+    """Search the container registries the given domains and projects are related to."""
     from ai.backend.common.container_registry import ContainerRegistryType
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.container_registry.request import (
@@ -104,7 +111,8 @@ def scoped_search(
             result = await registry.container_registry.scoped_search(
                 ScopedSearchContainerRegistriesInput(
                     scope=ContainerRegistryScope(
-                        domain=[UUIDScope(value=domain_id) for domain_id in domain_ids]
+                        domain=[UUIDScope(value=domain_id) for domain_id in domain_ids] or None,
+                        project=[UUIDScope(value=project_id) for project_id in project_ids] or None,
                     ),
                     filter=registry_filter,
                     order=orders,

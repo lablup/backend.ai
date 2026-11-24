@@ -54,8 +54,11 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
+| [when a user granted the registry read role in a project scope searches in that scope, only the registries related to the project come back](#scoped_searching_by_project-a-user-granted-read-in-the-project-searches-its-registries) | answered |
 | [when a user granted permission to read registries in the domain to search searches scoped to that domain, with a name as the filter, the name order and a page size in one request, only the registries related to that domain that match the filter come back in name order](#scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries) | answered |
+| [searching in the scope of a project with no relation returns an empty list](#scoped_searching_by_project-a-user-searches-the-registries-of-a-project-with-no-relation) | answered |
 | [when a user not granted permission to read registries in the domain to search searches scoped to that domain, it is rejected for lack of permission](#scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused) | rejected |
+| [when a user granted only the project read role, not the registry read role, in a project scope searches, the call is rejected for lack of permission](#scoped_searching_by_project-a-user-without-registry-read-may-not-search-the-registries-of-a-project) | rejected |
 
 **admin_create**
 
@@ -509,6 +512,46 @@ Then
 
 ### scoped_search
 
+<a id="scoped_searching_by_project-a-user-granted-read-in-the-project-searches-its-registries"></a>
+
+#### [a-user-granted-read-in-the-project-searches-its-registries](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching_by_project.py): pass
+
+when a user granted the registry read role in a project scope searches in that scope, only the registries related to the project come back
+
+Given
+
+- one project, 2 registries related to it and one that is not, and one user granted the registry read role in the project scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Container registry related-1: image source
+  - Container registry related-2: image source
+  - Project team-1 allows Container registry related-1
+  - Project team-1 allows Container registry related-2
+  - Project other-1
+  - Container registry unrelated-1: image source
+  - Project other-1 allows Container registry unrelated-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-project permission
+    - Role read-in-project-1: applies only within the scope it is granted in
+    - Role read-in-project-1: READ allowed on every container_registry
+    - regular user user-1: holds Role read-in-project-1
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1 searches in the project team-1
+
+Then
+
+- only the registries related to the project are left
+  - items = ['related-1', 'related-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries"></a>
 
 #### [a-user-reading-registries-in-the-domain-scoped-searches-its-registries](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
@@ -583,6 +626,42 @@ Then
   - items[2].is_global = True
   - items[2].extra = None
 
+<a id="scoped_searching_by_project-a-user-searches-the-registries-of-a-project-with-no-relation"></a>
+
+#### [a-user-searches-the-registries-of-a-project-with-no-relation](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching_by_project.py): pass
+
+searching in the scope of a project with no relation returns an empty list
+
+Given
+
+- one project, 0 registries related to it and one that is not, and one user granted the registry read role in the project scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Container registry unrelated-1: image source
+  - Project other-1 allows Container registry unrelated-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-project permission
+    - Role read-in-project-1: applies only within the scope it is granted in
+    - Role read-in-project-1: READ allowed on every container_registry
+    - regular user user-1: holds Role read-in-project-1
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1 searches in the project team-1
+
+Then
+
+- only the registries related to the project are left
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused"></a>
 
 #### [a-user-not-reading-registries-in-the-domain-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
@@ -614,6 +693,43 @@ Given
 When
 
 - ContainerRegistryAdapter.scoped_search: user-1 reads scoped to the domain to search, with a name filter leaving out the other registry, the name order and a page size in one request
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="scoped_searching_by_project-a-user-without-registry-read-may-not-search-the-registries-of-a-project"></a>
+
+#### [a-user-without-registry-read-may-not-search-the-registries-of-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching_by_project.py): pass
+
+when a user granted only the project read role, not the registry read role, in a project scope searches, the call is rejected for lack of permission
+
+Given
+
+- one project, 2 registries related to it and one that is not, and one user granted the project read role in the project scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Container registry related-1: image source
+  - Container registry related-2: image source
+  - Project team-1 allows Container registry related-1
+  - Project team-1 allows Container registry related-2
+  - Project other-1
+  - Container registry unrelated-1: image source
+  - Project other-1 allows Container registry unrelated-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-project permission
+    - Role read-in-project-1: applies only within the scope it is granted in
+    - Role read-in-project-1: READ allowed on every project
+    - regular user user-1: holds Role read-in-project-1
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1 searches in the project team-1
 
 Then
 
