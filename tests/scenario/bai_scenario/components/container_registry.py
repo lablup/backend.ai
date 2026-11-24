@@ -881,3 +881,67 @@ class TheWantedRegistriesAreListedByName(
                 Same(f"items[{i}].extra", node.extra, registry.extra),
             ]
         return seen
+
+
+@dataclass(frozen=True)
+class DomainsOfARegistryAndACaller:
+    """레지스트리 하나, 그 레지스트리와 relation이 있는 도메인들, 그리고 부를 사람."""
+
+    registry: ContainerRegistryData
+    related: tuple[DomainData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class DomainsOfARegistryAndSomeone(Given[TestSeedingSession, DomainsOfARegistryAndACaller]):
+    """레지스트리 하나와 도메인 셋. ``related`` 개만 그 레지스트리와 relation이 있다.
+
+    호출자는 그 레지스트리 범위에서 ``entity_type`` 에 대한 읽기 역할을 받는다.
+    """
+
+    related: int = 2
+    entity_type: EntityType = DomainEntityType()
+
+    @override
+    def describe(self) -> str:
+        what_ko = "도메인" if self.entity_type == DomainEntityType() else "레지스트리"
+        what_en = "domain" if self.entity_type == DomainEntityType() else "registry"
+        return Says(
+            f"레지스트리 하나, 그 레지스트리와 relation이 있는 도메인 {self.related}개와 없는 도메인 하나, "
+            f"그리고 그 레지스트리 범위의 {what_ko} 읽기 역할을 받은 사용자 한 명",
+            english=(
+                f"one registry, {self.related} domains related to it and one that is not, and one "
+                f"user granted the {what_en} read role in the registry scope"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> DomainsOfARegistryAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        related = [
+            await seeding.creating(TestSeedDomain(name_hint="related")) for _ in range(self.related)
+        ]
+        for one in related:
+            await seeding.linking(AllowDomain(), one, registry)
+        await seeding.linking(
+            AllowDomain(),
+            home,
+            await seeding.creating(TestSeedContainerRegistry(name_hint="other")),
+        )
+        caller = await seeding.within(SomeoneOf(home, role=UserRole.USER))
+        await seeding.within(
+            SomeoneAllowingIn(
+                registry,
+                caller,
+                scope_of=lambda one: ContainerRegistryID(one.id),
+                entity_type=self.entity_type,
+                name_hint="read-in-registry",
+                permissions=(Permission.READ,),
+            )
+        )
+        return DomainsOfARegistryAndACaller(
+            registry=seeding.made(registry),
+            related=tuple(seeding.made(one) for one in related),
+            caller=seeding.made(caller),
+        )
