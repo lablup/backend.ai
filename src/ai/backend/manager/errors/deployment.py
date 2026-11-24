@@ -117,6 +117,21 @@ class RevisionMissingModelVFolder(FieldError, web.HTTPBadRequest):
         )
 
 
+class RevisionVFolderNotMountable(FieldError, web.HTTPBadRequest):
+    """A vfolder a revision mounts is gone or not in a mountable status."""
+
+    error_type = "https://api.backend.ai/probs/revision-vfolder-not-mountable"
+    error_title = "A vfolder the deployment revision mounts is not mountable."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            DeploymentRevisionFieldType(),
+            ActionOperationType.UPDATE,
+            ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class InvalidDeploymentStrategy(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-deployment-strategy"
     error_title = "Unknown or invalid deployment strategy."

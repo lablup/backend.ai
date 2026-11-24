@@ -22,6 +22,10 @@ class BAICode(enum.Enum):
         "no to_*/from_* conversion method in a v2 DTO; convert in the adapter",
     )
     CLI_DTO_IMPORT = ("BAI204", "CLI v2 imports ai.backend.common.dto inside the command function")
+    LAZY_GROUP_TARGET = ("BAI401", "LazyGroup import_name points at a missing module or name")
+    ADMIN_RESOLVER_CHECK = ("BAI402", "admin_ resolver must call check_admin_only() first")
+    STORAGE_MODULE_HANDLER = ("BAI403", "storage api handler must be a handler class method")
+    APPPROXY_NATIVE_ENUM = ("BAI404", "App Proxy column must not use a native ENUM type")
 
     @property
     def code(self) -> str:

@@ -26,12 +26,14 @@ from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     MountItemInput,
     ResourceSlotEntryInput,
+    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class HandlerOptionsInput(BaseRequestModel):
@@ -390,4 +392,11 @@ class DefaultSessionOptionsInput(BaseRequestModel):
     agent_selection_policy: AgentSelectionPolicyEnum | None = Field(
         default=None,
         description=("Default value for `SchedulingTargetInput.agent_selection_policy`."),
+    )
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments, "
+            "frozen onto new sessions. Omit to use the default `${{ }}` and `{ }`."
+        ),
     )

@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import AccessKey
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
+from ai.backend.common.schema.resource_group import PreemptionConfig
+from ai.backend.common.types import (
+    AccessKey,
+    AgentSelectionStrategy,
+    PreemptionMode,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
@@ -20,8 +30,29 @@ from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
+from ai.backend.manager.models.resource_group.types import (
+    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
+    ResourceGroupOpts,
+)
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow, joined
+
+_NON_DEFAULT_SCHEDULER_OPTS = ResourceGroupOpts(
+    allowed_session_types=[SessionTypes.BATCH],
+    pending_timeout=timedelta(seconds=120),
+    config={NUM_RETRIES_TO_SKIP_CONFIG_KEY: 3},
+    agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
+    allow_fractional_resource_fragmentation=False,
+    route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY, RouteHealthStatus.DEGRADED],
+    preemption=PreemptionConfig(
+        enabled=True,
+        preemptible_priority=3,
+        order=PreemptionOrder.NEWEST,
+        mode=PreemptionMode.RESCHEDULE,
+        preemption_min_runtime=timedelta(seconds=30),
+        victim_scope=PreemptionVictimScope.PROJECT,
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -33,6 +64,7 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
+    holds_non_default_scheduler_opts: bool = False
 
     @override
     def kind(self) -> str:
@@ -50,6 +82,17 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
             parts.append(Says("비활성", english="inactive"))
         if self.is_default:
             parts.append(Says("기본 그룹", english="default group"))
+        if self.holds_non_default_scheduler_opts:
+            parts.append(
+                Says(
+                    "대기 세션 건너뛰기 재시도 횟수 3을 비롯해 스케줄러 옵션과 선점 설정이 모두 "
+                    "기본값과 다릅니다",
+                    english=(
+                        "every scheduler option, 3 retries before skipping a pending session "
+                        "among them, and the preemption config differ from the defaults"
+                    ),
+                )
+            )
         return joined(parts)
 
     @override
@@ -65,6 +108,9 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
             description=self.description,
             is_active=self.is_active,
             is_default=self.is_default,
+            scheduler_opts=(
+                _NON_DEFAULT_SCHEDULER_OPTS if self.holds_non_default_scheduler_opts else None
+            ),
         )
 
 

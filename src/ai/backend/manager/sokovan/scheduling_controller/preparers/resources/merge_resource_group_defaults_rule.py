@@ -10,7 +10,7 @@ override it.
 Scope:
 
   * option-level fields: ``priority``, ``job_priority``, ``is_preemptible``,
-    ``cluster_mode``, ``timeouts``,
+    ``cluster_mode``, ``timeouts``, ``interpolation``,
     ``scheduling_target.agent_selection_policy``
   * per-group ``execution_spec`` fields: ``image_id``, ``resources``,
     ``resource_opts``, ``environ``, ``mounts``, ``startup_command``,
@@ -89,6 +89,11 @@ class MergeResourceGroupDefaultsRule(ResourceSpecDraftRule):
                     opts.handler_options
                     if opts.handler_options is not None
                     else rg_defaults.handler_options
+                ),
+                "interpolation": (
+                    opts.interpolation
+                    if opts.interpolation is not None
+                    else rg_defaults.interpolation
                 ),
                 "scheduling_target": new_sched,
             }

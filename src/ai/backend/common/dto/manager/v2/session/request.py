@@ -498,6 +498,14 @@ class EnqueueSessionInput(BaseRequestModel):
         default=None, description="Webhook URL for session lifecycle events."
     )
 
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments, fixed "
+            "for the session. Omit to use the resource group's `default_session_options`."
+        ),
+    )
+
     # Batch-only
     batch: BatchConfigInput | None = Field(
         default=None,
@@ -590,13 +598,6 @@ class StartSessionServiceInput(BaseRequestModel):
     )
     login_session_token: str | None = Field(
         default=None, description="Login session token for proxy auth."
-    )
-    interpolation: ServiceArgumentInterpolationInput | None = Field(
-        default=None,
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
-            "Omit to use the default `${{ }}` and `{ }`."
-        ),
     )
 
 

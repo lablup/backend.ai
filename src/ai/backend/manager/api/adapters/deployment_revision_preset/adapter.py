@@ -17,13 +17,15 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
+from ai.backend.common.dto.manager.v2.common import (
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelHealthCheckInfoDTO,
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
-    ServiceArgumentInterpolationInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
@@ -188,11 +190,6 @@ def _model_service_config_to_dto(
             # Resolve fills the strict defaults so the response shows effective values.
             _model_health_check_to_dto(service.health_check.to_resolved())
             if service.health_check is not None
-            else None
-        ),
-        interpolation=(
-            ServiceArgumentInterpolationInfoDTO.model_validate(service.interpolation.model_dump())
-            if service.interpolation is not None
             else None
         ),
     )

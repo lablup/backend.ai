@@ -9,6 +9,10 @@ import pytest
 from ai.backend.agent.scratch.types import KernelRecoveryScratchData
 from ai.backend.agent.scratch.utils import ScratchConfig
 from ai.backend.agent.types import KernelOwnershipData
+from ai.backend.common.config import (
+    ServiceArgumentInterpolation,
+    ServiceArgumentInterpolationDelimiter,
+)
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
 
@@ -145,3 +149,33 @@ class TestSaveJsonRecoveryData:
         assert loaded.id == sample_scratch_data.id
         assert loaded.network_driver == sample_scratch_data.network_driver
         assert loaded.repl_in_port == sample_scratch_data.repl_in_port
+
+
+class TestServiceInterpolationInRecoveryData:
+    async def test_roundtrip_keeps_service_interpolation(
+        self,
+        config: ScratchConfig,
+        sample_scratch_data: KernelRecoveryScratchData,
+    ) -> None:
+        interpolation = ServiceArgumentInterpolation(
+            delimiters=[ServiceArgumentInterpolationDelimiter(start="<<", end=">>")]
+        )
+        await config.save_json_recovery_data(
+            sample_scratch_data.model_copy(update={"service_interpolation": interpolation})
+        )
+        loaded = await config.get_json_recovery_data()
+        assert loaded is not None
+        assert loaded.service_interpolation == interpolation
+
+    async def test_record_written_without_it_loads_as_none(
+        self,
+        config: ScratchConfig,
+        config_path: Path,
+        sample_scratch_data: KernelRecoveryScratchData,
+    ) -> None:
+        (config_path / "recovery.json").write_text(
+            sample_scratch_data.model_dump_json(exclude={"service_interpolation"})
+        )
+        loaded = await config.get_json_recovery_data()
+        assert loaded is not None
+        assert loaded.service_interpolation is None

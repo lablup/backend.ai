@@ -4,7 +4,7 @@
 
 ## API handlers
 
-- Every handler must be a method of a typed handler class: no module-level async functions.
+- Every handler must be a method of a typed handler class: no module-level async functions (`BAI403`).
 - Use the `@api_handler` or `@stream_api_handler` decorator.
 - Parse requests with `PathParam[T]`, `BodyParam[T]`: do not access the raw request object directly.
 

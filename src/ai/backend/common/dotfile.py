@@ -50,26 +50,32 @@ class InvalidDotfilePath(InvalidAPIParameters):
         )
 
 
+def _relative_dotfile_path(raw: str) -> PurePosixPath:
+    path = PurePosixPath(raw)
+    if "\x00" in raw or ".." in path.parts:
+        raise InvalidDotfilePath(f"dotfile path must stay under {_KERNEL_WORK_DIR}.")
+    if path.is_absolute():
+        if not path.is_relative_to(_KERNEL_WORK_DIR):
+            raise InvalidDotfilePath(f"dotfile path must stay under {_KERNEL_WORK_DIR}.")
+        path = path.relative_to(_KERNEL_WORK_DIR)
+    if not path.parts:
+        raise InvalidDotfilePath("dotfile path must name a file.")
+    if str(path) in _RESERVED_PATHS or path.parts[0] in _RESERVED_FIRST_SEGMENTS:
+        raise InvalidDotfilePath("dotfile path is reserved for internal operations.")
+    return path
+
+
+def validate_dotfile_path(raw: str) -> str:
+    """Return ``raw`` unchanged if it is a dotfile path under `/home/work`; raise
+    :class:`InvalidDotfilePath` otherwise."""
+    _relative_dotfile_path(raw)
+    return raw
+
+
 class DotfilePath:
     """A dotfile path under `/home/work`; relative paths are based on that directory."""
 
     relative: PurePosixPath
 
     def __init__(self, raw: str) -> None:
-        self.relative = self._to_relative(raw)
-        if str(self.relative) in _RESERVED_PATHS or self.relative.parts[0] in (
-            _RESERVED_FIRST_SEGMENTS
-        ):
-            raise InvalidDotfilePath("dotfile path is reserved for internal operations.")
-
-    def _to_relative(self, raw: str) -> PurePosixPath:
-        path = PurePosixPath(raw)
-        if "\x00" in raw or ".." in path.parts:
-            raise InvalidDotfilePath(f"dotfile path must stay under {_KERNEL_WORK_DIR}.")
-        if path.is_absolute():
-            if not path.is_relative_to(_KERNEL_WORK_DIR):
-                raise InvalidDotfilePath(f"dotfile path must stay under {_KERNEL_WORK_DIR}.")
-            path = path.relative_to(_KERNEL_WORK_DIR)
-        if not path.parts:
-            raise InvalidDotfilePath("dotfile path must name a file.")
-        return path
+        self.relative = _relative_dotfile_path(raw)

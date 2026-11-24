@@ -118,7 +118,7 @@ class TestBatchLoadByIds:
 
     @pytest.fixture
     def adapter(self, processors: MagicMock) -> UserAdapter:
-        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock())
+        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     async def test_answers_per_id(
         self,
@@ -166,7 +166,7 @@ class TestBatchLookupByEmails:
 
     @pytest.fixture
     def adapter(self, processors: MagicMock) -> UserAdapter:
-        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock())
+        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     async def test_answers_per_email_in_one_lookup(
         self,
@@ -198,7 +198,7 @@ class TestUserOrderConversion:
 
     @pytest.fixture
     def adapter(self) -> UserAdapter:
-        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     @pytest.mark.parametrize("field", list(UserOrderField))
     def test_every_published_field_converts(
@@ -224,7 +224,7 @@ class TestUserTimestampFilterConversion:
 
     @pytest.fixture
     def adapter(self) -> UserAdapter:
-        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     def test_modified_at_reaches_the_updated_at_column(self, adapter: UserAdapter) -> None:
         conditions = adapter._convert_user_filter(
@@ -268,7 +268,7 @@ class TestUserKeypairNestedFilterConversion:
 
     @pytest.fixture
     def adapter(self) -> UserAdapter:
-        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     def test_some_reaches_the_keypairs_table(self, adapter: UserAdapter) -> None:
         conditions = adapter._convert_user_filter(

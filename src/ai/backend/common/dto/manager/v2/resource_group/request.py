@@ -8,10 +8,11 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, NonNegativeFloat, NonNegativeInt, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
@@ -26,11 +27,13 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import PreemptionVictimScope
+from ai.backend.common.types import AgentSelectionStrategy, PreemptionVictimScope, SessionTypes
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
+    "CreateResourceGroupSchedulerOptionsConfigInput",
+    "CreateResourceGroupSchedulerOptionsInput",
     "DeleteResourceGroupInput",
     "PartialBulkPurgeResourceGroupsInput",
     "PartialBulkUpdateResourceGroupItemInput",
@@ -51,7 +54,72 @@ __all__ = (
     "UpdateResourceGroupConfigInput",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
+    "UpdateResourceGroupSchedulerOptionsConfigInput",
+    "UpdateResourceGroupSchedulerOptionsInput",
 )
+
+
+class CreateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
+    """Input for the ``config`` section of a new resource group's scheduler options."""
+
+    num_retries_to_skip: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Number of scheduling retries before a pending session is skipped. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+
+
+class CreateResourceGroupSchedulerOptionsInput(BaseRequestModel):
+    """Input for a new resource group's scheduler options."""
+
+    allowed_session_types: list[SessionTypes] = Field(
+        default_factory=lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
+        description=(
+            "Session types that may be created in the resource group. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    pending_timeout: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout). "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    config: CreateResourceGroupSchedulerOptionsConfigInput | None = Field(
+        default=None,
+        description=(
+            f"The ``config`` section of the scheduler options. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    agent_selection_strategy: AgentSelectionStrategy = Field(
+        default=AgentSelectionStrategy.DISPERSED,
+        description=(
+            f"How agents are chosen for a session's kernels. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    allow_fractional_resource_fragmentation: bool = Field(
+        default=True,
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    route_cleanup_target_statuses: list[RouteHealthStatus] = Field(
+        default_factory=lambda: [RouteHealthStatus.UNHEALTHY],
+        description=(
+            "Route health statuses whose routes are cleaned up automatically. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
 
 
 class CreateResourceGroupInput(BaseRequestModel):
@@ -104,6 +172,12 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=SchedulerTypeDTO.FIFO,
         description="Scheduler type value (fifo/lifo/drf/fair-share).",
     )
+    scheduler_options: CreateResourceGroupSchedulerOptionsInput | None = Field(
+        default=None,
+        description=(
+            f"Scheduler options. Omit to use the defaults. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
@@ -146,6 +220,69 @@ class PreemptionConfigInputDTO(BaseRequestModel):
         description=(
             "Scope preemption victims are drawn from (user/project/domain/resource-group). "
             "Default is user."
+        ),
+    )
+
+
+class UpdateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
+    """Input for updating the ``config`` section of a resource group's scheduler options."""
+
+    num_retries_to_skip: NonNegativeInt | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Number of scheduling retries before a pending session is skipped."
+            " Omit to leave unchanged; null clears."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+
+
+class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
+    """Input for updating a resource group's scheduler options. Omitted keys are kept."""
+
+    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    pending_timeout: NonNegativeFloat | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "The ``config`` section of the scheduler options. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    agent_selection_strategy: AgentSelectionStrategy | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "How agents are chosen for a session's kernels. Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    allow_fractional_resource_fragmentation: bool | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+            " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
+    route_cleanup_target_statuses: list[RouteHealthStatus] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Route health statuses whose routes are cleaned up automatically."
+            " Omit to leave unchanged."
+            f" Added in {NEXT_RELEASE_VERSION}."
         ),
     )
 
@@ -214,6 +351,13 @@ class UpdateResourceGroupInput(BaseRequestModel):
     preemption: PreemptionConfigInputDTO | None | Unset = Field(
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
+    )
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Scheduler options. Omit to leave unchanged; omitted keys are kept."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 
@@ -404,6 +548,13 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     preemption: PreemptionConfigInputDTO | None | Unset = Field(
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
+    )
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Scheduler options. Omit to leave unchanged; omitted keys are kept."
+            f" Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
 
 

@@ -15,7 +15,6 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import aiohttp
 import pytest
 
 from ai.backend.common.contexts.user import with_user_context
@@ -39,7 +38,11 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
+from ai.backend.manager.errors.notification import (
+    NotificationDeliveryFailure,
+    NotificationProcessingFailure,
+    WebhookConnectionFailure,
+)
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import SendResult
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
@@ -270,16 +273,29 @@ class TestRuleFailureLogLevel:
     @pytest.mark.parametrize(
         ("channel_type", "error", "log_level"),
         [
-            (NotificationChannelType.WEBHOOK, aiohttp.ClientConnectionError(), _TRACE_LEVEL),
-            (NotificationChannelType.WEBHOOK, TimeoutError(), _TRACE_LEVEL),
             (
                 NotificationChannelType.WEBHOOK,
-                NotificationProcessingFailure("Webhook delivery failed with status 500"),
+                WebhookConnectionFailure("Failed to connect to the webhook URL"),
                 _TRACE_LEVEL,
             ),
             (
+                NotificationChannelType.WEBHOOK,
+                NotificationDeliveryFailure("Webhook delivery failed with status 404"),
+                _TRACE_LEVEL,
+            ),
+            (
+                NotificationChannelType.WEBHOOK,
+                NotificationProcessingFailure("internal"),
+                logging.ERROR,
+            ),
+            (
                 NotificationChannelType.EMAIL,
-                NotificationProcessingFailure("SMTP authentication failed"),
+                NotificationProcessingFailure("Email delivery failed"),
+                logging.ERROR,
+            ),
+            (
+                NotificationChannelType.EMAIL,
+                NotificationDeliveryFailure("SMTP authentication failed"),
                 logging.ERROR,
             ),
             (NotificationChannelType.WEBHOOK, RuntimeError("bug"), logging.ERROR),
