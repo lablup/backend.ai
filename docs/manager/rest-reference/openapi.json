@@ -11540,6 +11540,22 @@
             "default": null,
             "description": "Resource groups whose domains are being read",
             "title": "Resource Group"
+          },
+          "container_registry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Container registries whose related domains are being read",
+            "title": "Container Registry"
           }
         },
         "title": "DomainScope",

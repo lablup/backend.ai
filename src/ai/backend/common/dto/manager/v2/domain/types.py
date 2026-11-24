@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "DomainFairShareScopeDTO",
@@ -72,9 +73,17 @@ class DomainScope(BaseRequestModel):
     resource_group: list[UUIDScope] | None = Field(
         default=None, description="Resource groups whose domains are being read"
     )
+    container_registry: list[UUIDScope] | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Container registries whose related domains are being read"
+        ),
+    )
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> DomainScope:
-        if not self.resource_group:
-            raise ValueError("DomainScope requires a non-empty value for 'resource_group'")
+        if not self.resource_group and not self.container_registry:
+            raise ValueError(
+                "DomainScope requires a non-empty value for 'resource_group' or 'container_registry'"
+            )
         return self
