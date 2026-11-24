@@ -5,11 +5,12 @@ RUN apt-get update \
     gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 WORKDIR /build
 # The libraries are empty: since glibc 2.34 the real implementations live in libc.so.6.
-# The loader fails when a version name that the Python needs is not in versions.map.
-COPY versions.map ./
+# They keep the version names of the glibc libraries, which the loader checks.
 RUN set -e; \
   for arch in x86_64 aarch64; do \
     for library in libdl.so.2 libpthread.so.0 librt.so.1 libutil.so.1; do \
+      "${arch}-linux-gnu-readelf" --version-info "/usr/${arch}-linux-gnu/lib/${library}" \
+        | sed -n 's/.* Index: .* Name: \(GLIBC_[0-9.]*\) *$/\1 {};/p' > versions.map; \
       "${arch}-linux-gnu-gcc" -shared -nostdlib -s \
         -Wl,-soname,"${library}" -Wl,--version-script=versions.map \
         -Wl,--build-id=none -Wl,-z,noexecstack -Wl,--no-as-needed \
