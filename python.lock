@@ -2131,13 +2131,8 @@ requires-dist = [
     { name = "types-toml" },
     { name = "types-tqdm" },
     { name = "typing-extensions", specifier = "~=4.11" },
-<<<<<<< HEAD
-    { name = "uvloop", marker = "sys_platform != 'Windows'", specifier = "~=0.22.1" },
-    { name = "valkey-glide", specifier = "~=2.3.1" },
-=======
     { name = "uvloop", marker = "sys_platform != 'Windows'", specifier = "~=0.23.0" },
-    { name = "valkey-glide", specifier = "~=2.5.2" },
->>>>>>> cf408923f (fix(BAI-921): update uvloop to 0.23.0 to stop the fd double close (#17297))
+    { name = "valkey-glide", specifier = "~=2.3.1" },
     { name = "yarl", specifier = "~=1.25.1" },
     { name = "zipstream-new", specifier = "~=1.1.8" },
 ]

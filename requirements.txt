@@ -102,15 +102,9 @@ treelib~=1.7.0
 tt-smi~=3.0.36; sys_platform == 'linux' and platform_machine == 'x86_64'
 typeguard~=4.3
 typing_extensions~=4.11
-<<<<<<< HEAD
 textual~=0.79.1
-uvloop~=0.22.1; sys_platform != "Windows"
-valkey-glide~=2.3.1
-=======
-textual~=6.2
 uvloop~=0.23.0; sys_platform != "Windows"
-valkey-glide~=2.5.2
->>>>>>> cf408923f (fix(BAI-921): update uvloop to 0.23.0 to stop the fd double close (#17297))
+valkey-glide~=2.3.1
 yarl~=1.25.1
 zipstream-new~=1.1.8
 
