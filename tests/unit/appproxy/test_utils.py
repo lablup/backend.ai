@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from ai.backend.appproxy.common.config import HostPortPair, PermitHashConfig
+from ai.backend.appproxy.common.types import DigestModType
 from ai.backend.appproxy.common.utils import (
     calculate_permit_hash,
     config_key_to_kebab_case,
@@ -114,7 +115,7 @@ _PERMIT_USER_ID = UUID("6a1e4c2c-9f0d-4b8e-a0b6-8a7d1f2e3c4b")
 
 @pytest.fixture
 def permit_hash_config() -> PermitHashConfig:
-    return PermitHashConfig(secret=b"permit-secret")
+    return PermitHashConfig(secret=b"permit-secret", digest_mod=DigestModType.SHA256)
 
 
 def test_is_permit_valid_accepts_matching_permit(permit_hash_config: PermitHashConfig) -> None:
