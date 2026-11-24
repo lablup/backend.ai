@@ -279,6 +279,11 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
         pool_pre_ping=False,
         max_overflow=4,
         lock_conn_timeout=0,
+        tcp_keepalive_idle=10,
+        tcp_keepalive_interval=5,
+        tcp_keepalive_count=3,
+        tcp_user_timeout=25,
+        pre_ping_timeout=5.0,
     )
 
 
