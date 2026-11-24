@@ -1,16 +1,23 @@
-<<<<<<< HEAD
+import ssl
 from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from http import HTTPStatus
+from pathlib import Path
 from unittest import mock
 from unittest.mock import AsyncMock
 from uuid import UUID
 
+import aiohttp
 import pytest
 from aioresponses import aioresponses
 from yarl import URL
 
 from ai.backend.client.config import API_VERSION, APIConfig
+from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.func.vfolder import VFolderByName
 from ai.backend.client.session import Session
+
+_MAX_DOWNLOAD_RETRIES = 3
 
 
 def build_url(config: APIConfig, path: str, params: Mapping[str, str | int] | None = None) -> URL:
@@ -288,23 +295,6 @@ def test_vfolder_force_delete() -> None:
         )
         resp = session.VFolder("", id=vfolder_uuid).force_delete()
     assert resp == {}  # type: ignore[comparison-overlap]
-=======
-from __future__ import annotations
-
-import ssl
-from collections.abc import Iterator
-from dataclasses import dataclass
-from pathlib import Path
-from unittest import mock
-
-import aiohttp
-import pytest
-from yarl import URL
-
-from ai.backend.client.exceptions import BackendConnectError
-from ai.backend.client.func.vfolder import VFolderByName
-
-_MAX_DOWNLOAD_RETRIES = 3
 
 
 @dataclass(frozen=True)
@@ -345,7 +335,7 @@ class TestVFolderDownload:
                     mock.MagicMock(host="storage.example", port=6022),
                     ssl.SSLCertVerificationError(1, "certificate verify failed"),
                 ),
-                expected_error=BackendConnectError,
+                expected_error=BackendClientError,
                 expected_attempts=1,
             ),
             _FailingDownloadCase(
@@ -373,4 +363,3 @@ class TestVFolderDownload:
             )
 
         assert failing_download.storage_proxy_get.call_count == case.expected_attempts
->>>>>>> d781cb487 (fix(BAI-133): fail vfolder downloads at once on certificate errors (#17292))
