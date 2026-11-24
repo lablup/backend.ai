@@ -11,7 +11,6 @@ import aiohttp
 import janus
 from aiohttp import hdrs
 from aiotusclient import client
-from aiotusclient.exceptions import TusUploadFailed
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -332,15 +331,6 @@ class VFolderByName(BaseFunction):
             self.name = new_name
             return await resp.text()
 
-    @staticmethod
-    def _storage_proxy_certificate_error(
-        error: aiohttp.ClientConnectorCertificateError,
-    ) -> BackendConnectError:
-        return BackendConnectError(
-            "Failed to verify the TLS certificate of the storage proxy "
-            f"at {error.host}:{error.port}.\n\u279c {error.certificate_error}"
-        )
-
     def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]) -> None:
         with file_path.open(mode) as f:
             while True:
@@ -443,7 +433,10 @@ class VFolderByName(BaseFunction):
                                     q.close()
                                     await q.wait_closed()
                     except aiohttp.ClientConnectorCertificateError as e:
-                        raise self._storage_proxy_certificate_error(e) from e
+                        raise BackendConnectError(
+                            "Failed to verify the TLS certificate of the storage proxy "
+                            f"at {e.host}:{e.port}.\n\u279c {e.certificate_error}"
+                        ) from e
                     except (
                         ResponseFailed,
                         aiohttp.ClientPayloadError,
@@ -541,21 +534,16 @@ class VFolderByName(BaseFunction):
                 input_file = Path(file_path).relative_to(base_path).open("rb")
             print(f"Uploading {base_path / file_path} via {upload_info['url']} ...")
             # TODO: refactor out the progress bar
-            # aiotusclient retries every 300 seconds, up to 10 times, and a retry never succeeds:
-            # its get_offset() raises AttributeError on any response.
             uploader = tus_client.async_uploader(
                 file_stream=input_file,
                 url=upload_url,
                 upload_checksum=False,
                 chunk_size=chunk_size,
+                # The default is 10 retries, 300 seconds apart, and a retry never succeeds:
+                # get_offset() of aiotusclient raises AttributeError on any response.
                 retries=0,
             )
-            try:
-                await uploader.upload()
-            except TusUploadFailed as e:
-                if isinstance(e.__context__, aiohttp.ClientConnectorCertificateError):
-                    raise self._storage_proxy_certificate_error(e.__context__) from e
-                raise
+            await uploader.upload()
             input_file.close()
 
     async def _upload_recursively(

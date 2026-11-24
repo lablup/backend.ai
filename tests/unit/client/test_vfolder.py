@@ -89,13 +89,6 @@ class TestVFolderDownload:
 
 
 @dataclass(frozen=True)
-class _FailingUploadCase:
-    id: str
-    connection_error: aiohttp.ClientConnectorError
-    expected_error: type[Exception]
-
-
-@dataclass(frozen=True)
 class _FailingUpload:
     vfolder: VFolderByName
     file_path: Path
@@ -103,12 +96,16 @@ class _FailingUpload:
 
 class TestVFolderUpload:
     @pytest.fixture
-    def failing_upload(self, case: _FailingUploadCase, tmp_path: Path) -> Iterator[_FailingUpload]:
+    def upload_to_unverified_storage_proxy(self, tmp_path: Path) -> Iterator[_FailingUpload]:
         file_path = tmp_path / "data.bin"
         file_path.write_bytes(b"hello")
+        certificate_error = aiohttp.ClientConnectorCertificateError(
+            mock.MagicMock(host="storage.example", port=6022),
+            ssl.SSLCertVerificationError(1, "certificate verify failed"),
+        )
         with (
             mock.patch("ai.backend.client.func.vfolder.Request") as request_class,
-            mock.patch.object(aiohttp.ClientSession, "patch", side_effect=case.connection_error),
+            mock.patch.object(aiohttp.ClientSession, "patch", side_effect=certificate_error),
         ):
             upload_response = request_class.return_value.fetch.return_value.__aenter__.return_value
             upload_response.json = AsyncMock(
@@ -119,33 +116,12 @@ class TestVFolderUpload:
                 file_path=file_path,
             )
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _FailingUploadCase(
-                id="certificate-not-verified",
-                connection_error=aiohttp.ClientConnectorCertificateError(
-                    mock.MagicMock(host="storage.example", port=6022),
-                    ssl.SSLCertVerificationError(1, "certificate verify failed"),
-                ),
-                expected_error=BackendConnectError,
-            ),
-            _FailingUploadCase(
-                id="connection-refused",
-                connection_error=aiohttp.ClientConnectorError(
-                    mock.MagicMock(host="storage.example", port=6022),
-                    ConnectionRefusedError(111, "Connection refused"),
-                ),
-                expected_error=TusUploadFailed,
-            ),
-        ],
-        ids=lambda case: case.id,
-    )
     async def test_fails_without_waiting_for_a_retry(
-        self, case: _FailingUploadCase, failing_upload: _FailingUpload
+        self, upload_to_unverified_storage_proxy: _FailingUpload
     ) -> None:
-        with pytest.raises(case.expected_error):
+        with pytest.raises(TusUploadFailed):
             async with asyncio.timeout(5):
-                await failing_upload.vfolder._upload_files(
-                    [failing_upload.file_path], basedir=failing_upload.file_path.parent
+                await upload_to_unverified_storage_proxy.vfolder._upload_files(
+                    [upload_to_unverified_storage_proxy.file_path],
+                    basedir=upload_to_unverified_storage_proxy.file_path.parent,
                 )
