@@ -456,6 +456,93 @@ class DatabaseConfig(BaseConfigSchema):
             example=ConfigExample(local="0", prod="30"),
         ),
     ]
+    tcp_keepalive_idle: Annotated[
+        int,
+        Field(
+            default=10,
+            gt=0,
+            validation_alias=AliasChoices("tcp-keepalive-idle", "tcp_keepalive_idle"),
+            serialization_alias="tcp-keepalive-idle",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds a database connection is idle before TCP keepalive probes start. "
+                "Together with tcp-keepalive-interval and tcp-keepalive-count, "
+                "it detects a database member that stopped responding while a query is running."
+            ),
+            added_version="26.9.9",
+            example=ConfigExample(local="10", prod="10"),
+        ),
+    ]
+    tcp_keepalive_interval: Annotated[
+        int,
+        Field(
+            default=5,
+            gt=0,
+            validation_alias=AliasChoices("tcp-keepalive-interval", "tcp_keepalive_interval"),
+            serialization_alias="tcp-keepalive-interval",
+        ),
+        BackendAIConfigMeta(
+            description=("Seconds between TCP keepalive probes of a database connection."),
+            added_version="26.9.9",
+            example=ConfigExample(local="5", prod="5"),
+        ),
+    ]
+    tcp_keepalive_count: Annotated[
+        int,
+        Field(
+            default=3,
+            gt=0,
+            validation_alias=AliasChoices("tcp-keepalive-count", "tcp_keepalive_count"),
+            serialization_alias="tcp-keepalive-count",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Number of unanswered TCP keepalive probes after which "
+                "a database connection is closed."
+            ),
+            added_version="26.9.9",
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+    tcp_user_timeout: Annotated[
+        int,
+        Field(
+            default=25,
+            ge=0,
+            validation_alias=AliasChoices("tcp-user-timeout", "tcp_user_timeout"),
+            serialization_alias="tcp-user-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds that sent data of a database connection may stay unacknowledged "
+                "before the connection is closed (TCP_USER_TIMEOUT). "
+                "Keep it equal to tcp-keepalive-idle + tcp-keepalive-interval * tcp-keepalive-count, "
+                "as the connection is closed by this value instead of the keepalive count. "
+                "0 uses the system default. Applied on Linux only."
+            ),
+            added_version="26.9.9",
+            example=ConfigExample(local="25", prod="25"),
+        ),
+    ]
+    pre_ping_timeout: Annotated[
+        float,
+        Field(
+            default=5.0,
+            gt=0,
+            validation_alias=AliasChoices("pre-ping-timeout", "pre_ping_timeout"),
+            serialization_alias="pre-ping-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for the pre-ping of a pooled connection. "
+                "When it expires, the connection is terminated and the pool connects again. "
+                "Applies when pool-pre-ping is enabled."
+            ),
+            added_version="26.9.9",
+            example=ConfigExample(local="5", prod="5"),
+        ),
+    ]
 
     @model_validator(mode="before")
     @classmethod
