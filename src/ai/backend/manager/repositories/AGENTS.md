@@ -82,5 +82,5 @@
 ## What does not belong here
 
 - Business logic / domain validation (belongs to services/).
-- Exposing `Row` directly: convert to a `data/` type before returning.
+- Exposing `Row` directly: convert to a `data/` type before returning (flake8 `BAI301`, on or off in `tools/flake8-plugins/README.md`).
 - `manager.dto` imports.

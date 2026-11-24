@@ -10,8 +10,8 @@
 
 | 출처 | 담는 값 | 변경 전파 |
 |---|---|---|
-| TOML 파일(컴포넌트별) | node, process 로컬 설정 | boot 때만 읽는다, 재시작이 필요하다 |
-| etcd | cluster 전역 설정(공유 자원, volume, redis 연결 등) | 감시한다, 변경 시 전체 설정을 다시 검증한다(hot reload) |
+| TOML 파일(컴포넌트별) | node, process 로컬 설정, Valkey 연결 | boot 때만 읽는다, 재시작이 필요하다 |
+| etcd | cluster 전역 설정(공유 자원, volume 등) | 감시한다, 변경 시 전체 설정을 다시 검증한다(hot reload) |
 
 - 두 출처는 하나의 pydantic 통합 설정(`config/unified.py`)으로 병합된다. 코드가 읽는 값은 항상 통합 설정이다.
 - key 의 위치 결정: node 마다 다르면 파일, cluster 가 공유하면 etcd.

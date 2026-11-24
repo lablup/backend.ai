@@ -43,7 +43,8 @@ jobs:
           TAG: ${{ steps.get-tag.outputs.tag }}
         run: |
           for ARCH in aarch64 x86_64; do
-            URL="https://github.com/lablup/all-smi/releases/download/${TAG}/all-smi-linux-${ARCH}-musl.tar.gz"
+            # The static musl build cannot dlopen libnvidia-ml.so.1.
+            URL="https://github.com/lablup/all-smi/releases/download/${TAG}/all-smi-linux-${ARCH}.tar.gz"
             echo "Downloading from: $URL"
             curl -fL -o all-smi.tar.gz "$URL"
             tar -xzf all-smi.tar.gz
@@ -55,7 +56,8 @@ jobs:
               echo "Error: all-smi binary not found in the archive for $ARCH"
               exit 1
             fi
-            rm -f all-smi.tar.gz
+            # Files left in the checkout go into the pull request created below.
+            rm -f all-smi.tar.gz liball_smi_amd.so
           done
 
       - name: Move binaries to target location
@@ -85,7 +87,7 @@ jobs:
           title: "deps: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
           author: "Lablup Octodog <mu001@lablup.com>"
           body: |
-            This PR updates the all-smi binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
+            This PR updates the all-smi binaries (glibc variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
             Source: https://github.com/lablup/all-smi/releases/tag/${{ steps.get-tag.outputs.tag }}
 

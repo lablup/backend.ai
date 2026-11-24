@@ -22,6 +22,12 @@ class BAICode(enum.Enum):
         "no to_*/from_* conversion method in a v2 DTO; convert in the adapter",
     )
     CLI_DTO_IMPORT = ("BAI204", "CLI v2 imports ai.backend.common.dto inside the command function")
+    ROW_RETURN = ("BAI301", "repository public method returns a Row; return a data/ type")
+    ROW_METHOD = ("BAI302", "Row class method other than a to_*/from_* conversion or a dunder")
+    MIGRATION_CONSTRAINT_NAME = (
+        "BAI303",
+        "convention constraint name in a migration; wrap it in op.f()",
+    )
     LAZY_GROUP_TARGET = ("BAI401", "LazyGroup import_name points at a missing module or name")
     ADMIN_RESOLVER_CHECK = ("BAI402", "admin_ resolver must call check_admin_only() first")
     STORAGE_MODULE_HANDLER = ("BAI403", "storage api handler must be a handler class method")

@@ -26,6 +26,8 @@ from ai.backend.common.exception import DuplicateEntityTypeName
 def _subclasses[T](base: type[T]) -> list[type[T]]:
     found: list[type[T]] = []
     for sub in base.__subclasses__():
+        if not sub.__module__.startswith("ai.backend."):
+            continue  # defined by another test file of this process
         found.append(sub)
         found.extend(_subclasses(sub))
     return found

@@ -29,6 +29,19 @@ def register_v2_auto_generated_file_routes(
         handler.switch_default,
         middlewares=[auth_required],
     )
+    registry.add("GET", "/{auto_generated_file_id}", handler.get, middlewares=[auth_required])
+    registry.add(
+        "POST",
+        "/{auto_generated_file_id}/revisions",
+        handler.add_revision,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/{auto_generated_file_id}/revisions/search",
+        handler.search_revisions,
+        middlewares=[auth_required],
+    )
     registry.add("DELETE", "/{auto_generated_file_id}", handler.purge, middlewares=[auth_required])
 
     return registry

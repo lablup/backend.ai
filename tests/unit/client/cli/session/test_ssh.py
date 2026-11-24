@@ -27,19 +27,45 @@ class FakeStdout:
             return b""
         return self._lines.pop(0)
 
-
-class FakeProxyProc:
-    stdout: FakeStdout
-    returncode: int
-
-    def __init__(self, port: int) -> None:
-        self.stdout = FakeStdout([f"listening at 127.0.0.1:{port}\n".encode()])
-        self.returncode = 0
-
-    def send_signal(self, signum: int) -> None:
+    def close(self) -> None:
         pass
 
-    def wait(self) -> int:
+
+class FakeProxyProc:
+    """A proxy that exits on the first stop request it does not ignore."""
+
+    stdout: FakeStdout
+    returncode: int
+    ignored_stops: int
+    stops: list[str]
+    _exited: bool
+
+    def __init__(self, port: int, ignored_stops: int = 0) -> None:
+        self.stdout = FakeStdout([f"listening at 127.0.0.1:{port}\n".encode()])
+        self.returncode = 0
+        self.ignored_stops = ignored_stops
+        self.stops = []
+        self._exited = False
+
+    def _stop(self, name: str, force: bool = False) -> None:
+        self.stops.append(name)
+        if force or len(self.stops) > self.ignored_stops:
+            self._exited = True
+
+    def send_signal(self, signum: int) -> None:
+        self._stop("interrupt")
+
+    def terminate(self) -> None:
+        self._stop("terminate")
+
+    def kill(self) -> None:
+        self._stop("kill", force=True)
+
+    def wait(self, timeout: float | None = None) -> int:
+        if not self._exited:
+            if timeout is None:
+                raise AssertionError("waited forever on a proxy that has not exited")
+            raise subprocess.TimeoutExpired("sshd proxy", timeout)
         return self.returncode
 
 
@@ -51,7 +77,9 @@ def _download_dest(cmd: Sequence[str]) -> Path:
 
 
 @pytest.fixture
-def fake_ssh_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callable[..., None]:
+def fake_ssh_subprocess(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Callable[..., list[FakeProxyProc]]:
     """Install stubs for the `session download` and `app ... sshd` subprocesses,
     and point `~/.ssh` at a temporary home directory."""
     home_dir = tmp_path / "home"
@@ -63,7 +91,10 @@ def fake_ssh_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Call
         barrier: threading.Barrier | None = None,
         download_fails: bool = False,
         key_content: bytes = KEY_CONTENT,
-    ) -> None:
+        ignored_stops: int = 0,
+    ) -> list[FakeProxyProc]:
+        proxies: list[FakeProxyProc] = []
+
         def fake_run(cmd: Sequence[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
             # The key always lands in the destination directory under its
             # container-side basename, even when the download later fails.
@@ -76,16 +107,19 @@ def fake_ssh_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Call
 
         def fake_popen(cmd: Sequence[str], **kwargs: Any) -> FakeProxyProc:
             bind_addr = cmd[cmd.index("-b") + 1]
-            return FakeProxyProc(int(bind_addr.rsplit(":", maxsplit=1)[1]))
+            proxy = FakeProxyProc(int(bind_addr.rsplit(":", maxsplit=1)[1]), ignored_stops)
+            proxies.append(proxy)
+            return proxy
 
         monkeypatch.setattr(subprocess, "run", fake_run)
         monkeypatch.setattr(subprocess, "Popen", fake_popen)
+        return proxies
 
     return install
 
 
 def test_container_ssh_ctx_concurrent_invocations_in_same_cwd(
-    fake_ssh_subprocess: Callable[..., None],
+    fake_ssh_subprocess: Callable[..., list[FakeProxyProc]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -122,7 +156,7 @@ def test_container_ssh_ctx_concurrent_invocations_in_same_cwd(
 
 
 def test_container_ssh_ctx_leaves_no_key_behind_when_download_fails(
-    fake_ssh_subprocess: Callable[..., None],
+    fake_ssh_subprocess: Callable[..., list[FakeProxyProc]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -140,7 +174,7 @@ def test_container_ssh_ctx_leaves_no_key_behind_when_download_fails(
 
 
 def test_container_ssh_ctx_yields_none_when_the_session_holds_no_private_key(
-    fake_ssh_subprocess: Callable[..., None],
+    fake_ssh_subprocess: Callable[..., list[FakeProxyProc]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -151,6 +185,33 @@ def test_container_ssh_ctx_yields_none_when_the_session_holds_no_private_key(
     with container_ssh_ctx("mock-session", 9922) as key_path:
         assert key_path is None
 
+    assert not list((tmp_path / "home" / ".ssh").iterdir())
+
+
+@pytest.mark.parametrize(
+    ("ignored_stops", "expected_stops"),
+    [
+        (0, ["interrupt"]),
+        (1, ["interrupt", "terminate"]),
+        (2, ["interrupt", "terminate", "kill"]),
+    ],
+    ids=["exits-on-interrupt", "ignores-interrupt", "ignores-terminate"],
+)
+def test_container_ssh_ctx_stops_the_proxy_and_removes_the_key(
+    fake_ssh_subprocess: Callable[..., list[FakeProxyProc]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    ignored_stops: int,
+    expected_stops: list[str],
+) -> None:
+    """A proxy that ignores SIGINT must not leave the call hanging or the key on disk (BA-8310)."""
+    monkeypatch.chdir(tmp_path)
+    proxies = fake_ssh_subprocess(ignored_stops=ignored_stops)
+
+    with container_ssh_ctx("mock-session", 9922) as key_path:
+        assert key_path is not None
+
+    assert proxies[0].stops == expected_stops
     assert not list((tmp_path / "home" / ".ssh").iterdir())
 
 

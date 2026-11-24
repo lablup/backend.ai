@@ -27,7 +27,6 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior, HostPortPair
-from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER, sync_file_lock
@@ -35,8 +34,8 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 
 @pytest.fixture(scope="session")
-def logging_config() -> Generator[LoggingConfig]:
-    config = LoggingConfig(
+def logging_config() -> LoggingConfig:
+    return LoggingConfig(
         version=1,
         disable_existing_loggers=False,
         handlers={},
@@ -60,9 +59,6 @@ def logging_config() -> Generator[LoggingConfig]:
             "sqlalchemy": LogLevel.WARNING,
         },
     )
-    logger = LocalLogger(config)
-    with logger:
-        yield config
 
 
 @pytest.fixture(scope="session")

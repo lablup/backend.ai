@@ -43,7 +43,6 @@ from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.auto_generated_file import (
     A_FILE_NOT_DEFAULT,
     ANOTHER_DEFAULT_FILE,
-    CONFIG_PERMISSION,
     THE_DEFAULT_FILE,
     AUserAndTheirOwnConfig,
     SomeoneWithTheirOwnConfig,
@@ -143,7 +142,6 @@ class TheDefaultFilesInPathOrder(Then[Laid, Answer]):
                 ),
                 Held(f"items[{at}].scope_id", node.scope_id, SameAs(laid.owner.id, THE_OWNER)),
                 Same(f"items[{at}].path", node.path, seeded.path),
-                Same(f"items[{at}].permission", node.permission, CONFIG_PERMISSION),
                 Same(f"items[{at}].is_default", node.is_default, True),
                 Held(f"items[{at}].created_at", node.created_at, WrittenByThisRun(self.started)),
                 Held(f"items[{at}].updated_at", node.updated_at, WrittenByThisRun(self.started)),

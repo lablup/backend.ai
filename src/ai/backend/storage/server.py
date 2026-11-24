@@ -37,6 +37,7 @@ from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -95,6 +96,8 @@ async def server_main_logwrapper(
     tuple_args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
+    child_status: ChildStatus = tuple_args[4][pidx]
+    child_status.publish_pid()
     args = ServerMainArgs(
         local_config=tuple_args[0],
         config_path=tuple_args[1],
@@ -114,6 +117,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -321,6 +325,7 @@ async def server_main(
     loop.set_debug(args.local_config.debug.asyncio)
 
     storage_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await storage_init_stack.__aenter__()
     try:
         monitor = await storage_init_stack.enter_async_context(
@@ -413,14 +418,17 @@ async def server_main(
             log.info("process uid and gid changed", uid=uid, gid=gid)
 
         log.info("storage-proxy started")
-    except Exception:
+    except Exception as e:
         log.exception("server initialization failed, shutting down")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
     try:
         yield
     finally:
         log.info("storage-proxy shutting down")
         await storage_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @click.group(invoke_without_command=True)
@@ -538,14 +546,24 @@ def main(
                 else:
                     extra_procs = tuple()
 
+                child_statuses = tuple(ChildStatus() for _ in range(num_workers))
+                child_exit_monitor = ChildExitMonitor(child_statuses)
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=num_workers,
                         extra_procs=extra_procs,
-                        args=(local_config, resolved_config_path, log_endpoint, log_level),
+                        main_ctxmgr=child_exit_monitor.main_context(),
+                        args=(
+                            local_config,
+                            resolved_config_path,
+                            log_endpoint,
+                            log_level,
+                            child_statuses,
+                        ),
                         runner=runner,
                     )
+                    child_exit_monitor.raise_system_exit()
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                 log.info("storage-proxy exited")
