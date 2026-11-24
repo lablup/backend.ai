@@ -77,6 +77,8 @@ from ai.backend.manager.api.gql.audit_log.resolver.query import (
     scoped_audit_logs_v2,
 )
 from ai.backend.manager.api.gql.auto_generated_file.resolver import (
+    add_auto_generated_file_revision,
+    auto_generated_file,
     create_auto_generated_file,
     my_auto_generated_files,
     purge_auto_generated_file,
@@ -942,6 +944,7 @@ class Query:
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
     scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
+    auto_generated_file = auto_generated_file
     scoped_auto_generated_files = scoped_auto_generated_files
     my_auto_generated_files = my_auto_generated_files
     ssh_key = ssh_key
@@ -1580,6 +1583,7 @@ class Mutation:
     delete_vfolder_auto_mount = delete_vfolder_auto_mount
     # Auto-generated file mutations
     create_auto_generated_file = create_auto_generated_file
+    add_auto_generated_file_revision = add_auto_generated_file_revision
     switch_default_auto_generated_file = switch_default_auto_generated_file
     purge_auto_generated_file = purge_auto_generated_file
     my_upload_ssh_key = my_upload_ssh_key
