@@ -24,7 +24,15 @@ from ai.backend.appproxy.common.defs import (
     X_RSTUDIO_REQUEST_HEADER,
 )
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
+<<<<<<< HEAD
 from ai.backend.appproxy.common.types import RouteInfo
+=======
+from ai.backend.appproxy.common.utils import strip_permit_cookie
+from ai.backend.appproxy.worker.config import ProxyWorkerConfig
+from ai.backend.appproxy.worker.types import (
+    WorkerMetricRegistry,
+)
+>>>>>>> 97334e92b (fix(BAI-240): stop forwarding the App Proxy forward-auth cookie upstream (#16968))
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
@@ -174,8 +182,21 @@ class HTTPBackend(BaseBackend):
         # copy frontend request headers without hop-by-hop headers,
         # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
+<<<<<<< HEAD
             if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
                 backend_rqst_hdrs.add(key, value)
+=======
+            if key in HOP_ONLY_HEADERS or key in _FORWARDING_HEADERS:
+                continue
+            if key.lower() == "cookie":
+                cookie_value = strip_permit_cookie(value)
+                if cookie_value is None:
+                    continue
+                value = cookie_value
+            backend_rqst_hdrs.add(key, value)
+        # TODO: Read the app from the ingress once an ingress carries it.
+        serves_rstudio = self._circuit is not None and self._circuit.app == "rstudio"
+>>>>>>> 97334e92b (fix(BAI-240): stop forwarding the App Proxy forward-auth cookie upstream (#16968))
         # overwrite proxy-related headers
         backend_rqst_hdrs[X_FORWARDED_PROTO_HEADER] = protocol
         if self.circuit.app == "rstudio":
