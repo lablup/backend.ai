@@ -108,12 +108,6 @@ async def query_userinfo(
     query_on_behalf_of: AccessKey | None = None,
 ) -> SessionOwnerContext:
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
-        await check_if_requester_is_eligible_to_act_as_target_access_key(
-            conn,
-            requester_role,
-            requester_domain,
-            query_on_behalf_of,
-        )
         owner_access_key = query_on_behalf_of
     else:
         owner_access_key = requester_access_key
@@ -123,8 +117,7 @@ async def query_userinfo(
     resource_policy = None
 
     if keypair_resource_policy is None or requester_access_key != owner_access_key:
-        # Admin or superadmin is creating sessions for another user.
-        # The check for admin privileges is already done in get_access_key_scope().
+        # The session is for another keypair: read its owner and resource policy.
         query = (
             sa.select(
                 keypairs.c.user,
@@ -144,8 +137,21 @@ async def query_userinfo(
         owner_domain = row.domain_name
         owner_uuid = row.user
         actual_owner_role: UserRole = row.role
-        # For delegated sessions, the owner's actual role determines group access.
-        role_for_group_resolution: UserRole = actual_owner_role
+        role_for_group_resolution: UserRole
+        if owner_access_key == requester_access_key:
+            role_for_group_resolution = actual_owner_role
+        elif owner_uuid == requester_uuid:
+            # Another keypair of the requester is their own session, not a delegation.
+            role_for_group_resolution = UserRole.USER
+        else:
+            check_if_requester_is_eligible_to_act_as_target_user(
+                requester_role,
+                requester_domain,
+                actual_owner_role,
+                owner_domain,
+            )
+            # For delegated sessions, the owner's actual role determines group access.
+            role_for_group_resolution = actual_owner_role
         query = (
             sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
@@ -250,24 +256,6 @@ async def query_userinfo_from_session(
 ) -> SessionOwnerContext:
     """Version of query_userinfo that accepts SASession instead of SAConnection."""
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
-        # Need to check privileges - convert session operations
-        query = (
-            sa.select(users.c.domain_name, users.c.role)
-            .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
-            .where(keypairs.c.access_key == query_on_behalf_of)
-        )
-        result = await db_sess.execute(query)
-        row = result.first()
-        if row is None:
-            raise AccessKeyNotFound("Unknown owner access key")
-        owner_domain = row.domain_name
-        owner_role = row.role
-        check_if_requester_is_eligible_to_act_as_target_user(
-            requester_role,
-            requester_domain,
-            owner_role,
-            owner_domain,
-        )
         owner_access_key = query_on_behalf_of
     else:
         owner_access_key = requester_access_key
@@ -277,8 +265,7 @@ async def query_userinfo_from_session(
     resource_policy = None
 
     if keypair_resource_policy is None or requester_access_key != owner_access_key:
-        # Admin or superadmin is creating sessions for another user.
-        # The check for admin privileges is already done in get_access_key_scope().
+        # The session is for another keypair: read its owner and resource policy.
         query = (
             sa.select(
                 keypairs.c.user,
@@ -298,8 +285,21 @@ async def query_userinfo_from_session(
         owner_domain = row.domain_name
         owner_uuid = row.user
         actual_owner_role: UserRole = row.role
-        # For delegated sessions, the owner's actual role determines group access.
-        role_for_group_resolution: UserRole = actual_owner_role
+        role_for_group_resolution: UserRole
+        if owner_access_key == requester_access_key:
+            role_for_group_resolution = actual_owner_role
+        elif owner_uuid == requester_uuid:
+            # Another keypair of the requester is their own session, not a delegation.
+            role_for_group_resolution = UserRole.USER
+        else:
+            check_if_requester_is_eligible_to_act_as_target_user(
+                requester_role,
+                requester_domain,
+                actual_owner_role,
+                owner_domain,
+            )
+            # For delegated sessions, the owner's actual role determines group access.
+            role_for_group_resolution = actual_owner_role
         query = (
             sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
