@@ -179,7 +179,8 @@ class NotificationChannelSpecGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.3.0", description="Specification for webhook notification channel."
+        added_version=NEXT_RELEASE_VERSION,
+        description="Specification for webhook notification channel.",
     ),
     model=WebhookSpecInfo,
     name="WebhookSpec",
@@ -190,7 +191,9 @@ class WebhookSpecGQL(NotificationChannelSpecGQL):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="SMTP authentication credentials."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="SMTP authentication credentials."
+    ),
     model=SMTPAuthInfo,
     name="SMTPAuth",
 )
@@ -199,7 +202,9 @@ class SMTPAuthGQL:
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="SMTP server connection settings."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="SMTP server connection settings."
+    ),
     model=SMTPConnectionInfo,
     name="SMTPConnection",
 )
@@ -211,7 +216,7 @@ class SMTPConnectionGQL:
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="Email message settings."),
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Email message settings."),
     model=EmailMessageInfo,
     name="EmailMessage",
 )
@@ -223,7 +228,8 @@ class EmailMessageGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.3.0", description="Specification for email notification channel."
+        added_version=NEXT_RELEASE_VERSION,
+        description="Specification for email notification channel.",
     ),
     model=EmailSpecInfo,
     name="EmailSpec",

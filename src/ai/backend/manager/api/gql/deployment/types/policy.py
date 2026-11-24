@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategySpecInfo,
     RollingUpdateStrategySpecInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import (
     IntOrPercent as IntOrPercentDTO,
 )
@@ -65,7 +66,7 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
         description=dedent_strip("""
             A rolling-update budget value: either an absolute count or a percentage.
             Exactly one of 'count' or 'percent' is non-null.
@@ -112,7 +113,7 @@ class DeploymentStrategySpecGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="25.19.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Rolling update strategy specification.",
     ),
     model=RollingUpdateStrategySpecInfo,
@@ -126,7 +127,7 @@ class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="25.19.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Blue-green deployment strategy specification.",
     ),
     model=BlueGreenStrategySpecInfo,

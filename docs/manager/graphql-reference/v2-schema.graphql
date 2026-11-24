@@ -2166,7 +2166,7 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
-"""Added in 25.19.0. Blue-green deployment strategy specification."""
+"""Added in 26.10.0. Blue-green deployment strategy specification."""
 type BlueGreenStrategySpec implements DeploymentStrategySpec {
   strategy: DeploymentStrategyType!
   autoPromote: Boolean!
@@ -6207,7 +6207,7 @@ input EffectiveResourceAllocationV2Input {
   resourceGroupName: String!
 }
 
-"""Added in 26.3.0. Email message settings."""
+"""Added in 26.10.0. Email message settings."""
 type EmailMessage {
   """Sender email address"""
   fromEmail: String!
@@ -6226,7 +6226,7 @@ input EmailMessageInput {
   subjectTemplate: String = null
 }
 
-"""Added in 26.3.0. Specification for email notification channel."""
+"""Added in 26.10.0. Specification for email notification channel."""
 type EmailSpec implements NotificationChannelSpec {
   """Channel type discriminator"""
   channelType: NotificationChannelType!
@@ -7947,7 +7947,7 @@ input IntFilter {
 }
 
 """
-Added in 26.4.2. A rolling-update budget value: either an absolute count or a percentage.
+Added in 26.10.0. A rolling-update budget value: either an absolute count or a percentage.
 Exactly one of 'count' or 'percent' is non-null.
 """
 type IntOrPercent {
@@ -19420,7 +19420,7 @@ input RollingUpdateConfigInput {
   maxUnavailable: IntOrPercentInput
 }
 
-"""Added in 25.19.0. Rolling update strategy specification."""
+"""Added in 26.10.0. Rolling update strategy specification."""
 type RollingUpdateStrategySpec implements DeploymentStrategySpec {
   strategy: DeploymentStrategyType!
   maxSurge: IntOrPercent!
@@ -20076,7 +20076,7 @@ input RuntimeVariantUsedBy {
   deployment: [UUID!] = null
 }
 
-"""Added in 26.3.0. SMTP authentication credentials."""
+"""Added in 26.10.0. SMTP authentication credentials."""
 type SMTPAuth {
   """SMTP auth username (password is never exposed)"""
   username: String
@@ -20088,7 +20088,7 @@ input SMTPAuthInput {
   password: String = null
 }
 
-"""Added in 26.3.0. SMTP server connection settings."""
+"""Added in 26.10.0. SMTP server connection settings."""
 type SMTPConnection {
   """SMTP server host"""
   host: String!
@@ -25560,7 +25560,7 @@ extend type VirtualFolderNode implements Node @key(fields: "id") {
   id: ID!
 }
 
-"""Added in 26.3.0. Specification for webhook notification channel."""
+"""Added in 26.10.0. Specification for webhook notification channel."""
 type WebhookSpec implements NotificationChannelSpec {
   """Channel type discriminator"""
   channelType: NotificationChannelType!

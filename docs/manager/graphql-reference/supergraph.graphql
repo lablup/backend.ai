@@ -2860,7 +2860,7 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
-"""Added in 25.19.0. Blue-green deployment strategy specification."""
+"""Added in 26.10.0. Blue-green deployment strategy specification."""
 type BlueGreenStrategySpec implements DeploymentStrategySpec
   @join__implements(graph: STRAWBERRY, interface: "DeploymentStrategySpec")
   @join__type(graph: STRAWBERRY)
@@ -8525,7 +8525,7 @@ input EffectiveResourceAllocationV2Input
   resourceGroupName: String!
 }
 
-"""Added in 26.3.0. Email message settings."""
+"""Added in 26.10.0. Email message settings."""
 type EmailMessage
   @join__type(graph: STRAWBERRY)
 {
@@ -8548,7 +8548,7 @@ input EmailMessageInput
   subjectTemplate: String = null
 }
 
-"""Added in 26.3.0. Specification for email notification channel."""
+"""Added in 26.10.0. Specification for email notification channel."""
 type EmailSpec implements NotificationChannelSpec
   @join__implements(graph: STRAWBERRY, interface: "NotificationChannelSpec")
   @join__type(graph: STRAWBERRY)
@@ -11024,7 +11024,7 @@ input IntFilter
 }
 
 """
-Added in 26.4.2. A rolling-update budget value: either an absolute count or a percentage.
+Added in 26.10.0. A rolling-update budget value: either an absolute count or a percentage.
 Exactly one of 'count' or 'percent' is non-null.
 """
 type IntOrPercent
@@ -25600,7 +25600,7 @@ input RollingUpdateConfigInput
   maxUnavailable: IntOrPercentInput
 }
 
-"""Added in 25.19.0. Rolling update strategy specification."""
+"""Added in 26.10.0. Rolling update strategy specification."""
 type RollingUpdateStrategySpec implements DeploymentStrategySpec
   @join__implements(graph: STRAWBERRY, interface: "DeploymentStrategySpec")
   @join__type(graph: STRAWBERRY)
@@ -28156,7 +28156,7 @@ type SliderOption
   step: Float!
 }
 
-"""Added in 26.3.0. SMTP authentication credentials."""
+"""Added in 26.10.0. SMTP authentication credentials."""
 type SMTPAuth
   @join__type(graph: STRAWBERRY)
 {
@@ -28172,7 +28172,7 @@ input SMTPAuthInput
   password: String = null
 }
 
-"""Added in 26.3.0. SMTP server connection settings."""
+"""Added in 26.10.0. SMTP server connection settings."""
 type SMTPConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -33250,7 +33250,7 @@ type VirtualFolderPermissionList implements PaginatedList
   total_count: Int!
 }
 
-"""Added in 26.3.0. Specification for webhook notification channel."""
+"""Added in 26.10.0. Specification for webhook notification channel."""
 type WebhookSpec implements NotificationChannelSpec
   @join__implements(graph: STRAWBERRY, interface: "NotificationChannelSpec")
   @join__type(graph: STRAWBERRY)
