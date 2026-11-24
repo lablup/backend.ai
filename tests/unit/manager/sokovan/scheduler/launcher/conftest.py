@@ -262,6 +262,12 @@ def session_for_start_single_kernel() -> SessionDataForStart:
 
 
 @pytest.fixture
+def sessions_for_concurrent_start() -> list[SessionDataForStart]:
+    """Two distinct single-kernel sessions for starting."""
+    return [_create_session_for_start(), _create_session_for_start()]
+
+
+@pytest.fixture
 def session_for_start_multi_kernel() -> SessionDataForStart:
     """Session with multiple kernels (cluster session)."""
     return _create_session_for_start(
