@@ -85,7 +85,7 @@ class AdminCreateKeypairInputGQL(PydanticInputMixin[AdminCreateKeypairInputDTO])
     is_admin: bool = gql_field(
         default=False, description="Whether the keypair has admin privileges."
     )
-    rate_limit: int = gql_field(default=30000, description="API rate limit (requests per minute).")
+    rate_limit: int = gql_field(default=30000, description="API rate limit (requests per window).")
 
 
 @gql_pydantic_input(

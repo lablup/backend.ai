@@ -20,7 +20,8 @@ from ai.backend.web.ratelimit import manager_proxy_rate_limited
 
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 _RATE_LIMIT = 1000
-_RESET = 500
+_WINDOW_SECONDS = 60
+_RESET = 50
 _ANONYMOUS_LIMIT = 7
 _CLIENT_IP = "10.0.0.1"
 _AUTHENTICATED_SESSION = {"authenticated": True, "token": {"user_id": str(_USER_ID)}}
@@ -30,7 +31,7 @@ _AUTHENTICATED_SESSION = {"authenticated": True, "token": {"user_id": str(_USER_
 def mock_valkey_rate_limit_client() -> AsyncMock:
     client = AsyncMock(spec=ValkeyRateLimitClient)
     client.get_user_rlim_window.return_value = RateLimitState(
-        count=0, limit=_RATE_LIMIT, reset_after_seconds=_RESET
+        count=0, limit=_RATE_LIMIT, window_seconds=_WINDOW_SECONDS, reset_after_seconds=_RESET
     )
     return client
 
@@ -57,7 +58,7 @@ class _PassThroughCase:
     id: str
     session: dict[str, Any]
     rlim_window: RateLimitState | None = RateLimitState(
-        count=0, limit=_RATE_LIMIT, reset_after_seconds=_RESET
+        count=0, limit=_RATE_LIMIT, window_seconds=_WINDOW_SECONDS, reset_after_seconds=_RESET
     )
 
 
@@ -144,7 +145,10 @@ async def test_gates_on_the_user_count(
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=_AUTHENTICATED_SESSION))
     mock_valkey_rate_limit_client.get_user_rlim_window.return_value = RateLimitState(
-        count=case.count, limit=_RATE_LIMIT, reset_after_seconds=_RESET
+        count=case.count,
+        limit=_RATE_LIMIT,
+        window_seconds=_WINDOW_SECONDS,
+        reset_after_seconds=_RESET,
     )
 
     response = await manager_proxy_rate_limited(handler)(proxied_request)
@@ -165,7 +169,10 @@ async def test_429_carries_the_rate_limit_headers(
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=_AUTHENTICATED_SESSION))
     mock_valkey_rate_limit_client.get_user_rlim_window.return_value = RateLimitState(
-        count=_RATE_LIMIT, limit=_RATE_LIMIT, reset_after_seconds=_RESET
+        count=_RATE_LIMIT,
+        limit=_RATE_LIMIT,
+        window_seconds=_WINDOW_SECONDS,
+        reset_after_seconds=_RESET,
     )
 
     response = await manager_proxy_rate_limited(handler)(proxied_request)
@@ -173,7 +180,7 @@ async def test_429_carries_the_rate_limit_headers(
     assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
     assert response.headers["X-RateLimit-Remaining"] == "0"
     assert response.headers["X-RateLimit-Reset"] == str(_RESET)
-    assert response.headers["X-RateLimit-Window"] == str(ratelimit._RATELIMIT_WINDOW)
+    assert response.headers["X-RateLimit-Window"] == str(_WINDOW_SECONDS)
 
 
 @pytest.fixture
@@ -196,7 +203,10 @@ async def test_an_anonymous_query_is_judged_by_the_address_window(
     """The two windows stand apart, so the limit reported says which one governed."""
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value={}))
     mock_valkey_rate_limit_client.get_ip_rlim_window.return_value = RateLimitState(
-        count=_ANONYMOUS_LIMIT, limit=_ANONYMOUS_LIMIT, reset_after_seconds=_RESET
+        count=_ANONYMOUS_LIMIT,
+        limit=_ANONYMOUS_LIMIT,
+        window_seconds=_WINDOW_SECONDS,
+        reset_after_seconds=_RESET,
     )
 
     response = await manager_proxy_rate_limited(handler)(anonymous_request)
@@ -215,7 +225,10 @@ async def test_an_anonymous_query_below_the_address_limit_is_proxied(
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value={}))
     mock_valkey_rate_limit_client.get_ip_rlim_window.return_value = RateLimitState(
-        count=_ANONYMOUS_LIMIT - 1, limit=_ANONYMOUS_LIMIT, reset_after_seconds=_RESET
+        count=_ANONYMOUS_LIMIT - 1,
+        limit=_ANONYMOUS_LIMIT,
+        window_seconds=_WINDOW_SECONDS,
+        reset_after_seconds=_RESET,
     )
 
     response = await manager_proxy_rate_limited(handler)(anonymous_request)

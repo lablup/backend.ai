@@ -16556,7 +16556,7 @@
           },
           "rate_limit": {
             "default": 30000,
-            "description": "API rate limit (requests per minute).",
+            "description": "API rate limit (requests per window).",
             "title": "Rate Limit",
             "type": "integer"
           }

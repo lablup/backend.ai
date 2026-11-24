@@ -45,6 +45,7 @@ valkey_rate_limit_resilience = Resilience(
 class RateLimitState:
     count: int
     limit: int
+    window_seconds: int
     reset_after_seconds: int
 
 
@@ -113,7 +114,8 @@ class ValkeyRateLimitClient:
         :param user_id: The user the counter is keyed by.
         :param window_seconds: The window length, applied when the request opens a window.
         :param limit: The limit to fix for the window, taken only when the request opens one.
-        :return: The count, the limit fixed for the window, and the seconds until it ends.
+        :return: The count, the limit and length fixed for the window, and the seconds
+            until it ends.
         """
         return await self._consume_rlim_window(
             self._user_rlim_window_key(user_id), window_seconds, limit
@@ -129,7 +131,8 @@ class ValkeyRateLimitClient:
         :param client_ip: The address the counter is keyed by.
         :param window_seconds: The window length, applied when the request opens a window.
         :param limit: The limit to fix for the window, taken only when the request opens one.
-        :return: The count, the limit fixed for the window, and the seconds until it ends.
+        :return: The count, the limit and length fixed for the window, and the seconds
+            until it ends.
         """
         return await self._consume_rlim_window(
             self._ip_rlim_window_key(client_ip), window_seconds, limit
@@ -139,23 +142,26 @@ class ValkeyRateLimitClient:
         self, key: str, window_seconds: int, limit: int
     ) -> RateLimitState:
         """
-        ``HSETNX`` and ``EXPIRE NX`` take their argument only from the request that opens
-        the window, so a later one leaves the limit and the deadline as they stand.
+        ``HSETNX`` and ``EXPIRE NX`` take their argument only from the request that opens the
+        window, so a later one leaves the limit, the length and the deadline as they stand.
         """
         batch = Batch(is_atomic=True)
         batch.hincrby(key, "count", 1)
         batch.hsetnx(key, "limit", str(limit))
+        batch.hsetnx(key, "window_seconds", str(window_seconds))
         batch.expire(key, window_seconds, ExpireOptions.HasNoExpiry)
-        batch.hget(key, "limit")
+        batch.hmget(key, ["limit", "window_seconds"])
         batch.ttl(key)
         async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             raise UnreachableError("an atomic batch without WATCH cannot be aborted")
-        count, _, _, fixed_limit, ttl = results
+        count, _, _, _, fixed_fields, ttl = results
+        fixed_limit, fixed_window_seconds = cast(list[bytes], fixed_fields)
         return RateLimitState(
             count=cast(int, count),
-            limit=int(cast(bytes, fixed_limit)),
+            limit=int(fixed_limit),
+            window_seconds=int(fixed_window_seconds),
             reset_after_seconds=cast(int, ttl),
         )
 
@@ -181,23 +187,24 @@ class ValkeyRateLimitClient:
 
     async def _read_rlim_window(self, key: str) -> RateLimitState | None:
         """
-        ``consume_*`` fixes the limit in the same atomic batch that opens a window,
-        so an open window always carries one.
+        A window opened by a manager that does not store ``window_seconds`` yet reads as no
+        open window: the manager still counts and judges the request.
         """
         batch = Batch(is_atomic=True)
-        batch.hmget(key, ["count", "limit"])
+        batch.hmget(key, ["count", "limit", "window_seconds"])
         batch.ttl(key)
         async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             return None
         fields, ttl = cast(list[object], results)
-        count, limit = cast(list[object], fields)
-        if count is None:
+        count, limit, window_seconds = cast(list[bytes | None], fields)
+        if count is None or limit is None or window_seconds is None:
             return None
         return RateLimitState(
-            count=int(cast(bytes, count)),
-            limit=int(cast(bytes, limit)),
+            count=int(count),
+            limit=int(limit),
+            window_seconds=int(window_seconds),
             reset_after_seconds=cast(int, ttl),
         )
 

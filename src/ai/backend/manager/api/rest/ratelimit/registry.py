@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         ValkeyRateLimitClient,
     )
     from ai.backend.manager.api.rest.types import RouteDeps
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -27,6 +28,7 @@ def register_ratelimit_routes(
     route_deps: RouteDeps,
     *,
     valkey_rate_limit: ValkeyRateLimitClient | None,
+    config_provider: ManagerConfigProvider,
 ) -> RouteRegistry:
     """Build the ratelimit sub-application.
 
@@ -39,6 +41,6 @@ def register_ratelimit_routes(
     reg = RouteRegistry.create("ratelimit", route_deps.cors_options)
 
     if valkey_rate_limit is not None:
-        reg.rlim_middleware = make_rlim_middleware(valkey_rate_limit)
+        reg.rlim_middleware = make_rlim_middleware(valkey_rate_limit, config_provider)
 
     return reg

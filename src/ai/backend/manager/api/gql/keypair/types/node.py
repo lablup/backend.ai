@@ -67,7 +67,7 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     last_used: datetime | None = gql_field(
         description="Timestamp when the keypair was last used for an API call."
     )
-    rate_limit: int = gql_field(description="API rate limit (requests per minute).")
+    rate_limit: int = gql_field(description="API rate limit (requests per window).")
     num_queries: int = gql_field(description="Total number of API queries made with this keypair.")
     resource_policy: str = gql_field(
         description="Name of the resource policy assigned to this keypair."

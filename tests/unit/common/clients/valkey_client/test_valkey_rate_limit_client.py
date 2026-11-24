@@ -3,11 +3,36 @@ from __future__ import annotations
 import asyncio
 import uuid
 
+import pytest
+
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
     RateLimitState,
     ValkeyRateLimitClient,
 )
 from ai.backend.common.data.entity.user import UserID
+
+
+@pytest.fixture
+async def user_with_an_open_window(test_valkey_rate_limit: ValkeyRateLimitClient) -> UserID:
+    user_id = UserID(uuid.uuid4())
+    key = f"user.{user_id}.rate_limit_window"
+    async with test_valkey_rate_limit._client.client() as conn:
+        await conn.hset(key, {"count": "1", "limit": "30000", "window_seconds": "900"})
+        await conn.expire(key, 900)
+    return user_id
+
+
+@pytest.fixture
+async def user_with_an_open_window_of_no_stored_length(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> UserID:
+    """A window opened by a manager that does not store the window length."""
+    user_id = UserID(uuid.uuid4())
+    key = f"user.{user_id}.rate_limit_window"
+    async with test_valkey_rate_limit._client.client() as conn:
+        await conn.hset(key, {"count": "1", "limit": "30000"})
+        await conn.expire(key, 900)
+    return user_id
 
 
 async def test_first_request_opens_the_window(
@@ -19,7 +44,7 @@ async def test_first_request_opens_the_window(
         key, window_seconds=60, limit=30000
     )
 
-    assert state == RateLimitState(count=1, limit=30000, reset_after_seconds=60)
+    assert state == RateLimitState(count=1, limit=30000, window_seconds=60, reset_after_seconds=60)
 
 
 async def test_later_requests_keep_the_window(
@@ -59,7 +84,7 @@ async def test_a_new_window_takes_the_limit_it_opens_with(
 
     state = await test_valkey_rate_limit.consume_user_rlim_window(key, window_seconds=60, limit=10)
 
-    assert state == RateLimitState(count=1, limit=10, reset_after_seconds=60)
+    assert state == RateLimitState(count=1, limit=10, window_seconds=60, reset_after_seconds=60)
 
 
 async def test_the_limit_of_the_open_user_window_stands(
@@ -71,6 +96,39 @@ async def test_the_limit_of_the_open_user_window_stands(
     state = await test_valkey_rate_limit.consume_user_rlim_window(key, window_seconds=60, limit=10)
 
     assert state.limit == 30000
+
+
+async def test_the_length_of_the_open_window_stands(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+    user_with_an_open_window: UserID,
+) -> None:
+    state = await test_valkey_rate_limit.consume_user_rlim_window(
+        user_with_an_open_window, window_seconds=60, limit=30000
+    )
+
+    assert state.window_seconds == 900
+    assert 60 < state.reset_after_seconds <= 900
+
+
+async def test_reading_the_window_reports_its_stored_length(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+    user_with_an_open_window: UserID,
+) -> None:
+    state = await test_valkey_rate_limit.get_user_rlim_window(user_with_an_open_window)
+
+    assert state is not None
+    assert state.window_seconds == 900
+
+
+async def test_a_window_without_a_stored_length_reads_as_no_open_window(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+    user_with_an_open_window_of_no_stored_length: UserID,
+) -> None:
+    state = await test_valkey_rate_limit.get_user_rlim_window(
+        user_with_an_open_window_of_no_stored_length
+    )
+
+    assert state is None
 
 
 async def test_the_limit_of_the_open_ip_window_stands(
@@ -124,4 +182,4 @@ async def test_a_user_and_an_address_of_the_same_id_hold_separate_windows(
         str(shared_id), window_seconds=60, limit=1000
     )
 
-    assert state == RateLimitState(count=1, limit=1000, reset_after_seconds=60)
+    assert state == RateLimitState(count=1, limit=1000, window_seconds=60, reset_after_seconds=60)

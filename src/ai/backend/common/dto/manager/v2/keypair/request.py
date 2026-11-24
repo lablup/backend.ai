@@ -143,7 +143,7 @@ class AdminCreateKeypairInput(BaseRequestModel):
     resource_policy: str = Field(description="Name of the resource policy to assign.")
     is_active: bool = Field(default=True, description="Whether the keypair should be active.")
     is_admin: bool = Field(default=False, description="Whether the keypair has admin privileges.")
-    rate_limit: int = Field(default=30000, description="API rate limit (requests per minute).")
+    rate_limit: int = Field(default=30000, description="API rate limit (requests per window).")
 
 
 class AdminUpdateKeypairInput(BaseRequestModel):

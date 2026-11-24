@@ -27,8 +27,6 @@ from ai.backend.web.auth import get_client_ip
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
-_RATELIMIT_WINDOW: Final = 60 * 15
-
 type Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
 
@@ -70,7 +68,7 @@ def manager_proxy_rate_limited(handler: Handler) -> Handler:
                     "X-RateLimit-Limit": str(rlim_window.limit),
                     "X-RateLimit-Remaining": "0",
                     "X-RateLimit-Reset": str(rlim_window.reset_after_seconds),
-                    "X-RateLimit-Window": str(_RATELIMIT_WINDOW),
+                    "X-RateLimit-Window": str(rlim_window.window_seconds),
                 },
             )
         return await handler(request)

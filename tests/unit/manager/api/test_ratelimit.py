@@ -19,14 +19,17 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.web.reserved_response_headers import apply_reserved_response_headers
 from ai.backend.manager.api.rest.ratelimit.handler import (
     _ANONYMOUS_RATELIMIT,
-    _RATELIMIT_WINDOW_SECONDS,
     make_rlim_middleware,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import APIConfig
 from ai.backend.manager.errors.api import RateLimitExceeded
 
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 _CLIENT_IP = "10.0.0.1"
 _RATE_LIMIT = 30000
+_CONFIGURED_WINDOW_SECONDS = 60
+_OPEN_WINDOW_SECONDS = 900
 _RESET_AFTER_SECONDS = 500
 
 
@@ -50,9 +53,20 @@ class TestRlimMiddleware:
         return client
 
     @pytest.fixture
-    def middleware(self, mock_valkey_client: MagicMock) -> Any:
+    def rate_limit_window_seconds(self) -> int:
+        """The window length the manager is configured with."""
+        return _CONFIGURED_WINDOW_SECONDS
+
+    @pytest.fixture
+    def mock_config_provider(self, rate_limit_window_seconds: int) -> MagicMock:
+        config_provider = MagicMock(spec=ManagerConfigProvider)
+        config_provider.config.api = APIConfig(rate_limit_window_seconds=rate_limit_window_seconds)
+        return config_provider
+
+    @pytest.fixture
+    def middleware(self, mock_valkey_client: MagicMock, mock_config_provider: MagicMock) -> Any:
         """Create the closure-based rate limit middleware."""
-        return make_rlim_middleware(mock_valkey_client)
+        return make_rlim_middleware(mock_valkey_client, mock_config_provider)
 
     @pytest.fixture
     def mock_handler(self) -> AsyncMock:
@@ -76,7 +90,19 @@ class TestRlimMiddleware:
         mock_valkey_client.consume_ip_rlim_window.return_value = RateLimitState(
             count=_ANONYMOUS_RATELIMIT + 1,
             limit=_ANONYMOUS_RATELIMIT,
+            window_seconds=_OPEN_WINDOW_SECONDS,
             reset_after_seconds=_RESET_AFTER_SECONDS,
+        )
+
+    @pytest.fixture
+    def user_window_opened_by_the_request(
+        self, mock_valkey_client: MagicMock, rate_limit_window_seconds: int
+    ) -> None:
+        mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
+            count=1,
+            limit=_RATE_LIMIT,
+            window_seconds=rate_limit_window_seconds,
+            reset_after_seconds=rate_limit_window_seconds,
         )
 
     @pytest.fixture
@@ -112,10 +138,16 @@ class TestRlimMiddleware:
         """The two windows stand apart, so the limit reported says which one governed."""
         # Arrange
         mock_valkey_client.consume_ip_rlim_window.return_value = RateLimitState(
-            count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+            count=1,
+            limit=_ANONYMOUS_RATELIMIT,
+            window_seconds=_OPEN_WINDOW_SECONDS,
+            reset_after_seconds=_RESET_AFTER_SECONDS,
         )
         mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
-            count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+            count=1,
+            limit=_RATE_LIMIT,
+            window_seconds=_OPEN_WINDOW_SECONDS,
+            reset_after_seconds=_RESET_AFTER_SECONDS,
         )
 
         # Act
@@ -154,7 +186,10 @@ class TestRlimMiddleware:
         """The headers report the window as it stands, whatever limit the request carried."""
         # Arrange
         mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
-            count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
+            count=case.count,
+            limit=case.limit,
+            window_seconds=_OPEN_WINDOW_SECONDS,
+            reset_after_seconds=_RESET_AFTER_SECONDS,
         )
 
         # Act
@@ -165,8 +200,26 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Limit"] == str(case.limit)
         assert response.headers["X-RateLimit-Remaining"] == case.expected_remaining
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
-        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
+        assert response.headers["X-RateLimit-Window"] == str(_OPEN_WINDOW_SECONDS)
         mock_handler.assert_called_once_with(mock_request_authorized)
+
+    @pytest.mark.parametrize("rate_limit_window_seconds", [60, 900])
+    async def test_a_window_opens_with_the_configured_length(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        mock_request_authorized: web.Request,
+        user_window_opened_by_the_request: None,
+        mock_handler: AsyncMock,
+        rate_limit_window_seconds: int,
+    ) -> None:
+        # Act
+        await middleware(mock_request_authorized, mock_handler)
+
+        # Assert
+        mock_valkey_client.consume_user_rlim_window.assert_awaited_once_with(
+            user_id=_USER_ID, window_seconds=rate_limit_window_seconds, limit=_RATE_LIMIT
+        )
 
     async def test_a_query_past_its_window_is_refused(
         self,
@@ -178,7 +231,10 @@ class TestRlimMiddleware:
         """One request past the limit is refused, and the quota survives the raise."""
         # Arrange
         mock_valkey_client.consume_user_rlim_window.return_value = RateLimitState(
-            count=_RATE_LIMIT + 1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+            count=_RATE_LIMIT + 1,
+            limit=_RATE_LIMIT,
+            window_seconds=_OPEN_WINDOW_SECONDS,
+            reset_after_seconds=_RESET_AFTER_SECONDS,
         )
 
         # Act & Assert
@@ -189,7 +245,7 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
         assert response.headers["X-RateLimit-Remaining"] == "0"
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
-        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
+        assert response.headers["X-RateLimit-Window"] == str(_OPEN_WINDOW_SECONDS)
         mock_handler.assert_not_called()
 
     @pytest.mark.parametrize("path", ["/health", "/health/livez", "/health/readyz"])

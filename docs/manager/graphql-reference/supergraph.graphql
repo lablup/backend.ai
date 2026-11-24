@@ -231,7 +231,7 @@ input AdminCreateKeypairInput
   """Whether the keypair has admin privileges."""
   isAdmin: Boolean! = false
 
-  """API rate limit (requests per minute)."""
+  """API rate limit (requests per window)."""
   rateLimit: Int! = 30000
 }
 
@@ -12281,7 +12281,7 @@ type KeyPairV2 implements Node
   """Timestamp when the keypair was last used for an API call."""
   lastUsed: DateTime
 
-  """API rate limit (requests per minute)."""
+  """API rate limit (requests per window)."""
   rateLimit: Int!
 
   """Total number of API queries made with this keypair."""

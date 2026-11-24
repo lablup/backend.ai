@@ -26,11 +26,12 @@ from ai.backend.manager.api.rest.types import WebRequestHandler
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
+
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.api import RateLimitExceeded
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
-_RATELIMIT_WINDOW_SECONDS: Final = 60 * 15
 _ANONYMOUS_RATELIMIT: Final = 1000
 _HEALTH_PATH: Final = "/health"
 
@@ -51,8 +52,9 @@ class RateLimitQuota:
 
 def make_rlim_middleware(
     valkey_client: ValkeyRateLimitClient,
+    config_provider: ManagerConfigProvider,
 ) -> Middleware:
-    """Create a rate-limit middleware that captures *valkey_client* via closure."""
+    """Create a rate-limit middleware that captures its arguments via closure."""
 
     @web.middleware
     async def rlim_middleware(
@@ -63,11 +65,12 @@ def make_rlim_middleware(
         # TODO: let the health routes declare the exemption as a handler attribute.
         if request.path == _HEALTH_PATH or request.path.startswith(f"{_HEALTH_PATH}/"):
             return await handler(request)
+        window_seconds = config_provider.config.api.rate_limit_window_seconds
         rlim_window: RateLimitState
         if request["is_authorized"]:
             rlim_window = await valkey_client.consume_user_rlim_window(
                 user_id=request["user"]["uuid"],
-                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+                window_seconds=window_seconds,
                 limit=request["user"]["rate_limit"],
             )
         else:
@@ -76,7 +79,7 @@ def make_rlim_middleware(
                 raise UnreachableError("a request over a socket always has a peer address")
             rlim_window = await valkey_client.consume_ip_rlim_window(
                 client_ip=client_ip,
-                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+                window_seconds=window_seconds,
                 limit=_ANONYMOUS_RATELIMIT,
             )
         reserve_response_headers(
@@ -85,7 +88,7 @@ def make_rlim_middleware(
                 limit=rlim_window.limit,
                 remaining=max(rlim_window.limit - rlim_window.count, 0),
                 reset_after_seconds=rlim_window.reset_after_seconds,
-                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+                window_seconds=rlim_window.window_seconds,
             ),
         )
         if rlim_window.count > rlim_window.limit:

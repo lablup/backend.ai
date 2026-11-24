@@ -2048,6 +2048,25 @@ class APIConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="100"),
         ),
     ]
+    rate_limit_window_seconds: Annotated[
+        int,
+        Field(
+            default=900,
+            ge=1,
+            validation_alias=AliasChoices("rate_limit_window_seconds", "rate-limit-window-seconds"),
+            serialization_alias="rate-limit-window-seconds",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Length of the API rate limit window in seconds. "
+                "A keypair's rate_limit is the number of requests allowed per window, so "
+                "changing the length changes what the stored rate_limit values mean. "
+                "A change applies to windows opened after it; open windows keep theirs."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="900", prod="900"),
+        ),
+    ]
     resources: Annotated[
         ResourcesConfig | None,
         Field(default=None),
