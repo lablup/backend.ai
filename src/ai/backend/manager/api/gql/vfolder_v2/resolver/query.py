@@ -9,6 +9,7 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
@@ -62,6 +63,9 @@ async def admin_vfolders_v2(
 ) -> VFolderConnection | None:
     """Search all virtual folders (superadmin only)."""
     check_admin_only()
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
     result = await info.context.adapters.vfolder.admin_search(
         SearchVFoldersInput(
             usage=usage.to_pydantic() if usage else None,
@@ -74,6 +78,7 @@ async def admin_vfolders_v2(
             limit=limit,
             offset=offset,
         ),
+        UserID(me.user_id),
     )
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
@@ -137,6 +142,9 @@ async def scoped_vfolders_v2(
     offset: int | None = None,
 ) -> VFolderConnection | None:
     """Page through the virtual folders the named scopes reach."""
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
     result = await info.context.adapters.vfolder.scoped_search(
         ScopedSearchVFoldersInput(
             scope=scope.to_pydantic(),
@@ -150,6 +158,7 @@ async def scoped_vfolders_v2(
             limit=limit,
             offset=offset,
         ),
+        UserID(me.user_id),
     )
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
@@ -194,6 +203,9 @@ async def project_vfolders(
     offset: int | None = None,
 ) -> VFolderConnection | None:
     """List virtual folders within a specific project."""
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
     result = await info.context.adapters.vfolder.project_search(
         project_id,
         SearchVFoldersInput(
@@ -207,6 +219,7 @@ async def project_vfolders(
             limit=limit,
             offset=offset,
         ),
+        UserID(me.user_id),
     )
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
@@ -265,7 +278,8 @@ async def my_vfolders(
             before=before,
             limit=limit,
             offset=offset,
-        )
+        ),
+        UserID(me.user_id),
     )
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]

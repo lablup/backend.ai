@@ -8,6 +8,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
@@ -88,7 +89,9 @@ class ListingTheProjectFolders(When[AFolderAndItsReader, VFolderAdapter, Answer]
         if project is None:
             raise LookupError("the folder was laid in no project")
         with ActingAs(laid.caller):
-            return await adapter.project_search(project, SearchVFoldersInput())
+            return await adapter.project_search(
+                project, SearchVFoldersInput(), UserID(laid.caller.id)
+            )
 
 
 @dataclass(frozen=True)

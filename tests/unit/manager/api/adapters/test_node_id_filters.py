@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.agent.request import AgentFilter
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
@@ -149,11 +150,12 @@ class NodeIdFilterCase:
     field: str
     column: str
     deprecated_field: str | None = None
+    other_arguments: Sequence[Any] = ()
 
     def conditions(self, field: str, value: uuid.UUID) -> list[QueryCondition]:
         adapter = self.adapter.__new__(self.adapter)
-        convert: Callable[[Any], list[QueryCondition]] = getattr(adapter, self.convert)
-        return convert(self.filter_type(**{field: UUIDFilter(equals=value)}))
+        convert: Callable[..., list[QueryCondition]] = getattr(adapter, self.convert)
+        return convert(self.filter_type(**{field: UUIDFilter(equals=value)}), *self.other_arguments)
 
 
 CASES = [
@@ -501,7 +503,12 @@ CASES = [
         UserAdapter, "_convert_keypair_filter", KeypairFilter, "field_id", "keypairs.id"
     ),
     NodeIdFilterCase(
-        VFolderAdapter, "_convert_vfolder_filter", VFolderFilter, "entity_id", "vfolders.id"
+        VFolderAdapter,
+        "_convert_vfolder_filter",
+        VFolderFilter,
+        "entity_id",
+        "vfolders.id",
+        other_arguments=(UserID(uuid.uuid4()),),
     ),
 ]
 

@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
@@ -100,7 +101,8 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
                     scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)])
-                )
+                ),
+                UserID(laid.caller.id),
             )
 
 

@@ -7,6 +7,7 @@ from typing import Self
 
 from ai.backend.common.dto.manager.v2.vfolder.request import VFolderFilter, VFolderOrder
 from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderMountPermissionFilter,
     VFolderStatusFilter,
     VFolderUsageModeFilter,
 )
@@ -28,7 +29,7 @@ from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNes
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 from ai.backend.manager.api.gql.vfolder_auto_mount.types import VFolderAutoMountNestedFilterGQL
 
-from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL
+from .enum import VFolderMountPermissionGQL, VFolderOperationStatusGQL, VFolderUsageModeGQL
 
 
 @gql_pydantic_input(
@@ -77,6 +78,29 @@ class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description=(
+            "Filter for the level the current user mounts a vfolder at. "
+            "RW_DELETE matches READ_WRITE."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="VFolderMountPermissionFilter",
+)
+class VFolderMountPermissionFilterGQL(PydanticInputMixin[VFolderMountPermissionFilter]):
+    equals: VFolderMountPermissionGQL | None = gql_field(description="Exact match.", default=None)
+    in_: list[VFolderMountPermissionGQL] | None = gql_field(
+        description="Match any of the given levels.", name="in", default=None
+    )
+    not_equals: VFolderMountPermissionGQL | None = gql_field(
+        description="Exclude an exact match.", default=None
+    )
+    not_in: list[VFolderMountPermissionGQL] | None = gql_field(
+        description="Exclude any of the given levels.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.4.2",
     ),
@@ -106,6 +130,16 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Select vfolders by the auto-mounts set on them.",
+        ),
+        default=None,
+    )
+    mount_permission: VFolderMountPermissionFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter by the level the current user mounts the vfolder at "
+                "(`VFolder.mountPermission`)."
+            ),
         ),
         default=None,
     )

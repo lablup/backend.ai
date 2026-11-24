@@ -27,6 +27,7 @@ __all__ = (
     "OrderDirection",
     "VFolderInvitationState",
     "VFolderMetadataInfo",
+    "VFolderMountPermissionFilter",
     "VFolderOperationStatusField",
     "VFolderOrderField",
     "VFolderOwnershipInfo",
@@ -75,6 +76,10 @@ class VFolderStatusFilter(EnumFilter[VFolderOperationStatusField]):
 
 class VFolderUsageModeFilter(EnumFilter[VFolderUsageMode]):
     """Filter for vfolder usage mode values."""
+
+
+class VFolderMountPermissionFilter(EnumFilter[VFolderPermissionField]):
+    """Filter for the level the caller mounts a vfolder at."""
 
 
 class VFolderMetadataInfo(BaseResponseModel):

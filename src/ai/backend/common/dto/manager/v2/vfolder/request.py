@@ -25,6 +25,7 @@ from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 
 from .types import (
     OrderDirection,
+    VFolderMountPermissionFilter,
     VFolderOrderField,
     VFolderPermissionField,
     VFolderStatusFilter,
@@ -443,6 +444,13 @@ class VFolderFilter(BaseRequestModel):
     entity_id: UUIDFilter | None = Field(
         default=None,
         description=f"Added in {NEXT_RELEASE_VERSION}. Filter by vfolder ID.",
+    )
+    mount_permission: VFolderMountPermissionFilter | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the level the caller mounts the "
+            "vfolder at. wd matches rw."
+        ),
     )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")

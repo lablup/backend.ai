@@ -10,6 +10,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -85,7 +86,7 @@ class SearchingEveryFolder(When[AFolderAndItsReader, VFolderAdapter, SearchVFold
         self, adapter: VFolderAdapter, laid: AFolderAndItsReader
     ) -> SearchVFoldersPayload:
         with ActingAs(laid.caller):
-            return await adapter.admin_search(SearchVFoldersInput())
+            return await adapter.admin_search(SearchVFoldersInput(), UserID(laid.caller.id))
 
 
 @dataclass(frozen=True)
@@ -111,7 +112,8 @@ class SearchingMyOwnScope(When[AFolderAndItsReader, VFolderAdapter, SearchVFolde
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
                     scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)])
-                )
+                ),
+                UserID(laid.caller.id),
             )
 
 
@@ -152,7 +154,8 @@ class SearchingByFragmentInOrder(
                         VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
                     ],
                     limit=self.limit,
-                )
+                ),
+                UserID(laid.caller.id),
             )
 
 
