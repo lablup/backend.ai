@@ -95,7 +95,8 @@ class NotificationService:
         Raises:
             NotificationChannelNotFound: If the channel does not exist
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If sending the test message fails
+            NotificationDeliveryFailure: If the channel's destination rejects the test message
+            NotificationProcessingFailure: If sending the test message fails for any other reason
         """
         channel_data = await self._repository.get_channel_by_id(action.channel_id)
         await self._notification_center.validate_channel(channel_data, action.test_message)
@@ -119,7 +120,8 @@ class NotificationService:
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If sending the rendered message fails
+            NotificationDeliveryFailure: If the channel's destination rejects the rendered message
+            NotificationProcessingFailure: If sending the rendered message fails for any other reason
         """
         # Fetch the rule to know its rule_type, then the channel it names. The rule
         # carries the channel's id, not the channel — reading both is this method's

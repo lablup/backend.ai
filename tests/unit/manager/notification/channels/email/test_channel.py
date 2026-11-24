@@ -111,7 +111,7 @@ class TestEmailChannelSend:
         with pytest.raises(NotificationDeliveryFailure, match=reason) as exc_info:
             await channel.send(message)
 
-        assert exc_info.value.is_client_error()
+        assert exc_info.value.status_code == 400
         assert exc_info.value.__cause__ is error
 
     @pytest.mark.parametrize(
