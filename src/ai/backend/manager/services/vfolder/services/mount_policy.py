@@ -87,20 +87,21 @@ class VFolderMountPolicyService:
     async def scoped_search_user_vfolder_mounts(
         self, action: ScopedSearchUserVFolderMountsAction
     ) -> ScopedSearchUserVFolderMountsActionResult:
+        user_id = action.searcher.user_id
         found = await self._vfolder_repository.scoped_search_user_vfolder_mounts(
-            action.searcher, action.user_id
+            action.scopes, action.searcher
         )
         vfolders = found.page.items
         held = await self._permission_check.held_permissions(
-            action.user_id, [vfolder.id for vfolder in vfolders]
+            user_id, [vfolder.id for vfolder in vfolders]
         )
         return ScopedSearchUserVFolderMountsActionResult(
             items=[
                 UserVFolderMountData(
-                    user_id=action.user_id,
+                    user_id=user_id,
                     vfolder_id=vfolder.id,
                     mount_permission=resolve_mount_policy(
-                        action.user_id,
+                        user_id,
                         owner_user_id=vfolder.user,
                         default_mount_permission=vfolder.default_mount_permission,
                         held=held.get(vfolder.id, Permission.NONE),

@@ -499,7 +499,6 @@ class VFolderAdapter(BaseAdapter):
         self, input: ScopedSearchUserVFolderMountsInput
     ) -> SearchUserVFolderMountsPayload:
         """Search the pairs of the scope user and the vfolders the named scopes reach."""
-        user_id = UserID(input.scope.user[0].value)
         vfolder_searcher = self._build_searcher(
             VFolderSearcher,
             conditions=self._convert_user_vfolder_mount_filter(input.filter)
@@ -516,22 +515,18 @@ class VFolderAdapter(BaseAdapter):
         )
         action_result = await self._mount_policy.scoped_search_user_vfolder_mounts.run(
             ScopedSearchUserVFolderMountsAction(
-                user_id=user_id,
-                searcher=ScopedSearcher(
-                    scopes=self._scope_targets(
-                        VFolderScope(
-                            domain=input.scope.domain,
-                            project=input.scope.project,
-                            user=input.scope.user,
-                        )
-                    ),
-                    used_by=(),
-                    searcher=UserVFolderMountSearcher(
-                        pagination=vfolder_searcher.pagination,
-                        conditions=vfolder_searcher.conditions,
-                        orders=vfolder_searcher.orders,
-                        user_id=user_id,
-                    ),
+                scopes=self._scope_targets(
+                    VFolderScope(
+                        domain=input.scope.domain,
+                        project=input.scope.project,
+                        user=input.scope.user,
+                    )
+                ),
+                searcher=UserVFolderMountSearcher(
+                    pagination=vfolder_searcher.pagination,
+                    conditions=vfolder_searcher.conditions,
+                    orders=vfolder_searcher.orders,
+                    user_id=UserID(input.scope.user[0].value),
                 ),
             )
         )

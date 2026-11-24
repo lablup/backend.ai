@@ -108,10 +108,9 @@ from ai.backend.manager.models.resource_policy.row import (
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.scopes import OperationScope, ScopeTarget
 from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user.lookups import UserEmailLookup
 from ai.backend.manager.models.user.queries import joined_project_ids_query
@@ -147,6 +146,7 @@ from ai.backend.manager.models.vfolder.row import (
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import (
+    UserVFolderMountSearcher,
     VFolderSearcher,
     VFolderUserMountPolicySearcher,
 )
@@ -1954,14 +1954,14 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def scoped_search_user_vfolder_mounts(
-        self, scoped: ScopedSearcher[VFolderRow, VFolderData], user_id: UserID
+        self, scopes: Sequence[ScopeTarget], searcher: UserVFolderMountSearcher
     ) -> UserVFolderMountPage:
-        """A page of the vfolders the scopes reach, with the mount policy rows the user
-        holds on them."""
+        """A page of the vfolders the scopes reach, with the mount policy rows the searcher's
+        user holds on them."""
         async with self._v2_ops.read_ops() as r:
-            page = await r.scoped_search(scoped)
+            page = await r.search_with_scopes(scopes, searcher)
             rows = await r.query_owned_fields(
-                VFolderUserMountPolicyQuerier(user_id=user_id),
+                VFolderUserMountPolicyQuerier(user_id=searcher.user_id),
                 [vfolder.id for vfolder in page.items],
             )
             return UserVFolderMountPage(

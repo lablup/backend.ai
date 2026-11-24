@@ -7,14 +7,13 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.data.vfolder.types import UserVFolderMountData, VFolderData
-from ai.backend.manager.models.specs.searcher import ScopedSearcher
-from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.data.vfolder.types import UserVFolderMountData
+from ai.backend.manager.models.scopes import ScopeTarget
+from ai.backend.manager.models.vfolder.searchers import UserVFolderMountSearcher
 
 __all__ = (
     "ScopedSearchUserVFolderMountsAction",
@@ -30,8 +29,8 @@ class ScopedSearchUserVFolderMountsAction(BaseScopeAction):
     cannot see is rejected rather than served the rest.
     """
 
-    user_id: UserID
-    searcher: ScopedSearcher[VFolderRow, VFolderData]
+    scopes: Sequence[ScopeTarget]
+    searcher: UserVFolderMountSearcher
 
     @override
     @classmethod
@@ -50,7 +49,7 @@ class ScopedSearchUserVFolderMountsAction(BaseScopeAction):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [scope.scope_id() for scope in self.searcher.scopes]
+        return [scope.scope_id() for scope in self.scopes]
 
 
 @dataclass(frozen=True)
