@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -38,6 +39,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
+from ai.backend.manager.views.sokovan.scheduling import SchedulingData
 from ai.backend.manager.views.sokovan.session import (
     TerminatingSessionData,
 )
@@ -67,11 +69,16 @@ class TestScheduleSessionsLifecycleHandler:
             scheduling_controller=AsyncMock(),
         )
 
+    @pytest.fixture
+    def scheduling_data_without_workloads(self) -> SchedulingData:
+        return SchedulingData(resource_group=MagicMock(), workloads=[], system_snapshot=MagicMock())
+
     async def test_all_sessions_scheduled_successfully(
         self,
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
+        scheduling_data_without_workloads: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
         schedule_result_success_factory: Callable[..., ScheduleResult],
     ) -> None:
@@ -82,7 +89,7 @@ class TestScheduleSessionsLifecycleHandler:
         Then: All sessions appear in result.successes with reason
         """
         # Arrange
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
         mock_provisioner.schedule_resource_group.return_value = schedule_result_success_factory(
             pending_sessions_multiple
         )
@@ -105,6 +112,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
+        scheduling_data_without_workloads: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-002: Partial scheduling - some sessions skipped.
@@ -115,7 +123,7 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange - Only first session is scheduled
         first_session = pending_sessions_multiple[0]
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[first_session.session_info.identity.id],
             scheduling_failures=[],
@@ -141,6 +149,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
+        scheduling_data_without_workloads: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-003: Non-attempted sessions are marked as skipped (not failures).
@@ -151,7 +160,7 @@ class TestScheduleSessionsLifecycleHandler:
         Then: All sessions appear in result.skipped with reason
         """
         # Arrange - No sessions scheduled, no failures reported
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[],
             scheduling_failures=[],
@@ -176,6 +185,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
+        scheduling_data_without_workloads: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-006: Sessions reported as scheduling failures appear in result.failures.
@@ -186,7 +196,7 @@ class TestScheduleSessionsLifecycleHandler:
         Then: All sessions appear in result.failures with reason from the failure msg
         """
         # Arrange - All sessions fail scheduling
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[],
             scheduling_failures=[
@@ -215,6 +225,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
+        scheduling_data_without_workloads: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-007: Scheduled, failed, and non-attempted sessions are categorized.
@@ -226,7 +237,7 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange
         scheduled_session, failed_session, *rest = pending_sessions_multiple
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[scheduled_session.session_info.identity.id],
             scheduling_failures=[
@@ -259,6 +270,7 @@ class TestScheduleSessionsLifecycleHandler:
         handler: ScheduleSessionsLifecycleHandler,
         mock_provisioner: AsyncMock,
         mock_repository: AsyncMock,
+        scheduling_data_without_workloads: SchedulingData,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
         """SC-SS-008: Sessions left unattempted behind a blocked one are skipped.
@@ -271,7 +283,7 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange
         blocked_session, *rest = pending_sessions_multiple
-        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_repository.get_scheduling_data.return_value = scheduling_data_without_workloads
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[],
             scheduling_failures=[
@@ -357,6 +369,36 @@ class TestScheduleSessionsLifecycleHandler:
 
         # Verify provisioner was not called
         mock_provisioner.schedule_resource_group.assert_not_awaited()
+
+    async def test_a_session_enqueued_after_the_coordinators_query_waits_for_the_next_cycle(
+        self,
+        handler: ScheduleSessionsLifecycleHandler,
+        mock_provisioner: AsyncMock,
+        mock_repository: AsyncMock,
+        pending_sessions_multiple: list[SessionWithKernels],
+        schedule_result_success_factory: Callable[..., ScheduleResult],
+    ) -> None:
+        handed_workloads = [
+            MagicMock(meta=MagicMock(session_id=session.session_info.identity.id))
+            for session in pending_sessions_multiple
+        ]
+        late_workload = MagicMock(meta=MagicMock(session_id=SessionId(uuid.uuid4())))
+        mock_repository.get_scheduling_data.return_value = SchedulingData(
+            resource_group=MagicMock(),
+            workloads=[*handed_workloads, late_workload],
+            system_snapshot=MagicMock(),
+        )
+        mock_provisioner.schedule_resource_group.return_value = schedule_result_success_factory(
+            pending_sessions_multiple
+        )
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
+
+        (scheduling_data,) = mock_provisioner.schedule_resource_group.await_args.args
+        assert scheduling_data.workloads == handed_workloads
+        assert {s.session_id for s in result.successes} == {
+            session.session_info.identity.id for session in pending_sessions_multiple
+        }
 
 
 # =============================================================================

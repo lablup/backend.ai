@@ -236,18 +236,29 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
+        options = dict(opts)
+        interpolation = self.data.get("service_interpolation")
+        if interpolation is not None and options.get("interpolation") is None:
+            options["interpolation"] = interpolation
         return await self.runner.feed_start_service({
             "name": service,
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
-            "options": opts,
+            "options": options,
         })
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        interpolation = self.data.get("service_interpolation")
+        service = model_service.get("service")
+        if interpolation is not None and service is not None:
+            model_service = {
+                **model_service,
+                "service": {**service, "interpolation": interpolation},
+            }
         return await self.runner.feed_start_model_service(model_service)
 
     @override

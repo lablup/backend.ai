@@ -76,6 +76,15 @@ def app_config_fragment() -> None:
     """App config fragment commands."""
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.auto_generated_file:auto_generated_file",
+    name="auto-generated-file",
+)
+def auto_generated_file() -> None:
+    """Auto-generated file commands."""
+
+
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.domain:domain")
 def domain() -> None:
     """Domain commands."""
@@ -237,6 +246,11 @@ def object_storage() -> None:
 )
 def entity_label() -> None:
     """Entity label commands."""
+
+
+@v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.ssh_key:ssh_key", name="ssh-key")
+def ssh_key() -> None:
+    """SSH key commands."""
 
 
 @v2.group(

@@ -6,7 +6,6 @@ import tomli
 
 from ai.backend.common.config import (
     DEFAULT_SHELL,
-    DefaultModelDefinition,
     ModelConfig,
     ModelConfigDraft,
     ModelDefinition,
@@ -24,7 +23,6 @@ from ai.backend.common.config import (
     merge,
     override_key,
 )
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def test_override_key() -> None:
@@ -399,108 +397,6 @@ class TestModelDefinitionDraftMerge:
         assert merged.service.health_check.enable is False
         assert merged.service.health_check.path == "/override"
         assert merged.service.health_check.expected_status_code == 101
-
-
-class TestModelServiceArgumentInterpolation:
-    def test_merge_keeps_baseline_interpolation_when_override_omits_it(self) -> None:
-        base = ModelDefinitionDraft.model_validate({
-            "models": [
-                {
-                    "name": "demo",
-                    "service": {
-                        "port": 8080,
-                        "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
-                    },
-                }
-            ]
-        })
-        override = ModelDefinitionDraft.model_validate({
-            "models": [{"model_path": "/models/demo", "service": {"start_command": "serve"}}]
-        })
-
-        resolved = base.merge(override).to_resolved()
-
-        service = resolved.models[0].service
-        assert service is not None
-        assert service.model_dump(mode="json")["interpolation"] == {
-            "delimiters": [{"start": "{{", "end": "}}"}]
-        }
-
-    def test_merge_replaces_interpolation_with_override(self) -> None:
-        base = ModelDefinitionDraft.model_validate({
-            "models": [
-                {
-                    "name": "demo",
-                    "service": {
-                        "port": 8080,
-                        "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
-                    },
-                }
-            ]
-        })
-        override = ModelDefinitionDraft.model_validate({
-            "models": [
-                {
-                    "model_path": "/models/demo",
-                    "service": {"interpolation": {"delimiters": [{"start": "<%", "end": "%>"}]}},
-                }
-            ]
-        })
-
-        resolved = base.merge(override).to_resolved()
-
-        service = resolved.models[0].service
-        assert service is not None
-        assert service.interpolation is not None
-        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("<%", "%>")]
-
-    def test_unset_interpolation_resolves_to_legacy_delimiters(self) -> None:
-        draft = ModelDefinitionDraft.model_validate({
-            "models": [{"name": "demo", "model_path": "/models", "service": {"port": 8080}}]
-        })
-
-        service = draft.to_resolved().models[0].service
-
-        assert service is not None
-        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [
-            ("${{", "}}"),
-            ("{", "}"),
-        ]
-
-    def test_runtime_variant_baseline_interpolation_reaches_revision(self) -> None:
-        baseline = DefaultModelDefinition.model_validate({
-            "models": [
-                {
-                    "name": "demo",
-                    "service": {
-                        "port": 8080,
-                        "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
-                    },
-                }
-            ]
-        })
-        override = ModelDefinitionDraft.model_validate({"models": [{"model_path": "/models"}]})
-
-        service = baseline.to_draft().merge(override).to_resolved().models[0].service
-
-        assert service is not None
-        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("{{", "}}")]
-
-    def test_runtime_variant_baseline_rejects_empty_delimiters(self) -> None:
-        with pytest.raises(BackendAISchemaValidationFailed):
-            DefaultModelDefinition.model_validate({
-                "models": [
-                    {"name": "demo", "service": {"port": 8080, "interpolation": {"delimiters": []}}}
-                ]
-            })
-
-    @pytest.mark.parametrize(
-        "interpolation",
-        [{}, {"delimiters": []}, {"delimiters": [{"start": "", "end": "}}"}]}],
-    )
-    def test_draft_rejects_empty_delimiters(self, interpolation: dict[str, Any]) -> None:
-        with pytest.raises(BackendAISchemaValidationFailed):
-            ModelServiceConfigDraft.model_validate({"interpolation": interpolation})
 
 
 class TestHealthCheckJudgment:

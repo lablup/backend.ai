@@ -466,6 +466,11 @@ class SessionAdapter(BaseAdapter):
                 if input.session_group_id is not None
                 else None
             ),
+            interpolation=(
+                ServiceArgumentInterpolation.model_validate(input.interpolation.model_dump())
+                if input.interpolation is not None
+                else None
+            ),
             user_id=UserID(user_id),
             user_role=UserRole(user_role),
             access_key=AccessKey(access_key),
@@ -1656,11 +1661,6 @@ class SessionAdapter(BaseAdapter):
             port=input.port,
             arguments=json.dumps(input.arguments) if input.arguments else None,
             envs=json.dumps(input.envs) if input.envs else None,
-            interpolation=(
-                ServiceArgumentInterpolation.model_validate(input.interpolation.model_dump())
-                if input.interpolation is not None
-                else None
-            ),
         )
         result = await self._session.start_service.run(action)
         return StartSessionServicePayload(token=result.token, wsproxy_addr=result.wsproxy_addr)

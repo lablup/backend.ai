@@ -22,12 +22,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
+    ServiceArgumentInterpolationInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import MountItemInput
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
@@ -327,6 +329,11 @@ def default_session_options_from_input(
             if options.agent_selection_policy is not None
             else baseline.agent_selection_policy
         ),
+        interpolation=(
+            ServiceArgumentInterpolation.model_validate(options.interpolation.model_dump())
+            if options.interpolation is not None
+            else baseline.interpolation
+        ),
     )
 
 
@@ -344,4 +351,7 @@ def default_session_options_to_info(options: DefaultSessionOptions) -> DefaultSe
         ),
         handler_options=_handler_options_to_info(options.handler_options),
         agent_selection_policy=_agent_selection_policy_to_info(options.agent_selection_policy),
+        interpolation=ServiceArgumentInterpolationInfoDTO.model_validate(
+            options.interpolation.model_dump()
+        ),
     )

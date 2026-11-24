@@ -795,6 +795,15 @@ class Context(metaclass=ABCMeta):
                 items.extend(document["items"])
         return items
 
+    def read_default_domain_id(self, manager_seeds: Path) -> str:
+        return str(
+            next(
+                item["id"]
+                for item in self.read_seed_items(manager_seeds, "domain")
+                if item["name"] == "default"
+            )
+        )
+
     def write_seed_file(self, path: Path, kind: str, items: Sequence[dict[str, Any]]) -> None:
         with path.open("w", encoding="utf8") as fp:
             YAML(typ="safe").dump({"kind": kind, "version": 1, "items": list(items)}, fp)
@@ -822,11 +831,7 @@ class Context(metaclass=ABCMeta):
             resource_group_id = str(
                 uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
             )
-            default_domain_id = next(
-                item["id"]
-                for item in self.read_seed_items(manager_seeds, "domain")
-                if item["name"] == "default"
-            )
+            default_domain_id = self.read_default_domain_id(manager_seeds)
             resource_groups.append({
                 "id": resource_group_id,
                 "name": sftp.scaling_group,
@@ -1992,8 +1997,24 @@ class Context(metaclass=ABCMeta):
                 }
             ],
         )
+        with self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds:
+            default_domain_id = self.read_default_domain_id(manager_seeds)
+        relation_seed_path = (
+            self.install_info.base_path / "harbor" / "domain-container-registry-seed.yaml"
+        )
+        self.write_seed_file(
+            relation_seed_path,
+            "domain_container_registry",
+            [{"domain_id": default_domain_id, "registry_id": registry_id}],
+        )
         self.log_header("Registering local Harbor as a Backend.AI container registry...")
-        await self.run_manager_cli(["mgr", "seed", "apply", str(seed_path)])
+        await self.run_manager_cli([
+            "mgr",
+            "seed",
+            "apply",
+            str(seed_path),
+            str(relation_seed_path),
+        ])
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")

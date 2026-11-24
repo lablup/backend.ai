@@ -15,3 +15,23 @@ class DefaultSSHKeypairNotFound(FieldError, web.HTTPNotFound):
     @override
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(SSHKeypairFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
+
+
+class SSHKeyNotFound(FieldError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/ssh-key-not-found"
+    error_title = "The SSH key does not exist."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(SSHKeypairFieldType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
+
+
+class DefaultSSHKeyConflict(FieldError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/default-ssh-key-conflict"
+    error_title = "Another request changed the user's default SSH key at the same time."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            SSHKeypairFieldType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )

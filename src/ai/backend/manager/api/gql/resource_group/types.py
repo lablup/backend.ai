@@ -14,9 +14,16 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput as CreateResourceGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupSchedulerOptionsConfigInput as CreateResourceGroupSchedulerOptionsConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupSchedulerOptionsInput as CreateResourceGroupSchedulerOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     PartialBulkPurgeResourceGroupsInput as PartialBulkPurgeResourceGroupsInputDTO,
@@ -62,6 +69,12 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupInput as UpdateResourceGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupSchedulerOptionsConfigInput as UpdateResourceGroupSchedulerOptionsConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupSchedulerOptionsInput as UpdateResourceGroupSchedulerOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload as AllowedDomainsPayloadDTO,
@@ -145,6 +158,8 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "AgentSelectionStrategyGQL",
+    "CreateResourceGroupSchedulerOptionsConfigInputGQL",
+    "CreateResourceGroupSchedulerOptionsInputGQL",
     "FairShareResourceGroupSpecGQL",
     "PreemptionConfigGQL",
     "PreemptionConfigInput",
@@ -167,6 +182,8 @@ __all__ = (
     "UpdateResourceGroupFairShareSpecPayload",
     "UpdateResourceGroupInput",
     "UpdateResourceGroupPayload",
+    "UpdateResourceGroupSchedulerOptionsConfigInputGQL",
+    "UpdateResourceGroupSchedulerOptionsInputGQL",
 )
 
 
@@ -876,6 +893,74 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     )
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating the config section of a resource group's scheduler options.",
+    ),
+    name="UpdateResourceGroupSchedulerOptionsConfigInput",
+)
+class UpdateResourceGroupSchedulerOptionsConfigInputGQL(
+    PydanticInputMixin[UpdateResourceGroupSchedulerOptionsConfigInputDTO]
+):
+    num_retries_to_skip: int | None = gql_field(
+        description=(
+            "Number of scheduling retries before a pending session is skipped."
+            " Omit to leave unchanged; null clears."
+        ),
+        default=UNSET,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for updating a resource group's scheduler options. Omitted keys are kept."
+        ),
+    ),
+    name="UpdateResourceGroupSchedulerOptionsInput",
+)
+class UpdateResourceGroupSchedulerOptionsInputGQL(
+    PydanticInputMixin[UpdateResourceGroupSchedulerOptionsInputDTO]
+):
+    allowed_session_types: list[SessionTypes] | None = gql_field(
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+    pending_timeout: float | None = gql_field(
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+    config: UpdateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_field(
+        description="The config section of the scheduler options. Omit to leave unchanged.",
+        default=UNSET,
+    )
+    agent_selection_strategy: AgentSelectionStrategyGQL | None = gql_field(
+        description="How agents are chosen for a session's kernels. Omit to leave unchanged.",
+        default=UNSET,
+    )
+    allow_fractional_resource_fragmentation: bool | None = gql_field(
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+            " Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+    route_cleanup_target_statuses: list[ReplicaHealthStatusGQL] | None = gql_field(
+        description=(
+            "Route health statuses whose routes are cleaned up automatically."
+            " Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+
+
 # Mutation Input/Payload types
 
 
@@ -994,6 +1079,13 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         ),
         default=UNSET,
     )
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_type(
@@ -1057,6 +1149,13 @@ class UpdateResourceGroupV2InputGQL(PydanticInputMixin[UpdateResourceGroupInputD
         description=(
             "Preemption configuration. When provided, replaces the entire preemption config."
             " Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler options. Omit to leave unchanged; omitted keys are kept.",
         ),
         default=UNSET,
     )
@@ -1135,6 +1234,70 @@ class PartialBulkResourceGroupsPayloadGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for the config section of a new resource group's scheduler options.",
+    ),
+    name="CreateResourceGroupSchedulerOptionsConfigInput",
+)
+class CreateResourceGroupSchedulerOptionsConfigInputGQL(
+    PydanticInputMixin[CreateResourceGroupSchedulerOptionsConfigInputDTO]
+):
+    num_retries_to_skip: int | None = gql_field(
+        description="Number of scheduling retries before a pending session is skipped.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for a new resource group's scheduler options.",
+    ),
+    name="CreateResourceGroupSchedulerOptionsInput",
+)
+class CreateResourceGroupSchedulerOptionsInputGQL(
+    PydanticInputMixin[CreateResourceGroupSchedulerOptionsInputDTO]
+):
+    allowed_session_types: list[SessionTypes] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Session types that may be created in the resource group.",
+        ),
+        default_factory=lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
+    )
+    pending_timeout: float = gql_field(
+        description="Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+        default=0.0,
+    )
+    config: CreateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_field(
+        description="The config section of the scheduler options.",
+        default=None,
+    )
+    agent_selection_strategy: AgentSelectionStrategyGQL = gql_field(
+        description="How agents are chosen for a session's kernels.",
+        default=AgentSelectionStrategy.DISPERSED,
+    )
+    allow_fractional_resource_fragmentation: bool = gql_field(
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+        ),
+        default=True,
+    )
+    route_cleanup_target_statuses: list[ReplicaHealthStatusGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Route health statuses whose routes are cleaned up automatically.",
+        ),
+        default_factory=lambda: [RouteHealthStatus.UNHEALTHY],
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Input for creating a new resource group.",
         added_version="26.4.2",
     ),
@@ -1174,6 +1337,13 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
             description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE).",
         ),
         default=SchedulerTypeGQL.FIFO,
+    )
+    scheduler_options: CreateResourceGroupSchedulerOptionsInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler options. Omit to use the defaults.",
+        ),
+        default=None,
     )
 
 

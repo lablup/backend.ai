@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any, cast, override
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import zmq
@@ -22,6 +23,7 @@ from ai.backend.agent.kernel import (
     match_distro_data,
 )
 from ai.backend.common import msgpack
+from ai.backend.common.types import ServicePort, ServicePortProtocols
 
 
 def test_match_distro_data() -> None:
@@ -376,3 +378,58 @@ class TestAClosedRunnerStaysClosed:
             assert not sockets.input_sock.socket.closed
         finally:
             sockets.close()
+
+
+_SESSION_INTERPOLATION = {"delimiters": [{"start": "<<", "end": ">>"}]}
+
+
+def _kernel_with_service(
+    service_interpolation: dict[str, Any] | None,
+) -> tuple[DockerKernel, MagicMock]:
+    kernel = DockerKernel.__new__(DockerKernel)
+    kernel.data = {"service_interpolation": service_interpolation}
+    kernel.service_ports = [
+        ServicePort(
+            name="jupyter",
+            protocol=ServicePortProtocols.HTTP,
+            container_ports=[8080],
+            host_ports=[None],
+            is_inference=False,
+        )
+    ]
+    runner = MagicMock()
+    runner.feed_start_service = AsyncMock(return_value={"status": "started"})
+    runner.feed_start_model_service = AsyncMock(return_value={"status": "started"})
+    kernel.runner = runner
+    return kernel, runner
+
+
+class TestServiceStartUsesTheSessionInterpolation:
+    """The interpolation fixed on the session fills a start that does not name its own."""
+
+    async def test_start_service_takes_the_session_interpolation(self) -> None:
+        kernel, runner = _kernel_with_service(_SESSION_INTERPOLATION)
+        await kernel.start_service("jupyter", {})
+        sent = runner.feed_start_service.await_args.args[0]
+        assert sent["options"]["interpolation"] == _SESSION_INTERPOLATION
+
+    async def test_start_service_keeps_its_own_interpolation(self) -> None:
+        own = {"delimiters": [{"start": "{{", "end": "}}"}]}
+        kernel, runner = _kernel_with_service(_SESSION_INTERPOLATION)
+        await kernel.start_service("jupyter", {"interpolation": own})
+        sent = runner.feed_start_service.await_args.args[0]
+        assert sent["options"]["interpolation"] == own
+
+    async def test_start_service_without_session_interpolation_sends_options_as_given(
+        self,
+    ) -> None:
+        kernel, runner = _kernel_with_service(None)
+        await kernel.start_service("jupyter", {"arguments": {}})
+        sent = runner.feed_start_service.await_args.args[0]
+        assert sent["options"] == {"arguments": {}}
+
+    async def test_start_model_service_takes_the_session_interpolation(self) -> None:
+        kernel, runner = _kernel_with_service(_SESSION_INTERPOLATION)
+        await kernel.start_model_service({"name": "model", "service": {"port": 8000}})
+        sent = runner.feed_start_model_service.await_args.args[0]
+        assert sent["service"] == {"port": 8000, "interpolation": _SESSION_INTERPOLATION}

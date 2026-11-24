@@ -59,6 +59,9 @@ class BuildInternalDataRule(SessionSpecDraftRule):
             overlay["model_definition"] = dict(extras.model_definition)
         if extras.sudo_session_enabled:
             overlay["sudo_session_enabled"] = True
+        interpolation = draft.resource.options.interpolation
+        if interpolation is not None:
+            overlay["service_interpolation"] = interpolation.model_dump()
 
         if not overlay:
             return draft

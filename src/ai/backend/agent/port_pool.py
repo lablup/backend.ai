@@ -10,6 +10,7 @@ monitoring state.
 
 from __future__ import annotations
 
+import math
 from collections import OrderedDict
 from collections.abc import Iterable
 from time import monotonic
@@ -39,8 +40,8 @@ class PortPool:
         self._start = start
         self._end = end
         self._cooldown_sec = cooldown_sec
-        # Initial unused ports get released_at=0.0 so they always pass cooldown.
-        self._ports = OrderedDict.fromkeys(range(start, end + 1), 0.0)
+        # -inf, not 0.0: monotonic() is below cooldown_sec right after the host boots.
+        self._ports = OrderedDict.fromkeys(range(start, end + 1), -math.inf)
 
     def __len__(self) -> int:
         return len(self._ports)

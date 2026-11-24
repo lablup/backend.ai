@@ -8,18 +8,13 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    UpdatePresetModelDefinitionInput,
-)
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
-    _model_definition_to_dto,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.errors.common import GenericForbidden
@@ -95,49 +90,3 @@ async def test_no_ids_read_nothing(
 ) -> None:
     assert await adapter.batch_load_by_ids([]) == []
     processors.bulk_get.run.assert_not_awaited()
-
-
-class TestModelDefinitionPatchInterpolation:
-    @pytest.fixture
-    def stored(self) -> PresetModelDefinition:
-        return PresetModelDefinition.model_validate({
-            "models": [
-                {
-                    "service": {
-                        "port": 8000,
-                        "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
-                    }
-                }
-            ]
-        })
-
-    def test_patch_without_interpolation_keeps_stored_one(
-        self, stored: PresetModelDefinition
-    ) -> None:
-        patch = UpdatePresetModelDefinitionInput.model_validate({
-            "models": [{"service": {"port": 9000}}]
-        })
-
-        state = DeploymentRevisionPresetAdapter._convert_model_definition_state(
-            patch, _model_definition_to_dto(stored)
-        )
-
-        service = state.value().models[0].service
-        assert service is not None
-        assert service.port == 9000
-        assert service.interpolation is not None
-        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("{{", "}}")]
-
-    def test_null_interpolation_keeps_stored_one(self, stored: PresetModelDefinition) -> None:
-        patch = UpdatePresetModelDefinitionInput.model_validate({
-            "models": [{"service": {"interpolation": None}}]
-        })
-
-        state = DeploymentRevisionPresetAdapter._convert_model_definition_state(
-            patch, _model_definition_to_dto(stored)
-        )
-
-        service = state.value().models[0].service
-        assert service is not None
-        assert service.interpolation is not None
-        assert [(d.start, d.end) for d in service.interpolation.delimiters] == [("{{", "}}")]

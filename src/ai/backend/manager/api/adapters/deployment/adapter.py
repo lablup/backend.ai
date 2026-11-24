@@ -165,7 +165,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateStrategySpecInfo,
     RouteOrderField,
     RuntimeVariantPresetValueInfoDTO,
-    ServiceArgumentInterpolationInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
@@ -441,9 +440,6 @@ def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceCon
         shell=service.shell,
         port=service.port,
         health_check=health_check,
-        interpolation=ServiceArgumentInterpolationInfoDTO.model_validate(
-            service.interpolation.model_dump()
-        ),
     )
 
 

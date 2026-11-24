@@ -87,7 +87,7 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import ProcessorDependencies
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
@@ -154,6 +154,7 @@ from ai.backend.manager.models.kernel_group_resource_slot.row import (  # noqa: 
     KernelGroupResourceSlotRow,
 )
 from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
@@ -206,8 +207,11 @@ from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
+from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
+from ai.backend.manager.services.ssh_key.service import SSHKeyService
 from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     ETCD_PASSWORD,
@@ -1790,6 +1794,18 @@ def processor_registry(
             ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
+    )
+
+
+@pytest.fixture()
+def ssh_key_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> SSHKeyProcessors:
+    """The SSH keypair processors, which the user adapter reads the default public key through."""
+    return SSHKeyProcessors(
+        processor_registry.group(GroupMeta(UserEntityType())),
+        SSHKeyService(SSHKeyRepository(V2DBOpsProvider(database_engine)), SSHKeyValidator()),
     )
 
 

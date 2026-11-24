@@ -44,7 +44,6 @@ from ai.backend.common.dto.manager.query import (
 from ai.backend.common.dto.manager.v2.common import (
     NonEmptyList,
     ResourceSlotEntryInput,
-    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
@@ -178,13 +177,6 @@ class ModelServiceConfigInput(BaseRequestModel):
     )
     port: int | None = None
     health_check: ModelHealthCheckInput | None = None
-    interpolation: ServiceArgumentInterpolationInput | None = Field(
-        default=None,
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments. "
-            "Omit to inherit it; the default is `${{ }}` and `{ }`."
-        ),
-    )
 
 
 class ModelConfigInput(BaseRequestModel):
