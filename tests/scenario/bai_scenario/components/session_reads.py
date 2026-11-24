@@ -352,6 +352,7 @@ def kernel_dump(kernel: KernelInfo, slot_name: str, quantity: Decimal) -> dict[s
             "allocation": allocation_dump(slot_name, quantity),
             "shares": {"entries": []},
             "resource_opts": None,
+            "attached_devices": [],
         },
         "lifecycle": {
             "status": _folded_kernel_status(kernel.lifecycle.status),
