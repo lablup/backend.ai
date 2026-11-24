@@ -923,6 +923,9 @@ async def server_main(
         if os.geteuid() == 0:
             uid = local_config.proxy_worker.user
             gid = local_config.proxy_worker.group
+            # The glide client reconnects through this root-owned 0600 socket after setuid.
+            for glide_socket in Path("/tmp").glob(f"glide-socket-{os.getpid()}-*"):
+                os.chown(glide_socket, uid, gid, follow_symlinks=False)
             os.setgroups([
                 g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
             ])
