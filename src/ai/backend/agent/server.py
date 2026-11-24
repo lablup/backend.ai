@@ -1665,15 +1665,9 @@ async def server_main(
         monitor.console_locals["agent_server"] = agent_server
 
         await agent_init_stack.enter_async_context(service_discovery_ctx(etcd, agent_server))
-<<<<<<< HEAD
         log.info("Started the agent service.")
-    except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
-=======
-        log.info("agent service started")
     except Exception as e:
-        log.exception("agent initialization failed, shutting down")
->>>>>>> e68240b7 (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+        log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
         init_error = e
 
@@ -1813,20 +1807,6 @@ def main(
                 child_statuses = tuple(ChildStatus() for _ in range(_NUM_WORKERS))
                 child_exit_monitor = ChildExitMonitor(child_statuses)
 
-<<<<<<< HEAD
-                @aiotools.main_context
-                def server_main_ctx() -> Generator[None, signal.Signals, None]:
-                    """Tear the supervisor down when a worker dies outside the shutdown
-                    path, so that the service manager sees a failed unit instead of a
-                    supervisor with no worker."""
-                    child_exit_monitor.start()
-                    try:
-                        yield
-                    finally:
-                        child_exit_monitor.disarm()
-
-=======
->>>>>>> e68240b7 (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")

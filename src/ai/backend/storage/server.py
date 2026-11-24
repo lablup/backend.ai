@@ -35,13 +35,8 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-<<<<<<< HEAD
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
-=======
-from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
->>>>>>> e68240b7 (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -411,15 +406,9 @@ async def server_main(
                 os.setuid(uid)
             log.info("Changed process uid:gid to {}:{}", uid, gid)
 
-<<<<<<< HEAD
         log.info("Started the storage-proxy service.")
-    except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
-=======
-        log.info("storage-proxy started")
     except Exception as e:
-        log.exception("server initialization failed, shutting down")
->>>>>>> e68240b7 (fix(BAI-890): exit non-zero when a worker ends without finishing its shutdown (#17285))
+        log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
         init_error = e
     try:
