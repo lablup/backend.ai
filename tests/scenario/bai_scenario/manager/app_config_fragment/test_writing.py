@@ -31,7 +31,8 @@ from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfi
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.permission import NotEnoughPermission, VirtualEntityNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.virtual_entity import VirtualEntityNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,

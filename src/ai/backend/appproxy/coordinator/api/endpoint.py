@@ -14,9 +14,7 @@ from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
-    EndpointConfig,
     PydanticResponse,
-    SessionConfig,
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import (
@@ -44,8 +42,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreateEndpointItem,
-    EndpointTagsModel,
-    SessionTagsModel,
     TagsModel,
 )
 from ai.backend.common.types import BackendAISchema
@@ -54,16 +50,11 @@ from .types import StubResponseModel
 from .utils import auth_required
 
 
-class EndpointTagConfig(BackendAISchema):
-    session: SessionConfig
-    endpoint: EndpointConfig
-
-
 class EndpointCreationRequestModel(BackendAISchema):
     version: Annotated[str, Field(description="Creation API version")]
     service_name: Annotated[str, Field(description="Name of the model service.")]
     tags: Annotated[
-        EndpointTagConfig,
+        TagsModel,
         Field(
             description="Metadata of target model service and dependent sessions.",
         ),
@@ -116,10 +107,7 @@ def _request_model_to_item(
         deployment_id=deployment_id,
         version=params.version,
         service_name=params.service_name,
-        tags=TagsModel(
-            session=SessionTagsModel.model_validate(params.tags.session.model_dump(mode="json")),
-            endpoint=EndpointTagsModel.model_validate(params.tags.endpoint.model_dump(mode="json")),
-        ),
+        tags=params.tags,
         open_to_public=params.open_to_public,
         health_check=params.health_check,
     )

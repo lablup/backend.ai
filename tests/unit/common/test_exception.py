@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any
+from typing import Any, override
 
 import pytest
 from aiohttp import web
 
 from ai.backend.common.exception import (
+    BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
@@ -15,6 +17,45 @@ from ai.backend.common.exception import (
     PassthroughError,
     UserNotFound,
 )
+
+
+class _ErrorWithoutStatusBase(BackendAIError):
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class _ErrorWithNotFoundBase(BackendAIError, web.HTTPNotFound):
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+@dataclass(frozen=True)
+class _ResponseStatusCase:
+    error_cls: type[BackendAIError]
+    expected_status: int
+
+
+class TestBackendAIErrorResponseStatus:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ResponseStatusCase(error_cls=_ErrorWithoutStatusBase, expected_status=500),
+            _ResponseStatusCase(error_cls=_ErrorWithNotFoundBase, expected_status=404),
+        ],
+        ids=lambda case: case.error_cls.__name__,
+    )
+    def test_response_status(self, case: _ResponseStatusCase) -> None:
+        assert case.error_cls().status == case.expected_status
 
 
 class TestBackendAIErrorCode:

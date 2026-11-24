@@ -483,7 +483,6 @@ def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[
         Same("is_default", node.is_default, True),
         Same("rate_limit", node.rate_limit, SERVER_RATE_LIMIT),
         Same("resource_policy", node.resource_policy, laid.key_policy),
-        Same("ssh_public_key", node.ssh_public_key, ""),
         Same("num_queries", node.num_queries, 0),
         Same("last_used", node.last_used, None),
         Held(
@@ -497,9 +496,7 @@ def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[
 
 
 def _extra_key(key: KeyPairData, *, is_active: bool = True) -> KeyPairData:
-    return replace(
-        key, is_active=is_active, is_default=False, rate_limit=SERVER_RATE_LIMIT, ssh_public_key=""
-    )
+    return replace(key, is_active=is_active, is_default=False, rate_limit=SERVER_RATE_LIMIT)
 
 
 @dataclass(frozen=True)

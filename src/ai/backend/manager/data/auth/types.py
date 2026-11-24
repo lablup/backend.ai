@@ -17,12 +17,6 @@ from ai.backend.manager.data.user.types import UserStatus
 
 
 @dataclass
-class SSHKeypair:
-    ssh_public_key: str
-    ssh_private_key: str
-
-
-@dataclass
 class AuthorizationResult:
     user_id: UserID
     access_key: AccessKey

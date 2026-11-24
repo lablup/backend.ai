@@ -68,6 +68,7 @@ from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -79,7 +80,6 @@ from ai.backend.common.types import (
     DeviceName,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
@@ -848,6 +848,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             "assigned_ports": assigned_ports,
             # 'domain_socket_proxies': self.domain_socket_proxies,
             "block_service_ports": self.internal_data.get("block_service_ports", False),
+            "service_interpolation": self.internal_data.get("service_interpolation"),
         }
 
 
@@ -951,10 +952,7 @@ class KubernetesAgent(
                     f"Scratch type {self.local_config.container.scratch_type} is not supported",
                 )
 
-            try:
-                await core_api.create_persistent_volume(body=new_pv.to_dict())
-            except Exception:
-                raise
+            await core_api.create_persistent_volume(body=new_pv.to_dict())
 
         pvc = await core_api.list_persistent_volume_claim_for_all_namespaces(
             label_selector="backend.ai/backend-ai-scratch-volume",

@@ -24,7 +24,7 @@ from .types import AppConfigGQL
             "contributes to yields an empty merge."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: list[str],
@@ -44,7 +44,7 @@ async def my_app_configs(
             "need config before they have credentials."
         ),
     )
-)  # type: ignore[misc]
+)
 async def public_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: list[str],

@@ -20,7 +20,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
         ),
         added_version="26.9.0",
     )
-)  # type: ignore[misc]
+)
 async def entity_types(
     info: Info[StrawberryGQLContext],
 ) -> list[EntityTypeGQL]:

@@ -81,7 +81,7 @@ class RedisSubscriber(AbstractSubscriber):
         return cls(client, channels)
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore[override]
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload]:  # type: ignore[override]
         """
         Subscribe to broadcast messages.
 
@@ -141,9 +141,7 @@ class RedisSubscriber(AbstractSubscriber):
             except Exception as e:
                 failure_count += 1
                 if failure_count == _ERROR_FAILURE_COUNT:
-                    log.error(
-                        "broadcast read keeps failing", exc_info=e, attempt_count=failure_count
-                    )
+                    log.exception("broadcast read keeps failing", attempt_count=failure_count)
                 elif failure_count == 1:
                     log.warning("broadcast read failed", exc_info=e, attempt_count=failure_count)
                 else:

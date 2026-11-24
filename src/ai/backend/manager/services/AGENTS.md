@@ -18,8 +18,8 @@ grows a branch; the generic services take no hook or callback that could hide a 
 - Family selection (the five shapes) and the gate/wiring rules are owned by
   `actions/AGENTS.md`. The per-entity_type judgment (entity/field/global/scope)
   and its tables live in `KNOWLEDGE.md`.
-- Action and ActionResult MUST be `@dataclass(frozen=True)`.
-- Exactly one `Action` + `ActionResult` pair per action file.
+- Action and ActionResult MUST be `@dataclass(frozen=True)` (flake8 `BAI102`, on or off in `tools/flake8-plugins/README.md`).
+- Exactly one `Action` + `ActionResult` pair per action file (flake8 `BAI103`, on or off in `tools/flake8-plugins/README.md`).
 - Every concrete Action MUST override `entity_id()` and `operation_type()`.
 - v2 actions declare `action_name()`, recorded on audit rows: `<verb>_<entity>` in
   lowercase snake_case (plural entity for searches, for example `search_resource_slot_types`),
@@ -86,6 +86,7 @@ grows a branch; the generic services take no hook or callback that could hide a 
 
 ## What does not belong here
 
-- SQL queries or ORM operations.
+- SQL queries or ORM operations: do not import `sqlalchemy`.
+- `manager.dto` imports.
 - HTTP request/response handling.
 - Direct DB session creation (`begin_session()` / `begin_readonly_session()`).

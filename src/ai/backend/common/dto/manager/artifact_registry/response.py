@@ -16,6 +16,16 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     VerificationStepResult,
 )
+from ai.backend.common.dto.manager.artifact.response import (
+    ArtifactRevisionDTO,
+    ArtifactRevisionImportTaskDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactAvailability,
+    ArtifactRemoteStatus,
+    ArtifactStatus,
+    ArtifactType,
+)
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -40,35 +50,18 @@ __all__ = (
 # ---------------------------------------------------------------------------
 
 
-class ArtifactRevisionDTO(BackendAISchema):
-    """Artifact revision data (without readme) for API responses."""
-
-    id: UUID = Field(description="Revision ID")
-    artifact_id: UUID = Field(description="Parent artifact ID")
-    version: str = Field(description="Revision version string")
-    size: int | None = Field(default=None, description="Total size in bytes")
-    status: str = Field(description="Revision status")
-    remote_status: str | None = Field(default=None, description="Remote status")
-    created_at: datetime | None = Field(default=None, description="Creation timestamp")
-    updated_at: datetime | None = Field(default=None, description="Last update timestamp")
-    digest: str | None = Field(default=None, description="Content digest")
-    verification_result: VerificationStepResult | None = Field(
-        default=None, description="Verification result"
-    )
-
-
 class ArtifactDTO(BackendAISchema):
     """Artifact data with revisions (without readme in revisions) for API responses."""
 
     id: UUID = Field(description="Artifact ID")
     name: str = Field(description="Artifact name")
-    type: str = Field(description="Artifact type")
+    type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")
     registry_id: UUID = Field(description="Registry ID")
     source_registry_id: UUID = Field(description="Source registry ID")
     registry_type: ArtifactRegistryType = Field(description="Registry type")
     source_registry_type: ArtifactRegistryType = Field(description="Source registry type")
-    availability: str = Field(description="Artifact availability status")
+    availability: ArtifactAvailability = Field(description="Artifact availability status")
     scanned_at: datetime = Field(description="When the artifact was scanned")
     updated_at: datetime = Field(description="When the artifact was last updated")
     readonly: bool = Field(description="Whether the artifact is read-only")
@@ -86,8 +79,8 @@ class ArtifactRevisionDataDTO(BackendAISchema):
     version: str = Field(description="Revision version string")
     readme: str | None = Field(default=None, description="Readme content")
     size: int | None = Field(default=None, description="Total size in bytes")
-    status: str = Field(description="Revision status")
-    remote_status: str | None = Field(default=None, description="Remote status")
+    status: ArtifactStatus = Field(description="Revision status")
+    remote_status: ArtifactRemoteStatus | None = Field(default=None, description="Remote status")
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp")
     digest: str | None = Field(default=None, description="Content digest")
@@ -101,13 +94,13 @@ class ArtifactWithRevisionsDTO(BackendAISchema):
 
     id: UUID = Field(description="Artifact ID")
     name: str = Field(description="Artifact name")
-    type: str = Field(description="Artifact type")
+    type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")
     registry_id: UUID = Field(description="Registry ID")
     source_registry_id: UUID = Field(description="Source registry ID")
     registry_type: ArtifactRegistryType = Field(description="Registry type")
     source_registry_type: ArtifactRegistryType = Field(description="Source registry type")
-    availability: str = Field(description="Artifact availability status")
+    availability: ArtifactAvailability = Field(description="Artifact availability status")
     scanned_at: datetime = Field(description="When the artifact was scanned")
     updated_at: datetime = Field(description="When the artifact was last updated")
     readonly: bool = Field(description="Whether the artifact is read-only")
@@ -115,13 +108,6 @@ class ArtifactWithRevisionsDTO(BackendAISchema):
     revisions: list[ArtifactRevisionDataDTO] = Field(
         default_factory=list, description="Artifact revisions with full data"
     )
-
-
-class ArtifactRevisionImportTaskDTO(BackendAISchema):
-    """Import task for an artifact revision."""
-
-    task_id: str | None = Field(default=None, description="Background task ID")
-    artifact_revision: ArtifactRevisionDTO = Field(description="The artifact revision")
 
 
 class ArtifactRevisionReadmeDTO(BackendAISchema):
@@ -147,7 +133,7 @@ class DelegateScanArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDTO] = Field(description="Scanned artifacts")
     source_registry_id: UUID = Field(description="Source registry ID")
     source_registry_type: ArtifactRegistryType = Field(description="Source registry type")
-    readme_data: dict[str, ArtifactRevisionReadmeDTO] = Field(
+    readme_data: dict[UUID, ArtifactRevisionReadmeDTO] = Field(
         default_factory=dict, description="Readme data keyed by revision ID"
     )
 

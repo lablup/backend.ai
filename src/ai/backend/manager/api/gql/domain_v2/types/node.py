@@ -21,10 +21,12 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_federation_type,
     gql_field,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.fair_share.types.domain import DomainFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
@@ -43,6 +45,13 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.container_registry.filters import (
+        ContainerRegistryV2Filter,
+        ContainerRegistryV2OrderBy,
+    )
+    from ai.backend.manager.api.gql.container_registry.types import (
+        ContainerRegistryV2Connection,
+    )
     from ai.backend.manager.api.gql.project_v2.types.filters import (
         ProjectV2Filter,
         ProjectV2OrderBy,
@@ -115,9 +124,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         description="Lifecycle information including activation status and timestamps."
     )
 
-    @gql_field(
+    @gql_resolver(
         description="Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
-    )  # type: ignore[misc]
+    )
     async def fair_share(
         self,
         info: Info,
@@ -134,12 +143,12 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
 
         return DomainFairShareGQL.from_pydantic(payload.item)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.0",
             description="Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.",
         )
-    )  # type: ignore[misc]
+    )
     async def active_resource_overview(
         self,
         info: Info,
@@ -149,9 +158,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         )
         return ActiveResourceOverviewGQL.from_pydantic(dto)
 
-    @gql_field(
+    @gql_resolver(
         description="Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time."
-    )  # type: ignore[misc]
+    )
     async def usage_buckets(
         self,
         info: Info,
@@ -202,7 +211,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @gql_field(description="Projects belonging to this domain.")  # type: ignore[misc]
+    @gql_resolver(description="Projects belonging to this domain.")
     async def projects(
         self,
         info: Info,
@@ -266,7 +275,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @gql_field(description="Users belonging to this domain.")  # type: ignore[misc]
+    @gql_resolver(description="Users belonging to this domain.")
     async def users(
         self,
         info: Info,
@@ -330,12 +339,12 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Resource groups this domain may schedule on.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_groups(
         self,
         info: Info[StrawberryGQLContext],
@@ -404,14 +413,92 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Container registries this domain is allowed to use.",
+        )
+    )
+    async def container_registries(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ContainerRegistryV2Filter,
+            strawberry.lazy("ai.backend.manager.api.gql.container_registry.filters"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ContainerRegistryV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.container_registry.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ContainerRegistryV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.container_registry.types"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.container_registry.request import (
+            ScopedSearchContainerRegistriesInput,
+        )
+        from ai.backend.common.dto.manager.v2.container_registry.types import (
+            ContainerRegistryScope,
+        )
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.container_registry.types import (
+            ContainerRegistryGQL,
+            ContainerRegistryV2Connection,
+            ContainerRegistryV2Edge,
+        )
+
+        payload = await info.context.adapters.container_registry.scoped_search(
+            ScopedSearchContainerRegistriesInput(
+                scope=ContainerRegistryScope(domain=[UUIDScope(value=UUID(self.id))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ContainerRegistryGQL.from_pydantic(data) for data in payload.items]
+        edges = [
+            ContainerRegistryV2Edge(node=node, cursor=encode_cursor(node.id)) for node in nodes
+        ]
+        return ContainerRegistryV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "System session environ rows bound to this domain itself, soft-deleted ones included."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def system_session_environs(
         self,
         info: Info[StrawberryGQLContext],

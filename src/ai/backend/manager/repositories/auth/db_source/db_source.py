@@ -13,6 +13,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
@@ -32,7 +33,6 @@ from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
-    UserData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
@@ -95,9 +95,12 @@ class LoginSessionCreationResult:
     session_token: str
 
 
+type VerifiedUser = sa.RowMapping
+
+
 @dataclass(frozen=True)
 class CredentialVerificationResult:
-    user: sa.RowMapping
+    user: VerifiedUser
     active_sessions: list[ActiveSessionInfo]  # ordered by created_at ASC
 
 
@@ -253,24 +256,6 @@ class AuthDBSource:
             await conn.execute(keypair_query)
 
     @auth_db_source_resilience.apply()
-    async def fetch_ssh_public_key(self, access_key: str) -> str | None:
-        """Fetch SSH public key for an access key from database."""
-        async with self._db.begin() as conn:
-            query = sa.select(keypairs.c.ssh_public_key).where(keypairs.c.access_key == access_key)
-            return await conn.scalar(query)
-
-    @auth_db_source_resilience.apply()
-    async def modify_ssh_keypair(self, access_key: str, public_key: str, private_key: str) -> None:
-        """Modify SSH keypair for an access key in database."""
-        async with self._db.begin() as conn:
-            data = {
-                "ssh_public_key": public_key,
-                "ssh_private_key": private_key,
-            }
-            query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
-            await conn.execute(query)
-
-    @auth_db_source_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
         """Whether an active keypair holds the given secret key."""
         async with self._db.begin_readonly() as conn:
@@ -314,29 +299,6 @@ class AuthDBSource:
         """The id a key names, or None when it names nothing."""
         async with self._v2_ops.read_ops() as r:
             return await r.lookup_entity_id(lookup)
-
-    def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
-        """Convert UserRow to UserData."""
-        return UserData(
-            uuid=row.uuid,
-            username=row.username,
-            email=row.email,
-            password=row.password,
-            need_password_change=row.need_password_change or False,
-            full_name=row.full_name,
-            description=row.description,
-            is_active=row.status == UserStatus.ACTIVE,
-            status=row.status or UserStatus.ACTIVE,
-            status_info=row.status_info,
-            created_at=row.created_at,
-            modified_at=row.updated_at,
-            password_changed_at=row.password_changed_at,
-            domain_name=row.domain_name or "",
-            role=row.role or UserRole.USER,
-            integration_name=row.integration_id,  # DB column is integration_id
-            resource_policy=row.resource_policy,
-            sudo_session_enabled=row.sudo_session_enabled,
-        )
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
@@ -426,7 +388,7 @@ class AuthDBSource:
 
     async def _migrate_password_hash(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         row: sa.Row[Any],
         domain_name: str,
         email: str,
@@ -443,7 +405,7 @@ class AuthDBSource:
 
     async def _record_login_history(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         user_id: UUID,
         domain_name: str,
         result: LoginAttemptResult,
@@ -623,13 +585,21 @@ class AuthDBSource:
         """Verify credentials without password migration (for signout, etc.)"""
         async with self._db.begin_readonly_read_committed() as conn:
             result = await conn.execute(
-                sa.select(users.c.uuid, users.c.username, users.c.password).where(
-                    (users.c.email == email) & (users.c.domain_name == domain_name)
-                ),
+                sa.select(
+                    users.c.uuid,
+                    users.c.username,
+                    users.c.password,
+                    users.c.status,
+                    users.c.password_changed_at,
+                ).where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
             row = await self._password_matched_row(result.first(), target_password_info)
         return UserCredential(
-            user_id=UserID(row.uuid), username=row.username, hashed_password=row.password
+            user_id=UserID(row.uuid),
+            username=row.username,
+            hashed_password=row.password,
+            status=row.status,
+            password_changed_at=row.password_changed_at,
         )
 
     @auth_db_source_resilience.apply()

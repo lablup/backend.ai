@@ -68,6 +68,7 @@ from ai.backend.agent.errors import (
     InvalidChunkSizeError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.resources import KernelCreationInProgress
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
@@ -187,6 +188,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.lock import FileLock
 from ai.backend.common.log.types import (
     ContainerLogData,
@@ -216,7 +218,6 @@ from ai.backend.common.types import (
     ImageCanonical,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelCreationResult,
     KernelId,
     MountPermission,
@@ -622,7 +623,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
 
         (
             arch,
-            matched_distro,
+            _matched_distro,
             matched_libc_style,
             krunner_volume,
             krunner_pyver,
@@ -903,7 +904,7 @@ class AbstractAgent[
     _deferred_destroys: dict[KernelId, list[ContainerLifecycleEvent]]
 
     @contextmanager
-    def track_pull(self, image: str) -> Generator[bool, None, None]:
+    def track_pull(self, image: str) -> Generator[bool]:
         """Context manager to track pull operations."""
         # Check if image is already being pulled
         if image in self._active_pulls:
@@ -919,9 +920,7 @@ class AbstractAgent[
             self._active_pulls.pop(image, None)
 
     @contextmanager
-    def track_create(
-        self, kernel_id: KernelId, session_id: SessionId
-    ) -> Generator[bool, None, None]:
+    def track_create(self, kernel_id: KernelId, session_id: SessionId) -> Generator[bool]:
         """Context manager to track kernel creation operations."""
         # Check if kernel is already being created
         if kernel_id in self._active_creates:
@@ -1600,7 +1599,12 @@ class AbstractAgent[
                                 ),
                             )
                     # Notify cleanup waiters after all state updates.
-                    if kernel_obj is not None and kernel_obj.clean_event is not None:
+                    # A failed clean has already put its exception on this future.
+                    if (
+                        kernel_obj is not None
+                        and kernel_obj.clean_event is not None
+                        and not kernel_obj.clean_event.done()
+                    ):
                         kernel_obj.clean_event.set_result(None)
                     ev.set_done_future_result(None)
         log.debug("clean event handled", container_id=ev.container_id)
@@ -2662,10 +2666,9 @@ class AbstractAgent[
                         session_id=session_id,
                     )
             await self.reconstruct_resource_usage()
-        else:
-            if self.kernel_registry.get(kernel_id) is registered:
-                # A failed re-creation ends the kernel: CLEAN must forget it, not keep it.
-                self.restarting_kernels.pop(kernel_id, None)
+        elif self.kernel_registry.get(kernel_id) is registered:
+            # A failed re-creation ends the kernel: CLEAN must forget it, not keep it.
+            self.restarting_kernels.pop(kernel_id, None)
         if deferred:
             # Held while this create had no container; sent now with the one it made, if any.
             container_id = registered.container_id if registered is not None else None
@@ -2737,7 +2740,12 @@ class AbstractAgent[
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
                 log.debug("kernel creation already in progress")
-                raise ResourceError("Kernel creation already in progress")
+                raise KernelCreationInProgress("Kernel creation already in progress")
+            if not restarting and kernel_id in self.kernel_registry:
+                # Replacing the registered object would orphan its runner, which keeps
+                # reconnecting to the address and steals the replies of whoever gets it next.
+                log.debug("kernel already created")
+                raise ResourceError("Kernel already created")
 
             if throttle_sema is None:
                 # make a local semaphore
@@ -2774,10 +2782,9 @@ class AbstractAgent[
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:
                     environ["LOCAL_USER_ID"] = str(ouid)
-                else:
-                    if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                        uid = self.local_config.container.kernel_uid
-                        environ["LOCAL_USER_ID"] = str(uid)
+                elif KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    uid = self.local_config.container.kernel_uid
+                    environ["LOCAL_USER_ID"] = str(uid)
 
                 sgids = set(ctx.get_supplementary_gids() or [])
                 kernel_gid: int = self.local_config.container.kernel_gid
@@ -2785,9 +2792,8 @@ class AbstractAgent[
                     environ["LOCAL_GROUP_ID"] = str(ogid)
                     if KernelFeatures.UID_MATCH in ctx.kernel_features:
                         sgids.add(kernel_gid)
-                else:
-                    if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                        environ["LOCAL_GROUP_ID"] = str(kernel_gid)
+                elif KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    environ["LOCAL_GROUP_ID"] = str(kernel_gid)
 
                 environ.update(
                     await ctx.get_extra_envs(),
@@ -2982,9 +2988,7 @@ class AbstractAgent[
                     exposed_ports = [2000, 2001]
                     service_ports: list[ServicePort] = []
                     port_map: dict[str, ServicePort] = {}
-                    preopen_ports = ctx.kernel_config.get("preopen_ports")
-                    if preopen_ports is None:
-                        preopen_ports = []
+                    preopen_ports = ctx.kernel_config.get("preopen_ports") or []
 
                     service_ports.append({
                         "name": "sshd",

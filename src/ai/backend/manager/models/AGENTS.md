@@ -9,6 +9,8 @@
 Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy: do not add new ones.
 
+Do not import `manager.server`, `manager.sokovan`, `manager.clients` or `manager.dto`.
+
 Domains migrated to the v2 specs add them next to `row.py`: `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
 reads, `scopes.py` for the scopes that filter the row.
@@ -40,7 +42,7 @@ The spec bases live in `models/specs/`: read `models/specs/AGENTS.md` before tou
 - Only graph edge rows (`entity_memberships`, `scope_bindings`) reference `virtual_entities.id`
   by foreign key. A row attached to an entity (`entity_labels`, `entity_invitations`) carries the
   `(entity_type, entity_id)` pair.
-- A node id never goes on a `data/` type. A Row's `to_data()` names the entity as an `EntityIdentifier`.
+- A node id never goes on a `data/` type. The data built from a row names the entity as an `EntityIdentifier`.
 
 ## Singleton scopes (`global_entities`)
 

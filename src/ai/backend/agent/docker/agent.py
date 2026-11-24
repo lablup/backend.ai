@@ -146,6 +146,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -160,7 +161,6 @@ from ai.backend.common.types import (
     ImageCanonical,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
@@ -192,6 +192,7 @@ LIBC_BANNER_GLIBC_REGEX = re.compile(r"^GNU C Library .*release version (\d+\.\d
 # Upper bound for one libc probe container (start, run, exit). The probe executes paths
 # from an untrusted image, so a hang must not stall session creation.
 _LIBC_PROBE_TIMEOUT_SEC: Final[float] = 30.0
+_KERNEL_WORK_DIR: Final[Path] = Path("/home/work")
 # Docker reports these when the probe command does not exist or cannot be executed in the
 # image; anything else from the daemon is a real error and must surface as such.
 _LIBC_PROBE_EXEC_FAILURE_MARKERS: Final[tuple[str, ...]] = (
@@ -660,12 +661,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 if do_override:
                     chown_scratch(ouid, ogid)
-                else:
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        chown_scratch(
-                            self.local_config.container.kernel_uid,
-                            self.local_config.container.kernel_gid,
-                        )
+                elif KernelFeatures.UID_MATCH in self.kernel_features:
+                    chown_scratch(
+                        self.local_config.container.kernel_uid,
+                        self.local_config.container.kernel_gid,
+                    )
 
             await run_in_executor_with_context(None, _clone_dotfiles)
 
@@ -955,6 +955,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
+        await run_in_executor_with_context(None, self._create_mount_points_in_work_dir, mounts)
+
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:
                 # TODO: enforce readable/writable but not deletable
@@ -979,6 +981,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
         self.container_configs.append(container_config)
+
+    def _create_mount_points_in_work_dir(self, mounts: Sequence[Mount]) -> None:
+        # With Docker running as root and the agent as a non-root user, runc creates a missing
+        # mount point below /home/work as root inside the scratch work directory, and the agent
+        # cannot remove a nested one (e.g. /home/work/a/b) when it cleans the scratch.
+        for mount in mounts:
+            if mount.type != MountTypes.BIND or _KERNEL_WORK_DIR not in mount.target.parents:
+                continue
+            if mount.source is None or not mount.source.is_dir():
+                continue
+            mount_point = self.work_dir / mount.target.relative_to(_KERNEL_WORK_DIR)
+            mount_point.mkdir(parents=True, exist_ok=True)
 
     @override
     async def apply_accelerator_allocation(
@@ -1023,13 +1037,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
-                    else:
-                        if KernelFeatures.UID_MATCH in self.kernel_features:
-                            self._chown_paths_if_root(
-                                [self.work_dir / "bootstrap.sh"],
-                                self.local_config.container.kernel_uid,
-                                self.local_config.container.kernel_gid,
-                            )
+                    elif KernelFeatures.UID_MATCH in self.kernel_features:
+                        self._chown_paths_if_root(
+                            [self.work_dir / "bootstrap.sh"],
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
+                        )
 
                 await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
@@ -1077,7 +1090,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 pubkey = self.internal_data["ssh_keypair"]["public_key"].encode("ascii")
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
 
-                def _populate_ssh_config() -> None:
+                def _populate_ssh_config(pubkey: bytes = pubkey, privkey: bytes = privkey) -> None:
                     paths = ContainerSSHFileWriter(self.work_dir, pubkey, privkey).write()
 
                     def chown_idfile(uid: int | None, gid: int | None) -> None:
@@ -1085,12 +1098,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                     if ouid is not None or ogid is not None:
                         chown_idfile(ouid, ogid)
-                    else:
-                        if KernelFeatures.UID_MATCH in self.kernel_features:
-                            chown_idfile(
-                                self.local_config.container.kernel_uid,
-                                self.local_config.container.kernel_gid,
-                            )
+                    elif KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_idfile(
+                            self.local_config.container.kernel_uid,
+                            self.local_config.container.kernel_gid,
+                        )
 
                 await run_in_executor_with_context(None, _populate_ssh_config)
 
@@ -1114,13 +1126,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 tmp.chmod(int(dotfile["perm"], 8))
             if ouid is not None or ogid is not None:
                 self._chown_paths_if_root(tmp_paths, ouid, ogid)
-            else:
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    self._chown_paths_if_root(
-                        tmp_paths,
-                        self.local_config.container.kernel_uid,
-                        self.local_config.container.kernel_gid,
-                    )
+            elif KernelFeatures.UID_MATCH in self.kernel_features:
+                self._chown_paths_if_root(
+                    tmp_paths,
+                    self.local_config.container.kernel_uid,
+                    self.local_config.container.kernel_gid,
+                )
 
         return DockerKernel(
             self.ownership_data,
@@ -1616,6 +1627,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "host_ports": host_ports,
             "domain_socket_proxies": self.domain_socket_proxies,
             "block_service_ports": self.internal_data.get("block_service_ports", False),
+            "service_interpolation": self.internal_data.get("service_interpolation"),
         }
 
 
@@ -2373,7 +2385,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if container_id is not None:
                 container = docker.containers.container(container_id)
 
-                async def log_iter() -> AsyncGenerator[bytes, None]:
+                async def log_iter() -> AsyncGenerator[bytes]:
                     it = container.log(
                         stdout=True,
                         stderr=True,
@@ -2473,7 +2485,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]

@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
@@ -42,7 +43,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class DeploymentUpdater(DataUpdater[EndpointRow, DeploymentInfo]):
-    """Edits a deployment's own columns: metadata, replica count, network."""
+    """Edits a deployment's own columns and its designated agents."""
 
     deployment_id: DeploymentID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -53,6 +54,10 @@ class DeploymentUpdater(DataUpdater[EndpointRow, DeploymentInfo]):
     replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     open_to_public: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     url: TriState[str] = field(default_factory=TriState[str].nop)
+    # ``deployment_designated_agents`` rows, not a column; the service writes them.
+    designated_agents: OptionalState[frozenset[AgentUUID]] = field(
+        default_factory=OptionalState[frozenset[AgentUUID]].nop
+    )
 
     @property
     @override

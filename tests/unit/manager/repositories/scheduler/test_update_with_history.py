@@ -26,6 +26,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
@@ -49,6 +50,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -61,7 +63,7 @@ class TestUpdateWithHistory:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -96,7 +98,7 @@ class TestUpdateWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
+    ) -> AsyncGenerator[DomainFixtureData]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -119,7 +121,7 @@ class TestUpdateWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -146,7 +148,7 @@ class TestUpdateWithHistory:
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -166,7 +168,7 @@ class TestUpdateWithHistory:
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test user resource policy and return policy name."""
         policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
 
@@ -187,7 +189,7 @@ class TestUpdateWithHistory:
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Create test keypair resource policy and return policy name."""
         policy_name = f"test-keypair-policy-{uuid.uuid4().hex[:8]}"
 
@@ -216,7 +218,7 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -242,7 +244,7 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AsyncGenerator[AccessKey]:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
 
@@ -268,7 +270,7 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -298,7 +300,7 @@ class TestUpdateWithHistory:
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
-    ) -> AsyncGenerator[SessionId, None]:
+    ) -> AsyncGenerator[SessionId]:
         """Create test session in PREPARING status and return session ID."""
         session_id = SessionId(uuid.uuid4())
 
@@ -338,7 +340,11 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history updates session and creates history record atomically."""
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         from_status = SessionStatus.PREPARING
         to_status = SessionStatus.PREPARED
@@ -397,7 +403,11 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history records failure status correctly."""
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         from_status = SessionStatus.PREPARING
         to_status = SessionStatus.ERROR
@@ -491,7 +501,11 @@ class TestUpdateWithHistory:
                 db_sess.add(session)
 
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         from_status = SessionStatus.PREPARING
         to_status = SessionStatus.PREPARED
@@ -548,7 +562,11 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history when no sessions match the condition."""
         # Setup with non-existent session ID
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         non_existent_id = SessionId(uuid.uuid4())
 
         updater = SessionStatusBatchUpdater(
@@ -585,7 +603,11 @@ class TestUpdateWithHistory:
     ) -> None:
         """Test update_with_history with no history to record."""
         # Setup
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         to_status = SessionStatus.PREPARED
 
@@ -627,7 +649,11 @@ class TestUpdateWithHistory:
         Neither ``from_status`` nor which attempt result was recorded is part
         of the merge key — only attempt-vs-skip is (see the skip test below).
         """
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # First call - creates history record
         updater1 = SessionStatusBatchUpdater(
@@ -735,7 +761,11 @@ class TestUpdateWithHistory:
         attempt record stays the number the give-up (deprioritization)
         classification is allowed to see.
         """
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         updater = SessionStatusBatchUpdater(
             session_ids=[test_session_id],
@@ -792,7 +822,11 @@ class TestUpdateWithHistory:
         test_session_id: SessionId,
     ) -> None:
         """Test that different phase creates new record (no merge)."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # First call
         updater1 = SessionStatusBatchUpdater(
@@ -853,7 +887,11 @@ class TestUpdateWithHistory:
         test_session_id: SessionId,
     ) -> None:
         """Test that different error_code creates new record (no merge)."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # First call
         updater1 = SessionStatusBatchUpdater(
@@ -913,7 +951,11 @@ class TestUpdateWithHistory:
         test_session_id: SessionId,
     ) -> None:
         """Test that different to_status creates new record (no merge)."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # First call
         updater1 = SessionStatusBatchUpdater(
@@ -1009,7 +1051,11 @@ class TestUpdateWithHistory:
                 )
                 db_sess.add(session)
 
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # First batch call - creates 3 history records
         updater1 = SessionStatusBatchUpdater(
@@ -1134,7 +1180,11 @@ class TestUpdateWithHistory:
             )
         ]
 
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         updated_count = await db_source.update_with_history(updater, histories)
         assert updated_count == 1
 

@@ -32,7 +32,7 @@ class TestArtifactRegistryRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -46,7 +46,7 @@ class TestArtifactRegistryRepository:
     async def sample_registry_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample artifact registry directly in DB and return its ID"""
         registry_id = uuid.uuid4()
         row_id = uuid.uuid4()
@@ -67,7 +67,7 @@ class TestArtifactRegistryRepository:
     async def sample_registries_for_filtering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[ArtifactRegistryType, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[ArtifactRegistryType, uuid.UUID]]:
         """Create sample artifact registries with different types for filter testing"""
         registry_map: dict[ArtifactRegistryType, uuid.UUID] = {}
         types = [ArtifactRegistryType.HUGGINGFACE, ArtifactRegistryType.RESERVOIR]
@@ -92,7 +92,7 @@ class TestArtifactRegistryRepository:
     async def sample_registries_for_ordering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample artifact registries with predictable names for ordering tests"""
         registry_ids = []
         names = ["alpha-registry", "beta-registry", "gamma-registry", "delta-registry"]
@@ -117,7 +117,7 @@ class TestArtifactRegistryRepository:
     async def sample_registries_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample artifact registries for pagination testing"""
         registry_ids = []
 
@@ -141,7 +141,7 @@ class TestArtifactRegistryRepository:
     async def artifact_registry_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ArtifactRegistryRepository, None]:
+    ) -> AsyncGenerator[ArtifactRegistryRepository]:
         """Create ArtifactRegistryRepository instance with database"""
         repo = ArtifactRegistryRepository(
             db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)

@@ -21,7 +21,6 @@ def generate_signature(
     """
     Generates the API request signature from the given parameters.
     """
-    hash_type = hash_type
     hostname = endpoint.raw_authority
     body_hash = hashlib.new(hash_type, b"").hexdigest()
 

@@ -29,6 +29,7 @@ from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -71,9 +72,9 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(added_version="26.4.3", description="Resolved category entity.")
-    )  # type: ignore[misc]
+    )
     async def category(self, info: Info[StrawberryGQLContext]) -> CategoryGQL | None:
         if self.category_id is None:
             return None

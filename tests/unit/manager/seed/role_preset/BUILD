@@ -23,3 +23,5 @@ python_tests(
         "src/ai/backend/manager/models/alembic/versions/bf07cae92d86_grant_role_presets_on_system_session_environ.py:../../../src",
     ],
 )
+
+python_test_utils(name="test_utils")

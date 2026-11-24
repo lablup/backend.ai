@@ -99,26 +99,25 @@ class RedisStorage(AbstractStorage):
                 max_age=self.max_age,
                 expiration_dt=session.expiration_dt,
             )
+        elif session.empty:
+            # Logout or refresh
+            self.save_cookie(
+                response=response,
+                cookie_data="",
+                max_age=self.max_age,
+                expiration_dt=session.expiration_dt,
+            )
+            # response.headers.set('X-BackendAI-SessionID', "")
         else:
-            if session.empty:
-                # Logout or refresh
-                self.save_cookie(
-                    response=response,
-                    cookie_data="",
-                    max_age=self.max_age,
-                    expiration_dt=session.expiration_dt,
-                )
-                # response.headers.set('X-BackendAI-SessionID', "")
-            else:
-                key = str(key)
-                response._headers["X-BackendAI-SessionID"] = key
-                self.save_cookie(
-                    response=response,
-                    cookie_data=key,
-                    max_age=self.max_age,
-                    expiration_dt=session.expiration_dt,
-                )
-                # response.headers.set('X-BackendAI-SessionID', key)
+            key = str(key)
+            response._headers["X-BackendAI-SessionID"] = key
+            self.save_cookie(
+                response=response,
+                cookie_data=key,
+                max_age=self.max_age,
+                expiration_dt=session.expiration_dt,
+            )
+            # response.headers.set('X-BackendAI-SessionID', key)
 
         data_str = self._encoder(self._get_session_data(session))
         await self._valkey_client.set_session_data(

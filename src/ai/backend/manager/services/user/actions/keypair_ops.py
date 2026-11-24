@@ -14,7 +14,7 @@ from typing import final, override
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.ops.base import (
@@ -267,11 +267,10 @@ class AdminSearchKeypairsAction(GlobalSearcherOpsAction[KeyPairRow, KeyPairData]
 
 @dataclass(frozen=True)
 class AdminRegisterSSHKeypairAction(_KeypairOfUserAction):
-    """Overwrite the SSH keypair a keypair row carries."""
+    """Overwrite the SSH public key a keypair row carries."""
 
-    access_key: str
-    ssh_public_key: str
-    ssh_private_key: str
+    access_key: AccessKey
+    ssh_public_key: SSHPublicKey
 
     @override
     @classmethod

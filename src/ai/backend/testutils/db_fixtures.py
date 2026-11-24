@@ -1,8 +1,8 @@
 """
-Per-process test database on the ``postgres_container`` server.
+Per-file test database on the ``postgres_container`` server.
 
-Every pytest process gets its own ``test_db_<token>`` database, so several processes
-can share one PostgreSQL server while ``with_tables`` creates and truncates tables.
+Every test module gets its own ``test_db_<token>`` database, so several processes and
+files can share one PostgreSQL server while ``with_tables`` creates and truncates tables.
 Register with ``pytest_plugins = ["ai.backend.testutils.db_fixtures"]``.
 """
 
@@ -28,7 +28,7 @@ from ai.backend.testutils.bootstrap import (
     POSTGRES_PASSWORD,
     POSTGRES_USER,
 )
-from ai.backend.testutils.db import with_global_entities
+from ai.backend.testutils.db_global import with_global_entities
 
 # The server already answered pg_isready; a longer wait would not change the outcome.
 CONNECT_TIMEOUT = 30.0
@@ -85,7 +85,7 @@ async def _drop_database(addr: HostPortPairModel, dbname: str) -> None:
         await engine.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_database_url(
     postgres_container: tuple[str, HostPortPairModel],
 ) -> Iterator[str]:
@@ -99,7 +99,7 @@ def test_database_url(
 @pytest.fixture
 async def database_connection(test_database_url: str) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """
-    Engine on the per-process database, no tables created.
+    Engine on the per-file database, no tables created.
     Use with ``with_tables`` from ``ai.backend.testutils.db``.
     Function-scoped so each test's event loop owns its asyncpg connections.
     """

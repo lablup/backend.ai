@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.dto.manager.artifact_registry.request import (
     OffsetPaginationInput,
     PaginationInput,
@@ -87,6 +88,6 @@ class TestScanArtifacts:
             ScanArtifactsRequest(
                 registry_id=registry_fixture.huggingface_registry_id,
                 limit=5,
-                order="downloads",
+                order=ModelSortKey.DOWNLOADS,
             ),
         )

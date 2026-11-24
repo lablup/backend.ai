@@ -19,6 +19,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -71,12 +72,12 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
         description="Timestamp when the session was invalidated."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The user who owns this login session.",
         )
-    )  # type: ignore[misc]
+    )
     async def user(
         self,
         info: Info[StrawberryGQLContext],

@@ -20,7 +20,7 @@ REJECTED = ["26.9.0b1", "26.9.0dev1", "26.9.0rc", "26.9.0-alpha", ""]
 
 def run(version: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(SCRIPT), version], capture_output=True, text=True
+        [sys.executable, str(SCRIPT), version], check=False, capture_output=True, text=True
     )
 
 

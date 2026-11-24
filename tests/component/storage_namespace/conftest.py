@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from collections.abc import AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -185,3 +188,20 @@ async def storage_namespace_factory(
 @pytest.fixture(autouse=True)
 def _act_as_superadmin(acting_superadmin: None) -> None:
     """These tests drive processors directly, so they supply the caller the gates read."""
+
+
+@pytest.fixture()
+def acting_superadmin() -> Iterator[None]:
+    """Run the test body as a superadmin, the caller the action gates read."""
+    with with_user_context(
+        UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+        )
+    ):
+        yield

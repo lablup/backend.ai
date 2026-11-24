@@ -336,7 +336,7 @@ class BaseRunner(metaclass=ABCMeta):
             kspecs = kernelspec_mgr.get_all_specs()
             for kname in kspecs:
                 if self.jupyter_kspec_name in kname:
-                    log.debug("starting " + kname + " kernel...")
+                    log.debug("starting %s kernel...", kname)
                     self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
                     await self.kernel_mgr.start_kernel()
                     if not await self.kernel_mgr.is_alive():
@@ -353,7 +353,7 @@ class BaseRunner(metaclass=ABCMeta):
                             # self.init_jupyter_kernel()
                         except RuntimeError:
                             # Clean up for client and kernel will be done in `shutdown`.
-                            log.error("jupyter channel is not active!")
+                            log.exception("jupyter channel is not active!")
                             self.kernel_mgr = None
                     break
             else:
@@ -370,7 +370,7 @@ class BaseRunner(metaclass=ABCMeta):
         if self.kernel_mgr and await self.kernel_mgr.is_alive():
             if self.kernel_client is None:
                 raise RuntimeError("Kernel client is not initialized")
-            log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
+            log.info("shutting down %s kernel...", self.jupyter_kspec_name)
             await self.kernel_mgr.shutdown_kernel()
             self.kernel_client.stop_channels()
             if await self.kernel_mgr.is_alive():
@@ -494,8 +494,8 @@ class BaseRunner(metaclass=ABCMeta):
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
-        except Exception as e:
-            log.exception("unexpected error: {}", e)
+        except Exception:
+            log.exception("unexpected error")
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
@@ -609,7 +609,6 @@ class BaseRunner(metaclass=ABCMeta):
 
         # Run jupyter kernel's blocking execution method in an executor pool.
         allow_stdin = self.user_input_queue is not None
-        stdin_hook = None if self.user_input_queue is None else stdin_hook  # type: ignore
         try:
             await aexecute_interactive(
                 self.kernel_client,
@@ -617,10 +616,10 @@ class BaseRunner(metaclass=ABCMeta):
                 timeout_seconds=None,
                 output_hook=output_hook,
                 allow_stdin=allow_stdin,
-                stdin_hook=stdin_hook,
+                stdin_hook=stdin_hook if allow_stdin else None,
             )
-        except Exception as e:
-            log.exception(str(e))
+        except Exception:
+            log.exception("Failed to run the command")
             return 127
         return exit_code
 
@@ -771,7 +770,7 @@ class BaseRunner(metaclass=ABCMeta):
                 "port": model_service_info["port"],
                 "ports": [model_service_info["port"]],
                 "protocol": "http",
-                "options": {},
+                "options": {"interpolation": model_service_info.get("interpolation")},
             }
             result = await self._start_service(
                 service_info,
@@ -1285,7 +1284,7 @@ class BaseRunner(metaclass=ABCMeta):
             except asyncio.CancelledError:
                 break
             except NotImplementedError:
-                log.error("Unsupported operation for this kernel: {0}", op_type)
+                log.exception("Unsupported operation for this kernel: {0}", op_type)
                 await asyncio.sleep(0)
             except Exception:
                 log.exception("main_loop: unexpected error")

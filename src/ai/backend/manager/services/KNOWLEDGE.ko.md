@@ -48,6 +48,7 @@ entity (`Entity*`):
 | artifact_revision | artifact | import/approve 상태 기계는 revision 단위이다 |
 | model_card | project | |
 | session_template | 생성 scope (domain/project/user) | |
+| auto_generated_file | 생성 scope (domain/project/user) | 사용자, 프로젝트, 도메인의 파일을 모두 여기서 생성하고, owner 가 scope 다 |
 | role | role 이 속한 scope | |
 
 ## field 로 내린 entity_type
@@ -61,7 +62,6 @@ entity (`Entity*`):
 | deployment:policy | deployment | deployment 의 단일(1:1, FK CASCADE) rollout 전략 설정 (확정) |
 | role:permission, role:assignment | role | |
 | keypair | user | credential 로 독립 권한이 없고, 이름을 변경하기보다 해지하고 재발급한다 |
-| dotfile | keypair | keypairs row 안에 묶인 column |
 | image:alias, tag, resource_limit | image | |
 | storage_namespace | object_storage | storage_id+namespace, 수명이 묶인다 |
 | fair_share x3, usage_bucket x3 | resource_group | 모든 row 가 `resource_group_id` 를 가진다(fair share 유일성의 key). row 는 scope 별로 분해한 resource group 의 회계이고, domain/project/user 접근은 읽기의 scope 필터이며, 관리 write 는 rg 수준이다 |

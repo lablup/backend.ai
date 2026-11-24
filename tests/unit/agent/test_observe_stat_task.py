@@ -15,14 +15,14 @@ class TestObserveStatTaskDecorator:
     """Tests for _observe_stat_task decorator error handling."""
 
     @pytest.fixture
-    def mock_stat_task_observer(self) -> Generator[Mock, None, None]:
+    def mock_stat_task_observer(self) -> Generator[Mock]:
         with patch("ai.backend.agent.agent.StatTaskObserver") as mock_cls:
             mock_observer = Mock()
             mock_cls.instance.return_value = mock_observer
             yield mock_observer
 
     @pytest.fixture
-    def mock_log(self) -> Generator[Mock, None, None]:
+    def mock_log(self) -> Generator[Mock]:
         with patch("ai.backend.agent.agent.log") as _mock_log:
             yield _mock_log
 

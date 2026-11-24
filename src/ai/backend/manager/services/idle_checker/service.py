@@ -1,5 +1,7 @@
 from ai.backend.common.data.idle_checker.types import IdleCheckerSpec
-from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryPresetInvalidLabel,
+)
 from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
 from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name

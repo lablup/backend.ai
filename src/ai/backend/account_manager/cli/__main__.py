@@ -17,11 +17,12 @@ _LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"]
 @click.pass_context
 def main(
     _ctx: click.Context,
-    _log_level: str,
+    log_level: str,
 ) -> None:
     """
     Backend.AI Account Manager CLI
     """
+    _ = log_level
     setproctitle("backend.ai: account-manager.cli")
 
 

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class InvalidManagerKeypairError(BackendAIError):
+class InvalidManagerKeypairError(BackendAIError, web.HTTPInternalServerError):
     """Raised when manager secret key is missing from the keypair file."""
 
     error_type = "https://api.backend.ai/probs/dependency/invalid-manager-keypair"
@@ -30,7 +32,7 @@ class InvalidManagerKeypairError(BackendAIError):
         )
 
 
-class DependencyInitializationError(BackendAIError):
+class DependencyInitializationError(BackendAIError, web.HTTPInternalServerError):
     """Raised when a required dependency fails to initialize during Composer startup."""
 
     error_type = "https://api.backend.ai/probs/dependency/initialization-failure"

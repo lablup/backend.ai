@@ -30,10 +30,7 @@ from ai.backend.manager.errors.resource import DataTransformationFailed
 def verify_vfolder_name(folder: str) -> bool:
     if folder in RESERVED_VFOLDERS:
         return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True
+    return all(not pattern.match(folder) for pattern in RESERVED_VFOLDER_PATTERNS)
 
 
 _MOUNT_BASE: Final = PurePosixPath("/home/work")
@@ -299,6 +296,24 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
         VFolderOperationStatus.DELETE_ERROR,
     },
 }
+
+
+@dataclass(frozen=True)
+class VFolderMountAvailability:
+    """The vfolders among those asked about that cannot be mounted, by the reason."""
+
+    missing: frozenset[VFolderUUID]
+    """No row: the vfolder was purged."""
+    trashed: frozenset[VFolderUUID]
+    """In the trash (``DELETE_PENDING``); restoring it makes it mountable again."""
+    deleted: frozenset[VFolderUUID]
+    """Being deleted or deleted from storage (``DELETE_ONGOING`` and later)."""
+    not_ready: frozenset[VFolderUUID]
+    """Any other status outside ``MOUNTABLE`` (``CREATING``, ``ERROR``)."""
+
+    @property
+    def all_mountable(self) -> bool:
+        return not (self.missing or self.trashed or self.deleted or self.not_ready)
 
 
 @dataclass

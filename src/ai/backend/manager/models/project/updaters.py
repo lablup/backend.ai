@@ -23,7 +23,6 @@ from ai.backend.manager.models.project.searchable_fields import ProjectSearchabl
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import (
     DataBatchUpdater,
-    DataUpdater,
     GuardedDataUpdater,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -84,40 +83,6 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.dotfiles.update_dict(to_update, "dotfiles")
         return to_update
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: ProjectRow) -> ProjectData:
-        return ProjectSearchableFields.own.to_data(row)
-
-
-@dataclass
-class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
-    """Replaces the packed dotfile entries a project hands to its sessions."""
-
-    project_id: ProjectID
-    dotfiles: bytes
-
-    @property
-    @override
-    def row_class(self) -> type[ProjectRow]:
-        return ProjectRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return ProjectRow.id
-
-    @override
-    def target_id_value(self) -> ProjectID:
-        return self.project_id
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"dotfiles": self.dotfiles}
 
     @property
     @override

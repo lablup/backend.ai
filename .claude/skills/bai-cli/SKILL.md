@@ -39,7 +39,7 @@ Check options with `--help`.
 
 ### Core
 
-- **domain**: user(get) | admin(search, create, update, delete, purge)
+- **domain**: user(get, create-container-registry-relations, purge-container-registry-relations) | admin(search, create, update, delete, purge)
 - **user**: user(get, create, update, delete, search) | admin(create, delete, search)
 - **project**: user(get, assign-users, unassign-users | sub role: search) | admin(search, create, update, delete, purge)
 - **agent**: user(empty group) | admin(search, total-resources, update-resource-group)
@@ -71,7 +71,7 @@ Check options with `--help`.
 
 ### Registries and Artifacts
 
-- **container-registry**: user(empty group) | admin(search, create, update, delete)
+- **container-registry**: user(scoped-search) | admin(search, create, update, delete)
 - **artifact**: user(get, update, delete, restore | sub revision: get, approve, reject, cancel-import, cleanup) | admin(search)
 - **artifact-registry**: user(get)
 - **huggingface-registry**: user(create, get, search, update, delete), no admin variant
@@ -90,6 +90,7 @@ Check options with `--help`.
 - **login-history**: admin(search) | my(search)
 - **login-session**: admin(search, revoke) | my(search, revoke)
 - **login-client-type**: user(get) | admin(search, create, update, delete)
+- **ssh-key**: user(get, switch-default) | my(upload, search)
 
 ### Resource Management
 
@@ -112,6 +113,7 @@ Check options with `--help`.
 - **app-config-definition**: admin(create, get, search, purge)
 - **app-config-allow-list**: admin(create, get, search, update, purge)
 - **app-config-fragment**: user(get, update, purge, bulk-purge) | my(get, update) | admin(search)
+- **auto-generated-file**: user(create, scoped-search, switch-default, purge) | my(search)
 - **idle-checker**: admin(create, search, update, purge)
 - **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) | my(keypairs, sessions)
 

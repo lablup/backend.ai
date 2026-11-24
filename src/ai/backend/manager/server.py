@@ -33,9 +33,9 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
+from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
 from setproctitle import setproctitle
 
-from ai.backend.common.cli import LazyGroup
 from ai.backend.common.config import find_config_file
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
@@ -47,7 +47,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import load_configured_wheelhouse
+from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -66,8 +66,8 @@ from ai.backend.manager.dependencies.composer import (
     DependencyResources,
     ManagerDependencyComposer,
 )
+from ai.backend.manager.version import __version__
 
-from . import __version__
 from .api.rest.app import _mount_registry_tree
 from .api.rest.internal.tree import build_internal_api_routes
 from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
@@ -452,6 +452,9 @@ async def server_main(
             apply_otel_tracer(otel_spec)
             StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_client()
+            if config_provider.config.otel.trace_db_statements:
+                AsyncPGInstrumentor().instrument()
+                log.info("opentelemetry asyncpg instrumentation initialized")
             root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
@@ -606,11 +609,6 @@ def main(
     else:
         # Click is going to invoke a subcommand.
         pass
-
-
-@main.group(cls=LazyGroup, import_name="ai.backend.manager.api.auth:cli")
-def auth() -> None:
-    pass
 
 
 if __name__ == "__main__":

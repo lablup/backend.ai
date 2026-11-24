@@ -23,6 +23,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -46,6 +47,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )
@@ -56,6 +58,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )

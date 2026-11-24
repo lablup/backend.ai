@@ -20,17 +20,17 @@ Scenario: incomplete 2 / 25
 - direct implementation (14)
   - admin_replace_default_deployment_options: success present 2 · rejection present 2 (single_entity)
   - admin_replace_default_session_options: success present 1 · rejection present 2 (single_entity)
-  - create: success present 2 · rejection present 3 (global_scope)
+  - create: success present 4 · rejection present 3 (global_scope)
   - get_allowed_domains_for_resource_group: success present 2 · rejection present 1 (single_entity)
   - get_allowed_projects_for_resource_group: success present 1 · rejection present 1 (single_entity)
   - get_resource_info: success present 2 · rejection present 2 (single_entity)
   - purge: success present 2 · rejection present 2 (single_entity)
-  - update: success present 5 · rejection present 3 (single_entity)
+  - update: success present 6 · rejection present 3 (single_entity)
   - update_allowed_domains_for_resource_group: success present 1 · rejection present 3 (relation, single_entity)
   - update_allowed_projects_for_resource_group: success present 1 · rejection present 1 (relation, single_entity)
   - update_allowed_resource_groups_for_domain: success present 3 · rejection present 2 (global_scope, relation, single_entity)
   - update_allowed_resource_groups_for_project: success present 1 · rejection present 1 (global_scope, relation, single_entity)
-  - update_config: success present 2 · rejection present 1 (single_entity)
+  - update_config: success present 3 · rejection present 1 (single_entity)
   - update_fair_share_spec: success present 3 · rejection present 3 (single_entity)
 
 **batch_load_by_ids**
@@ -148,6 +148,8 @@ Scenario: incomplete 2 / 25
 |---|---|
 | [when no default group exists and the superadmin creates one designated as the default, the group comes back as the default](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
 | [when the superadmin creates a resource group with only a name, the whole group comes back active, public and not the default, filled from the defaults in the code](#creating-the-superadmin-makes-a-resource-group) | answered |
+| [when the superadmin creates a resource group with its scheduler options, the whole group comes back with those options](#creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options) | answered |
+| [when the superadmin creates a resource group inactive, private and with the lifo scheduler, the whole group comes back with those values](#creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler) | answered |
 | [creating with a name another resource group already holds is rejected as a duplicate name](#creating-a-name-another-resource-group-already-holds-is-refused) | rejected |
 | [when a user who is not the superadmin tries to create a resource group, the call is rejected for lacking the role](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | rejected |
 | [when the monitor tries to create a resource group, the call is rejected for lacking the role. the monitor passes reads only](#creating-the-monitor-may-not-make-a-resource-group) | rejected |
@@ -193,6 +195,7 @@ Scenario: incomplete 2 / 25
 | [an edit naming no field answers the group with nothing changed](#editing-an-edit-naming-no-field-changes-nothing) | answered |
 | [deactivating an active group answers the group as inactive](#editing-deactivating-a-resource-group-answers-it-inactive) | answered |
 | [when no default group exists, making a group the default answers it as the default](#editing-making-a-resource-group-the-default-answers-it-default) | answered |
+| [when the superadmin changes the scheduler options together with the preemption config, the whole group comes back with both holding the new values](#editing-the-superadmin-changes-the-scheduler-options-with-the-preemption-config) | answered |
 | [when the superadmin changes only the description, the whole group comes back with the new description and the rest unchanged](#editing-the-superadmin-changing-the-description-leaves-the-rest) | answered |
 | [a user granted nothing trying to change the description is rejected for not enough permission](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | rejected |
 | [when another default group exists, making a different group the default is rejected because a default group already exists](#editing-making-a-second-resource-group-the-default-is-refused) | rejected |
@@ -237,6 +240,7 @@ Scenario: incomplete 2 / 25
 |---|---|
 | [when the superadmin changes the preemption config, the whole group comes back with the new preemption values](#editing-the-superadmin-changes-the-preemption-config) | answered |
 | [when the superadmin changes the config to a last-in-first-out scheduler, private visibility, host network and a given proxy address, the whole group comes back with those values](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | answered |
+| [when the superadmin clears the retries before skipping a pending session on a group that has them, the whole group comes back without them and otherwise unchanged](#editing-the-superadmin-clears-the-retries-to-skip) | answered |
 | [a user granted nothing trying to change the config is rejected for not enough permission](#editing-a-user-granted-nothing-may-not-edit-the-config) | rejected |
 
 **update_fair_share_spec**
@@ -321,6 +325,12 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[0].scheduler.options.pending_timeout = 0.0
+  - items[0].scheduler.options.config.num_retries_to_skip = None
+  - items[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[0].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - items[0].default_deployment_options: skipped: the default the installation sets
   - items[0].default_session_options: skipped: the default the installation sets
   - items[1].id: skipped: the database generates it
@@ -339,6 +349,12 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[1].scheduler.options.pending_timeout = 0.0
+  - items[1].scheduler.options.config.num_retries_to_skip = None
+  - items[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[1].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - items[1].default_deployment_options: skipped: the default the installation sets
   - items[1].default_session_options: skipped: the default the installation sets
   - items[2] = None
@@ -443,6 +459,12 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[0].scheduler.options.pending_timeout = 0.0
+  - items[0].scheduler.options.config.num_retries_to_skip = None
+  - items[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[0].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - items[0].default_deployment_options: skipped: the default the installation sets
   - items[0].default_session_options: skipped: the default the installation sets
   - items[1].id: skipped: the database generates it
@@ -461,6 +483,12 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[1].scheduler.options.pending_timeout = 0.0
+  - items[1].scheduler.options.config.num_retries_to_skip = None
+  - items[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[1].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - items[1].default_deployment_options: skipped: the default the installation sets
   - items[1].default_session_options: skipped: the default the installation sets
   - items[2] = None
@@ -540,6 +568,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -583,6 +617,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -996,6 +1036,12 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[0].scheduler.options.pending_timeout = 0.0
+  - successes[0].scheduler.options.config.num_retries_to_skip = None
+  - successes[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[0].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - successes[0].default_deployment_options: skipped: the default the installation sets
   - successes[0].default_session_options: skipped: the default the installation sets
   - successes[1].id: skipped: the database generates it
@@ -1014,6 +1060,12 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[1].scheduler.options.pending_timeout = 0.0
+  - successes[1].scheduler.options.config.num_retries_to_skip = None
+  - successes[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[1].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - successes[1].default_deployment_options: skipped: the default the installation sets
   - successes[1].default_session_options: skipped: the default the installation sets
   - failed count = 1
@@ -1096,6 +1148,12 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[0].scheduler.options.pending_timeout = 0.0
+  - successes[0].scheduler.options.config.num_retries_to_skip = None
+  - successes[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[0].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - successes[0].default_deployment_options: skipped: the default the installation sets
   - successes[0].default_session_options: skipped: the default the installation sets
   - successes[1].id: skipped: the database generates it
@@ -1114,6 +1172,12 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[1].scheduler.options.pending_timeout = 0.0
+  - successes[1].scheduler.options.config.num_retries_to_skip = None
+  - successes[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[1].scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - successes[1].default_deployment_options: skipped: the default the installation sets
   - successes[1].default_session_options: skipped: the default the installation sets
   - failed = []
@@ -1759,6 +1823,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -1801,6 +1871,108 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
+<a id="creating-the-superadmin-makes-a-resource-group-with-its-scheduler-options"></a>
+
+#### [the-superadmin-makes-a-resource-group-with-its-scheduler-options](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
+
+when the superadmin creates a resource group with its scheduler options, the whole group comes back with those options
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.create: user-1 creates batch-only with the allowed session types, the pending timeout, the retries before skipping a pending session, the agent selection strategy, whether fractional resources may fragment and the route statuses to clean up
+
+Then
+
+- the whole resource group just created comes back
+  - id: skipped: the database generates it
+  - name = 'batch-only'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.options.pending_timeout = 60.0
+  - scheduler.options.config.num_retries_to_skip = 3
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
+<a id="creating-the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler"></a>
+
+#### [the-superadmin-makes-an-inactive-private-resource-group-with-its-scheduler](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
+
+when the superadmin creates a resource group inactive, private and with the lifo scheduler, the whole group comes back with those values
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.create: user-1 creates reserved inactive and private, with the lifo scheduler
+
+Then
+
+- the whole resource group just created comes back
+  - id: skipped: the database generates it
+  - name = 'reserved'
+  - status.is_active = False
+  - status.is_public = False
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.LIFO: 'lifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2184,6 +2356,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2227,6 +2405,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2328,6 +2512,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2371,6 +2561,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2414,6 +2610,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2457,6 +2659,61 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
+<a id="editing-the-superadmin-changes-the-scheduler-options-with-the-preemption-config"></a>
+
+#### [the-superadmin-changes-the-scheduler-options-with-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
+
+when the superadmin changes the scheduler options together with the preemption config, the whole group comes back with both holding the new values
+
+Given
+
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.update: user-1 updates the preemption config and the scheduler options of resource-group-1 together
+
+Then
+
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = True
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>]
+  - scheduler.options.pending_timeout = 60.0
+  - scheduler.options.config.num_retries_to_skip = 3
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.DEGRADED: 'degraded'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2500,6 +2757,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -2984,6 +3247,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
   - scheduler.preemption.preemption_min_runtime = 60.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -3027,6 +3296,61 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
+<a id="editing-the-superadmin-clears-the-retries-to-skip"></a>
+
+#### [the-superadmin-clears-the-retries-to-skip](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
+
+when the superadmin clears the retries before skipping a pending session on a group that has them, the whole group comes back without them and otherwise unchanged
+
+Given
+
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler, every scheduler option, 3 retries before skipping a pending session among them, and the preemption config differ from the defaults
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.update_config: user-1 clears the retries before skipping a pending session of resource-group-1
+
+Then
+
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = True
+  - scheduler.preemption.preemptible_priority = 3
+  - scheduler.preemption.order = <PreemptionOrder.NEWEST: 'newest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
+  - scheduler.preemption.preemption_min_runtime = 30.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.options.pending_timeout = 120.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.ROUNDROBIN: 'roundrobin'>
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>, <RouteHealthStatus.DEGRADED: 'degraded'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -3105,6 +3429,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -3152,6 +3482,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
@@ -3195,6 +3531,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = [<RouteHealthStatus.UNHEALTHY: 'unhealthy'>]
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 

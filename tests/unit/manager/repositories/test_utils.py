@@ -27,7 +27,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow, kernels
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -67,7 +66,7 @@ def create_test_password_info(password: str) -> PasswordInfo:
 @pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Database connection with tables created for test_utils tests."""
     async with with_tables(
         database_connection,
@@ -81,7 +80,6 @@ async def db_with_cleanup(
             RoleRow,
             UserRoleRow,
             UserRow,
-            KeyPairRow,
             ProjectRow,
             ContainerRegistryRow,
             ImageRow,
@@ -106,7 +104,7 @@ async def db_with_cleanup(
 @pytest.fixture
 async def session_info(
     db_with_cleanup: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[tuple[str, Any], None]:
+) -> AsyncGenerator[tuple[str, Any]]:
     """Create test session data for sql_json_merge and aggregate function tests."""
     user_uuid = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]

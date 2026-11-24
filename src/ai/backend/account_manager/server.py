@@ -111,13 +111,13 @@ async def exception_middleware(
             ) from ex
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest from ex
-    except asyncio.CancelledError as e:
+    except asyncio.CancelledError:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
         log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
-        raise e
+        raise
     except Exception as e:
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+        log.exception("Uncaught exception in HTTP request handlers")
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc()) from e
         raise InternalServerError() from e
@@ -232,7 +232,9 @@ def build_root_app(
                 yield
         except Exception as e:
             exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+            log.exception(
+                "Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info
+            )
 
     async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
         for cctx in app["_cctx_instances"]:

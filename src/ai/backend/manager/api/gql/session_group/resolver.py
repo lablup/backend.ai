@@ -48,7 +48,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
             "is not found."
         ),
     )
-)  # type: ignore[misc]
+)
 async def session_group(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -65,7 +65,7 @@ async def session_group(
             "Groups marked deleted are left out unless the filter names `deletedAt`."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_session_groups(
     info: Info[StrawberryGQLContext],
     filter: SessionGroupFilterGQL | None = None,
@@ -102,7 +102,7 @@ async def admin_session_groups(
             "replica group holds are left out."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_session_groups(
     info: Info[StrawberryGQLContext],
     scope: SessionGroupScopeGQL,

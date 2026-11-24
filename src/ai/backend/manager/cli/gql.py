@@ -26,6 +26,7 @@ def show(_cli_ctx: CLIContext) -> None:
     warnings.warn(
         "The 'gql' subcommand is deprecated. Use the 'api' subcommand.",
         DeprecationWarning,
+        stacklevel=2,
     )
     schema = graphene.Schema(query=Query, mutation=Mutation, auto_camelcase=False)
     log.info("======== GraphQL API Schema ========")

@@ -69,7 +69,7 @@ class TestQuerierIntPK:
     async def int_row_class(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[type[QuerierTestRowInt], None]:
+    ) -> AsyncGenerator[type[QuerierTestRowInt]]:
         """Create ORM test table with integer PK and return row class."""
         async with database_connection.begin() as conn:
             await conn.run_sync(
@@ -86,7 +86,7 @@ class TestQuerierIntPK:
         self,
         database_connection: ExtendedAsyncSAEngine,
         int_row_class: type[QuerierTestRowInt],
-    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+    ) -> AsyncGenerator[list[dict[str, int | str]]]:
         """Insert sample data and return list of inserted data."""
         data: list[dict[str, int | str]] = [
             {"id": 1, "name": "item-1", "value": "value-1"},
@@ -146,7 +146,7 @@ class TestQuerierUUIDPK:
     async def uuid_row_class(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[type[QuerierTestRowUUID], None]:
+    ) -> AsyncGenerator[type[QuerierTestRowUUID]]:
         """Create ORM test table with UUID PK and return row class."""
         async with database_connection.begin() as conn:
             await conn.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
@@ -164,7 +164,7 @@ class TestQuerierUUIDPK:
         self,
         database_connection: ExtendedAsyncSAEngine,
         uuid_row_class: type[QuerierTestRowUUID],
-    ) -> AsyncGenerator[list[dict[str, UUID | str]], None]:
+    ) -> AsyncGenerator[list[dict[str, UUID | str]]]:
         """Insert sample data and return list of inserted data."""
         data: list[dict[str, UUID | str]] = [
             {"id": uuid4(), "name": "item-1", "value": "value-1"},
@@ -244,7 +244,7 @@ class TestBatchQuerierBasic:
     async def batch_row_class(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[type[BatchQuerierTestRow], None]:
+    ) -> AsyncGenerator[type[BatchQuerierTestRow]]:
         """Create ORM test table for batch querier and return row class."""
         async with database_connection.begin() as conn:
             await conn.run_sync(
@@ -261,7 +261,7 @@ class TestBatchQuerierBasic:
         self,
         database_connection: ExtendedAsyncSAEngine,
         batch_row_class: type[BatchQuerierTestRow],
-    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+    ) -> AsyncGenerator[list[dict[str, int | str]]]:
         """Insert sample data for batch querier tests."""
         data = [
             {"id": i, "name": f"item-{i}", "status": "active" if i % 2 == 0 else "inactive"}
@@ -420,7 +420,7 @@ class TestBatchQuerierScopeValidation:
     async def scope_test_row_class(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[type[ScopeValidationTestRow], None]:
+    ) -> AsyncGenerator[type[ScopeValidationTestRow]]:
         """Create ORM test table for scope validation and return row class."""
         async with database_connection.begin() as conn:
             await conn.run_sync(
@@ -437,7 +437,7 @@ class TestBatchQuerierScopeValidation:
         self,
         database_connection: ExtendedAsyncSAEngine,
         scope_test_row_class: type[ScopeValidationTestRow],
-    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+    ) -> AsyncGenerator[list[dict[str, int | str]]]:
         """Insert sample data for scope validation tests."""
         data: list[dict[str, int | str]] = [
             {"id": 1, "name": "item-a", "category": "cat1"},
@@ -716,7 +716,7 @@ class TestBatchQuerierMultipleScopes:
     async def scope_test_row_class(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[type[ScopeValidationTestRow], None]:
+    ) -> AsyncGenerator[type[ScopeValidationTestRow]]:
         async with database_connection.begin() as conn:
             await conn.run_sync(
                 lambda c: Base.metadata.create_all(c, [ScopeValidationTestRow.__table__])
@@ -732,7 +732,7 @@ class TestBatchQuerierMultipleScopes:
         self,
         database_connection: ExtendedAsyncSAEngine,
         scope_test_row_class: type[ScopeValidationTestRow],
-    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+    ) -> AsyncGenerator[list[dict[str, int | str]]]:
         data: list[dict[str, int | str]] = [
             {"id": 1, "name": "item-a", "category": "cat1"},
             {"id": 2, "name": "item-b", "category": "cat1"},

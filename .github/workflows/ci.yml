@@ -43,6 +43,7 @@ jobs:
       models: ${{ steps.filter.outputs.models }}
       seeds: ${{ steps.filter.outputs.seeds }}
       release: ${{ steps.release.outputs.release }}
+      full-run: ${{ steps.full.outputs.full-run }}
       base-ref: ${{ steps.base.outputs.ref }}
     steps:
     - uses: actions/checkout@v6
@@ -59,6 +60,34 @@ jobs:
     - name: Detect release PR
       id: release
       uses: ./.github/actions/detect-release-pr
+    - name: Decide whether the run covers every target
+      id: full
+      # A tag, a release PR, a push to a version branch and a PR into one check every
+      # target; anything else only what changed since `base-ref`.
+      env:
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+        REF_NAME: ${{ github.ref_name }}
+        BASE_REF: ${{ github.base_ref }}
+        RELEASE: ${{ steps.release.outputs.release }}
+      run: |
+        full=false
+        case "$EVENT" in
+          push)
+            case "$REF" in
+              refs/tags/*) full=true ;;
+              refs/heads/*)
+                case "$REF_NAME" in
+                  [0-9][0-9].[0-9]|[0-9][0-9].[0-9][0-9]) full=true ;;
+                esac ;;
+            esac ;;
+          pull_request)
+            if [ "$RELEASE" == "true" ]; then full=true; fi
+            case "$BASE_REF" in
+              [0-9][0-9].[0-9]|[0-9][0-9].[0-9][0-9]) full=true ;;
+            esac ;;
+        esac
+        echo "full-run=$full" >> "$GITHUB_OUTPUT"
     - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad  # v3
       id: filter
       with:
@@ -76,13 +105,14 @@ jobs:
             - '.github/workflows/docker-images.yml'
             - '.github/actions/pants-caches/**'
             - '.github/scripts/plan-ci-targets.py'
+            - '.github/scripts/run-pytest-shard.py'
           models:
             - 'src/ai/backend/manager/models/**'
           seeds:
             - 'seeds/**'
 
-  # A tag and a release PR check every target; anything else only what changed
-  # since `base-ref`. A fork PR gets no problem-matcher annotations. Only a push to
+  # A run `detect-changes` marks `full-run` checks every target; anything else only what
+  # changed since `base-ref`. A fork PR gets no problem-matcher annotations. Only a push to
   # a branch passes `cache-branch`, and the caches are saved only when
   # `decide-cache-save.sh` finds it at the tip of main or of a maintained version.
   check-build-and-lint:
@@ -105,7 +135,7 @@ jobs:
       detect-changes-result: ${{ needs.detect-changes.result }}
       base-ref: ${{ needs.detect-changes.outputs.base-ref }}
       annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      full-run: ${{ needs.detect-changes.outputs.full-run == 'true' }}
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   # Builds the dependents map once and hands every typecheck and test job its
@@ -142,32 +172,13 @@ jobs:
         # Depth 2 holds `base-ref`.
         fetch-depth: 2
         lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> "$GITHUB_ENV"
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Restore the Pants caches
-      uses: ./.github/actions/pants-caches
-      with:
-        mode: restore
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
-      with:
-        named-caches-hash: disable
-        cache-lmdb-store: 'false'
+    - name: Install uv
+      run: pip install uv
     - name: Plan the targets and shards
       id: plan
       env:
-        # The dependents map holds about 6.5GiB; above the limit pantsd drops it and
-        # the next run of the planner builds it again.
-        PANTS_PANTSD_MAX_MEMORY_USAGE: 10GiB
         BASE_REF: ${{ needs.detect-changes.outputs.base-ref }}
-        FULL_RUN: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+        FULL_RUN: ${{ needs.detect-changes.outputs.full-run }}
       run: |
         flags=()
         if [ "$FULL_RUN" == "true" ]; then flags=(--full-run); fi
@@ -178,19 +189,10 @@ jobs:
       with:
         name: ci-targets
         path: dist/ci-targets
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.plan-targets.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
 
   typecheck:
-    # `contents: read`: only type-checks
-    # `actions: write`: `pants-caches` deletes superseded caches
     permissions:
       contents: read
-      actions: write
     needs: plan-targets
     # Always runs on a tag push: a skipped `typecheck` skips `release` even past `lint-and-typecheck`.
     if: >-
@@ -200,7 +202,6 @@ jobs:
     with:
       targets-artifact: ci-targets
       annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   lint-and-typecheck:
     needs: [check-build-and-lint, plan-targets, typecheck]
@@ -275,19 +276,16 @@ jobs:
 
   test-unit:
     # `contents: read`: only runs the unit tests
-    # `actions: write`: `pants-caches` deletes superseded caches
     permissions:
       contents: read
-      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
-    uses: ./.github/workflows/ci-test.yml
+    uses: ./.github/workflows/ci-pytest.yml
     with:
       suite: unit
       shards: ${{ needs.plan-targets.outputs.unit-shards }}
       runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
       targets-artifact: ci-targets
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-scenario:
     # `contents: read`: only runs the scenario tests
@@ -306,20 +304,17 @@ jobs:
 
   test-component:
     # `contents: read`: only runs the component tests
-    # `actions: write`: `pants-caches` deletes superseded caches
     permissions:
       contents: read
-      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
-    uses: ./.github/workflows/ci-test.yml
+    uses: ./.github/workflows/ci-pytest.yml
     with:
       suite: component
       shards: ${{ needs.plan-targets.outputs.component-shards }}
       runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
       sentinel-hosts: true
       targets-artifact: ci-targets
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-integration:
     # `contents: read`: only runs the integration tests

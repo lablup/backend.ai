@@ -94,7 +94,7 @@ _PRESET_NAMES = {preset.id: preset.name for preset in _PRESETS}
 @pytest.fixture
 async def db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, _TABLES):
         async with database_connection.begin() as conn:
             await conn.execute(

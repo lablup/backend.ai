@@ -41,6 +41,7 @@ from ai.backend.manager.container_registry.base import (
 )
 from ai.backend.manager.data.image.types import ImageData, ImageIdentifier, ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound, RegistryNotFoundForImage
 from ai.backend.manager.models.agent.row import AgentRow
@@ -49,6 +50,9 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -75,6 +79,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.repositories.session.db_source.db_source import SessionDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
@@ -161,7 +166,7 @@ class _FakeRegistryScanner(BaseContainerRegistry):
 @pytest.fixture
 async def db_with_cleanup(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """The global entities come with it: an image of a global registry joins
     `public`, which needs that singleton's id."""
     async with with_tables(
@@ -177,6 +182,7 @@ async def db_with_cleanup(
             AssocGroupUserRow,
             ContainerRegistryRow,
             AssociationContainerRegistriesGroupsRow,
+            DomainContainerRegistryRelationRow,
             ImageRow,
             ImageAliasRow,
             VirtualEntityRow,
@@ -243,6 +249,12 @@ async def registry_id(
         )
         await VirtualEntitySeeder().get_or_create_node(
             sess, ContainerRegistryEntityType(), registry_id
+        )
+        await sess.flush()
+        sess.add(
+            DomainContainerRegistryRelationRow(
+                domain_id=domain_id, container_registry_id=registry_id
+            )
         )
         await sess.commit()
     return registry_id
@@ -483,7 +495,9 @@ class TestImageOwnershipGraph:
         )
 
         await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).check_available_image(image_id, DOMAIN_NAME, user_id)
 
     async def test_another_users_image_reads_as_absent(
@@ -503,7 +517,9 @@ class TestImageOwnershipGraph:
 
         with pytest.raises(ImageNotFound):
             await ScheduleDBSource(
-                db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+                db_with_cleanup,
+                ReconcileOpsProvider(db_with_cleanup),
+                KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ).check_available_image(image_id, DOMAIN_NAME, user_id)
 
     async def test_an_image_that_is_not_customized_is_reachable_by_anyone(
@@ -516,7 +532,9 @@ class TestImageOwnershipGraph:
         image_id, _ = await self._create_image(db_with_cleanup, registry_id, "a")
 
         await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).check_available_image(image_id, DOMAIN_NAME, user_id)
 
     async def test_a_customized_image_with_no_creator_is_reachable_by_nobody(
@@ -530,7 +548,9 @@ class TestImageOwnershipGraph:
 
         with pytest.raises(ImageNotFound):
             await ScheduleDBSource(
-                db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+                db_with_cleanup,
+                ReconcileOpsProvider(db_with_cleanup),
+                KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ).check_available_image(image_id, DOMAIN_NAME, user_id)
 
     async def test_purging_the_creator_leaves_the_image_reachable_by_nobody(
@@ -548,7 +568,11 @@ class TestImageOwnershipGraph:
             await sess.execute(sa.delete(UserRow).where(UserRow.uuid == owner_id))
             await sess.commit()
 
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         with pytest.raises(ImageNotFound):
             await db_source.check_available_image(image_id, DOMAIN_NAME, onlooker_id)

@@ -190,8 +190,6 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
         if name is None:
             faker = Faker()
             name = f"pysdk-{faker.user_name()}"
-        else:
-            name = name
 
         ######
         envs = prepare_env_arg(env)
@@ -482,8 +480,6 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
         """
         if name is None:
             name = f"pysdk-{secrets.token_hex(5)}"
-        else:
-            name = name
 
         envs = prepare_env_arg(env) if len(env) > 0 or no_env else undefined
         parsed_resources = (
@@ -661,21 +657,20 @@ def _destroy_cmd(docs: str | None = None) -> Callable[..., None]:
                 except Exception as e:
                     print_error(e)
                     has_failure = True
-            else:
-                if not has_failure:
-                    print_done("Done.")
-                    if forced:
-                        print_warn(
-                            "If you have destroyed a session whose status is one of "
-                            "[`CREATING`, `TERMINATING`, `ERROR`], "
-                            "Manual cleanup of actual containers may be required."
-                        )
-                if stats:
-                    stats_data = ret.get("stats", None) if ret else None
-                    if stats_data:
-                        print(format_stats(stats_data))
-                    else:
-                        print("Statistics is not available.")
+            if not has_failure:
+                print_done("Done.")
+                if forced:
+                    print_warn(
+                        "If you have destroyed a session whose status is one of "
+                        "[`CREATING`, `TERMINATING`, `ERROR`], "
+                        "Manual cleanup of actual containers may be required."
+                    )
+            if stats:
+                stats_data = ret.get("stats", None) if ret else None
+                if stats_data:
+                    print(format_stats(stats_data))
+                else:
+                    print("Statistics is not available.")
             if has_failure:
                 sys.exit(ExitCode.FAILURE)
 
@@ -725,9 +720,8 @@ def _restart_cmd(docs: str | None = None) -> Callable[..., None]:
                 except Exception as e:
                     print_error(e)
                     has_failure = True
-            else:
-                if not has_failure:
-                    print_done("Done.")
+            if not has_failure:
+                print_done("Done.")
             if has_failure:
                 sys.exit(ExitCode.FAILURE)
 
@@ -1033,7 +1027,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 pbar.display(data["message"])
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
+                                completion_msg_func = lambda error_msg=error_msg: print_fail(
                                     f"Error during the operation: {error_msg}",
                                 )
                             case BgtaskStatus.CANCELLED:
@@ -1046,7 +1040,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 if errors:
                                     for error in errors:
                                         print_fail(f"Error reported: {error}")
-                                    completion_msg_func = lambda: print_warn(
+                                    completion_msg_func = lambda errors=errors: print_warn(
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
@@ -1089,6 +1083,10 @@ def _ssh_cmd(docs: str | None = None) -> Callable[..., None]:
         SESSION_REF: The user-provided name or the unique ID of a running compute session.
 
         All remaining options and arguments not listed here are passed to the ssh command as-is.
+
+        The command signs in with the session's SSH key. A session holds none when you uploaded
+        only a public key; ssh then uses your own keys (~/.ssh/id_*, ssh-agent), or pass
+        "-i <your private key>".
         """
         try:
             with container_ssh_ctx(session_ref, port) as key_path:
@@ -1101,8 +1099,7 @@ def _ssh_cmd(docs: str | None = None) -> Callable[..., None]:
                         "UserKnownHostsFile=/dev/null",
                         "-o",
                         "NoHostAuthenticationForLocalhost=yes",
-                        "-i",
-                        key_path,
+                        *(["-i", str(key_path)] if key_path is not None else []),
                         "work@localhost",
                         "-p",
                         str(port),
@@ -1135,6 +1132,30 @@ main.command(
 session.command(
     context_settings=_ssh_cmd_context_settings,
 )(_ssh_cmd())
+
+
+# The scp options that take a value (`man scp`).
+_SCP_OPTIONS_WITH_VALUE = frozenset("cDFiJloPSX")
+
+
+def _split_scp_args(args: Sequence[str]) -> tuple[list[str], list[str]]:
+    """Split the extra scp arguments into options and paths. scp reads options only
+    before the paths, so the caller places them there."""
+    options: list[str] = []
+    paths: list[str] = []
+    rest = iter(args)
+    for arg in rest:
+        if not arg.startswith("-") or arg == "-":
+            paths.append(arg)
+            continue
+        options.append(arg)
+        for index, flag in enumerate(arg[1:], start=2):
+            if flag in _SCP_OPTIONS_WITH_VALUE:
+                # The value follows in the next argument unless it is attached (`-ikey`).
+                if index == len(arg) and (value := next(rest, None)) is not None:
+                    options.append(value)
+                break
+    return options, paths
 
 
 def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
@@ -1173,6 +1194,10 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
 
         All remaining options and arguments not listed here are passed to the ssh command as-is.
 
+        The command signs in with the session's SSH key. A session holds none when you uploaded
+        only a public key; ssh then uses your own keys (~/.ssh/id_*, ssh-agent), or pass
+        "-i <your private key>".
+
         Examples:
 
         * Uploading a local directory to the session:
@@ -1186,6 +1211,7 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
         recursive_args = []
         if recursive:
             recursive_args.append("-r")
+        extra_options, extra_paths = _split_scp_args(ctx.args)
         try:
             with container_ssh_ctx(session_ref, port) as key_path:
                 scp_proc = subprocess.run(
@@ -1197,14 +1223,14 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
                         "UserKnownHostsFile=/dev/null",
                         "-o",
                         "NoHostAuthenticationForLocalhost=yes",
-                        "-i",
-                        key_path,
+                        *(["-i", str(key_path)] if key_path is not None else []),
                         "-P",
                         str(port),
                         *recursive_args,
+                        *extra_options,
                         src,
                         dst,
-                        *ctx.args,
+                        *extra_paths,
                     ],
                     shell=False,
                     check=False,  # be transparent against the main command

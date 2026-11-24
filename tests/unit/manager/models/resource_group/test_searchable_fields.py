@@ -73,7 +73,7 @@ _WITH_TABLES: list[TableOrORM] = [
 @pytest.fixture
 async def db_with_tables(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Database connection with tables created for SQLAlchemy mapper initialization."""
     async with with_tables(database_connection, _WITH_TABLES):
         yield database_connection

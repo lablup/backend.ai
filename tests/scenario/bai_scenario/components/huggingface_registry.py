@@ -39,9 +39,9 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     in_language,
 )
-from bai_scenario.components.answers import TheFailedItemIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
+from bai_scenario.components.the_failed_item_is_refused import TheFailedItemIsRefused
 from bai_scenario.seeds.artifact_registry.registry import TestSeedHuggingFaceRegistry
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole

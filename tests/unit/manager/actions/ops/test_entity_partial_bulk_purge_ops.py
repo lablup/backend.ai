@@ -72,7 +72,7 @@ DENIALS_RECORDED_AS_ERROR_ON_A_FAILED_RUN = pytest.mark.xfail(
 
 
 @pytest.fixture
-async def fragment_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def fragment_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         ops_db, [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow]
     ):

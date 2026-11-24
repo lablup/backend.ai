@@ -288,7 +288,7 @@ trace.set_tracer_provider(_otel_provider)
 
 
 @pytest.fixture
-def span_exporter() -> Generator[InMemorySpanExporter, None, None]:
+def span_exporter() -> Generator[InMemorySpanExporter]:
     _otel_exporter.clear()
     yield _otel_exporter
 

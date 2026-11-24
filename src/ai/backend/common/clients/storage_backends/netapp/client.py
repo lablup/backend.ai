@@ -456,7 +456,7 @@ async def _spawn_and_watch(
     cmdargs: Sequence[str | bytes],
     *,
     tail_length: int = 50,
-) -> AsyncGenerator[bytes, None]:
+) -> AsyncGenerator[bytes]:
     last_lines: list[bytes] = []
     proc = await asyncio.create_subprocess_exec(
         *cmdargs,

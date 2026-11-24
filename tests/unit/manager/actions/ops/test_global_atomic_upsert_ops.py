@@ -63,7 +63,7 @@ async def _grant_global(
 
 
 @pytest.fixture
-async def fragment_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def fragment_db(ops_db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Every config is defined; only the allowed ones may be written at ``public``."""
     async with with_tables(
         ops_db, [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow]

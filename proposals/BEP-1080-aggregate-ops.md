@@ -48,7 +48,7 @@ An aggregate first sets the scope with the same scope input as search, and reque
 |---|---|
 | `scope` | Scope kind and id |
 | `total` | Values of the whole scope |
-| `groups[].key` | Values of the fields in groupBy. Fields not in groupBy are null |
+| `groups[].key` | Values of the fields in groupBy. Fields not in groupBy are left out of the response; a key whose value is NULL is null |
 | Value fields of `groups[]` | The same value fields as total |
 
 Rejected: a flat row list has no item for a per-scope error and total.
@@ -92,7 +92,7 @@ Rejected: a value type holding counts per enum value gives the same result as gr
 
 ### Computation and declarations
 
-How values are computed (today, on read) lives only in the repository's measures and does not appear in actions, DTOs or GQL. An entity declares group slots and value slots in `{Entity}AggregateFields` in `models/{entity}/aggregate_fields.py`, and takes columns and names from the fields of `{Entity}SearchableFields`. A to-many value is computed with one join and `GROUP BY`, not with a subquery per row.
+How values are computed (today, on read) lives only in the repository's measures and does not appear in actions, DTOs or GQL. An entity declares group items and value items in the `aggregate` section of `{Entity}QuerySpec` (BEP-1082), and each item wraps a `QueryColumn` of `own` for its column and name. A to-many value is computed with one join and `GROUP BY`, not with a subquery per row.
 
 | Declaration, component | Content |
 |---|---|
@@ -102,7 +102,15 @@ How values are computed (today, on read) lives only in the repository's measures
 | `ToManyCorrelation` | A (row_id, child value) pair select besides EXISTS. Used by `ToManyGroup` |
 | Session nested | Add `resource_allocations` under kernels (depth 2) |
 
-Rejected: adding slots to `SearchableField` means changing all 978 declarations or giving empty slots a default.
+| Result layer | Key not in groupBy |
+|---|---|
+| Repository result | The `AggregateGroup` key is a per-entity `PartialRecord`; reading an unselected field raises `NotSelectedError` |
+| REST v2 response DTO | The common converter maps the key record; the field becomes pydantic `MISSING` and is left out of JSON |
+| GQL | The default resolver rejects `MISSING` as a field error; key fields are nullable, so only that field is null with an error |
+| Key whose value is NULL | null in every layer, distinct from an unselected key |
+| Where `MISSING` is used | Only on the group keys a request picks |
+
+Rejected: adding group and value slots to `QueryColumn` means changing all 978 declarations or giving empty slots a default.
 
 ## Impact
 
@@ -125,3 +133,5 @@ Rejected: adding slots to `SearchableField` means changing all 978 declarations 
 - `src/ai/backend/manager/models/specs/search/AGENTS.md`: search field declaration rules
 - `src/ai/backend/manager/models/virtual_entity/queries.py`: scope paths
 - `src/ai/backend/common/dto/manager/query.py`: filters per value type
+- `src/ai/backend/common/data/partial.py`: `PartialRecord`, which holds only the selected fields
+- [BEP-1082 Requested Field Read](BEP-1082-requested-field-read.md): the `QuerySpec` declaration

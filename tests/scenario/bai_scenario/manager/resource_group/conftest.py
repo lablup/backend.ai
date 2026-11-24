@@ -11,10 +11,11 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -117,6 +118,8 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
+            registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+            registry.group(GroupMeta(ContainerRegistryEntityType())),
             DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
         FakeDeploymentCoordinator(deployment_handlers),

@@ -108,11 +108,11 @@ class StubMessageQueue:
         self._broadcast_messages = broadcast_messages or []
         self.done_calls: list[bytes] = []
 
-    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:
+    async def consume_queue(self) -> AsyncGenerator[MQMessage]:
         for msg in self._anycast_messages:
             yield msg
 
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload]:
         for msg in self._broadcast_messages:
             yield msg
 

@@ -16,17 +16,6 @@ from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 
-class InvalidSSHPrivateKey(FieldError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-ssh-private-key"
-    error_title = "The SSH private key is invalid or in an unsupported format."
-
-    @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            KeyPairFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_DATA_FORMAT
-        )
-
-
 class InvalidSSHPublicKey(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-ssh-public-key"
     error_title = "The SSH public key is invalid or in an unsupported format."
@@ -57,15 +46,4 @@ class NoDefaultKeypairResourcePolicy(EntityError, web.HTTPInternalServerError):
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
             KeyPairResourcePolicyEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
-        )
-
-
-class SSHKeypairMismatch(FieldError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/ssh-keypair-mismatch"
-    error_title = "The SSH public key does not match the private key."
-
-    @override
-    def field_error_code(self) -> FieldErrorCode:
-        return FieldErrorCode(
-            KeyPairFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
         )

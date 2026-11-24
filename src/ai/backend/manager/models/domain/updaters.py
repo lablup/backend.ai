@@ -15,7 +15,7 @@ from ai.backend.manager.errors.resource import DomainPurgeInProgress
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -72,40 +72,6 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         # Field is named integration_name above model layer; DB column remains integration_id.
         self.integration_name.update_dict(to_update, "integration_id")
         return to_update
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: DomainRow) -> DomainData:
-        return DomainSearchableFields.own.to_data(row)
-
-
-@dataclass
-class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
-    """Replaces the packed dotfile entries a domain hands to its sessions."""
-
-    domain_id: DomainID
-    dotfiles: bytes
-
-    @property
-    @override
-    def row_class(self) -> type[DomainRow]:
-        return DomainRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return DomainRow.id
-
-    @override
-    def target_id_value(self) -> DomainID:
-        return self.domain_id
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"dotfiles": self.dotfiles}
 
     @property
     @override

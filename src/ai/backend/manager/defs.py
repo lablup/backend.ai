@@ -9,6 +9,9 @@ from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH as DEFAULT_IMAGE_ARCH_
 from ai.backend.common.arch import arch_name_aliases as arch_name_aliases_
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
+from ai.backend.common.dto.manager.artifact_registry.request import (
+    ARTIFACT_MAX_SCAN_LIMIT as ARTIFACT_MAX_SCAN_LIMIT_,
+)
 from ai.backend.common.types import SlotName, SlotTypes
 
 
@@ -44,8 +47,6 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
-SECRET_KEY_PLACEHOLDER: Final = "*****"
-TOKEN_PLACEHOLDER: Final = "*****"
 
 
 # Mapping between vfolder names and their in-container paths.
@@ -131,4 +132,4 @@ START_SESSION_TIMEOUT_SEC: Final[float] = 60 * 30  # 30 min
 
 DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW: Final[str] = "5m"
 
-ARTIFACT_MAX_SCAN_LIMIT: Final[int] = 500
+ARTIFACT_MAX_SCAN_LIMIT: Final[int] = ARTIFACT_MAX_SCAN_LIMIT_

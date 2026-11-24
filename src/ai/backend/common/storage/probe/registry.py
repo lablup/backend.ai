@@ -19,10 +19,14 @@ class VolumeStatusSnapshot:
 class VolumeStatusCheckRegistry:
     """Every volume status check a service runs, and the latest observation of each."""
 
-    _checks: Sequence[AbstractVolumeStatusCheck]
+    _checks: dict[StorageVolumeName, AbstractVolumeStatusCheck]
 
     def __init__(self, checks: Sequence[AbstractVolumeStatusCheck]) -> None:
-        self._checks = checks
+        self._checks = {check.id(): check for check in checks}
+
+    def update(self, checks: Sequence[AbstractVolumeStatusCheck]) -> None:
+        """Replaces the checks with the given ones."""
+        self._checks = {check.id(): check for check in checks}
 
     def snapshot(self) -> Mapping[StorageVolumeName, VolumeStatusSnapshot]:
         """The last observation of every check."""
@@ -30,5 +34,5 @@ class VolumeStatusCheckRegistry:
             check.id(): VolumeStatusSnapshot(
                 storage_backend_metadata=check.storage_backend_metadata(), result=check.latest()
             )
-            for check in self._checks
+            for check in self._checks.values()
         }

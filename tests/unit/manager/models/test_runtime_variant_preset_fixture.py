@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.errors.resource import DataTransformationFailed
-from ai.backend.manager.models.base import populate_fixture
+from ai.backend.manager.models.fixture import populate_fixture
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -26,7 +26,7 @@ class TestRuntimeVariantPresetFixture:
     async def db_engine(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [

@@ -52,7 +52,6 @@ from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearc
 from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -97,7 +96,7 @@ class TestDeploymentUsage:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -109,7 +108,6 @@ class TestDeploymentUsage:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -134,7 +132,7 @@ class TestDeploymentUsage:
     async def usage(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[UsageFixture, None]:
+    ) -> AsyncGenerator[UsageFixture]:
         """One deployment with a single revision naming one variant and one preset."""
         suffix = uuid.uuid4().hex[:8]
         domain_id = DomainID(uuid.uuid4())

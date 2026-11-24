@@ -118,8 +118,6 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
             keypair_secrets=KeyPairSecrets(
                 access_key=AccessKey(f"AK{token}"),
                 secret_key=self.secret_key or SecretValue(f"sk-{token}"),
-                ssh_public_key="",
-                ssh_private_key="",
             ),
             keypair_resource_policy=keypair_policy.name,
         )

@@ -17,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class CircuitCreationError(BackendAIError):
+class CircuitCreationError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit creation fails."""
 
     error_type = "https://api.backend.ai/probs/appproxy/circuit-creation-failed"
@@ -32,7 +32,7 @@ class CircuitCreationError(BackendAIError):
         )
 
 
-class InvalidCircuitConfigError(BackendAIError):
+class InvalidCircuitConfigError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit configuration is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-circuit-config"
@@ -47,7 +47,7 @@ class InvalidCircuitConfigError(BackendAIError):
         )
 
 
-class InvalidCircuitStateError(BackendAIError):
+class InvalidCircuitStateError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit state is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy/invalid-circuit-state"

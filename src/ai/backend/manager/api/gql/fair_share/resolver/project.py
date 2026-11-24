@@ -42,7 +42,7 @@ from ai.backend.manager.errors.auth import SuperadminRequired
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get project fair share data (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -59,7 +59,7 @@ async def admin_project_fair_share(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List project fair shares (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_project_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: ProjectFairShareFilter | None = None,
@@ -113,7 +113,7 @@ async def admin_project_fair_shares(
         added_version="26.2.0",
         description="Get project fair share data within resource group scope.",
     )
-)  # type: ignore[misc]
+)
 async def rg_project_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
@@ -130,7 +130,7 @@ async def rg_project_fair_share(
     BackendAIGQLMeta(
         added_version="26.2.0", description="List project fair shares within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
@@ -185,7 +185,7 @@ async def rg_project_fair_shares(
         added_version="26.1.0", description="Get project fair share data (superadmin only)."
     ),
     deprecation_reason="Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -207,7 +207,7 @@ async def project_fair_share(
         added_version="26.1.0", description="List project fair shares (superadmin only)."
     ),
     deprecation_reason="Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def project_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: ProjectFairShareFilter | None = None,

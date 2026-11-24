@@ -47,7 +47,7 @@ class TestBootstrapScriptRevision:
     @pytest.fixture
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -218,6 +218,29 @@ class TestBootstrapScriptRevision:
             (2, "echo 2", user_id),
             (3, "echo 3", user_id),
         ]
+
+    async def test_current_revisions_read_the_latest_of_each_script(
+        self,
+        repository: UserRepository,
+        user_id: UserID,
+        default_script: BootstrapScriptID,
+        other_script: BootstrapScriptID,
+    ) -> None:
+        await repository.add_default_bootstrap_script_revision(
+            user_id, BootstrapScript("echo 2"), user_id
+        )
+        unknown = BootstrapScriptID(uuid.uuid4())
+
+        current = await repository.current_bootstrap_script_revisions([
+            default_script,
+            other_script,
+            unknown,
+        ])
+
+        assert {script_id: revision.script for script_id, revision in current.items()} == {
+            default_script: "echo 2",
+            other_script: "echo other",
+        }
 
     @pytest.mark.usefixtures("deleted_default_script")
     async def test_soft_deleted_default_reads_as_none(

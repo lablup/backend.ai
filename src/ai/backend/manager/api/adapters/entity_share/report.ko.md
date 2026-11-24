@@ -10,11 +10,11 @@
   - my_search: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (6)
-  - accept: 성공 있음 1 · 거부 있음 1 (scope)
+  - accept: 성공 있음 2 · 거부 있음 2 (scope)
   - cancel: 성공 있음 1 · 거부 있음 1 (single_entity)
   - create: 성공 있음 1 · 거부 있음 1 (scope)
-  - leave: 성공 있음 1 · 거부 있음 1 (scope)
-  - reject: 성공 있음 1 · 거부 있음 1 (scope)
+  - leave: 성공 있음 2 · 거부 있음 1 (scope)
+  - reject: 성공 있음 2 · 거부 있음 1 (scope)
   - revoke: 성공 있음 1 · 거부 있음 1 (single_entity)
 
 **batch_load_by_ids**
@@ -50,8 +50,10 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 받아들이면 받아들인 공유가 통째로 옵니다](#answering-a-project-answerer-accepts-the-offer-to-the-project) | 성공 |
 | [자기 스코프에서 공유에 답할 수 있는 사용자가 제안을 받아들이면 받아들인 공유가 통째로 옵니다](#answering-the-recipient-accepts-the-offer) | 성공 |
-| [아무 권한도 없는 사용자가 제안을 받아들이면 권한 부족으로 거부됩니다](#answering-a-user-granted-nothing-may-not-accept-the-offer) | 거부 |
+| [프로젝트 앞으로 온 제안을 그 프로젝트에서 공유를 읽을 수만 있는 사용자가 받아들이면 권한 부족으로 거부됩니다](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | 거부 |
+| [아무 권한도 없는 사용자가 제안을 받아들이면 공유를 찾을 수 없다는 이유로 거부됩니다](#answering-a-user-granted-nothing-may-not-accept-the-offer) | 거부 |
 
 **cancel**
 
@@ -71,15 +73,17 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트가 빌린 공유에서 탈퇴하면 회수된 공유가 통째로 옵니다](#withdrawing-a-project-answerer-leaves-the-share-the-project-took) | 성공 |
 | [빌린 사람이 자기 스코프에서 공유에서 탈퇴하면 회수된 공유가 통째로 옵니다](#withdrawing-the-recipient-leaves-the-share) | 성공 |
-| [아무 권한도 없는 사용자가 공유에서 탈퇴해도 권한 부족으로 거부됩니다](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | 거부 |
+| [아무 권한도 없는 사용자가 공유에서 탈퇴해도 공유를 찾을 수 없다는 이유로 거부됩니다](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | 거부 |
 
 **reject**
 
 | 시나리오 | 판정 |
 |---|---|
+| [프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 거절하면 거절된 공유가 통째로 옵니다](#answering-a-project-answerer-rejects-the-offer-to-the-project) | 성공 |
 | [자기 스코프에서 공유에 답할 수 있는 사용자가 제안을 거절하면 거절된 공유가 통째로 옵니다](#answering-the-recipient-rejects-the-offer) | 성공 |
-| [아무 권한도 없는 사용자가 제안을 거절해도 권한 부족으로 거부됩니다](#answering-a-user-granted-nothing-may-not-reject-the-offer) | 거부 |
+| [아무 권한도 없는 사용자가 제안을 거절해도 공유를 찾을 수 없다는 이유로 거부됩니다](#answering-a-user-granted-nothing-may-not-reject-the-offer) | 거부 |
 
 **revoke**
 
@@ -112,11 +116,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -172,11 +178,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -233,11 +241,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -286,11 +296,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -345,11 +357,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -397,11 +411,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -466,11 +482,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -518,11 +536,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -587,11 +607,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -617,6 +639,73 @@ Then
 
 ### accept
 
+<a id="answering-a-project-answerer-accepts-the-offer-to-the-project"></a>
+
+#### [a-project-answerer-accepts-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
+
+프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 받아들이면 받아들인 공유가 통째로 옵니다
+
+Given
+
+- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 범위의 공유 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+      - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 share-lender-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-lender-1: entity_share 전체에 CREATE 허용
+    - 역할 share-lender-1: entity_share 전체에 READ 허용
+    - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 share-lender-1 보유
+    - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: entity_share 전체에 READ 허용
+    - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 share-recipient-2 보유
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
+    - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
+    - 역할 share-recipient-1: entity_share 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 프로젝트 borrowing-team-1
+  - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
+
+When
+
+- EntityShareAdapter.accept: user-2이 폴더 folder-1의 공유 제안을 받아들입니다
+
+Then
+
+- 그 공유 전체가 응답으로 옵니다
+  - sharer_user_id: 미리 만든 빌려준 사람의 id 와 같다
+  - recipient_entity_type = 'project'
+  - recipient_entity_id: 미리 만든 폴더를 빌린 프로젝트의 id 와 같다
+  - recipient_email = None
+  - target_entity_type = 'vfolder'
+  - target_entity_id: 미리 만든 폴더의 id 와 같다
+  - permissions = []
+  - status = 'accepted'
+  - expires_at = None
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - id: 미리 만든 공유의 id 와 같다
+  - entity_id: 미리 만든 공유의 id 와 같다
+
 <a id="answering-the-recipient-accepts-the-offer"></a>
 
 #### [the-recipient-accepts-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
@@ -639,11 +728,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -676,11 +767,64 @@ Then
   - id: 미리 만든 공유의 id 와 같다
   - entity_id: 미리 만든 공유의 id 와 같다
 
+<a id="answering-a-project-reader-may-not-accept-the-offer-to-the-project"></a>
+
+#### [a-project-reader-may-not-accept-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
+
+프로젝트 앞으로 온 제안을 그 프로젝트에서 공유를 읽을 수만 있는 사용자가 받아들이면 권한 부족으로 거부됩니다
+
+Given
+
+- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 범위의 공유 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+      - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 share-lender-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-lender-1: entity_share 전체에 CREATE 허용
+    - 역할 share-lender-1: entity_share 전체에 READ 허용
+    - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 share-lender-1 보유
+    - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: entity_share 전체에 READ 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 share-recipient-2 보유
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
+    - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
+    - 역할 share-recipient-1: entity_share 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 프로젝트 borrowing-team-1
+  - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
+
+When
+
+- EntityShareAdapter.accept: user-2이 폴더 folder-1의 공유 제안을 받아들입니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
 <a id="answering-a-user-granted-nothing-may-not-accept-the-offer"></a>
 
 #### [a-user-granted-nothing-may-not-accept-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-아무 권한도 없는 사용자가 제안을 받아들이면 권한 부족으로 거부됩니다
+아무 권한도 없는 사용자가 제안을 받아들이면 공유를 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -698,11 +842,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -724,7 +870,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: NotEnoughPermission
+  - 거부: GenericBadRequest
 
 ### cancel
 
@@ -750,11 +896,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -809,11 +957,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -861,11 +1011,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -919,11 +1071,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -948,6 +1102,74 @@ Then
 
 ### leave
 
+<a id="withdrawing-a-project-answerer-leaves-the-share-the-project-took"></a>
+
+#### [a-project-answerer-leaves-the-share-the-project-took](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
+
+프로젝트에서 공유에 답할 수 있는 사용자가 그 프로젝트가 빌린 공유에서 탈퇴하면 회수된 공유가 통째로 옵니다
+
+Given
+
+- 프로젝트 폴더 하나와, 다른 프로젝트에 빌려준 공유, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 범위의 공유 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+      - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 share-lender-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-lender-1: entity_share 전체에 CREATE 허용
+    - 역할 share-lender-1: entity_share 전체에 READ 허용
+    - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 share-lender-1 보유
+    - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: entity_share 전체에 READ 허용
+    - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 share-recipient-2 보유
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
+    - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
+    - 역할 share-recipient-1: entity_share 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 프로젝트 borrowing-team-1
+  - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
+  - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 받는 사람이 받아들임
+
+When
+
+- EntityShareAdapter.leave: user-2이 폴더 folder-1의 공유를 빌린 공유에서 탈퇴합니다
+
+Then
+
+- 그 공유 전체가 응답으로 옵니다
+  - sharer_user_id: 미리 만든 빌려준 사람의 id 와 같다
+  - recipient_entity_type = 'project'
+  - recipient_entity_id: 미리 만든 폴더를 빌린 프로젝트의 id 와 같다
+  - recipient_email = None
+  - target_entity_type = 'vfolder'
+  - target_entity_id: 미리 만든 폴더의 id 와 같다
+  - permissions = []
+  - status = 'revoked'
+  - expires_at = None
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - id: 미리 만든 공유의 id 와 같다
+  - entity_id: 미리 만든 공유의 id 와 같다
+
 <a id="withdrawing-the-recipient-leaves-the-share"></a>
 
 #### [the-recipient-leaves-the-share](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
@@ -970,11 +1192,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1012,7 +1236,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-leave-the-share](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
 
-아무 권한도 없는 사용자가 공유에서 탈퇴해도 권한 부족으로 거부됩니다
+아무 권한도 없는 사용자가 공유에서 탈퇴해도 공유를 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -1030,11 +1254,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1056,9 +1282,76 @@ When
 Then
 
 - 거부됩니다
-  - 거부: NotEnoughPermission
+  - 거부: GenericBadRequest
 
 ### reject
+
+<a id="answering-a-project-answerer-rejects-the-offer-to-the-project"></a>
+
+#### [a-project-answerer-rejects-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
+
+프로젝트 앞으로 온 제안을 그 프로젝트에서 공유에 답할 수 있는 사용자가 거절하면 거절된 공유가 통째로 옵니다
+
+Given
+
+- 프로젝트 폴더 하나와, 다른 프로젝트에 보낸 제안, 그리고 자기 스코프와 폴더를 빌린 프로젝트에서 공유 권한을 받은 사람
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 범위의 공유 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+      - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 share-lender-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-lender-1: entity_share 전체에 CREATE 허용
+    - 역할 share-lender-1: entity_share 전체에 READ 허용
+    - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 share-lender-1 보유
+    - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: entity_share 전체에 READ 허용
+    - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
+    - 역할 share-recipient-2: project 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 share-recipient-2 보유
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
+    - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
+    - 역할 share-recipient-1: entity_share 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 share-recipient-1 보유
+    - 역할 share-recipient-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-3: user 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 READ 허용
+    - 역할 share-recipient-3: entity_share 전체에 UPDATE 허용
+    - 역할 share-recipient-3: entity_share 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 share-recipient-3 보유
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 프로젝트 borrowing-team-1
+  - 프로젝트에 보낸 vfolder 공유 제안 project-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
+
+When
+
+- EntityShareAdapter.reject: user-2이 폴더 folder-1의 공유 제안을 거절합니다
+
+Then
+
+- 그 공유 전체가 응답으로 옵니다
+  - sharer_user_id: 미리 만든 빌려준 사람의 id 와 같다
+  - recipient_entity_type = 'project'
+  - recipient_entity_id: 미리 만든 폴더를 빌린 프로젝트의 id 와 같다
+  - recipient_email = None
+  - target_entity_type = 'vfolder'
+  - target_entity_id: 미리 만든 폴더의 id 와 같다
+  - permissions = []
+  - status = 'rejected'
+  - expires_at = None
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - id: 미리 만든 공유의 id 와 같다
+  - entity_id: 미리 만든 공유의 id 와 같다
 
 <a id="answering-the-recipient-rejects-the-offer"></a>
 
@@ -1082,11 +1375,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1123,7 +1418,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-reject-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-아무 권한도 없는 사용자가 제안을 거절해도 권한 부족으로 거부됩니다
+아무 권한도 없는 사용자가 제안을 거절해도 공유를 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -1141,11 +1436,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1167,7 +1464,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: NotEnoughPermission
+  - 거부: GenericBadRequest
 
 ### revoke
 
@@ -1193,11 +1490,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용
@@ -1253,11 +1552,13 @@ Given
     - 역할 share-lender-1: entity_share 전체에 READ 허용
     - 역할 share-lender-1: entity_share 전체에 SOFT_DELETE 허용
     - 일반 사용자 user-1: 역할 share-lender-1 보유
-  - 자기 스코프의 공유 권한을 받은 사용자 준비
+  - 자기 자신을 읽을 수 있고 자기 스코프의 공유 권한을 받은 사용자 준비
     - 역할 share-recipient-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-1: user 전체에 READ 허용
     - 역할 share-recipient-1: entity_share 전체에 READ 허용
     - 일반 사용자 user-1: 역할 share-recipient-1 보유
     - 역할 share-recipient-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 share-recipient-2: user 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 READ 허용
     - 역할 share-recipient-2: entity_share 전체에 UPDATE 허용
     - 역할 share-recipient-2: entity_share 전체에 SOFT_DELETE 허용

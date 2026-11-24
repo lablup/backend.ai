@@ -37,10 +37,10 @@ from ai.backend.common.dto.manager.auth.response import (
     MyIpResponse,
     SignoutResponse,
     SignupResponse,
-    SSHKeypairResponse,
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import (
@@ -50,6 +50,7 @@ from ai.backend.common.dto.manager.auth.types import (
 )
 from ai.backend.common.dto.manager.v2.user.request import UpdatePasswordInput
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
@@ -57,7 +58,6 @@ from ai.backend.manager.dto.auth import SignupHeader
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
 from ai.backend.manager.services.auth.actions.logout import LogoutAction
@@ -294,23 +294,6 @@ class AuthHandler:
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
-    # generate_ssh_keypair (PATCH /auth/ssh-keypair)
-    # ------------------------------------------------------------------
-
-    async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
-        result = await self._auth.generate_ssh_keypair.run(
-            GenerateSSHKeypairAction(
-                user_id=UserID(ctx.user_uuid),
-                access_key=ctx.access_key,
-            )
-        )
-        resp = SSHKeypairResponse(
-            ssh_public_key=result.ssh_keypair.ssh_public_key,
-            ssh_private_key=result.ssh_keypair.ssh_private_key,
-        )
-        return APIResponse.build(HTTPStatus.OK, resp)
-
-    # ------------------------------------------------------------------
     # upload_ssh_keypair (POST /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
@@ -319,17 +302,12 @@ class AuthHandler:
     ) -> APIResponse:
         params = body.parsed
         pubkey = f"{params.pubkey.rstrip()}\n"
-        privkey = f"{params.privkey.rstrip()}\n"
         result = await self._auth.upload_ssh_keypair.run(
             UploadSSHKeypairAction(
                 user_id=UserID(ctx.user_uuid),
-                public_key=pubkey,
-                private_key=privkey,
-                access_key=ctx.access_key,
+                public_key=SSHPublicKey(pubkey),
+                access_key=AccessKey(ctx.access_key),
             )
         )
-        resp = SSHKeypairResponse(
-            ssh_public_key=result.ssh_keypair.ssh_public_key,
-            ssh_private_key=result.ssh_keypair.ssh_private_key,
-        )
+        resp = UploadSSHKeypairResponse(ssh_public_key=result.public_key)
         return APIResponse.build(HTTPStatus.OK, resp)

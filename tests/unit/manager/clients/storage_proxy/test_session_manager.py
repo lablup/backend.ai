@@ -180,7 +180,7 @@ class TestStorageSessionManager:
         client = storage_scenario.manager.get_manager_facing_client("shared")
         pool = storage_scenario.manager._proxies["shared"].endpoint_pool
         stream = cast(
-            AsyncGenerator[bytes, None],
+            AsyncGenerator[bytes],
             client.fetch_file_content_streaming("volume", "folder", "file"),
         )
         try:

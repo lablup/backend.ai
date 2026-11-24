@@ -57,13 +57,13 @@ from ai.backend.manager.models.image.scopes import (
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher, ReferenceImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.minilang import EnumFieldItem
+from ai.backend.manager.models.minilang.field_spec import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
-from ai.backend.manager.models.rbac import ScopeType
+from ai.backend.manager.models.rbac.base import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole
@@ -386,25 +386,24 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         items: Sequence[Image],
         domain_name: str,
     ) -> Sequence[Image]:
-        from ai.backend.manager.models.domain.row import domains
+        from ai.backend.manager.models.domain.row import DomainRow
+        from ai.backend.manager.models.domain_container_registry_relation.row import (
+            DomainContainerRegistryRelationRow,
+        )
+        from ai.backend.manager.models.image.row import ImageRow
 
-        async with ctx.db.begin() as conn:
-            query = (
-                sa.select(domains.c.allowed_docker_registries)
-                .select_from(domains)
-                .where(domains.c.name == domain_name)
-            )
-            result = await conn.execute(query)
-            allowed_docker_registries = result.scalar()
-
-        if allowed_docker_registries is None:
-            return []
-
-        filtered_items: list[Image] = [
-            item for item in items if item.registry in allowed_docker_registries
-        ]
-
-        return filtered_items
+        related_registries = (
+            sa.select(DomainContainerRegistryRelationRow.container_registry_id)
+            .join(DomainRow, DomainRow.id == DomainContainerRegistryRelationRow.domain_id)
+            .where(DomainRow.name == domain_name)
+        )
+        query = sa.select(ImageRow.id).where(
+            ImageRow.id.in_([item.id for item in items]),
+            ImageRow.registry_id.in_(related_registries),
+        )
+        async with ctx.db.begin_readonly() as conn:
+            allowed_ids = set((await conn.execute(query)).scalars())
+        return [item for item in items if item.id in allowed_ids]
 
     def matches_filter(
         self,
@@ -939,18 +938,19 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.purge_image_by_id.run(
-            PurgeImageByIdAction(
-                image_id=ImageID(image_uuid),
-            )
-        )
-
+        # The untag reads the image row, so it runs while the row still exists.
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.run(
                 UntagImageFromRegistryAction(
                     image_id=ImageID(image_uuid),
                 )
             )
+
+        result = await ctx.processors.image.purge_image_by_id.run(
+            PurgeImageByIdAction(
+                image_id=ImageID(image_uuid),
+            )
+        )
 
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 

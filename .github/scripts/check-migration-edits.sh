@@ -20,8 +20,10 @@
 #
 # `released` names a migration that has been through a release cut, `unreleased`
 # one merged during the current development cycle, and `allowed` either of the
-# two on a pull request carrying the override label. Exit 1 when a finding
-# stands, 0 when there is none or the label carries them all.
+# two on a pull request carrying the override label. `unmarked` names a
+# migration added under manager/models/alembic/versions/ without a `# Part of:`
+# comment (at line start or after code); the label does not cover it. Exit 1
+# when a finding stands, 0 when there is none or the label carries them all.
 #
 # Whether a migration has been released is read off its `# Part of:` comment,
 # which `scripts/freeze_release_version.py` rewrites from NEXT_RELEASE_VERSION
@@ -102,12 +104,22 @@ describe_migration() {
 
 released=""
 unreleased=""
+unmarked=""
 
 while IFS="$(printf '\t')" read -r status old new; do
   # A diff that found nothing still reaches the loop as one empty line.
   [ -n "$status" ] || continue
   case "${status%%[0-9]*}" in
-    A) continue ;;
+    A)
+      case "$old" in
+        */__init__.py) continue ;;
+        src/ai/backend/manager/models/alembic/versions/*.py)
+          if ! git show "$head_sha:$old" 2>/dev/null | grep -qE '(^|[[:space:]])# Part of:'; then
+            unmarked="${unmarked}unmarked	adds	${old}	has no # Part of: comment
+"
+          fi ;;
+      esac
+      continue ;;
     M) verb="rewrites"; path="$old" ;;
     D) verb="deletes"; path="$old" ;;
     R) verb="renames"; path="$old" ;;
@@ -132,17 +144,27 @@ $(git diff --name-status --find-renames "$base_sha...$head_sha" \
 EOF
 
 findings="${released}${unreleased}"
-if [ -z "$findings" ]; then
-  echo "The pull request edits no existing migration." >&2
+if [ -z "$findings" ] && [ -z "$unmarked" ]; then
+  echo "The pull request edits no existing migration and every new one carries # Part of:." >&2
   exit 0
 fi
 
-if [ "$overridden" = true ]; then
-  printf '%s' "$findings" | sed 's/^[a-z]*/allowed/'
-  echo "The pull request carries '$override_label'; the findings above stand as a record." >&2
-  exit 0
+status=0
+if [ -n "$findings" ]; then
+  if [ "$overridden" = true ]; then
+    printf '%s' "$findings" | sed 's/^[a-z]*/allowed/'
+    echo "The pull request carries '$override_label'; the findings above stand as a record." >&2
+  else
+    printf '%s' "$findings"
+    echo "A migration already applied elsewhere cannot be changed in place -- add a new migration instead, or carry '$override_label' to record why this one has to change. See src/ai/backend/manager/models/alembic/AGENTS.md." >&2
+    status=1
+  fi
 fi
 
-printf '%s' "$findings"
-echo "A migration already applied elsewhere cannot be changed in place -- add a new migration instead, or carry '$override_label' to record why this one has to change. See src/ai/backend/manager/models/alembic/AGENTS.md." >&2
-exit 1
+# The label covers edits to released migrations only, never a missing marker.
+if [ -n "$unmarked" ]; then
+  printf '%s' "$unmarked"
+  echo "A new manager migration needs a '# Part of: NEXT_RELEASE_VERSION' comment. See src/ai/backend/manager/models/alembic/AGENTS.md." >&2
+  status=1
+fi
+exit "$status"

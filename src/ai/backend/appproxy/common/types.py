@@ -25,6 +25,10 @@ from ai.backend.appproxy.common.defs import (
     WORKER_WILDCARD_DOMAIN_LABEL,
 )
 from ai.backend.appproxy.common.errors.service import WorkerFrontendLabelsInvalid
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     BackendAISchema,
@@ -287,18 +291,18 @@ class SerializableCircuit(BackendAISchema):
 class SessionConfig(BackendAISchema):
     model_config = ConfigDict(populate_by_name=True)
 
-    id: Annotated[UUID | None, Field(default=None)]
-    user_uuid: UUID
+    id: Annotated[SessionID | None, Field(default=None)]
+    user_uuid: UserID
     # Renamed from ``group_id`` to ``project_id`` to align with v2 naming.
     # ``group_id`` is accepted as a validation alias so older Manager peers
     # that still send the legacy key continue to work on the wire.
-    project_id: UUID = Field(validation_alias=AliasChoices("project_id", "group_id"))
+    project_id: ProjectID = Field(validation_alias=AliasChoices("project_id", "group_id"))
     access_key: Annotated[str | None, Field(default=None)]
     domain_name: str
 
 
 class EndpointConfig(BackendAISchema):
-    id: UUID
+    id: DeploymentID
     runtime_variant: Annotated[RuntimeVariant | None, Field(default=None)]
     existing_url: AnyUrl | None
 

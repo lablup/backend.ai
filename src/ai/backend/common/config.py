@@ -198,6 +198,18 @@ class PreStartAction(BaseConfigModel):
     )
 
 
+class ServiceArgumentInterpolationDelimiter(BaseConfigModel):
+    start: str = Field(min_length=1, description="Opening delimiter.", examples=["{{"])
+    end: str = Field(min_length=1, description="Closing delimiter.", examples=["}}"])
+
+
+class ServiceArgumentInterpolation(BaseConfigModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiter] = Field(
+        min_length=1,
+        description="Delimiters that mark the variables to fill in the service arguments.",
+    )
+
+
 class ModelHealthCheck(BaseConfigModel):
     enable: bool = Field(
         default=False,
@@ -1020,11 +1032,10 @@ def find_config_file(daemon_name: str) -> Path:
     for _path in toml_paths:
         if _path.is_file():
             return _path
-    else:
-        searched_paths = ",".join(map(str, toml_paths))
-        raise ConfigurationError({
-            "find_config_file()": f"Could not read config from: {searched_paths}",
-        })
+    searched_paths = ",".join(map(str, toml_paths))
+    raise ConfigurationError({
+        "find_config_file()": f"Could not read config from: {searched_paths}",
+    })
 
 
 def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:

@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.3.0",
         description="Query audit logs with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_audit_logs_v2(
     info: Info[StrawberryGQLContext],
     filter: AuditLogFilterGQL | None = None,
@@ -76,7 +76,7 @@ async def admin_audit_logs_v2(
             "All scope items are OR'd; raises an error if every field is empty."
         ),
     )
-)  # type: ignore[misc]
+)
 async def scoped_audit_logs_v2(
     info: Info[StrawberryGQLContext],
     scope: AuditLogScopeGQL,

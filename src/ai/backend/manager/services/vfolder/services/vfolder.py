@@ -129,10 +129,6 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.lookup import (
-    LookupVFolderAction,
-    LookupVFolderActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
     PartialBulkDeleteVFoldersAction,
 )
@@ -287,20 +283,6 @@ class VFolderService:
                 )
             )
         return PartialBulkResult(items=items)
-
-    async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
-        """Resolve one vfolder name into its id.
-
-        No access checking — the session-create path that still accepts names in
-        ``creation_config["mounts"]`` validates the resolved ids downstream.
-        """
-        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names([
-            action.vfolder_name
-        ])
-        vfolder_id = name_to_id.get(action.vfolder_name)
-        if vfolder_id is None:
-            raise VFolderNotFound(extra_data=[action.vfolder_name])
-        return LookupVFolderActionResult(vfolder_uuid=VFolderUUID(vfolder_id))
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         """Create the vfolder the action's insert spec describes.
@@ -1394,7 +1376,7 @@ class VFolderService:
         user_info = await self._vfolder_repository.get_user_info(action.user_id)
         if not user_info:
             raise VFolderInvalidParameter("No such user.")
-        user_role, user_domain_name = user_info
+        _user_role, user_domain_name = user_info
 
         source_vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 

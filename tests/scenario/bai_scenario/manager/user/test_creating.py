@@ -537,10 +537,7 @@ def _created_keypair_verdicts(
         Same(f"{at}keypair.is_default", node.is_default, True),
         Same(f"{at}keypair.rate_limit", node.rate_limit, RATE_LIMIT),
         Same(f"{at}keypair.resource_policy", node.resource_policy, laid.keypair_policy),
-        Skipped(
-            f"{at}keypair.ssh_public_key",
-            Says("매니저가 만든 RSA 키입니다", english="it is the RSA key the manager made"),
-        ),
+        Same(f"{at}keypair.ssh_public_key", node.ssh_public_key, None),
         Same(f"{at}keypair.num_queries", node.num_queries, 0),
         Same(f"{at}keypair.last_used", node.last_used, None),
         Held(

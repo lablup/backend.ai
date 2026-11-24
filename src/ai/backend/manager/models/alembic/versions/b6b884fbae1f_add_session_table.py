@@ -404,17 +404,15 @@ def upgrade() -> None:
                     sess = session_map[sess_id]
                     try:
                         if sess["created_at"] is not None and row.created_at is not None:
-                            if sess["created_at"] > row.created_at:
-                                sess["created_at"] = row.created_at
-                                # st_change = row["st_change"]
+                            sess["created_at"] = min(sess["created_at"], row.created_at)
+                            # st_change = row["st_change"]
                     except (TypeError, ValueError):
                         pass
 
                     try:
                         if sess["starts_at"] is not None and row.starts_at is not None:
-                            if sess["starts_at"] > row.starts_at:
-                                sess["starts_at"] = row.starts_at
-                                # st_change = row["st_change"]
+                            sess["starts_at"] = min(sess["starts_at"], row.starts_at)
+                            # st_change = row["st_change"]
                     except (TypeError, ValueError):
                         pass
 
@@ -425,9 +423,8 @@ def upgrade() -> None:
 
                     try:
                         if sess["terminated_at"] is not None and row.terminated_at is not None:
-                            if sess["terminated_at"] < row.terminated_at:
-                                sess["terminated_at"] = row.terminated_at
-                                # st_change = row["status_changed"]
+                            sess["terminated_at"] = max(sess["terminated_at"], row.terminated_at)
+                        # st_change = row["status_changed"]
                         elif sess["terminated_at"] is None:
                             pass
                         elif row.terminated_at is None:

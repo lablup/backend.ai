@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 def make_app_ctx(
     pidx: int,
     config_provider: ManagerConfigProvider,
-) -> Callable[[web.Application], AsyncGenerator[None, None]]:
-    async def app_ctx(_app: web.Application) -> AsyncGenerator[None, None]:
+) -> Callable[[web.Application], AsyncGenerator[None]]:
+    async def app_ctx(_app: web.Application) -> AsyncGenerator[None]:
         if pidx == 0:
             await config_provider.legacy_etcd_config_loader.register_myself()
         yield

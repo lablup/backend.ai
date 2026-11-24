@@ -68,7 +68,7 @@ class TestVfolderSearchInProject:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -102,7 +102,7 @@ class TestVfolderSearchInProject:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create two projects with vfolders: project_a has 2 vfolders, project_b has 1."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"

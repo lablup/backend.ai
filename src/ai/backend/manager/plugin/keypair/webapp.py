@@ -75,6 +75,8 @@ async def _webapp_shutdown(app: web.Application) -> None:
 
 
 class KeypairAuthWebAppPlugin(WebappPlugin):
+    require_explicit_allow = True
+
     @override
     async def init(self, context: Any = None) -> None:
         pass

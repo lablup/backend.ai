@@ -37,8 +37,6 @@ class UserKeypairSeed(BackendAISchema):
     is_default: bool = False
     resource_policy_id: KeyPairResourcePolicyUUID
     rate_limit: int | None = Field(default=None, ge=-(2**31), le=2**31 - 1)
-    ssh_public_key: str | None = None
-    ssh_private_key: str | None = None
 
     @field_validator("secret_key")
     @classmethod
@@ -59,8 +57,6 @@ class UserKeypairSeed(BackendAISchema):
             is_default=self.is_default,
             resource_policy_id=self.resource_policy_id,
             rate_limit=self.rate_limit,
-            ssh_public_key=self.ssh_public_key,
-            ssh_private_key=self.ssh_private_key,
         )
 
 

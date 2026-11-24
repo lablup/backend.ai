@@ -103,7 +103,7 @@ class _RefusedUpserter(_ShareUpserter):
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, [DanglingUpsertTestRow]):
         yield database_connection
 

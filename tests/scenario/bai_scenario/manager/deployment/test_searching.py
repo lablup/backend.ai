@@ -11,14 +11,20 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
     ScopedSearchDeploymentsInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import AdminSearchDeploymentsPayload
-from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    DeploymentPolicyInfo,
+    DeploymentScope,
+    RollingUpdateConfigInfo,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -123,13 +129,16 @@ class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 
 @dataclass(frozen=True)
 class EveryLaidDeploymentIsFound(Then[ManyDeploymentsAndACaller, Searched]):
-    """답으로 받은 배포가 모두, 그리고 그것만 세어진다."""
+    """답으로 받은 배포가 모두, 그리고 그것만 세어진다. 배포 정책은 가진 배포에만 온다."""
 
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 배포가 모두, 그리고 그것만 셉니다",
-            english="every deployment seeded in advance is counted, and nothing else",
+            "미리 저장한 배포가 모두, 그리고 그것만 셉니다. 배포 정책은 정책을 가진 배포에만 옵니다",
+            english=(
+                "every deployment seeded in advance is counted, and nothing else; the "
+                "deployment policy comes only with the deployment that has one"
+            ),
         )
 
     @override
@@ -142,6 +151,25 @@ class EveryLaidDeploymentIsFound(Then[ManyDeploymentsAndACaller, Searched]):
                 "items",
                 sorted(one.metadata.name for one in payload.items),
                 sorted(one.metadata.name for one in laid.laid),
+            ),
+            Same(
+                "items[].policy",
+                {one.metadata.name: one.policy for one in payload.items},
+                {
+                    one.metadata.name: (
+                        DeploymentPolicyInfo(
+                            strategy=DeploymentStrategy.ROLLING,
+                            rolling_update=RollingUpdateConfigInfo(
+                                max_surge=IntOrPercent(count=1),
+                                max_unavailable=IntOrPercent(count=0),
+                            ),
+                            blue_green=None,
+                        )
+                        if one.id == laid.named.id
+                        else None
+                    )
+                    for one in laid.laid
+                },
             ),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),

@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-시나리오: 미완성 3 / 14
+시나리오: 미완성 3 / 17
 
 - ops 구성 (12)
   - bulk_get_ids: 대표 성공 ✓ · 대표 거부 ✓
@@ -17,9 +17,12 @@
   - restore: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
-- 직접 구현 (2)
+- 직접 구현 (5)
   - create: 성공 있음 2 · 거부 있음 4 (global_scope)
+  - create_container_registry_relations: 성공 있음 2 · 거부 있음 2 (relation)
   - purge: 성공 있음 1 · 거부 있음 4 (single_entity)
+  - purge_container_registry_relations: 성공 있음 2 · 거부 있음 1 (relation)
+  - sync_registry_relations: 성공 있음 2 · 거부 있음 1 (relation)
 
 **bulk_get_ids**
 
@@ -132,6 +135,15 @@
 | [superadmin 이 아닌 사용자가 도메인을 생성하려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | 거부 |
 | [엔티티 권한 집행을 꺼도 도메인 생성은 여전히 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사하기 때문입니다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | 거부 |
 
+**create_container_registry_relations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 도메인과 레지스트리 사이에 relation 을 만들 수 있습니다](#creating_registry_relations-a-user-granted-on-both-scopes-creates-a-domain-registry-relation) | 성공 |
+| [이미 있는 relation 을 다시 만들어도 거부되지 않고, 응답에서는 빠집니다](#creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response) | 성공 |
+| [도메인과 존재하지 않는 레지스트리 사이에 relation 을 만들려 하면 그 레지스트리가 없다는 이유로 거부됩니다](#creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | 거부 |
+| [레지스트리에만 권한을 받은 사용자가 도메인과 그 레지스트리 사이에 relation 을 만들려 하면 거부됩니다](#creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation) | 거부 |
+
 **purge**
 
 | 시나리오 | 판정 |
@@ -141,6 +153,22 @@
 | [사용자가 딸린 도메인은 superadmin 이라도 purge 할 수 없습니다](#deleting-a-domain-holding-a-user-is-not-purged) | 거부 |
 | [아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없습니다](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | 거부 |
 | [아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부됩니다](#deleting-purging-a-name-nothing-answers-to-is-not-found) | 거부 |
+
+**purge_container_registry_relations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 도메인과 레지스트리 사이의 relation 을 지울 수 있습니다](#purging_registry_relations-a-user-granted-on-both-scopes-purges-a-domain-registry-relation) | 성공 |
+| [없는 relation 을 지워도 거부되지 않고, 응답에서는 빠집니다](#purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response) | 성공 |
+| [레지스트리에만 권한을 받은 사용자가 도메인과 그 레지스트리 사이의 relation 을 지우려 하면 거부됩니다](#purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation) | 거부 |
+
+**sync_registry_relations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 레지스트리를 넘겨 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다](#syncing_registry_relations-giving-a-registry-links-the-domain-to-it) | 성공 |
+| [relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | 성공 |
+| [도메인에 아무 권한이 없는 사용자가 relation 을 맞추려 하면 거부됩니다](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | 거부 |
 
 ### bulk_get_ids
 
@@ -1645,6 +1673,148 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
+### create_container_registry_relations
+
+<a id="creating_registry_relations-a-user-granted-on-both-scopes-creates-a-domain-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-creates-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
+
+도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 도메인과 레지스트리 사이에 relation 을 만들 수 있습니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.create_container_registry_relations: user-1이 home-1과 그 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 새로 만든 도메인과 레지스트리 relation 하나가 옵니다
+  - items: 요청한 도메인과 레지스트리 한 쌍와 같다
+
+<a id="creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response"></a>
+
+#### [creating-an-existing-relation-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
+
+이미 있는 relation 을 다시 만들어도 거부되지 않고, 응답에서는 빠집니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명, 도메인과 그 레지스트리 사이에 relation 이 이미 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.create_container_registry_relations: user-1이 home-1과 그 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 빈 목록이 옵니다
+  - items = []
+
+<a id="creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
+
+도메인과 존재하지 않는 레지스트리 사이에 relation 을 만들려 하면 그 레지스트리가 없다는 이유로 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - superadmin user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.create_container_registry_relations: user-1이 home-1과 존재하지 않는 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: ContainerRegistryNotFound
+
+<a id="creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-create-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_creating_registry_relations.py): pass
+
+레지스트리에만 권한을 받은 사용자가 도메인과 그 레지스트리 사이에 relation 을 만들려 하면 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 레지스트리에만 권한이 있는 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- DomainAdapter.create_container_registry_relations: user-1이 home-1과 그 레지스트리 사이에 relation 을 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
 ### purge
 
 <a id="deleting-purging-a-domain-nothing-else-refers-to-succeeds"></a>
@@ -1780,4 +1950,192 @@ Then
 
 - 거부됩니다
   - 거부: EntityNotFoundError
+
+### purge_container_registry_relations
+
+<a id="purging_registry_relations-a-user-granted-on-both-scopes-purges-a-domain-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-purges-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_purging_registry_relations.py): pass
+
+도메인과 레지스트리 두 스코프 모두에 권한을 받은 사용자는 그 도메인과 레지스트리 사이의 relation 을 지울 수 있습니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명, 도메인과 그 레지스트리 사이에 relation 이 이미 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.purge_container_registry_relations: user-1이 home-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 지운 도메인과 레지스트리 relation 하나가 옵니다
+  - items: 요청한 도메인과 레지스트리 한 쌍와 같다
+
+<a id="purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response"></a>
+
+#### [purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/domain/test_purging_registry_relations.py): pass
+
+없는 relation 을 지워도 거부되지 않고, 응답에서는 빠집니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 도메인과 레지스트리에 권한이 있는 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-domain 권한을 받은 사용자 준비
+    - 역할 allow-on-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-domain-1: domain 전체에 CREATE 허용
+    - 역할 allow-on-domain-1: domain 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-domain-1 보유
+
+When
+
+- DomainAdapter.purge_container_registry_relations: user-1이 home-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 빈 목록이 옵니다
+  - items = []
+
+<a id="purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-purge-a-domain-registry-relation](/tests/scenario/bai_scenario/manager/domain/test_purging_registry_relations.py): pass
+
+레지스트리에만 권한을 받은 사용자가 도메인과 그 레지스트리 사이의 relation 을 지우려 하면 거부됩니다
+
+Given
+
+- 도메인 하나, 레지스트리 하나, 레지스트리에만 권한이 있는 사용자 한 명, 도메인과 그 레지스트리 사이에 relation 이 이미 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- DomainAdapter.purge_container_registry_relations: user-1이 home-1과 그 레지스트리 사이의 relation 을 지웁니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### sync_registry_relations
+
+<a id="syncing_registry_relations-giving-a-registry-links-the-domain-to-it"></a>
+
+#### [giving-a-registry-links-the-domain-to-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+슈퍼관리자가 레지스트리를 넘겨 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다
+
+Given
+
+- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 superadmin 한 명이 있습니다
+  - 도메인 allowing-1
+  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리에 맞춥니다
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않습니다
+  - response = None
+
+<a id="syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it"></a>
+
+#### [leaving-a-linked-registry-out-unlinks-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다
+
+Given
+
+- 도메인 하나와 레지스트리 하나, 둘 사이에 relation 이 이미 있고, 그 도메인에 속한 superadmin 한 명이 있습니다
+  - 도메인 allowing-1
+  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
+  - 도메인 allowing-1 가 허용한 컨테이너 레지스트리 allowed-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 빈 목록에 맞춥니다
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않습니다
+  - response = None
+
+<a id="syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations"></a>
+
+#### [a-user-granted-nothing-may-not-sync-registry-relations](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+도메인에 아무 권한이 없는 사용자가 relation 을 맞추려 하면 거부됩니다
+
+Given
+
+- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 user 한 명이 있습니다
+  - 도메인 allowing-1
+  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리에 맞춥니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 

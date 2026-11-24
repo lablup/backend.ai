@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Final, override
 
 import aiofiles
 import aiotools
@@ -68,6 +68,7 @@ from .types import (
     PackageSource,
     Platform,
     PrerequisiteError,
+    ProxyBackend,
     ServerAddr,
     ServiceConfig,
     SftpAgentOptions,
@@ -75,6 +76,18 @@ from .types import (
 from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
+
+# Must match the entrypoints in configs/traefik/traefik.halfstack.yml.
+TRAEFIK_API_PORT: Final[int] = 8080
+TRAEFIK_PORT_RANGE: Final[tuple[int, int]] = (10205, 10300)
+# The coordinator emits wildcard routers on the fixed "domainproxy"
+# entrypoint; the installer swaps the portproxy_* entrypoints for it when the
+# wildcard traffic pattern is selected (same port the builtin wildcard
+# frontend binds).
+TRAEFIK_DOMAINPROXY_PORT: Final[int] = 10250
+APPPROXY_TRAEFIK_PLUGIN_VERSION: Final[str] = "0.0.5"
+APPPROXY_TRAEFIK_PLUGIN_REPO: Final[str] = "lablup/backend.ai-appproxy-worker-traefik"
+TRAEFIK_MARKER_DIR_PLACEHOLDER: Final[str] = "/__APPPROXY_MARKER_DIR__"
 
 
 class PostGuide(enum.Enum):
@@ -183,6 +196,8 @@ class Context(metaclass=ABCMeta):
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
             harbor=harbor,
             sftp_agent=sftp_agent,
+            frontend_mode=self.install_variable.frontend_mode,
+            proxy_backend=self.install_variable.proxy_backend,
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -629,6 +644,8 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
+        if self.install_variable.proxy_backend == ProxyBackend.TRAEFIK:
+            await self.prepare_traefik_assets(dst_compose_path)
 
     def _halfstack_profile_args(self) -> list[str]:
         profile_args_list: list[str] = []
@@ -639,6 +656,8 @@ class Context(metaclass=ABCMeta):
             profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
+        if self.install_variable.proxy_backend == ProxyBackend.TRAEFIK:
+            profile_args_list.append("--profile traefik")
         return profile_args_list
 
     async def _start_halfstack(self) -> None:
@@ -659,6 +678,51 @@ class Context(metaclass=ABCMeta):
         """,
             cwd=self.install_info.base_path,
         )
+
+    @property
+    def traefik_marker_dir(self) -> Path:
+        return self.install_info.base_path / "volumes" / "traefik" / "marker"
+
+    async def prepare_traefik_assets(self, compose_path: Path) -> None:
+        """Prepare the Traefik static config, appproxy plugin, and marker
+        directory before ``compose up`` starts the "traefik" profile."""
+        self.log_header("Preparing the Traefik assets (app-proxy traefik backend)...")
+        marker_dir = self.traefik_marker_dir
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        src_config_path = self.copy_config("traefik.yml")
+        dst_config_path = src_config_path.with_name("traefik.halfstack.current.yml")
+        src_config_path.rename(dst_config_path)
+        self.sed_in_place(dst_config_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        self.sed_in_place(compose_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        if self.install_variable.frontend_mode == FrontendMode.WILDCARD:
+            # The static config ships port-flavored (portproxy_* entrypoints).
+            # For the wildcard traffic pattern the coordinator emits routers on
+            # the fixed "domainproxy" entrypoint instead, and portproxy_10250
+            # would collide with it on :10250 -- so swap the entrypoint set.
+            yaml = YAML()
+            with dst_config_path.open("r") as fp:
+                static_conf = yaml.load(fp)
+            entrypoints = static_conf["entryPoints"]
+            for name in [k for k in entrypoints if k.startswith("portproxy_")]:
+                del entrypoints[name]
+            entrypoints["domainproxy"] = {
+                "address": f":{TRAEFIK_DOMAINPROXY_PORT}",
+            }
+            with dst_config_path.open("w") as fp:
+                yaml.dump(static_conf, fp)
+        plugin_root = marker_dir.parent
+        plugin_url = (
+            f"https://github.com/{APPPROXY_TRAEFIK_PLUGIN_REPO}/releases/download/"
+            f"{APPPROXY_TRAEFIK_PLUGIN_VERSION}/appproxy-traefik-plugin.tar.gz"
+        )
+        exit_code = await self.run_shell(
+            f'curl -fsSL "{plugin_url}" | tar xz -C "{plugin_root}"',
+        )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to download and extract the appproxy Traefik plugin "
+                f"(exit {exit_code}); URL: {plugin_url}"
+            )
 
     def _halfstack_compose_cmd(self) -> list[str]:
         compose_path = self.install_info.base_path / "docker-compose.halfstack.current.yml"
@@ -731,6 +795,15 @@ class Context(metaclass=ABCMeta):
                 items.extend(document["items"])
         return items
 
+    def read_default_domain_id(self, manager_seeds: Path) -> str:
+        return str(
+            next(
+                item["id"]
+                for item in self.read_seed_items(manager_seeds, "domain")
+                if item["name"] == "default"
+            )
+        )
+
     def write_seed_file(self, path: Path, kind: str, items: Sequence[dict[str, Any]]) -> None:
         with path.open("w", encoding="utf8") as fp:
             YAML(typ="safe").dump({"kind": kind, "version": 1, "items": list(items)}, fp)
@@ -758,11 +831,7 @@ class Context(metaclass=ABCMeta):
             resource_group_id = str(
                 uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
             )
-            default_domain_id = next(
-                item["id"]
-                for item in self.read_seed_items(manager_seeds, "domain")
-                if item["name"] == "default"
-            )
+            default_domain_id = self.read_default_domain_id(manager_seeds)
             resource_groups.append({
                 "id": resource_group_id,
                 "name": sftp.scaling_group,
@@ -786,7 +855,7 @@ class Context(metaclass=ABCMeta):
         self.os_info = await detect_os()
         text = Text()
         text.append("Detected OS info: ")
-        text.append(self.os_info.__rich__())  # type: ignore
+        text.append(self.os_info.__rich__())
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
@@ -978,14 +1047,8 @@ class Context(metaclass=ABCMeta):
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
-            elif accelerator in (
-                Accelerator.CUDA_MOCK,
-                Accelerator.CUDA_MIG_MOCK,
-                Accelerator.ROCM_MOCK,
-            ):
-                plugin_list = ['"ai.backend.accelerator.mock"']
             else:
-                plugin_list = []
+                plugin_list = ['"ai.backend.accelerator.mock"']
 
             await self._configure_mock_accelerator(accelerator)
         else:
@@ -1160,7 +1223,7 @@ class Context(metaclass=ABCMeta):
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
         with toml_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             etcd_table = tomlkit.table()
             etcd_addr_table = tomlkit.inline_table()
             etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
@@ -1170,26 +1233,26 @@ class Context(metaclass=ABCMeta):
             etcd_table["user"] = halfstack.etcd_user
             etcd_table["password"] = halfstack.etcd_password
             data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
+            data["storage-proxy"]["secret"] = service.storage_proxy_random
+            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path
             client_facing_addr_table = tomlkit.inline_table()
             client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
             client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
+            data["api"]["client"]["service-addr"] = client_facing_addr_table
             manager_facing_addr_table = tomlkit.inline_table()
             manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
             manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
+            data["api"]["manager"]["service-addr"] = manager_facing_addr_table
+            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key
             announce_addr_table = tomlkit.inline_table()
             announce_addr_table["host"] = self.install_variable.public_facing_address
             announce_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["announce-addr"] = announce_addr_table  # type: ignore
+            data["api"]["manager"]["announce-addr"] = announce_addr_table
             announce_internal_table = tomlkit.inline_table()
             announce_internal_table["host"] = self.install_variable.public_facing_address
             announce_internal_table["port"] = 16023
-            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table  # type: ignore
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table
+            data["volume"]["volume1"]["path"] = service.vfolder_relpath
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -1226,12 +1289,12 @@ class Context(metaclass=ABCMeta):
         )
 
         with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
-            data["api"][  # type: ignore
-                "endpoint"
-            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value
+            data["api"]["endpoint"] = (
+                f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+            )
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -1255,9 +1318,9 @@ class Context(metaclass=ABCMeta):
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table  # type: ignore
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+            data["session"]["redis"] = redis_table
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -1357,6 +1420,7 @@ class Context(metaclass=ABCMeta):
         tls_advertised = self.install_variable.tls_advertised
         advertised_port = self.install_variable.advertised_port
         wildcard_domain = self.install_variable.wildcard_domain
+        proxy_backend = self.install_variable.proxy_backend
         public_facing_address = self.install_variable.public_facing_address
         apphub_address = self.install_variable.apphub_address
         app_address = self.install_variable.app_address
@@ -1397,6 +1461,20 @@ class Context(metaclass=ABCMeta):
             announce_addr_table["host"] = public_facing_address
             announce_addr_table["port"] = service.appproxy_coordinator_addr.bind.port
             data["proxy_coordinator"]["announce_addr"] = announce_addr_table  # type: ignore[index]
+            if proxy_backend == ProxyBackend.TRAEFIK:
+                # Publish routing rules to etcd for the Traefik dataplane.
+                data["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+                traefik_etcd_addr_table = tomlkit.inline_table()
+                traefik_etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+                traefik_etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+                traefik_etcd_table = tomlkit.table()
+                traefik_etcd_table["namespace"] = "traefik"
+                traefik_etcd_table["addr"] = traefik_etcd_addr_table
+                traefik_etcd_table["user"] = halfstack.etcd_user
+                traefik_etcd_table["password"] = halfstack.etcd_password
+                traefik_table = tomlkit.table()
+                traefik_table["etcd"] = traefik_etcd_table
+                data["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -1434,11 +1512,44 @@ class Context(metaclass=ABCMeta):
             if tls_advertised:
                 data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
 
-            # set frontend mode (port or wildcard)
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
-
-            # configure based on frontend_mode
-            if frontend_mode == FrontendMode.WILDCARD:
+            # Configure based on (traffic pattern, dataplane backend).
+            if proxy_backend == ProxyBackend.TRAEFIK:
+                # Delegate the dataplane to the halfstack Traefik container;
+                # the traffic pattern becomes Traefik's internal sub-mode.
+                data["proxy_worker"]["frontend_mode"] = "traefik"  # type: ignore[index]
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+                traefik_table = tomlkit.table()
+                traefik_table["api_port"] = TRAEFIK_API_PORT
+                traefik_table["last_used_time_marker_directory"] = str(self.traefik_marker_dir)
+                if frontend_mode == FrontendMode.WILDCARD:
+                    if not wildcard_domain:
+                        raise RuntimeError(
+                            "The wildcard traffic pattern with the Traefik backend"
+                            " requires a wildcard domain -- pass --fqdn-prefix (or"
+                            " --app-base-domain) so the installer can derive it."
+                        )
+                    traefik_table["frontend_mode"] = "wildcard"
+                    traefik_wildcard_table = tomlkit.table()
+                    traefik_wildcard_table["domain"] = wildcard_domain
+                    traefik_wildcard_table["advertised_port"] = advertised_port
+                    traefik_wildcard_table["tls_advertised"] = tls_advertised
+                    traefik_table["wildcard_domain"] = traefik_wildcard_table
+                    # Advertise app URLs the same way as the builtin wildcard
+                    # frontend does.
+                    api_advertised_addr_table = tomlkit.inline_table()
+                    api_advertised_addr_table["host"] = app_address
+                    api_advertised_addr_table["port"] = advertised_port
+                    data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+                else:
+                    traefik_table["frontend_mode"] = "port"
+                    traefik_port_proxy_table = tomlkit.table()
+                    traefik_port_proxy_table["advertised_host"] = public_facing_address
+                    traefik_port_proxy_table["port_range"] = list(TRAEFIK_PORT_RANGE)
+                    traefik_table["port_proxy"] = traefik_port_proxy_table
+                data["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
+            elif frontend_mode == FrontendMode.WILDCARD:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
                 # Remove port_proxy section for wildcard mode
                 if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
                     del data["proxy_worker"]["port_proxy"]
@@ -1455,12 +1566,13 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["domain"] = wildcard_domain
                     bind_addr_table = tomlkit.inline_table()
                     bind_addr_table["host"] = "0.0.0.0"
-                    bind_addr_table["port"] = 10250
+                    bind_addr_table["port"] = TRAEFIK_DOMAINPROXY_PORT
                     wildcard_table["bind_addr"] = bind_addr_table
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())  # Add newline before next section
                     data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
             else:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
                 # update port_proxy.advertised_host
                 data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
             data["proxy_worker"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
@@ -1885,8 +1997,24 @@ class Context(metaclass=ABCMeta):
                 }
             ],
         )
+        with self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds:
+            default_domain_id = self.read_default_domain_id(manager_seeds)
+        relation_seed_path = (
+            self.install_info.base_path / "harbor" / "domain-container-registry-seed.yaml"
+        )
+        self.write_seed_file(
+            relation_seed_path,
+            "domain_container_registry",
+            [{"domain_id": default_domain_id, "registry_id": registry_id}],
+        )
         self.log_header("Registering local Harbor as a Backend.AI container registry...")
-        await self.run_manager_cli(["mgr", "seed", "apply", str(seed_path)])
+        await self.run_manager_cli([
+            "mgr",
+            "seed",
+            "apply",
+            str(seed_path),
+            str(relation_seed_path),
+        ])
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
@@ -2397,6 +2525,10 @@ class DockerContext(Context):
     # fails fast when the share is not mounted). Covered by the
     # SYSTEM_STATE_PATH mount of the agent.
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
+    # In-container target of the <base_path>/alembic.ini mount on manager and
+    # manager-cli; /app is the image WORKDIR, so `mgr schema` finds it with
+    # the default `-f alembic.ini` inside the manager container.
+    ALEMBIC_INI_MOUNT = "/app/alembic.ini"
     # Compose service DNS names of the halfstack members (same project via
     # the include: in the services compose file); bridge services address
     # them with the CONTAINER-side ports, not the host-published ones.
@@ -2779,8 +2911,9 @@ class DockerContext(Context):
 
         # Manager schema must exist before seeds and the app-proxy DB step
         # update scaling_groups (mirrors the PackageContext.configure() order).
+        # Use the compose mount explicitly rather than manager-cli's working_dir.
         self.log_header("Initializing manager database schema...")
-        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+        await self.run_manager_cli(["mgr", "schema", "oneshot", "-f", self.ALEMBIC_INI_MOUNT])
 
         self.log_header("Configuring agent...")
         await self.configure_agent()

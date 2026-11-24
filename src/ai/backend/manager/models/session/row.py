@@ -6,28 +6,22 @@ import logging
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    override,
 )
 from uuid import UUID
 
-import aiotools
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
     foreign,
     joinedload,
-    load_only,
     mapped_column,
-    noload,
     relationship,
     selectinload,
 )
@@ -53,7 +47,6 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
@@ -77,7 +70,6 @@ from ai.backend.manager.errors.kernel import (
     MainKernelNotFound,
     SessionNotFound,
     TooManyKernelsFound,
-    TooManySessionsMatched,
 )
 from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.models.base import (
@@ -94,18 +86,6 @@ from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryF
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import (
-    AbstractPermissionContext,
-    AbstractPermissionContextBuilder,
-    DomainScope,
-    ProjectScope,
-    ScopeType,
-    get_predefined_roles_in_scope,
-)
-from ai.backend.manager.models.rbac import (
-    UserScope as UserRBACScope,
-)
-from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -215,7 +195,6 @@ def _build_session_fetch_query(
     *,
     allow_stale: bool = True,
     for_update: bool = False,
-    do_ordering: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select[Any]:
@@ -234,8 +213,6 @@ def _build_session_fetch_query(
         query = query.limit(max_matches).offset(0)
     if for_update:
         query = query.with_for_update()
-    if do_ordering:
-        query = query.order_by(SessionRow.created_at)
     if eager_loading_op is not None:
         query = query.options(*eager_loading_op)
 
@@ -244,25 +221,16 @@ def _build_session_fetch_query(
 
 async def _match_sessions_by_id(
     db_session: SASession,
-    session_id_or_list: SessionId | list[SessionId],
+    session_id: SessionId,
     access_key: AccessKey | None = None,
     *,
-    allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> Sequence[SessionRow]:
-    cond: sa.sql.elements.ColumnElement[bool]
-    if isinstance(session_id_or_list, list):
-        cond = SessionRow.id.in_(session_id_or_list)
-    else:
-        if allow_prefix:
-            cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id_or_list}%")
-        else:
-            cond = SessionRow.id == session_id_or_list
     query = _build_session_fetch_query(
-        cond,
+        SessionRow.id == session_id,
         access_key,
         max_matches=max_matches,
         allow_stale=allow_stale,
@@ -270,34 +238,6 @@ async def _match_sessions_by_id(
         eager_loading_op=eager_loading_op,
     )
 
-    result = await db_session.execute(query)
-    return result.scalars().all()
-
-
-async def _match_sessions_by_name(
-    db_session: SASession,
-    session_name: str,
-    access_key: AccessKey,
-    *,
-    allow_prefix: bool = False,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    max_matches: int | None = None,
-    eager_loading_op: Sequence[_AbstractLoad] | None = None,
-) -> Sequence[SessionRow]:
-    cond: sa.sql.elements.ColumnElement[bool]
-    if allow_prefix:
-        cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
-    else:
-        cond = SessionRow.name == session_name
-    query = _build_session_fetch_query(
-        cond,
-        access_key,
-        max_matches=max_matches,
-        allow_stale=allow_stale,
-        for_update=for_update,
-        eager_loading_op=eager_loading_op,
-    )
     result = await db_session.execute(query)
     return result.scalars().all()
 
@@ -628,56 +568,6 @@ class SessionRow(CreatedAtMixin, Base):
     def project_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return joinedload(cls.group) if not already_joined else contains_eager(cls.group)
 
-    @classmethod
-    def from_dataclass(cls, session_data: SessionData) -> SessionRow:
-        vfolder_mounts = []
-        if session_data.vfolder_mounts:
-            vfolder_mounts = [
-                VFolderMount.from_dataclass(mount) for mount in session_data.vfolder_mounts
-            ]
-
-        instance = cls(
-            name=session_data.name,
-            session_type=session_data.session_type,
-            priority=session_data.priority,
-            cluster_mode=session_data.cluster_mode,
-            cluster_size=session_data.cluster_size,
-            agent_ids=session_data.agent_ids,
-            session_group_id=session_data.session_group_id,
-            scaling_group_name=session_data.resource_group_name,
-            target_sgroup_names=session_data.target_sgroup_names,
-            domain_name=session_data.domain_name,
-            group_id=session_data.group_id,
-            user_uuid=session_data.user_uuid,
-            access_key=session_data.access_key,
-            images=session_data.images,
-            image_ids=session_data.image_ids,
-            tag=session_data.tag,
-            vfolder_mounts=vfolder_mounts,
-            environ=session_data.environ,
-            bootstrap_script=session_data.bootstrap_script,
-            use_host_network=session_data.use_host_network,
-            timeout=session_data.timeout,
-            batch_timeout=session_data.batch_timeout,
-            status_history={},
-            status=session_data.status,
-            status_info=session_data.status_info,
-            status_data=session_data.status_data,
-            callback_url=session_data.callback_url,
-            startup_command=session_data.startup_command,
-            result=session_data.result,
-            num_queries=session_data.num_queries,
-            last_stat=session_data.last_stat,
-            network_type=session_data.network_type,
-            network_id=session_data.network_id,
-            created_at=session_data.created_at,
-            terminated_at=session_data.terminated_at,
-            starts_at=session_data.starts_at,
-            requested_starts_at=session_data.requested_starts_at,
-        )
-        instance.id = SessionId(session_data.id)
-        return instance
-
     def to_dataclass(self, owner: UserData | None = None) -> SessionData:
         return SessionData(
             id=self.id,
@@ -880,148 +770,8 @@ class SessionRow(CreatedAtMixin, Base):
 
         await execute_with_retry(_update)
 
-    @classmethod
-    async def match_sessions(
-        cls,
-        db_session: SASession,
-        session_reference: str | UUID | list[UUID],
-        access_key: AccessKey | None,
-        *,
-        allow_prefix: bool = False,
-        allow_stale: bool = True,
-        for_update: bool = False,
-        max_matches: int | None = 10,
-        eager_loading_op: Sequence[Any] | None = None,
-    ) -> list[SessionRow]:
-        """
-        Match the prefix of session ID or session name among the sessions
-        that belongs to the given access key, and return the list of SessionRow.
-        """
-
-        if isinstance(session_reference, list):
-            query_list = [
-                partial(
-                    _match_sessions_by_id,
-                    session_id_or_list=[SessionId(item) for item in session_reference],
-                    allow_prefix=False,
-                )
-            ]
-        else:
-            query_list = [
-                aiotools.apartial(
-                    _match_sessions_by_name,
-                    session_name=str(session_reference),
-                    allow_prefix=allow_prefix,
-                )
-            ]
-            try:
-                session_id = UUID(str(session_reference))
-                # Fetch id-based query first
-                query_list = [
-                    aiotools.apartial(
-                        _match_sessions_by_id,
-                        session_id_or_list=SessionId(session_id),
-                        allow_prefix=False,
-                    ),
-                    *query_list,
-                ]
-                if allow_prefix:
-                    query_list = [
-                        aiotools.apartial(
-                            _match_sessions_by_id,
-                            session_id_or_list=SessionId(session_id),
-                            allow_prefix=True,
-                        ),
-                        *query_list,
-                    ]
-            except ValueError:
-                pass
-
-        for fetch_func in query_list:
-            rows = await fetch_func(
-                db_session,
-                access_key=access_key,
-                allow_stale=allow_stale,
-                for_update=for_update,
-                max_matches=max_matches,
-                eager_loading_op=eager_loading_op,
-            )
-            if not rows:
-                continue
-            return list(rows)
-        return []
-
-    @classmethod
-    async def get_session(
-        cls,
-        db_session: SASession,
-        session_name_or_id: str | UUID,
-        access_key: AccessKey | None = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] | None = None,
-    ) -> SessionRow:
-        """
-        Retrieve the session information by session's UUID,
-        or session's name paired with access_key.
-        This will return the information of the session and the sibling kernel(s).
-
-        :param db_session: Database connection to use when fetching row.
-        :param session_name_or_id: Name or ID (UUID) of session to look up.
-        :param access_key: Access key used to create session.
-        :param allow_stale: If set to True, filter "inactive" sessions as well as "active" ones.
-                            Otherwise filter "active" sessions only.
-        :param for_update: Apply for_update during executing select query.
-        :param kernel_loading_strategy: Determines JOIN strategy of `kernels` relation when fetching session rows.
-        :param eager_loading_op: Extra loading operators to be passed directly to `match_sessions()` API.
-        """
-        _eager_loading_op = eager_loading_op or []
-        match kernel_loading_strategy:
-            case KernelLoadingStrategy.ALL_KERNELS:
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-            case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
-                kernel_rel = SessionRow.kernels
-                kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(kernel_rel).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-        _eager_loading_op.append(joinedload(SessionRow.user))
-
-        session_list = await cls.match_sessions(
-            db_session,
-            session_name_or_id,
-            access_key,
-            allow_stale=allow_stale,
-            for_update=for_update,
-            eager_loading_op=_eager_loading_op,
-        )
-        if not session_list:
-            raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
-        if len(session_list) > 1:
-            session_infos = [
-                {
-                    "session_id": sess.id,
-                    "session_name": sess.name,
-                    "status": sess.status,
-                    "created_at": sess.created_at,
-                }
-                for sess in session_list
-            ]
-            raise TooManySessionsMatched(extra_data={"matches": session_infos})
-        return session_list[0]
-
+    # Used only by AgentRegistry._clean_session_in_scope, which also loads the kernels
+    # and their agents. Leaves together with that read.
     @classmethod
     async def get_session_by_id(
         cls,
@@ -1042,7 +792,6 @@ class SessionRow(CreatedAtMixin, Base):
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=eager_loading_op,
-            allow_prefix=False,
         )
         try:
             return sessions[0]
@@ -1136,282 +885,3 @@ DEFAULT_SESSION_ORDERING = [
         )
     ),
 ]
-
-
-ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
-    perm for perm in ComputeSessionPermission
-])
-OWNER_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
-ADMIN_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
-MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
-    ComputeSessionPermission.READ_ATTRIBUTE,
-    ComputeSessionPermission.UPDATE_ATTRIBUTE,
-})
-PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
-MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
-
-type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
-
-
-class ComputeSessionPermissionContext(
-    AbstractPermissionContext[ComputeSessionPermission, SessionRow, SessionId]
-):
-    @property
-    def query_condition(self) -> WhereClauseType | None:
-        cond: WhereClauseType | None = None
-
-        def _OR_coalesce(
-            base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression[Any],
-        ) -> WhereClauseType:
-            return base_cond | _cond if base_cond is not None else _cond
-
-        if self.user_id_to_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.user_uuid.in_(self.user_id_to_permission_map.keys())
-            )
-        if self.project_id_to_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.group_id.in_(self.project_id_to_permission_map.keys())
-            )
-        if self.domain_name_to_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.domain_name.in_(self.domain_name_to_permission_map.keys())
-            )
-        if self.object_id_to_additional_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.id.in_(self.object_id_to_additional_permission_map.keys())
-            )
-        if self.object_id_to_overriding_permission_map:
-            cond = _OR_coalesce(
-                cond, SessionRow.id.in_(self.object_id_to_overriding_permission_map.keys())
-            )
-        return cond
-
-    @override
-    async def build_query(self) -> sa.sql.Select[Any] | None:
-        cond = self.query_condition
-        if cond is None:
-            return None
-        return sa.select(SessionRow).where(cond)
-
-    @override
-    async def calculate_final_permission(
-        self, rbac_obj: SessionRow
-    ) -> frozenset[ComputeSessionPermission]:
-        session_row = rbac_obj
-        session_id = session_row.id
-        permissions: frozenset[ComputeSessionPermission] = frozenset()
-
-        if (
-            overriding_perm := self.object_id_to_overriding_permission_map.get(session_id)
-        ) is not None:
-            permissions = overriding_perm
-        else:
-            permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
-            if session_row.user_uuid is not None:
-                permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
-            permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
-            permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
-        return permissions
-
-
-class ComputeSessionPermissionContextBuilder(
-    AbstractPermissionContextBuilder[ComputeSessionPermission, ComputeSessionPermissionContext]
-):
-    db_session: SASession
-
-    def __init__(self, db_session: SASession) -> None:
-        self.db_session = db_session
-
-    @override
-    async def calculate_permission(
-        self,
-        ctx: ClientContext,
-        target_scope: ScopeType,
-    ) -> frozenset[ComputeSessionPermission]:
-        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        return await self._calculate_permission_by_predefined_roles(roles)
-
-    @override
-    async def build_ctx_in_system_scope(
-        self,
-        ctx: ClientContext,
-    ) -> ComputeSessionPermissionContext:
-        from ai.backend.manager.models.domain.row import DomainRow
-
-        perm_ctx = ComputeSessionPermissionContext()
-        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
-        for row in await self.db_session.scalars(_domain_query_stmt):
-            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
-            perm_ctx.merge(to_be_merged)
-        return perm_ctx
-
-    @override
-    async def build_ctx_in_domain_scope(
-        self,
-        ctx: ClientContext,
-        scope: DomainScope,
-    ) -> ComputeSessionPermissionContext:
-        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
-        _user_perm_ctx = await self._build_at_user_scope_in_domain(
-            ctx, ctx.user_id, scope.domain_name
-        )
-        permission_ctx.merge(_user_perm_ctx)
-        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
-        permission_ctx.merge(_project_perm_ctx)
-        return permission_ctx
-
-    @override
-    async def build_ctx_in_project_scope(
-        self,
-        ctx: ClientContext,
-        scope: ProjectScope,
-    ) -> ComputeSessionPermissionContext:
-        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
-        _user_perm_ctx = await self._build_at_user_scope_in_project(
-            ctx, ctx.user_id, scope.project_id
-        )
-        permission_ctx.merge(_user_perm_ctx)
-        return permission_ctx
-
-    @override
-    async def build_ctx_in_user_scope(
-        self,
-        ctx: ClientContext,
-        scope: UserRBACScope,
-    ) -> ComputeSessionPermissionContext:
-        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
-
-    async def _build_at_domain_scope_non_recursively(
-        self,
-        ctx: ClientContext,
-        domain_name: str,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
-        return ComputeSessionPermissionContext(
-            domain_name_to_permission_map={domain_name: permissions}
-        )
-
-    async def _build_at_user_scope_in_domain(
-        self,
-        ctx: ClientContext,
-        user_id: UUID,
-        domain_name: str,
-    ) -> ComputeSessionPermissionContext:
-        # For Superadmin and monitor who can create objects in multiple different domains.
-        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
-
-        _vfolder_stmt = (
-            sa.select(SessionRow)
-            .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
-            .options(load_only(SessionRow.id))
-        )
-        own_folder_map = {
-            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
-        }
-        return ComputeSessionPermissionContext(
-            object_id_to_additional_permission_map=own_folder_map
-        )
-
-    async def _build_at_user_scope_in_project(
-        self,
-        ctx: ClientContext,
-        user_id: UUID,
-        project_id: UUID,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
-
-        _vfolder_stmt = (
-            sa.select(SessionRow)
-            .where((SessionRow.user_uuid == user_id) & (SessionRow.group_id == project_id))
-            .options(load_only(SessionRow.id))
-        )
-        own_folder_map = {
-            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
-        }
-        return ComputeSessionPermissionContext(
-            object_id_to_additional_permission_map=own_folder_map
-        )
-
-    async def _build_at_project_scopes_in_domain(
-        self,
-        ctx: ClientContext,
-        domain_name: str,
-    ) -> ComputeSessionPermissionContext:
-        result = ComputeSessionPermissionContext()
-
-        _project_stmt = (
-            sa.select(ProjectRow)
-            .where(ProjectRow.domain_name == domain_name)
-            .options(load_only(ProjectRow.id))
-        )
-        for row in await self.db_session.scalars(_project_stmt):
-            _row = row
-            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
-            result.merge(_project_perm_ctx)
-        return result
-
-    async def _build_at_project_scope_non_recursively(
-        self,
-        ctx: ClientContext,
-        project_id: UUID,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
-        return ComputeSessionPermissionContext(
-            project_id_to_permission_map={project_id: permissions}
-        )
-
-    async def _build_at_user_scope_non_recursively(
-        self,
-        ctx: ClientContext,
-        user_id: UUID,
-    ) -> ComputeSessionPermissionContext:
-        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
-        return ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
-
-    @override
-    @classmethod
-    async def _permission_for_owner(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return OWNER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_admin(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return ADMIN_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_monitor(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return MONITOR_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_privileged_member(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return PRIVILEGED_MEMBER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_member(
-        cls,
-    ) -> frozenset[ComputeSessionPermission]:
-        return MEMBER_PERMISSIONS
-
-
-async def get_permission_ctx(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: ScopeType,
-    requested_permission: ComputeSessionPermission,
-) -> ComputeSessionPermissionContext:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        builder = ComputeSessionPermissionContextBuilder(db_session)
-        return await builder.build(ctx, target_scope, requested_permission)

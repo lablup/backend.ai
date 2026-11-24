@@ -32,6 +32,9 @@ from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging.structured import StructuredLogger
 
@@ -198,9 +201,9 @@ async def proxy(
             circuit, worker = await add_circuit(
                 sess,
                 SessionConfig(
-                    id=token.session_id,
-                    user_uuid=token.user_uuid,
-                    project_id=token.group_id,
+                    id=SessionID(token.session_id),
+                    user_uuid=UserID(token.user_uuid),
+                    project_id=ProjectID(token.group_id),
                     access_key=token.access_key,
                     domain_name=token.domain_name,
                 ),

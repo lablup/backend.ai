@@ -27,6 +27,12 @@ from ai.backend.common.data.storage.types import (
     ArtifactStorageType,
     VFolderStorageTarget,
 )
+from ai.backend.common.dto.manager.artifact_registry.request import (
+    DelegateeTargetInput,
+    DelegateImportArtifactsRequest,
+    ImportArtifactsOptionsInput,
+)
+from ai.backend.common.dto.manager.v2.artifact import types as v2_types
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceGetCommitHashReqPathParam,
@@ -51,14 +57,11 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.dto.request import (
-    DelegateImportArtifactsReq,
-    ImportArtifactsOptions,
-)
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionError,
     ArtifactImportBadRequestError,
     ArtifactRevisionDeletionBadRequestError,
+    ArtifactRevisionImportInProgressError,
     RemoteReservoirArtifactImportError,
 )
 from ai.backend.manager.errors.artifact_registry import (
@@ -405,6 +408,11 @@ class ArtifactRevisionService:
             revision_data = await self._revision_ops.get_field(
                 ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
             )
+            if revision_data.status in ArtifactStatus.import_in_progress():
+                raise ArtifactRevisionImportInProgressError(
+                    f"Artifact revision {revision_data.id} is already being imported"
+                )
+
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
             reservoir_config = self._config_provider.config.reservoir
@@ -452,8 +460,8 @@ class ArtifactRevisionService:
                             result=revision_data, task_id=None
                         )
 
-                    await self._artifact_repository.update_artifact_revision_status(
-                        action.artifact_revision_id, ArtifactStatus.PULLING
+                    await self._artifact_repository.mark_artifact_revision_pulling(
+                        action.artifact_revision_id
                     )
 
                     vfolder_target: VFolderStorageTarget | None = None
@@ -501,9 +509,9 @@ class ArtifactRevisionService:
 
                             # Wait for remote to start pulling if not yet AVAILABLE
                             if remote_progress.status != ArtifactStatus.AVAILABLE.value:
-                                delegate_import_req = DelegateImportArtifactsReq(
+                                delegate_import_req = DelegateImportArtifactsRequest(
                                     artifact_revision_ids=[revision_data.id],
-                                    artifact_type=artifact.type,
+                                    artifact_type=v2_types.ArtifactType(artifact.type.value),
                                     # We can't pass delegatee_reservoir_id here since we don't have it.
                                     # So we depend on default.
                                     delegator_reservoir_id=None,
@@ -557,8 +565,8 @@ class ArtifactRevisionService:
                                         f"Last status: {remote_progress.status}"
                                     )
 
-                        await self._artifact_repository.update_artifact_revision_status(
-                            action.artifact_revision_id, ArtifactStatus.PULLING
+                        await self._artifact_repository.mark_artifact_revision_pulling(
+                            action.artifact_revision_id
                         )
 
                         vfolder_target: VFolderStorageTarget | None = None
@@ -601,11 +609,14 @@ class ArtifactRevisionService:
                 )
             )
 
-        except Exception as e:
+        except ArtifactRevisionImportInProgressError:
+            # The revision belongs to the import already running; it must not be marked FAILED.
+            raise
+        except Exception:
             await self._artifact_repository.update_artifact_revision_status(
                 action.artifact_revision_id, ArtifactStatus.FAILED
             )
-            raise e
+            raise
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
 
@@ -774,12 +785,21 @@ class ArtifactRevisionService:
         delegatee_reservoir_id = (
             action.delegatee_target.delegatee_reservoir_id if action.delegatee_target else None
         )
-        req = DelegateImportArtifactsReq(
+        req = DelegateImportArtifactsRequest(
             artifact_revision_ids=action.artifact_revision_ids,
             delegator_reservoir_id=delegatee_reservoir_id,
-            delegatee_target=action.delegatee_target,
-            artifact_type=action.artifact_type,
-            options=ImportArtifactsOptions(force=action.force),
+            delegatee_target=(
+                DelegateeTargetInput(
+                    delegatee_reservoir_id=action.delegatee_target.delegatee_reservoir_id,
+                    target_registry_id=action.delegatee_target.target_registry_id,
+                )
+                if action.delegatee_target
+                else None
+            ),
+            artifact_type=(
+                v2_types.ArtifactType(action.artifact_type.value) if action.artifact_type else None
+            ),
+            options=ImportArtifactsOptionsInput(force=action.force),
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)

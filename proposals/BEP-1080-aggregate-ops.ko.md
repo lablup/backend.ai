@@ -39,7 +39,7 @@
 |---|---|
 | `scope` | 스코프 종류와 id |
 | `total` | 스코프 전체의 값 |
-| `groups[].key` | groupBy 에 넣은 field 의 값. 넣지 않은 field 는 null |
+| `groups[].key` | groupBy 에 넣은 field 의 값. 넣지 않은 field 는 응답에서 제외, 값이 NULL 인 key 는 null |
 | `groups[]` 의 값 field | total 과 같은 값 field |
 
 기각한 대안: 평평한 row 목록에는 스코프별 에러와 total 을 담을 항목이 없습니다.
@@ -83,7 +83,7 @@ groupBy 는 filter 처럼 field 마다 값 type 별 group input 을 받고, fiel
 
 ### 계산과 선언
 
-계산 방식(지금은 읽을 때 계산)은 repository 의 measure 에만 있고 action, DTO, GQL 에는 나타나지 않습니다. 엔티티는 `models/{entity}/aggregate_fields.py` 의 `{Entity}AggregateFields` 에 group 칸과 값 칸을 선언하고, column 과 이름은 `{Entity}SearchableFields` 의 field 를 참조합니다. to-many 값은 row 마다 subquery 를 실행하지 않고 join 과 `GROUP BY` 한 번으로 계산합니다.
+계산 방식(지금은 읽을 때 계산)은 repository 의 measure 에만 있고 action, DTO, GQL 에는 나타나지 않습니다. 엔티티는 `{Entity}QuerySpec` (BEP-1082) 의 `aggregate` 섹션에 group 항목과 값 항목을 선언하고, 각 항목은 `own` 의 `QueryColumn` 을 감싸 column 과 이름을 가져옵니다. to-many 값은 row 마다 subquery 를 실행하지 않고 join 과 `GROUP BY` 한 번으로 계산합니다.
 
 | 선언, 구성 요소 | 내용 |
 |---|---|
@@ -93,7 +93,15 @@ groupBy 는 filter 처럼 field 마다 값 type 별 group input 을 받고, fiel
 | `ToManyCorrelation` | EXISTS 외에 (row_id, 자식 값) 쌍 select. `ToManyGroup` 이 사용 |
 | 세션 nested | kernels 아래 `resource_allocations` 추가 (깊이 2) |
 
-기각한 대안: `SearchableField` 에 칸을 추가하면 선언 978개를 모두 고치거나 빈 칸 기본값을 둬야 합니다.
+| 결과 계층 | groupBy 에 넣지 않은 key |
+|---|---|
+| repository 결과 | `AggregateGroup` 의 key 는 엔티티별 `PartialRecord`. 선택하지 않은 field 를 읽으면 `NotSelectedError` |
+| REST v2 응답 DTO | 공통 converter 가 key record 를 변환. pydantic `MISSING` 이 되어 JSON 에서 제외 |
+| GQL | 기본 resolver 가 `MISSING` 을 field 에러로 거부. key field 는 nullable 이라 그 field 만 null 과 에러, 나머지 결과는 유지 |
+| 값이 NULL 인 key | 모든 계층에서 null. 선택하지 않은 key 와 구분 |
+| `MISSING` 사용 범위 | 요청이 고르는 group key 에만 사용 |
+
+기각한 대안: `QueryColumn` 에 group, 값 칸을 추가하면 선언 978개를 모두 고치거나 빈 칸 기본값을 둬야 합니다.
 
 ## 영향
 
@@ -116,3 +124,5 @@ groupBy 는 filter 처럼 field 마다 값 type 별 group input 을 받고, fiel
 - `src/ai/backend/manager/models/specs/search/AGENTS.md`: search field 선언 규칙
 - `src/ai/backend/manager/models/virtual_entity/queries.py`: 스코프 경로
 - `src/ai/backend/common/dto/manager/query.py`: 값 type 별 filter
+- `src/ai/backend/common/data/partial.py`: 선택한 field 만 가지는 `PartialRecord`
+- [BEP-1082 요청한 필드만 조회](BEP-1082-requested-field-read.ko.md): `QuerySpec` 선언

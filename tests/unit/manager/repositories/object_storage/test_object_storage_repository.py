@@ -31,7 +31,7 @@ class TestObjectStorageRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -45,7 +45,7 @@ class TestObjectStorageRepository:
     async def sample_storage_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample Object storage directly in DB and return its ID"""
         storage_id = uuid.uuid4()
 
@@ -68,7 +68,7 @@ class TestObjectStorageRepository:
     async def sample_storages_for_ordering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample Object storages with predictable names for ordering tests"""
         storage_ids = []
         names = ["alpha-storage", "beta-storage", "gamma-storage", "delta-storage"]
@@ -96,7 +96,7 @@ class TestObjectStorageRepository:
     async def sample_storages_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 sample Object storages for pagination testing"""
         storage_ids = []
 
@@ -123,7 +123,7 @@ class TestObjectStorageRepository:
     async def object_storage_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ObjectStorageRepository, None]:
+    ) -> AsyncGenerator[ObjectStorageRepository]:
         """Create ObjectStorageRepository instance with database"""
         repo = ObjectStorageRepository(
             db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)

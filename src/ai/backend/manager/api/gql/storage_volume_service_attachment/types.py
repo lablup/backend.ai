@@ -32,6 +32,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.storage_volume.types import StorageVolumeFilterGQL
@@ -136,7 +137,7 @@ class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAt
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
-    @gql_field(description="The attached volume.")  # type: ignore[misc]
+    @gql_resolver(description="The attached volume.")
     async def storage_volume(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[
@@ -145,7 +146,7 @@ class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAt
     ]:
         raise NotImplementedAPI()
 
-    @gql_field(description="The service the volume is attached to.")  # type: ignore[misc]
+    @gql_resolver(description="The service the volume is attached to.")
     async def service_catalog(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[

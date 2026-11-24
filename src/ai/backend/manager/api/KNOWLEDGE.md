@@ -35,7 +35,7 @@ Adapter-side patterns: [adapters/KNOWLEDGE.md](adapters/KNOWLEDGE.md).
 | `admin_*` | global operation across all scopes | superadmin |
 | bare global read (get/search) | public read, served to every authenticated user | authenticated |
 | scoped operation (`scoped/search` paths) | one operation over caller-supplied scopes | RBAC per scope |
-| `my_*` | self-service: the caller is the scope | authenticated (adapter resolves the user) |
+| `my_*` | self-service: the caller is the scope | authenticated (the handler puts `current_user()` in the scope) |
 
 ## The v1 surfaces are frozen
 

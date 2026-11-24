@@ -1316,17 +1316,16 @@ class SessionService:
                             f"Service {service} does not open the port number {port}."
                         ) from e
                     host_port = sport["host_ports"][hport_idx]
+                # using the default (primary) port of the app
+                elif "host_ports" not in sport:
+                    host_port = sport["host_port"]  # legacy kernels
                 else:
-                    # using the default (primary) port of the app
-                    if "host_ports" not in sport:
-                        host_port = sport["host_port"]  # legacy kernels
-                    else:
-                        host_port = sport["host_ports"][0]
+                    host_port = sport["host_ports"][0]
                 break
         else:
             raise AppNotFound(f"{session_data.name}:{service}")
 
-        opts: MutableMapping[str, None | str | list[str]] = {}
+        opts: MutableMapping[str, Any] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
@@ -1651,6 +1650,7 @@ class SessionService:
                         ),
                         kernel_groups=kernel_groups,
                         handler_options=None,
+                        interpolation=action.interpolation,
                     ),
                 ),
                 internal_data_extras=InternalDataExtras(

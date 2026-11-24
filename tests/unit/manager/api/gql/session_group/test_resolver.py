@@ -56,7 +56,7 @@ class TestSessionGroup:
         info = MagicMock()
         info.context.adapters.session_group.get = AsyncMock(return_value=node)
 
-        result = await resolver.session_group.base_resolver(info, node.id)
+        result = await cast(Any, resolver.session_group).base_resolver(info, node.id)
 
         info.context.adapters.session_group.get.assert_awaited_once_with(SessionGroupID(node.id))
         assert result is not None
@@ -90,7 +90,7 @@ class TestAdminSessionGroups:
     ) -> None:
         with patch("ai.backend.manager.api.gql.utils.current_user", return_value=caller):
             with pytest.raises(InsufficientPrivilege):
-                await resolver.admin_session_groups.base_resolver(info)
+                await cast(Any, resolver.admin_session_groups).base_resolver(info)
 
         info.context.adapters.session_group.global_search.assert_not_awaited()
 
@@ -101,7 +101,7 @@ class TestAdminSessionGroups:
             "ai.backend.manager.api.gql.utils.current_user",
             return_value=_caller(is_superadmin=True),
         ):
-            result = await resolver.admin_session_groups.base_resolver(info, first=2)
+            result = await cast(Any, resolver.admin_session_groups).base_resolver(info, first=2)
 
         assert result is not None
         assert info.context.adapters.session_group.global_search.call_args.args[0].first == 2
@@ -126,7 +126,7 @@ class TestScopedSessionGroups:
     async def test_the_scope_reaches_the_adapter(self, info: MagicMock) -> None:
         project_id = uuid.uuid4()
 
-        await resolver.scoped_session_groups.base_resolver(
+        await cast(Any, resolver.scoped_session_groups).base_resolver(
             info, SessionGroupScopeGQL(project=[UUIDScopeGQL(value=project_id)])
         )
 
@@ -134,7 +134,7 @@ class TestScopedSessionGroups:
         assert search_input.scope == SessionGroupScope(project=[UUIDScope(value=project_id)])
 
     async def test_an_empty_page_has_no_cursors(self, info: MagicMock) -> None:
-        result = await resolver.scoped_session_groups.base_resolver(
+        result = await cast(Any, resolver.scoped_session_groups).base_resolver(
             info, SessionGroupScopeGQL(project=[UUIDScopeGQL(value=uuid.uuid4())])
         )
 

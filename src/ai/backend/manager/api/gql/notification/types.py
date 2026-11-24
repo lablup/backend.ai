@@ -144,6 +144,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_interface,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -287,7 +288,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     enabled: bool
     created_at: datetime
 
-    @gql_field(description="The channel this rule dispatches through.")  # type: ignore[misc]
+    @gql_resolver(description="The channel this rule dispatches through.")
     async def channel(self, info: Info[StrawberryGQLContext]) -> NotificationChannel:
         """Loaded on demand rather than carried by the rule.
 

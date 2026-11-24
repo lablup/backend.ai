@@ -48,7 +48,7 @@ def _meta(description: str) -> BackendAIGQLMeta:
 
 @gql_root_field(
     _meta("List the current user's role invitations."), deprecation_reason=_QUERY_REASON
-)  # type: ignore[misc]
+)
 async def my_role_invitations(
     info: Info[StrawberryGQLContext],
     filter: RoleInvitationFilterGQL | None = None,
@@ -65,7 +65,7 @@ async def my_role_invitations(
 
 @gql_root_field(
     _meta("List role invitations sent by the current user."), deprecation_reason=_QUERY_REASON
-)  # type: ignore[misc]
+)
 async def my_sent_role_invitations(
     info: Info[StrawberryGQLContext],
     filter: RoleInvitationFilterGQL | None = None,
@@ -80,7 +80,7 @@ async def my_sent_role_invitations(
     return RoleInvitationConnection.empty()
 
 
-@gql_root_field(_meta("List invitations for a specific role."), deprecation_reason=_QUERY_REASON)  # type: ignore[misc]
+@gql_root_field(_meta("List invitations for a specific role."), deprecation_reason=_QUERY_REASON)
 async def role_scoped_role_invitations(
     info: Info[StrawberryGQLContext],
     role_id: UUID,
@@ -99,7 +99,7 @@ async def role_scoped_role_invitations(
 @gql_root_field(
     _meta("List all role invitations across the system (superadmin only)."),
     deprecation_reason=_QUERY_REASON,
-)  # type: ignore[misc]
+)
 async def admin_role_invitations(
     info: Info[StrawberryGQLContext],
     filter: RoleInvitationFilterGQL | None = None,

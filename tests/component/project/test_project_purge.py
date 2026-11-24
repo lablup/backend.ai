@@ -147,7 +147,7 @@ class TestProjectPurgeRBACCleanup:
         for the project, so the per-project SYSTEM roles do not end up with
         dangling scope references that resolve to NULL via GraphQL.
         """
-        project_id, scope_id = project_with_rbac_rows
+        project_id, _scope_id = project_with_rbac_rows
 
         await admin_v2_registry.project.admin_purge(PurgeProjectInput(group_id=project_id))
 

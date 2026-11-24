@@ -61,7 +61,6 @@ from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -146,7 +145,7 @@ class TestContainerRegistryRepository:
     async def db_with_cleanup(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             global_entity_ids,
@@ -159,7 +158,6 @@ class TestContainerRegistryRepository:
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ImageRow,
                 VFolderRow,
@@ -434,6 +432,37 @@ class TestContainerRegistryRepository:
 
         # Then
         assert len(result) == 2
+
+    @pytest.fixture
+    async def registries_with_and_without_project(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        """A Harbor registry with an IDNA host, and a Docker registry with no project."""
+        async with db_with_cleanup.begin_session() as session:
+            session.add_all([
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(uuid.uuid4()),
+                    url="https://xn--3e0b707e.example.com",
+                    registry_name="harbor.example.com",
+                    type=ContainerRegistryType.HARBOR2,
+                    project="library",
+                ),
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(uuid.uuid4()),
+                    url="https://docker.example.com",
+                    registry_name="docker.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project=None,
+                ),
+            ])
+
+    @pytest.mark.usefixtures("registries_with_and_without_project")
+    async def test_get_known_registries_keys_by_project_and_name(
+        self, repository: ContainerRegistryRepository
+    ) -> None:
+        result = await repository.get_known_registries()
+
+        assert result == {"library/harbor.example.com": "https://한국.example.com/"}
 
     @pytest.fixture
     async def creator(self) -> ContainerRegistryCreator:
@@ -1394,7 +1423,7 @@ class TestContainerRegistryPublicMembership:
     async def db_with_cleanup(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [
@@ -1585,7 +1614,7 @@ class TestSearchContainerRegistries:
     async def db_with_cleanup(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             global_entity_ids,
@@ -1598,7 +1627,6 @@ class TestSearchContainerRegistries:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ImageRow,
                 VFolderRow,

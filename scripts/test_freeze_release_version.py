@@ -217,7 +217,11 @@ def check_freeze_version() -> None:
 
 def run_script(cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(SCRIPT.resolve()), VERSION], cwd=cwd, capture_output=True, text=True
+        [sys.executable, str(SCRIPT.resolve()), VERSION],
+        check=False,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
     )
 
 

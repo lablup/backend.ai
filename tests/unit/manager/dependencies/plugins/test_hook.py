@@ -8,10 +8,14 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookResult, Hoo
 from ai.backend.manager.dependencies.plugins.base import PluginsInput
 from ai.backend.manager.dependencies.plugins.hook import HookPluginDependency
 
+_PLUGINS_CONFIG = {"webapp": {"keypair_auth": {"secret": "s"}}}
+
 
 def _make_plugins_input() -> PluginsInput:
+    etcd = MagicMock()
+    etcd.get_prefix = AsyncMock(return_value=_PLUGINS_CONFIG)
     return PluginsInput(
-        etcd=MagicMock(),
+        etcd=etcd,
         local_config={"key": "value"},
         allowed_plugins={"plugin_a"},
         disabled_plugins={"plugin_b"},
@@ -43,7 +47,7 @@ class TestHookPluginDependency:
         async with dep.provide(plugins_input) as ctx:
             assert ctx is mock_ctx
             mock_ctx.init.assert_called_once_with(
-                context=plugins_input.init_context,
+                context=_PLUGINS_CONFIG,
                 allowlist=plugins_input.allowed_plugins,
                 blocklist=plugins_input.disabled_plugins,
             )

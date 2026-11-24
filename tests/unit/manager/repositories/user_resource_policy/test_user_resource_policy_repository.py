@@ -18,7 +18,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -52,7 +51,7 @@ class TestUserResourcePolicyRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -66,7 +65,6 @@ class TestUserResourcePolicyRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -97,7 +95,7 @@ class TestUserResourcePolicyRepository:
     @pytest.fixture
     async def sample_policy(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[UserResourcePolicyData, None]:
+    ) -> AsyncGenerator[UserResourcePolicyData]:
         """Create a sample policy in the database for testing"""
         policy_name = "test-policy-sample"
         async with db_with_cleanup.begin_session() as db_sess:

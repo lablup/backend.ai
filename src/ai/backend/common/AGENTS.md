@@ -12,7 +12,8 @@
 ## What does not belong here
 
 - Component-specific logic (manager session management, agent kernel handling, etc.).
-- Imports from `manager/`, `agent/`, `storage/`; dependencies must flow inward only.
+- Imports from `manager/`, `agent/`, `storage/`, `appproxy/`, `account_manager/`, `web/`, `client/`, `cli/`, `kernel/`,
+  `accelerator/`; dependencies must flow inward only.
 
 ## Adding to this package
 
@@ -33,3 +34,4 @@
 
 - `common/exception.py` defines the root hierarchy: do not add component-specific exceptions here.
 - Adding common exception base classes is allowed. Concrete domain exceptions are not.
+- Put a new exception shared by components in `common/errors/<domain>.py`, not in `common/exception.py`. Pants resolves dependencies per file, so a class added to `exception.py` selects the tests of every module that imports it.

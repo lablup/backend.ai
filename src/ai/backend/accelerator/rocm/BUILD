@@ -11,6 +11,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":lib",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

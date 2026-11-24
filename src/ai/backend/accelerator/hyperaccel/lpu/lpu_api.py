@@ -17,7 +17,7 @@ async def list_devices() -> list[LPUDevice]:
 
     for idx, folder in enumerate(folders):
         domain, bus, slot_func = folder.name.split(":")[:3]
-        slot, func = slot_func.split(".")[:2]
+        slot, _func = slot_func.split(".")[:2]
         display_driver_path = (folder / ".." / f"{domain}:{bus}:{slot}.1").resolve()
         renderD_files = await blocking_job(
             lambda ddp=display_driver_path: [

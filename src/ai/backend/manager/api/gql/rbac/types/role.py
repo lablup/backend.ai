@@ -130,12 +130,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -238,12 +240,12 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         default=None,
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The scope the role belongs to.",
         )
-    )  # type: ignore[misc]
+    )
     async def scope(
         self,
         info: Info[StrawberryGQLContext],
@@ -258,7 +260,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             RuntimeEntityID(EntityType.from_name(self.scope_type), self.scope_id)
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description=(
@@ -266,7 +268,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
                 "was not created from a preset or the preset has been purged."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def role_preset(
         self,
         info: Info[StrawberryGQLContext],
@@ -298,11 +300,11 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0", description="Permissions associated with this role."
         )
-    )  # type: ignore[misc]
+    )
     async def permissions(
         self,
         info: Info[StrawberryGQLContext],
@@ -369,7 +371,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             count=result.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.3.0",
             description="Users assigned to this role, as assignment rows.",
@@ -379,7 +381,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         deprecation_reason=(
             "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves."
         ),
-    )  # type: ignore[misc]
+    )
     async def users(
         self,
         info: Info[StrawberryGQLContext],
@@ -423,12 +425,12 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             count=result.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Users holding this role.",
         )
-    )  # type: ignore[misc]
+    )
     async def users_v2(
         self,
         info: Info[StrawberryGQLContext],
@@ -493,7 +495,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             count=payload.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.2",
             description="Scopes this role is registered in.",
@@ -504,7 +506,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             "Deprecated since 26.9.0. Use `scope`. A role belongs to one "
             "scope, so this connection holds that one scope and ignores `filter` and `order_by`."
         ),
-    )  # type: ignore[misc]
+    )
     async def scopes(
         self,
         filter: Annotated[
@@ -590,12 +592,12 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The assigned role.")  # type: ignore[misc]
+    @gql_resolver(description="The assigned role.")
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
-    @gql_field(description="The assigned user.")  # type: ignore[misc]
+    @gql_resolver(description="The assigned user.")
     async def user(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -608,12 +610,12 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
         return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The user who granted this role assignment.",
         )
-    )  # type: ignore[misc]
+    )
     async def granted_by_user(
         self,
         info: Info[StrawberryGQLContext],

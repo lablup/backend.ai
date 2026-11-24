@@ -5,23 +5,23 @@ import socket
 import time
 from typing import Any, override
 
-from aiohttp import web
-
 from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
     WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
-from ai.backend.appproxy.worker.types import (
-    Circuit,
-    PortFrontendInfo,
-    RootContext,
+from ai.backend.appproxy.worker.proxy.backend.tcp import TCPBackendArgs
+from ai.backend.appproxy.worker.types import Circuit, RootContext
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
+    IngressAccess,
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+    PortFrontend,
 )
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
@@ -29,7 +29,7 @@ from .base import BaseFrontend
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class TCPFrontend(BaseFrontend[TCPBackend, int]):
+class TCPFrontend(BaseFrontend[TCPBackend]):
     servers: list[asyncio.Server]
     server_tasks: list[asyncio.Task[Any]]
 
@@ -74,12 +74,12 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             port_range_end=port_end,
         )
 
-    async def _listen_task(self, circuit_key: int, server: asyncio.Server) -> None:
+    async def _listen_task(self, port: int, server: asyncio.Server) -> None:
         try:
             async with server:
                 await server.serve_forever()
         except Exception:
-            log.exception("TCP proxy listener failed", port=circuit_key)
+            log.exception("TCP proxy listener failed", port=port)
             raise
 
     @override
@@ -90,10 +90,6 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         for server in self.servers:
             server.close()
             await server.wait_closed()
-
-    def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
-        # TCP does not support authentication
-        return
 
     def _is_peer_allowed(self, writer: asyncio.StreamWriter, access: IngressAccess) -> bool:
         # TCP carries no forwarded-for header, so the allowlist is matched
@@ -106,50 +102,49 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         return True
 
     @override
-    async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TCPBackend:
-        return TCPBackend(routes, self.root_context, circuit)
-
-    @override
-    async def update_backend(self, backend: TCPBackend, routes: list[RouteInfo]) -> TCPBackend:
-        await backend.update_routes(routes)
-        return backend
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> TCPBackend:
+        return TCPBackend(
+            TCPBackendArgs(
+                last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
+                request_counter_key_queue=self.root_context.request_counter_key_queue,
+                metrics=self.root_context.metrics,
+                ingress=ingress,
+                circuit=circuit,
+            )
+        )
 
     @override
     async def terminate_backend(self, backend: TCPBackend) -> None:
         await backend.close()
-
-    @override
-    async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
-        now = time.time()
-        return [
-            backend.circuit
-            for backend in self.backends.values()
-            if (backend.last_used - now) >= threshold
-        ]
 
     async def _close_writer(self, writer: asyncio.StreamWriter) -> None:
         writer.close()
         await writer.wait_closed()
 
     async def pipe(
-        self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        self, port: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         metrics = self.root_context.metrics
-        backend: TCPBackend | None = self.backends.get(circuit_key)
-
-        if not backend:
+        frontend_key = IngressFrontend(
+            kind=IngressFrontendKind.PORT,
+            protocol=IngressProtocol.TCP,
+            port=PortFrontend(number=port),
+        ).key()
+        try:
+            ingress = await self._read_registered_ingress(frontend_key)
+        except IngressFrontendNotRegisteredError:
+            log.trace("rejecting a TCP connection to a frontend with no ingress")
+            await self._close_writer(writer)
+            return
+        backend = self.backends.get(frontend_key)
+        if backend is None:
             await self._close_writer(writer)
             return
 
-        with with_log_context(circuit_id=backend.circuit.id):
-            try:
-                ingress = await self._read_registered_ingress(
-                    backend.circuit.to_ingress_frontend().key()
-                )
-            except IngressFrontendNotRegisteredError:
-                log.trace("rejecting a TCP connection to a slot with no ingress")
-                await self._close_writer(writer)
-                return
+        # TODO: Use the ingress id once ingresses are stored as their own entity.
+        with with_log_context(circuit_id=backend.circuit_id):
             if not self._is_peer_allowed(writer, ingress.access):
                 await self._close_writer(writer)
                 return
@@ -165,11 +160,3 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             finally:
                 end = time.monotonic()
                 metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
-
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> int:
-        if not isinstance(circuit.frontend, PortFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.port

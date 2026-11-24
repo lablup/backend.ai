@@ -8,7 +8,7 @@ from typing import cast
 from click.testing import CliRunner
 
 from ai.backend.manager.actions.registry.types import Concern
-from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.cli.ops import cli
 
 

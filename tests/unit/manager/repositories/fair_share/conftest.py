@@ -53,7 +53,7 @@ from ai.backend.testutils.db import with_tables
 @pytest.fixture
 async def fair_share_row_tables(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Create the fair-share tables and register the related ORM mappers.
 
     Rows are listed in FK dependency order (parents before children); the

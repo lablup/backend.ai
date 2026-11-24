@@ -69,7 +69,7 @@ class TestCheckCredentialWithoutMigration:
     @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -133,7 +133,7 @@ class TestCheckCredentialWithoutMigration:
     @pytest.fixture
     async def user_resource_policy_name(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         name = f"user-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -207,6 +207,9 @@ class TestCheckCredentialWithoutMigration:
 
         assert credential.user_id == user_with_password.user_uuid
         assert compare_to_hashed_password(_PASSWORD, credential.hashed_password)
+        assert credential.status == UserStatus.ACTIVE
+        # The column defaults to the insert time, so a new user carries one.
+        assert credential.password_changed_at is not None
 
     async def test_a_wrong_password_names_the_user(
         self,

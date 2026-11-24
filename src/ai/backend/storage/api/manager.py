@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import secrets
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from contextlib import contextmanager as ctxmgr
@@ -130,7 +131,7 @@ async def token_auth_middleware(
                 content_type="application/problem+json",
             )
         ctx: RootContext = request.app["ctx"]
-        if token != ctx.local_config.api.manager.secret:
+        if not secrets.compare_digest(token.encode(), ctx.local_config.api.manager.secret.encode()):
             raise web.HTTPForbidden(
                 text=dump_json_str(
                     {

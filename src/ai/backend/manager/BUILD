@@ -7,9 +7,9 @@ python_sources(
     ],
     # Resources read at run time, attached to the file that reads them.
     overrides={
-        "__init__.py": {"dependencies": [":version"]},
         "api/rest/app.py": {"dependencies": [":vendor"]},
         "cli/dbschema.py": {"dependencies": [":revision-history"]},
+        "version.py": {"dependencies": [":version"]},
     },
 )
 
@@ -143,6 +143,7 @@ python_distribution(
         ":src",
         ":resources",
         "src/ai/backend/cli:src",  # install requirement: provides the `backend.ai` console script
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -180,6 +181,7 @@ pex_binary(
         ":src",
         ":resources",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )
@@ -191,6 +193,7 @@ pex_binary(
         ":src",
         ":resources",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )

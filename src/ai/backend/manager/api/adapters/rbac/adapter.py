@@ -166,8 +166,8 @@ from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.errors.base.not_found import NotFoundError
-from ai.backend.manager.errors.permission import (
-    NotEnoughPermission,
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.permission_field import (
     PermissionAlreadyGranted,
     ReplaceRolePermissionRoleIdMismatch,
 )
@@ -194,6 +194,7 @@ from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import (
     HeldRoleTarget,
     RoleTarget,
+    ScopedRoleTarget,
 )
 from ai.backend.manager.models.rbac_models.role.searchable_fields import (
     RoleSearchableFields,
@@ -714,6 +715,14 @@ class RBACAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         return await self.search_roles_in_scope([HeldRoleTarget(user_id=UserID(me.user_id))], input)
+
+    async def project_search_roles(
+        self, project_id: UUID, input: SearchRolesInput
+    ) -> SearchResult[RoleNode]:
+        """Search the roles registered in a project scope."""
+        return await self.search_roles_in_scope(
+            [ScopedRoleTarget(scope=ProjectID(project_id))], input
+        )
 
     async def search_roles_in_scope(
         self,

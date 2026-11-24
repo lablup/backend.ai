@@ -8,7 +8,7 @@ from typing import override
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.v2 import validators as v2_validators
 from ai.backend.manager.services.factory import create_processors
 from ai.backend.manager.services.processors import (

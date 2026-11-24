@@ -47,15 +47,14 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
-from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -69,7 +68,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
@@ -86,7 +85,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
@@ -109,8 +108,7 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
-from ai.backend.manager.agent_cache import AgentRPCCache
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
 from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
@@ -196,10 +194,6 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.repositories.client_ip_masking.repository import (
-    ClientIPMaskingRepository,
-)
 from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
@@ -208,24 +202,16 @@ from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDL
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
-    ResourcePolicyOpsProvider,
-)
-from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
-from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
-from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.repositories.user_resource_policy.repository import (
-    UserResourcePolicyRepository,
-)
+from ai.backend.manager.repositories.ssh_key.repository import SSHKeyRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.services.auth.processors import AuthProcessors
-from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
+from ai.backend.manager.services.ssh_key.service import SSHKeyService
 from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     ETCD_PASSWORD,
@@ -1200,8 +1186,6 @@ async def provision_user(
                     keypair_secrets=KeyPairSecrets(
                         access_key=AccessKey(keypair.access_key),
                         secret_key=SecretValue(keypair.secret_key),
-                        ssh_public_key="ssh-rsa test",
-                        ssh_private_key="test-private-key",
                     ),
                     keypair_resource_policy=resource_policy_fixture,
                 )
@@ -1757,70 +1741,9 @@ def agent_registry() -> AgentRegistry:
 
 
 @pytest.fixture()
-def agent_cache() -> AgentRPCCache:
-    """Mock — talks to Agent RPC (external component)."""
-    return AsyncMock(spec=AgentRPCCache)
-
-
-@pytest.fixture()
 def appproxy_client_pool() -> AppProxyClientPool:
     """Mock — talks to AppProxy (external component)."""
     return AsyncMock(spec=AppProxyClientPool)
-
-
-# ---------------------------------------------------------------------------
-# Shared auth_processors fixture (used by many domain conftests)
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture()
-def auth_processors(
-    database_engine: ExtendedAsyncSAEngine,
-    processor_registry: ProcessorRegistry[Any],
-    config_provider: ManagerConfigProvider,
-    hook_plugin_ctx: HookPluginContext,
-    valkey_clients: ValkeyClients,
-    storage_manager: StorageSessionManager,
-) -> AuthProcessors:
-    """Real AuthProcessors wired with real AuthService and AuthRepository."""
-    repo = AuthRepository(
-        database_engine,
-        V2DBOpsProvider(database_engine),
-        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-    )
-    user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
-    user_repository = UserRepository(
-        database_engine,
-        V2DBOpsProvider(database_engine),
-        ShareOpsProvider(database_engine),
-        ResourcePolicyOpsProvider(database_engine),
-        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-    )
-    group_repository = ProjectRepository(
-        database_engine,
-        V2DBOpsProvider(database_engine),
-        ResourcePolicyOpsProvider(database_engine),
-        config_provider,
-        valkey_clients.stat,
-        storage_manager,
-    )
-    service = AuthService(
-        hook_plugin_ctx=hook_plugin_ctx,
-        auth_repository=repo,
-        config_provider=config_provider,
-        valkey_session_client=valkey_clients.session,
-        user_resource_policy_repository=user_resource_policy_repository,
-        user_repository=user_repository,
-        group_repository=group_repository,
-        ssh_key_validator=SSHKeyValidator(),
-        client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
-        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-    )
-    return AuthProcessors(
-        processor_registry.group(GroupMeta(GlobalEntityType())),
-        processor_registry.group(GroupMeta(UserEntityType())),
-        service,
-    )
 
 
 @pytest.fixture()
@@ -1871,6 +1794,18 @@ def processor_registry(
             ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
+    )
+
+
+@pytest.fixture()
+def ssh_key_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> SSHKeyProcessors:
+    """The SSH keypair processors, which the user adapter reads the default public key through."""
+    return SSHKeyProcessors(
+        processor_registry.group(GroupMeta(UserEntityType())),
+        SSHKeyService(SSHKeyRepository(V2DBOpsProvider(database_engine)), SSHKeyValidator()),
     )
 
 
@@ -2002,26 +1937,3 @@ async def user_registry(
         yield registry
     finally:
         await registry.close()
-
-
-@pytest.fixture()
-def acting_superadmin() -> Iterator[None]:
-    """Run the test body as a superadmin.
-
-    A test that drives processors directly skips the HTTP layer, so nothing has set
-    the caller — and the gates the action layer imposes read it. Production always has
-    one; this supplies the equivalent so the test exercises the gate rather than
-    tripping over its absence.
-    """
-    with with_user_context(
-        UserData(
-            user_id=uuid.uuid4(),
-            is_authorized=True,
-            is_admin=True,
-            is_superadmin=True,
-            role=UserRole.SUPERADMIN,
-            domain_name="default",
-            domain_id=DomainID(uuid.uuid4()),
-        )
-    ):
-        yield

@@ -70,7 +70,7 @@ async def scan_available_resources(
 ) -> Mapping[SlotName, Decimal]:
     slots: MutableMapping[SlotName, Decimal] = {}
     for key, computer in compute_device_types.items():
-        known_slot_types.update(computer.slot_types)  # type: ignore  # (only updated here!)
+        known_slot_types.update(computer.slot_types)  # only updated here
         resource_slots = await computer.available_slots()
         for sname, sval in resource_slots.items():
             slots[sname] = Decimal(sval)
@@ -93,5 +93,4 @@ async def get_resource_spec_from_container(container_info: Any) -> KernelResourc
         if mount["Target"] == "/home/config":
             async with aiofiles.open(Path(mount["Source"]) / "resource.txt") as f:
                 return await KernelResourceSpec.aread_from_file(f)
-    else:
-        return None
+    return None

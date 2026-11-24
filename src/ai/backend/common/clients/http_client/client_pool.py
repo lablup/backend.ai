@@ -119,6 +119,7 @@ class ClientPool:
             warnings.warn(
                 f"{self!r} is garbage-collected but still has active client sessions.",
                 ResourceWarning,
+                stacklevel=2,
             )
 
     async def _cleanup_loop(self, cleanup_interval_seconds: float) -> None:

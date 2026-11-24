@@ -96,7 +96,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey, SecretKey, SSHPublicKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -112,6 +112,9 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
+from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.deprecated_search import (
     DeprecatedUserConditions,
@@ -129,6 +132,8 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.ssh_key.actions.search import ScopedSearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
@@ -201,6 +206,7 @@ class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
     _user: UserProcessors
+    _ssh_key: SSHKeyProcessors
     _domain: DomainProcessors
     _auth_config: AuthConfig
     _key_provider_pool: KeyProviderPool
@@ -211,8 +217,10 @@ class UserAdapter(BaseAdapter):
         domain: DomainProcessors,
         auth_config: AuthConfig,
         key_provider_pool: KeyProviderPool,
+        ssh_key: SSHKeyProcessors,
     ) -> None:
         self._user = user
+        self._ssh_key = ssh_key
         self._domain = domain
         self._auth_config = auth_config
         self._key_provider_pool = key_provider_pool
@@ -268,12 +276,19 @@ class UserAdapter(BaseAdapter):
         """Batch load keypairs by id for DataLoader use, checked per owning user."""
         if not ids:
             return []
-        return await self.batch_load_fields(
+        loaded = await self.batch_load_fields(
             self._user.bulk_get_keypairs,
             BulkGetKeypairsAction(ids=list(ids)),
             ids,
             self._keypair_data_to_node,
         )
+        keys = await self._default_ssh_public_keys([
+            UserID(node.user_id) for node in loaded if isinstance(node, KeypairNode)
+        ])
+        return [
+            self._with_ssh_public_key(node, keys) if isinstance(node, KeypairNode) else node
+            for node in loaded
+        ]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 
@@ -880,7 +895,7 @@ class UserAdapter(BaseAdapter):
             IssueMyKeypairAction(user_id=UserID(user_id))
         )
         return IssueMyKeypairPayload(
-            keypair=self._keypair_data_to_node(result.generated_data.keypair),
+            keypair=await self._keypair_node(result.generated_data.keypair),
             secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
@@ -897,7 +912,7 @@ class UserAdapter(BaseAdapter):
                 is_active=OptionalState.update(is_active),
             )
         )
-        return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
+        return UpdateMyKeypairPayload(keypair=await self._keypair_node(result.keypair))
 
     async def switch_default_access_key(
         self, user_id: UserID, access_key: AccessKey
@@ -939,7 +954,7 @@ class UserAdapter(BaseAdapter):
             SearchMyKeypairsAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            items=await self._keypair_nodes(action_result.items),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -961,9 +976,37 @@ class UserAdapter(BaseAdapter):
             rate_limit=data.rate_limit,
             num_queries=data.num_queries,
             resource_policy=data.resource_policy_name,
-            ssh_public_key=data.ssh_public_key,
+            ssh_public_key=None,
             user_id=data.user_id,
         )
+
+    async def _default_ssh_public_keys(self, user_ids: Sequence[UserID]) -> Mapping[UserID, str]:
+        """The public key of each named user's default SSH keypair."""
+        unique_ids = list(dict.fromkeys(user_ids))
+        if not unique_ids:
+            return {}
+        result = await self._ssh_key.scoped_search.run(
+            ScopedSearchSSHKeypairsAction(
+                targets=[UserSSHKeypairTarget(user_id=user_id) for user_id in unique_ids],
+                searcher=SSHKeypairSearcher(
+                    pagination=OffsetPagination(limit=len(unique_ids)),
+                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                ),
+            )
+        )
+        return {item.user_id: item.public_key for item in result.items}
+
+    @staticmethod
+    def _with_ssh_public_key(node: KeypairNode, keys: Mapping[UserID, str]) -> KeypairNode:
+        """The deprecated per-keypair SSH public key, answered with the owner's default."""
+        return node.model_copy(update={"ssh_public_key": keys.get(UserID(node.user_id))})
+
+    async def _keypair_nodes(self, items: Sequence[KeyPairData]) -> list[KeypairNode]:
+        keys = await self._default_ssh_public_keys([UserID(item.user_id) for item in items])
+        return [self._with_ssh_public_key(self._keypair_data_to_node(item), keys) for item in items]
+
+    async def _keypair_node(self, data: KeyPairData) -> KeypairNode:
+        return (await self._keypair_nodes([data]))[0]
 
     async def _secret_key_of(self, data: KeyPairData) -> SecretKey:
         """The keypair's secret key as plaintext, whatever form it is stored in."""
@@ -974,7 +1017,7 @@ class UserAdapter(BaseAdapter):
     async def _keypair_data_to_created_payload(self, data: KeyPairData) -> CreateKeypairPayload:
         """Convert KeyPairData to a CreateKeypairPayload, including the one-time secret key."""
         return CreateKeypairPayload(
-            keypair=UserAdapter._keypair_data_to_node(data),
+            keypair=await self._keypair_node(data),
             secret_key=await self._secret_key_of(data),
         )
 
@@ -994,7 +1037,7 @@ class UserAdapter(BaseAdapter):
             AdminCreateKeypairAction(user_id=UserID(input.user_id), creator=creator)
         )
         return AdminCreateKeypairPayload(
-            keypair=self._keypair_data_to_node(result.generated_data.keypair),
+            keypair=await self._keypair_node(result.generated_data.keypair),
             secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
@@ -1031,7 +1074,7 @@ class UserAdapter(BaseAdapter):
                 rate_limit=OptionalState.from_nullable(input.rate_limit),
             )
         )
-        return AdminUpdateKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
+        return AdminUpdateKeypairPayload(keypair=await self._keypair_node(result.keypair))
 
     async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
         """Admin deletes any keypair."""
@@ -1043,18 +1086,17 @@ class UserAdapter(BaseAdapter):
         result = await self._user.get_keypair.run(
             GetKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
-        return self._keypair_data_to_node(result.keypair)
+        return await self._keypair_node(result.keypair)
 
     async def admin_register_ssh_keypair(
         self, input: AdminRegisterSSHKeypairInput
     ) -> AdminRegisterSSHKeypairPayload:
-        """Admin registers (overwrites) a user's SSH keypair."""
+        """Admin registers (overwrites) a user's SSH public key."""
         result = await self._user.admin_register_ssh_keypair.run(
             AdminRegisterSSHKeypairAction(
                 user_id=await self._resolve_keypair_owner(input.access_key),
-                access_key=input.access_key,
-                ssh_public_key=input.ssh_public_key,
-                ssh_private_key=input.ssh_private_key,
+                access_key=AccessKey(input.access_key),
+                ssh_public_key=SSHPublicKey(input.ssh_public_key),
             )
         )
         return AdminRegisterSSHKeypairPayload(access_key=result.access_key)
@@ -1113,7 +1155,7 @@ class UserAdapter(BaseAdapter):
             )
         )
         return AdminSearchKeypairsPayload(
-            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            items=await self._keypair_nodes(action_result.items),
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=input.offset or 0,
@@ -1164,7 +1206,7 @@ class UserAdapter(BaseAdapter):
             )
         )
         return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            items=await self._keypair_nodes(action_result.items),
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

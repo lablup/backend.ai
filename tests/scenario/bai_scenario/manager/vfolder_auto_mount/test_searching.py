@@ -28,7 +28,8 @@ from ai.backend.manager.api.adapters.vfolder_auto_mount.adapter import VFolderAu
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.nothing_is_found import NothingIsFound
 from bai_scenario.components.vfolder_auto_mount import (
     AProjectAndAutoMountsToSearch,
     AProjectFolderAndAutoMounts,

@@ -10,27 +10,13 @@ from typing import (
 import aiodocker
 import trafaret as t
 
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-
-from . import __version__
-from .exception import (
-    GenericRocmError,
-    NoRocmDeviceError,
-    RocmMemFetchError,
-    RocmUtilFetchError,
-)
-from .hip import libhip, librocm_smi
-from .types import ROCmDevice, ROCmXCD
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     Measurement,
@@ -51,6 +37,16 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
+
+from . import __version__
+from .exception import (
+    GenericRocmError,
+    NoRocmDeviceError,
+    RocmMemFetchError,
+    RocmUtilFetchError,
+)
+from .hip import libhip, librocm_smi
+from .types import ROCmDevice, ROCmXCD
 
 __all__ = (
     "PREFIX",

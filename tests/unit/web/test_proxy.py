@@ -1,6 +1,6 @@
 import asyncio
 import socket
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial
@@ -11,7 +11,7 @@ import aiohttp
 import pytest
 import yarl
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Handler, Middleware
 from multidict import CIMultiDict, CIMultiDictProxy
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
@@ -292,9 +292,12 @@ async def _endpoint_pool(endpoints: list[str]) -> AsyncIterator[HealthyEndpointP
 
 
 async def _proxy_client(
-    aiohttp_client: Any, client_pool: ClientPool, endpoint_pool: HealthyEndpointPool
+    aiohttp_client: Any,
+    client_pool: ClientPool,
+    endpoint_pool: HealthyEndpointPool,
+    middlewares: Sequence[Middleware] = (),
 ) -> Any:
-    app = web.Application()
+    app = web.Application(middlewares=middlewares)
     app["config"] = MagicMock(
         api=MagicMock(domain="default", ssl_verify=False),
         service=MagicMock(enable_signup=True),
@@ -365,6 +368,54 @@ class TestResendToAnotherEndpoint:
 
             assert resp.status == 502
             assert len(received) == 1
+
+
+@pytest.fixture
+async def streaming_upstream(aiohttp_server: Any) -> _Upstream:
+    """An upstream that keeps streaming the response body until its peer closes."""
+
+    async def handler(request: web.Request) -> web.StreamResponse:
+        resp = web.StreamResponse()
+        await resp.prepare(request)
+        while True:
+            await resp.write(b"x" * 1024)
+            await asyncio.sleep(0.01)
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", handler)
+    server = await aiohttp_server(app)
+    return _Upstream(url=str(server.make_url("/")))
+
+
+class TestClientDisconnect:
+    async def test_client_disconnect_is_not_counted_against_upstream(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        streaming_upstream: _Upstream,
+    ) -> None:
+        finished: asyncio.Queue[None] = asyncio.Queue()
+
+        @web.middleware
+        async def notify_finished(request: web.Request, handler: Handler) -> web.StreamResponse:
+            try:
+                return await handler(request)
+            finally:
+                finished.put_nowait(None)
+
+        async with _endpoint_pool([streaming_upstream.url]) as endpoint_pool:
+            client = await _proxy_client(
+                aiohttp_client, client_pool, endpoint_pool, middlewares=[notify_finished]
+            )
+
+            # The failure threshold is 3, so 3 disconnects would mark the endpoint unhealthy.
+            for _ in range(3):
+                resp = await client.get("/func/folders")
+                await resp.content.readany()
+                resp.close()
+                await asyncio.wait_for(finished.get(), timeout=5)
+
+            assert endpoint_pool.is_healthy(streaming_upstream.url)
 
 
 @dataclass

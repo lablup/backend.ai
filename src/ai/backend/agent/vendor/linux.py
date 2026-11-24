@@ -148,8 +148,7 @@ class libnuma:
                             continue
                         cpuset, cpuset_source = result
                         return cpuset
-                    else:
-                        raise RuntimeError("should not reach here")
+                    raise RuntimeError("should not reach here")
                 case "darwin" | "win32":
                     try:
                         cpuset_source = "the cpus accessible by the docker service"

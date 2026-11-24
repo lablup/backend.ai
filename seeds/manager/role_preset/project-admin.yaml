@@ -15,6 +15,7 @@ items:
       app_config_fragment:              [read, update, create, soft_delete, hard_delete]
       artifact:                         []
       artifact_registry:                []
+      auto_generated_file:              [read, update, create, soft_delete, hard_delete]
       client_ip_masking_policy:         []
       container_registry:               [read]
       deployment:                       [read, update, create, soft_delete, hard_delete]

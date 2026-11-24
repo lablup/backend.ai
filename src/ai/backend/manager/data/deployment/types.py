@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, Self, override
 from uuid import UUID
 
 import yarl
@@ -392,6 +392,7 @@ class DeploymentMetadata:
     # the revision preset default (if any) and ultimately the system default.
     revision_history_limit: int | None = None
     tag: str | None = None
+    destroyed_at: datetime | None = None
 
 
 @dataclass
@@ -870,13 +871,30 @@ class DeploymentInfo:
     target_replica_group_id: ReplicaGroupID | None = None
     current_revision_id: DeploymentRevisionID | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
-    # Full revision data, populated only by the legacy (REST v1) / engine
-    # read paths that eagerly load the revision rows. ``None`` on the modern
-    # read path even when ``current_revision_id`` is set.
+    # Full revision data. The DeploymentDBSource reads fill it; a bare DeploymentInfoSearcher
+    # result and the write-path results leave it None even when the id is set.
     current_revision: ModelRevisionData | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision: ModelRevisionData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+
+    def with_revisions_and_policy(
+        self,
+        *,
+        current_revision_id: DeploymentRevisionID | None,
+        deploying_revision_id: DeploymentRevisionID | None,
+        current_revision: ModelRevisionData | None,
+        deploying_revision: ModelRevisionData | None,
+        policy: DeploymentPolicyData | None,
+    ) -> Self:
+        return replace(
+            self,
+            current_revision_id=current_revision_id,
+            deploying_revision_id=deploying_revision_id,
+            current_revision=current_revision,
+            deploying_revision=deploying_revision,
+            policy=policy,
+        )
 
 
 @dataclass(frozen=True)
@@ -1150,6 +1168,30 @@ class PresetAttributionData:
     preset_id: DeploymentPresetID | None
     # value fields are not used, currently dead code
     values: list[RuntimeVariantPresetValueData]
+
+
+class RevisionVFolderReference(enum.StrEnum):
+    """Where a revision references a vfolder."""
+
+    MODEL = "model"
+    EXTRA_MOUNT = "extra_mount"
+
+
+class RevisionServingState(enum.StrEnum):
+    """A revision that serves traffic or is being rolled out."""
+
+    CURRENT = "current"
+    DEPLOYING = "deploying"
+
+
+@dataclass(frozen=True)
+class ServingRevisionRef:
+    """A revision in ``RevisionServingState``, named by its ids and number."""
+
+    revision_id: DeploymentRevisionID
+    revision_number: int
+    deployment_id: DeploymentID
+    state: RevisionServingState
 
 
 @dataclass

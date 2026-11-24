@@ -69,7 +69,7 @@ class TestNotificationService:
     @pytest.fixture
     async def notification_service(
         self, mock_repository: MagicMock
-    ) -> AsyncGenerator[NotificationService, None]:
+    ) -> AsyncGenerator[NotificationService]:
         """Create NotificationService instance with mocked repository"""
         # Create real NotificationCenter and mock HTTP client pool later
         notification_center = NotificationCenter()

@@ -14,6 +14,12 @@
 - **Do not interpolate `${{ }}` into a shell command.** `env:` carries the value safely as far as the shell: from there hand it to the script as a quoted argument (`env: TAG: ${{ github.ref_name }}` → `run: scripts/foo.py "$TAG"`), so the script never learns the variable's name. A tag name, a branch name and a comment body are all written by someone else.
 - **Pin a third-party action to a commit SHA with a `# vN` comment beside it.** `actions/*` may use a major tag.
 
+## Typecheck
+
+- `ci-typecheck.yml` runs `mypy` from the `python-venv` action on the `.py` and `.pyi` files of `typecheck.txt`. It restores `.mypy_cache` and never saves it.
+- `mypy-cache.yml` saves `.mypy_cache` as `mypy-main-<sha>` after a full `mypy src tests` on each push to main, and deletes the older `mypy-main-*` entries. Only a push to main saves it.
+- A Pants source root `mypy` needs goes in `mypy_path` of `pyproject.toml`.
+
 ## Where a decision goes
 
 | In the workflow | In the script |
@@ -26,3 +32,23 @@
 A script whose decision cannot be reproduced by running it by hand is in the wrong shape.
 
 Worked examples: `scripts/sync-changelog-to-main.sh` (arguments, `--dry-run`, plain output) and `scripts/update-maintained-versions.sh` (arguments, in-place rewrite, `TODAY=` to pin the clock).
+
+## CI target plan
+
+`scripts/plan-ci-targets.py` (job `plan-targets` of `ci.yml`) plans the targets of typecheck and each test suite without Pants. Its docstring holds the selection rules.
+
+- The changed files are `git diff --name-only <base-ref>`; the dependents come from `ruff analyze graph --direction dependents` (`RUFF_GRAPH_VERSION`) over `src`, `tests` and `stubs`; the `.pyi` files of `stubs/` are graph nodes. ruff runs with `--isolated` so the `extend-exclude` of `pyproject.toml` does not drop directories; the script fails when the graph nodes differ from `git ls-files src tests stubs` (`.py`, `.pyi`), and a full typecheck lists those files.
+- The graph gets three edges Pants adds to import inference: a non-empty `__init__.py` to the modules under it, a `conftest.py` to the tests under it, and a `src/` or `tests/` BUILD `dependencies` entry (also one in an `overrides` entry, for the files it names) to the files of the target listing it. An entry naming a target by address reaches the target's files in two steps, as it does in Pants.
+- `python.lock`, `python.lock.metadata`, a `BUILD` under `src/` changed: full run. `pyproject.toml`, `pants.toml`, `stubs/` changed: typecheck of every `.py`. Any other file under `src/` or `tests/` that is not `.py`, `.md` or `.rst` changed (a `BUILD` under `tests/` included): the `.py` files of its directory count as changed.
+- The script reads the `python_tests`, `python_test_utils` and `python_sources` calls of the `src/` and `tests/` BUILD files itself and fails on a BUILD it cannot read or on a test file two `python_tests` own.
+- `typecheck.txt` lists file paths for mypy (`ci-typecheck.yml`), `unit.txt` and `component.txt` file paths for pytest (`ci-pytest.yml`); `integration.txt` and `scenario.txt` list Pants addresses (`ci-test.yml`, `ci-test-scenario.yml`).
+- `unit` and `component` have at most 3 shards (one per 40 and 20 tests). A file goes to the shard `crc32(path) % N`.
+- A run is a full run (every target) for a tag, a release PR, a push to a version branch (`YY.S`) and a PR whose base is one. `detect-changes` decides it as its output `full-run`.
+
+## Pytest suites
+
+`ci-pytest.yml` runs `unit` and `component` with `scripts/run-pytest-shard.py` in the venv of `actions/python-venv`, without Pants.
+
+- The script selects the shard's files and runs `--workers` pytest processes side by side, each with its own `BACKEND_TEST_EXEC_SLOT`. `unit` runs one process per file, `component` batches of files (`workers` * 2 of them).
+- The pytest options follow `[test]` in `pants.toml`: `--timeout=180`, `--reruns=1`.
+- Each process writes a junit report, uploaded as the artifact `junit-<suite>-<job index>`. The script writes the totals and the failed tests to the job summary and prints an `::error` annotation for each failed test.

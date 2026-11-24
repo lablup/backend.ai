@@ -246,9 +246,8 @@ def _search_docker_socket_files_impl() -> tuple[
                 yarl.URL("http://docker"),  # a fake hostname to construct a valid URL
                 connector_cls,
             )
-    else:
-        searched_paths = ", ".join(map(os.fsdecode, search_paths))
-        raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
+    searched_paths = ", ".join(map(os.fsdecode, search_paths))
+    raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
 
 
 def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
@@ -420,6 +419,10 @@ class PlatformTagSet(Mapping[str, str]):
     @override
     def __len__(self) -> int:
         return len(self._data)
+
+    @override
+    def __hash__(self) -> int:
+        raise TypeError(f"unhashable type: {type(self).__name__!r}")
 
     @override
     def __eq__(self, other: Any) -> bool:

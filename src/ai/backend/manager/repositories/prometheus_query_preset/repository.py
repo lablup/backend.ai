@@ -4,10 +4,12 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryEvaluationFailed,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
-    PrometheusQueryEvaluationFailed,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (

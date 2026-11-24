@@ -210,7 +210,7 @@ class TestTarget:
 @pytest.fixture
 async def slot_type_db(
     ops_db: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     """Every table the slot type purger's conflict checks read."""
     async with with_tables(
         ops_db,

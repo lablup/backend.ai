@@ -133,7 +133,7 @@ class TestRoleSearch:
         assert isinstance(result, SearchRolesResponse)
         assert len(result.roles) == 1
         assert result.pagination.total == 1
-        method, url, body = _last_request_call(mock_session)
+        method, url, _body = _last_request_call(mock_session)
         assert method == "POST"
         assert url.endswith("/admin/rbac/roles/search")
 
@@ -154,7 +154,7 @@ class TestRoleSearch:
         )
 
         assert isinstance(result, SearchRolesResponse)
-        method, url, body = _last_request_call(mock_session)
+        method, _url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert body is not None
         assert body["filter"]["name"]["contains"] == "test"
@@ -307,7 +307,7 @@ class TestSearchAssignedUsers:
         assert isinstance(result, SearchUsersAssignedToRoleResponse)
         assert len(result.users) == 1
         assert result.users[0].user_id == user_id
-        method, url, body = _last_request_call(mock_session)
+        method, url, _body = _last_request_call(mock_session)
         assert method == "POST"
         assert url.endswith(f"/admin/rbac/roles/{role_id}/assigned-users/search")
 

@@ -13,6 +13,8 @@ from sqlalchemy.engine import create_engine as _create_engine
 
 from ai.backend.common.db.connector import PrimaryMemberConnector
 from ai.backend.common.db.invalidator import FailedBeginInvalidator
+from ai.backend.common.db.pre_ping import PrePingTimeout
+from ai.backend.common.db.socket_options import TCPOptions
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging.structured import StructuredLogger
@@ -55,6 +57,12 @@ async def connect_database(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     db_url = db_config.sqlalchemy_url()
     members = [(addr.host, addr.port) for addr in db_config.addrs]
+    tcp_options = TCPOptions(
+        keepalive_idle=db_config.tcp_keepalive_idle,
+        keepalive_interval=db_config.tcp_keepalive_interval,
+        keepalive_count=db_config.tcp_keepalive_count,
+        user_timeout=db_config.tcp_user_timeout,
+    )
 
     version_check_db = create_async_engine(
         db_url,
@@ -65,6 +73,7 @@ async def connect_database(
             database=db_config.name,
             connect_timeout=db_config.connect_timeout,
             connect_kwargs={},
+            tcp_options=tcp_options,
         ).connect,
     )
     async with version_check_db.begin() as conn:
@@ -86,6 +95,7 @@ async def connect_database(
             database=db_config.name,
             connect_timeout=db_config.connect_timeout,
             connect_kwargs=pgsql_connect_opts,
+            tcp_options=tcp_options,
         ).connect,
         pool_size=db_config.pool_size,
         pool_recycle=db_config.pool_recycle,
@@ -101,6 +111,8 @@ async def connect_database(
         _lock_conn_timeout=int(db_config.lock_conn_timeout),
     )
     FailedBeginInvalidator().listen(db.sync_engine)
+    if db_config.pool_pre_ping:
+        PrePingTimeout(db_config.pre_ping_timeout).listen(db.sync_engine)
     yield db
     await db.dispose()
 

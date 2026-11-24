@@ -278,7 +278,7 @@ class DetectCloudScenario:
 
 class TestDetectCloud:
     @pytest.fixture
-    def mock_responses(self) -> Generator[IMDSRoutes, None, None]:
+    def mock_responses(self) -> Generator[IMDSRoutes]:
         routes = IMDSRoutes()
         with patch(
             "ai.backend.common.identity.aiohttp.ClientSession",
@@ -361,13 +361,13 @@ class TestDetectCloud:
 
 class TestIdentityFunctions:
     @pytest.fixture
-    def mock_curl(self) -> Generator[AsyncMock, None, None]:
+    def mock_curl(self) -> Generator[AsyncMock]:
         mock = AsyncMock()
         with patch("ai.backend.common.identity.curl", mock):
             yield mock
 
     @pytest.fixture
-    def mock_hostname(self) -> Generator[None, None, None]:
+    def mock_hostname(self) -> Generator[None]:
         with patch("socket.gethostname", return_value="testhost"):
             yield
 
@@ -376,7 +376,6 @@ class TestIdentityFunctions:
         ai.backend.common.identity.current_provider = CloudProvider.AWS
         ai.backend.common.identity._defined = False
         ai.backend.common.identity._define_functions()
-        return
 
     @pytest.mark.parametrize(
         ("curl_return", "expected"),
@@ -400,7 +399,6 @@ class TestIdentityFunctions:
         ai.backend.common.identity.current_provider = CloudProvider.AZURE
         ai.backend.common.identity._defined = False
         ai.backend.common.identity._define_functions()
-        return
 
     async def test_get_instance_id_with_invalid_json(
         self, mock_curl: AsyncMock, mock_hostname: None, azure_provider: None
@@ -451,7 +449,6 @@ class TestIdentityFunctions:
         ai.backend.common.identity.current_provider = CloudProvider.GCP
         ai.backend.common.identity._defined = False
         ai.backend.common.identity._define_functions()
-        return
 
     @pytest.mark.parametrize(
         "curl_return",

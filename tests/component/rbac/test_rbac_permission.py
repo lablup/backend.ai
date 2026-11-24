@@ -16,7 +16,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.base.field import FieldNotFoundError
-from ai.backend.manager.errors.permission import PermissionAlreadyGranted
+from ai.backend.manager.errors.permission_field import PermissionAlreadyGranted
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,

@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEn
 from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -33,7 +33,6 @@ from ai.backend.manager.data.secret.types import (
     SecretStatus,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -79,7 +78,7 @@ def registry(global_gate: VirtualEntityGlobalActionRBACValidator) -> ProcessorRe
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(global_scope=[global_gate]),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 

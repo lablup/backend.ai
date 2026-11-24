@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.errors.permission import RoleNotFound
+from ai.backend.manager.errors.role import RoleNotFound
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWriteItemResult

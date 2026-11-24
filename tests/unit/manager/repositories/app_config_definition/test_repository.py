@@ -55,7 +55,7 @@ from ai.backend.testutils.db import with_tables
 @pytest.fixture
 async def repository(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[OpsRepository[AppConfigDefinitionData], None]:
+) -> AsyncGenerator[OpsRepository[AppConfigDefinitionData]]:
     async with with_tables(
         global_entity_ids,
         [

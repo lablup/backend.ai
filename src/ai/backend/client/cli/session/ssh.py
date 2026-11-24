@@ -7,6 +7,7 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Final
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.pretty import print_fail, print_info
@@ -17,9 +18,35 @@ if pex_path := os.environ.get("PEX", None):
 else:
     CLI_EXECUTABLE = (sys.executable, "-m", "ai.backend.cli")
 
+# The proxy does not always exit on SIGINT (BA-8310), so stopping it escalates
+# to SIGTERM and then SIGKILL after each of these timeouts in seconds.
+_PROXY_INTERRUPT_TIMEOUT: Final[float] = 10.0
+_PROXY_TERMINATE_TIMEOUT: Final[float] = 5.0
+
+
+def _exited_within(proxy_proc: subprocess.Popen[bytes], timeout: float) -> bool:
+    try:
+        proxy_proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False
+    return True
+
+
+def _stop_proxy(proxy_proc: subprocess.Popen[bytes]) -> None:
+    proxy_proc.send_signal(signal.SIGINT)
+    if _exited_within(proxy_proc, _PROXY_INTERRUPT_TIMEOUT):
+        return
+    proxy_proc.terminate()
+    if _exited_within(proxy_proc, _PROXY_TERMINATE_TIMEOUT):
+        return
+    proxy_proc.kill()
+    proxy_proc.wait()
+
 
 @contextlib.contextmanager
-def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
+def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path | None]:
+    """Yield the session's private key, or None when the session holds none (the user uploaded
+    only a public key), so ssh falls back to the user's own keys."""
     random_id = secrets.token_hex(16)
     key_filename = "id_container"
     # Create ssh directory with recommended permissions if not exists
@@ -51,6 +78,10 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
             print(e.stdout.decode())
             sys.exit(ExitCode.FAILURE)
         (Path(download_dir) / key_filename).rename(key_path)
+    identity_path: Path | None = key_path
+    if not key_path.read_bytes().strip():
+        key_path.unlink()
+        identity_path = None
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
@@ -58,12 +89,13 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    if proxy_proc.stdout is None:
+    proxy_stdout = proxy_proc.stdout
+    if proxy_stdout is None:
         raise RuntimeError("Failed to capture stdout from proxy process")
     try:
         lines: list[bytes] = []
         while True:
-            line = proxy_proc.stdout.readline(1024)
+            line = proxy_stdout.readline(1024)
             if not line:
                 proxy_proc.wait()
                 print_fail(
@@ -76,8 +108,11 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
                 break
             lines.append(line)
         lines.clear()
-        yield key_path
+        yield identity_path
     finally:
-        proxy_proc.send_signal(signal.SIGINT)
-        proxy_proc.wait()
-        Path(key_path).unlink()
+        try:
+            _stop_proxy(proxy_proc)
+        finally:
+            proxy_stdout.close()
+            if identity_path is not None:
+                identity_path.unlink(missing_ok=True)

@@ -5,17 +5,28 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Final
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactAvailability,
+    ArtifactOrderField,
+    ArtifactType,
+)
 from ai.backend.common.types import BackendAISchema
 
+ARTIFACT_MAX_SCAN_LIMIT: Final[int] = 500
+
 __all__ = (
+    "ARTIFACT_MAX_SCAN_LIMIT",
+    "ScanArtifactModelPathParam",
+    "ScanArtifactModelQueryParam",
     # Nested types
     "DelegateeTargetInput",
     "ImportArtifactsOptionsInput",
@@ -93,8 +104,8 @@ class PaginationInput(BaseRequestModel):
 class ArtifactOrderingInput(BaseRequestModel):
     """Ordering options for artifact queries."""
 
-    order_by: list[tuple[str, bool]] = Field(
-        default_factory=lambda: [("NAME", False)],
+    order_by: list[tuple[ArtifactOrderField, bool]] = Field(
+        default_factory=lambda: [(ArtifactOrderField.NAME, False)],
         description="List of (field, descending) tuples",
     )
 
@@ -102,7 +113,9 @@ class ArtifactOrderingInput(BaseRequestModel):
 class ArtifactFilterInput(BaseRequestModel):
     """Filtering options for artifacts."""
 
-    artifact_type: list[str] | None = Field(default=None, description="Filter by artifact type(s)")
+    artifact_type: list[ArtifactType] | None = Field(
+        default=None, description="Filter by artifact type(s)"
+    )
     name_filter: StringFilter | None = Field(default=None, description="Filter by name")
     registry_filter: StringFilter | None = Field(
         default=None, description="Filter by registry name"
@@ -118,7 +131,7 @@ class ArtifactFilterInput(BaseRequestModel):
     source_registry_type: ArtifactRegistryType | None = Field(
         default=None, description="Filter by source registry type"
     )
-    availability: list[str] | None = Field(
+    availability: list[ArtifactAvailability] | None = Field(
         default=None, description="Filter by availability status"
     )
     AND: list[ArtifactFilterInput] | None = Field(default=None, description="AND filter group")
@@ -137,9 +150,12 @@ class ScanArtifactsRequest(BaseRequestModel):
     registry_id: UUID | None = Field(
         default=None, description="The unique identifier of the artifact registry to scan."
     )
-    artifact_type: str | None = Field(default=None, description="Artifact type filter")
-    limit: int = Field(description="Maximum number of artifacts to scan")
-    order: str | None = Field(default=None, description="Sort order key")
+    artifact_type: ArtifactType | None = Field(default=None, description="Artifact type filter")
+    limit: int = Field(
+        lt=ARTIFACT_MAX_SCAN_LIMIT,
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
+    )
+    order: ModelSortKey | None = Field(default=None, description="Sort order key")
     search: str | None = Field(default=None, description="Search query string")
 
 
@@ -154,9 +170,12 @@ class DelegateScanArtifactsRequest(BaseRequestModel):
         default=None,
         description="The target reservoir to delegate the scan.",
     )
-    artifact_type: str | None = Field(default=None, description="Artifact type filter")
-    limit: int = Field(description="Maximum number of artifacts to scan")
-    order: str | None = Field(default=None, description="Sort order key")
+    artifact_type: ArtifactType | None = Field(default=None, description="Artifact type filter")
+    limit: int = Field(
+        lt=ARTIFACT_MAX_SCAN_LIMIT,
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
+    )
+    order: ModelSortKey | None = Field(default=None, description="Sort order key")
     search: str | None = Field(default=None, description="Search query string")
 
 
@@ -173,7 +192,7 @@ class DelegateImportArtifactsRequest(BaseRequestModel):
     delegatee_target: DelegateeTargetInput | None = Field(
         default=None, description="The target reservoir to delegate the import."
     )
-    artifact_type: str | None = Field(default=None, description="Artifact type filter")
+    artifact_type: ArtifactType | None = Field(default=None, description="Artifact type filter")
     options: ImportArtifactsOptionsInput = Field(
         default_factory=ImportArtifactsOptionsInput,
         description="Options controlling import behavior such as forcing re-download.",
@@ -192,6 +211,17 @@ class ScanArtifactModelsRequest(BaseRequestModel):
     """Request body for batch scanning models."""
 
     models: list[ModelTarget] = Field(description="List of models to scan from the registry.")
+    registry_id: UUID | None = Field(
+        default=None, description="The unique identifier of the artifact registry to scan."
+    )
+
+
+class ScanArtifactModelPathParam(BaseRequestModel):
+    model_id: str = Field(description="The model to scan from the registry.")
+
+
+class ScanArtifactModelQueryParam(BaseRequestModel):
+    revision: str | None = Field(description="The model revision to scan from the registry.")
     registry_id: UUID | None = Field(
         default=None, description="The unique identifier of the artifact registry to scan."
     )

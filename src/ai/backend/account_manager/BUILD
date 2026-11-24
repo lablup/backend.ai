@@ -22,6 +22,7 @@ python_distribution(
     dependencies=[
         ":src",
         "src/ai/backend/cli:src",  # install requirement: provides the `backend.ai` console script
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -45,6 +46,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )
@@ -55,6 +57,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )

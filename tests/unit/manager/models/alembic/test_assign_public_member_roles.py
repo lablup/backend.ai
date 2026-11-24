@@ -69,7 +69,7 @@ class _Fixture:
 @pytest.fixture
 async def db(
     global_entity_ids: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(global_entity_ids, _TABLES):
         async with global_entity_ids.begin() as conn:
             await conn.execute(

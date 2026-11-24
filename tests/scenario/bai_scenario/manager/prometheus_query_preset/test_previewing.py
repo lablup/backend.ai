@@ -20,7 +20,9 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionResultInfo,
 )
-from ai.backend.common.exception import PrometheusQueryEvaluationFailed
+from ai.backend.common.errors.prometheus import (
+    PrometheusQueryEvaluationFailed,
+)
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )

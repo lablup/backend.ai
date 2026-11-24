@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.v2 import validators as v2_validators
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
     RefusingGlobalActionValidator,

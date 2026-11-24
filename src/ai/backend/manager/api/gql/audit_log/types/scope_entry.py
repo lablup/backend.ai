@@ -27,6 +27,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -59,7 +60,7 @@ class AuditLogScopeEntryGQL(PydanticNodeMixin[AuditLogScopeEntryNode]):
     scope_type: str = gql_field(description="Entity type of the scope.")
     scope_id: UUID = gql_field(description="ID of the scope entity.")
 
-    @gql_field(description="The scope entity. Null when it no longer exists.")  # type: ignore[misc]
+    @gql_resolver(description="The scope entity. Null when it no longer exists.")
     async def entity(
         self,
         info: Info[StrawberryGQLContext],
@@ -74,7 +75,7 @@ class AuditLogScopeEntryGQL(PydanticNodeMixin[AuditLogScopeEntryNode]):
             RuntimeEntityID(EntityType.from_name(self.scope_type), self.scope_id)
         )
 
-    @gql_field(description="The audit log the scope belongs to.")  # type: ignore[misc]
+    @gql_resolver(description="The audit log the scope belongs to.")
     async def audit_log(
         self,
         info: Info[StrawberryGQLContext],

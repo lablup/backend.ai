@@ -20,12 +20,12 @@ from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.api.rest.tree import build_api_routes
 from ai.backend.manager.data.common.sentinel import Undefined, undefined
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.version import __version__
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

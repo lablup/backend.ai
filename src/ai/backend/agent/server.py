@@ -63,6 +63,7 @@ from ai.backend.agent.errors.agent import (
     ImagePullTimeoutError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.resources import KernelCreationInProgress
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -109,13 +110,14 @@ from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import pretty_json
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import load_configured_wheelhouse
+from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.process.crashdump import enable_crash_dump
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -142,7 +144,6 @@ from ai.backend.common.types import (
     HostPortPair,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelCreationResult,
     KernelId,
     QueueSentinel,
@@ -908,8 +909,9 @@ class AgentRPCServer(aobject):
             log.exception("rpc handler failed")
             raise
         if errors:
-            # Raise up the first error.
-            if len(errors) == 1:
+            # Raise up the first error. The manager tells a creation in progress apart by
+            # its name, so kernels that are all being created answer with one of them.
+            if len(errors) == 1 or all(isinstance(e, KernelCreationInProgress) for e in errors):
                 raise errors[0]
             raise aiotools.TaskGroupError("agent.create_kernels() failed", errors)
         return raw_results
@@ -1786,7 +1788,7 @@ def main(
 
     # Determine where to read configuration.
     try:
-        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+        raw_cfg, _cfg_src_path = config.read_from_file(config_path, "agent")
     except config.ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",
@@ -1880,7 +1882,7 @@ def main(
                 child_exit_monitor = ChildExitMonitor(child_statuses)
 
                 @aiotools.main_context
-                def server_main_ctx() -> Generator[None, signal.Signals, None]:
+                def server_main_ctx() -> Generator[None, signal.Signals]:
                     """Tear the supervisor down when a worker dies outside the shutdown
                     path, so that the service manager sees a failed unit instead of a
                     supervisor with no worker."""

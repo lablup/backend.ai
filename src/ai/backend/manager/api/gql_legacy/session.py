@@ -23,7 +23,10 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -42,6 +45,7 @@ from ai.backend.manager.data.permission.permission_defs import ComputeSessionPer
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
+from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -49,11 +53,16 @@ from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAP
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
+from ai.backend.manager.models.minilang.field_spec import (
+    ArrayFieldItem,
+    JSONFieldItem,
+    ORMFieldItem,
+)
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import ScopeType, SystemScope
+from ai.backend.manager.models.rbac.base import DomainScope, ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac.base import UserScope as UserRBACScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_session_allocations,
@@ -66,7 +75,12 @@ from ai.backend.manager.models.session.row import (
     by_raw_filter,
     by_resource_group_name,
     by_status,
-    get_permission_ctx,
+)
+from ai.backend.manager.models.session.scopes import (
+    DomainSessionTarget,
+    ProjectSessionTarget,
+    SessionTarget,
+    UserSessionTarget,
 )
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.types import (
@@ -79,6 +93,9 @@ from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.row import get_permission_ctx as get_vfolder_permission_ctx
+from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
+    ScopedGetHeldPermissionsAction,
+)
 from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
@@ -318,15 +335,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         description="Added in 24.09.0.",
     )
 
-    @classmethod
-    async def get_node(
-        cls,
-        info: graphene.ResolveInfo,
-        id: str,
-    ) -> Self | None:
-        graphene_ctx: GraphQueryContext = info.context
-        session_id = resolve_entity_id(id, SessionID)
-        user = graphene_ctx.user
+    @staticmethod
+    def _visible_to(user: Mapping[str, Any]) -> sa.ColumnElement[bool]:
+        """The sessions the requester may read: all for a superadmin, the domain's for an
+        admin, their own for a user, none for any other role."""
         visible: sa.ColumnElement[bool]
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -337,6 +349,17 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 visible = SessionRow.user_uuid == user["uuid"]
             case _:
                 visible = sa.false()
+        return visible
+
+    @classmethod
+    async def get_node(
+        cls,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> Self | None:
+        graphene_ctx: GraphQueryContext = info.context
+        session_id = resolve_entity_id(id, SessionID)
+        visible = cls._visible_to(graphene_ctx.user)
         async with graphene_ctx.db.begin_readonly_session_read_committed() as db_session:
             stmt = (
                 sa.select(SessionRow)
@@ -680,10 +703,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             for dependee_id, dependent_id in dep_rows:
                 dep_map.setdefault(dependent_id, []).append(dependee_id)
 
-            # Step 2: Fetch dependent SessionRows with eager loading
+            # Step 2: Fetch the dependent SessionRows the requester may read
             sess_query = (
                 sa.select(SessionRow)
-                .where(SessionRow.id.in_(dependent_ids))
+                .where(cls._visible_to(ctx.user) & SessionRow.id.in_(dependent_ids))
                 .options(
                     selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
                     joinedload(SessionRow.user),
@@ -724,10 +747,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             for dependent_id, dependee_id in dep_rows:
                 dep_map.setdefault(dependee_id, []).append(dependent_id)
 
-            # Step 2: Fetch dependee SessionRows with eager loading
+            # Step 2: Fetch the dependee SessionRows the requester may read
             sess_query = (
                 sa.select(SessionRow)
-                .where(SessionRow.id.in_(dependee_ids))
+                .where(cls._visible_to(ctx.user) & SessionRow.id.in_(dependee_ids))
                 .options(
                     selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
                     joinedload(SessionRow.user),
@@ -740,6 +763,66 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                     objs_per_key[dependent_id].append(cls.from_row(ctx, row))
             return [*objs_per_key.values()]
 
+    @staticmethod
+    async def _scope_condition(
+        graph_ctx: GraphQueryContext,
+        scope_id: ScopeType,
+    ) -> sa.ColumnElement[bool]:
+        """The sessions the caller may read within `scope_id`, by the new RBAC.
+
+        Without READ on the scope, only their own; with enforcement off, their role
+        (a monitor reads their domain's).
+        """
+        user = graph_ctx.user
+        is_superadmin = user["role"] == UserRole.SUPERADMIN
+        target: SessionTarget
+        match scope_id:
+            case SystemScope() if is_superadmin:
+                return sa.true()
+            case SystemScope():
+                target = DomainSessionTarget(
+                    domain_id=await graph_ctx.scheduler_repository.get_domain_id_by_name(
+                        DomainName(user["domain_name"])
+                    )
+                )
+            case DomainScope(domain_name=domain_name):
+                target = DomainSessionTarget(
+                    domain_id=await graph_ctx.scheduler_repository.get_domain_id_by_name(
+                        DomainName(domain_name)
+                    )
+                )
+            case ProjectScope(project_id=project_id):
+                target = ProjectSessionTarget(project_id=project_id)
+            case UserRBACScope(user_id=user_id):
+                target = UserSessionTarget(user_id=UserID(user_id))
+        scope_cond = target.to_condition()()
+        if is_superadmin:
+            return scope_cond
+        if not graph_ctx.config_provider.config.manager.rbac.enforcement_enabled:
+            role_cond: sa.ColumnElement[bool] = (
+                SessionRow.domain_name == user["domain_name"]
+                if user["role"] == UserRole.MONITOR
+                else ComputeSessionNode._visible_to(user)
+            )
+            return scope_cond & role_cond
+        caller_id = UserID(user["uuid"])
+        own = UserSessionTarget(user_id=caller_id)
+        keys = [
+            GovernCheckKey(
+                user_id=caller_id, scope=scope.scope_id(), entity_type=SessionEntityType()
+            )
+            for scope in (target, own)
+        ]
+        result = await graph_ctx.processors.permission_controller.scoped_get_held_permissions.run(
+            ScopedGetHeldPermissionsAction(user_id=caller_id, keys=keys)
+        )
+        scope_key, own_key = keys
+        if result.granted.get(scope_key, Permission.NONE).covers(Permission.READ):
+            return scope_cond
+        if result.granted.get(own_key, Permission.NONE).covers(Permission.READ):
+            return scope_cond & own.to_condition()()
+        return sa.false()
+
     @classmethod
     async def get_accessible_node(
         cls,
@@ -749,29 +832,21 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         permission: ComputeSessionPermission,
     ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
-        user = graph_ctx.user
-        client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
         _, raw_session_id = id
-        async with graph_ctx.db.connect() as db_conn:
-            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
-            cond = permission_ctx.query_condition
-            if cond is None:
-                return None
-            try:
-                session_id = uuid.UUID(raw_session_id)
-            except ValueError as e:
-                raise InvalidAPIParameters(f"Invalid id: {raw_session_id}") from e
-            query = sa.select(SessionRow).where(cond & (SessionRow.id == session_id))
-            query = cls._add_basic_options_to_query(query)
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                session_row = await db_session.scalar(query)
+        try:
+            session_id = uuid.UUID(raw_session_id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {raw_session_id}") from e
+        if permission != ComputeSessionPermission.READ_ATTRIBUTE:
+            return None
+        cond = await cls._scope_condition(graph_ctx, scope_id)
+        query = sa.select(SessionRow).where(cond & (SessionRow.id == session_id))
+        query = cls._add_basic_options_to_query(query)
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
+            session_row = await db_session.scalar(query)
         if session_row is None:
             return None
-        return cls.from_row(
-            graph_ctx,
-            session_row,
-            permissions=await permission_ctx.calculate_final_permission(session_row),
-        )
+        return cls.from_row(graph_ctx, session_row)
 
     @classmethod
     async def get_accessible_connection(
@@ -817,28 +892,15 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        async with graph_ctx.db.connect() as db_conn:
-            user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
-            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
-            cond = permission_ctx.query_condition
-            if cond is None:
-                return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-            query = cls._add_basic_options_to_query(query.where(cond))
-            cnt_query = cls._add_basic_options_to_query(cnt_query.where(cond), is_count=True)
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                session_rows = list((await db_session.scalars(query)).all())
-                total_cnt = await db_session.scalar(cnt_query)
-        result: list[Self] = [
-            cls.from_row(
-                graph_ctx,
-                row,
-                permissions=await permission_ctx.calculate_final_permission(row),
-            )
-            for row in session_rows
-        ]
+        if permission != ComputeSessionPermission.READ_ATTRIBUTE:
+            return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
+        cond = await cls._scope_condition(graph_ctx, scope_id)
+        query = cls._add_basic_options_to_query(query.where(cond))
+        cnt_query = cls._add_basic_options_to_query(cnt_query.where(cond), is_count=True)
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
+            session_rows = list((await db_session.scalars(query)).all())
+            total_cnt = await db_session.scalar(cnt_query)
+        result: list[Self] = [cls.from_row(graph_ctx, row) for row in session_rows]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 

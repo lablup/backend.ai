@@ -5,7 +5,6 @@ import strawberry
 from graphql import GraphQLError
 from strawberry.extensions import QueryDepthLimiter
 from strawberry.federation import Schema
-from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
 from ai.backend.manager.api.gql.agent.resolver import (
@@ -76,6 +75,13 @@ from ai.backend.manager.api.gql.artifact.resolver import (
 from ai.backend.manager.api.gql.audit_log.resolver.query import (
     admin_audit_logs_v2,
     scoped_audit_logs_v2,
+)
+from ai.backend.manager.api.gql.auto_generated_file.resolver import (
+    create_auto_generated_file,
+    my_auto_generated_files,
+    purge_auto_generated_file,
+    scoped_auto_generated_files,
+    switch_default_auto_generated_file,
 )
 from ai.backend.manager.api.gql.client_ip_masking.resolver import (
     admin_client_ip_masking_policies,
@@ -160,10 +166,12 @@ from ai.backend.manager.api.gql.domain_v2.resolver.mutation import (
     admin_purge_domain_v2,
     admin_restore_domain_v2,
     admin_update_domain_v2,
+    create_domain_container_registry_relations,
     delete_domain_v2,
     partial_bulk_delete_domains_v2,
     partial_bulk_restore_domains_v2,
     partial_bulk_update_domains_v2,
+    purge_domain_container_registry_relations,
     restore_domain_v2,
     update_domain_v2,
 )
@@ -627,6 +635,7 @@ from ai.backend.manager.api.gql.scheduling_history.resolver import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from ai.backend.manager.api.gql.schema_config import GQLSchemaConfig
 from ai.backend.manager.api.gql.secret.resolver import admin_reencrypt_secrets, admin_secret_status
 from ai.backend.manager.api.gql.service_catalog.resolver import admin_service_catalogs
 from ai.backend.manager.api.gql.session.resolver.session import (
@@ -651,6 +660,12 @@ from ai.backend.manager.api.gql.session_group.resolver import (
 )
 from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
     admin_session_lifecycle_handlers,
+)
+from ai.backend.manager.api.gql.ssh_key.resolver import (
+    my_ssh_keys,
+    my_upload_ssh_key,
+    ssh_key,
+    switch_default_ssh_key,
 )
 from ai.backend.manager.api.gql.storage_volume.resolver import (
     admin_storage_volumes,
@@ -927,6 +942,10 @@ class Query:
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
     scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
+    scoped_auto_generated_files = scoped_auto_generated_files
+    my_auto_generated_files = my_auto_generated_files
+    ssh_key = ssh_key
+    my_ssh_keys = my_ssh_keys
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments
@@ -1291,6 +1310,8 @@ class Mutation:
     partial_bulk_update_domains_v2 = partial_bulk_update_domains_v2
     partial_bulk_delete_domains_v2 = partial_bulk_delete_domains_v2
     partial_bulk_restore_domains_v2 = partial_bulk_restore_domains_v2
+    create_domain_container_registry_relations = create_domain_container_registry_relations
+    purge_domain_container_registry_relations = purge_domain_container_registry_relations
     # Project V2 APIs
     admin_create_project_v2 = admin_create_project_v2
     admin_update_project_v2 = admin_update_project_v2
@@ -1557,6 +1578,12 @@ class Mutation:
     create_vfolder_auto_mount = create_vfolder_auto_mount
     update_vfolder_auto_mount = update_vfolder_auto_mount
     delete_vfolder_auto_mount = delete_vfolder_auto_mount
+    # Auto-generated file mutations
+    create_auto_generated_file = create_auto_generated_file
+    switch_default_auto_generated_file = switch_default_auto_generated_file
+    purge_auto_generated_file = purge_auto_generated_file
+    my_upload_ssh_key = my_upload_ssh_key
+    switch_default_ssh_key = switch_default_ssh_key
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
     partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels
@@ -1614,7 +1641,7 @@ schema = CustomizedSchema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
-    config=StrawberryConfig(auto_camel_case=True),
+    config=GQLSchemaConfig(auto_camel_case=True),
     federation_version="2.7",
     # Federation stubs bridging legacy graphene Node types into the Strawberry-owned
     # node(id:) resolver. Listed explicitly so they are part of the schema (and the Node
@@ -1643,7 +1670,7 @@ schema = CustomizedSchema(
 )
 
 
-@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))
 async def ping() -> str:
     return "pong"
 
@@ -1667,7 +1694,7 @@ class PublicQueries:
 # carries no auth middleware: anonymous queries compose against this subgraph alone.
 public_schema = Schema(
     query=PublicQueries,
-    config=StrawberryConfig(auto_camel_case=True),
+    config=GQLSchemaConfig(auto_camel_case=True),
     federation_version="2.7",
     extensions=[
         GQLLoggingExtension,

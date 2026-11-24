@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
@@ -31,9 +32,11 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
@@ -67,7 +70,6 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.storage_namespace.scopes import ObjectStorageNamespaceTarget
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -138,7 +140,7 @@ def registry(denying_scope: _DenyingScopeValidator) -> ProcessorRegistry[Any]:
                 scope=[denying_scope],
                 global_scope=[RefusingGlobalActionValidator()],
             ),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 
@@ -157,7 +159,7 @@ def bulk_registry(denying_bulk: _DenyingBulkValidator) -> ProcessorRegistry[Any]
                 atomic_bulk=[denying_bulk],
                 global_scope=[RefusingGlobalActionValidator()],
             ),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 
@@ -167,7 +169,12 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     denying_scope: _DenyingScopeValidator,
     regular_user: UserData,
 ) -> None:
-    processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    processors = DomainProcessors(
+        registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
+        MagicMock(),
+    )
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
         searcher=ScopedSearcher(

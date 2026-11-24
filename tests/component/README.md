@@ -40,19 +40,10 @@ A component test typically covers:
 - `tests/component/manager/models/gql_models/test_group.py` - Group operations
 - `tests/component/manager/models/gql_models/test_container_registry_nodes_v2.py` - GraphQL node behavior
 
-**Component Integration Tests** - Multiple internal subsystems working together:
-- `tests/component/agent/docker/test_agent.py` - Docker agent with multiple subsystems
-
 ## Directory Structure
 
 ```
 tests/component/
-├── agent/
-│   └── docker/           # Docker agent integration tests
-│       ├── test_agent.py
-│       ├── test_api.py
-│       ├── test_kernel.py
-│       └── ...
 ├── manager/
 │    ├── api/              # Top-level API endpoint tests
 │    │   ├── test_auth.py

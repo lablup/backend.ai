@@ -19,7 +19,7 @@ async def test_batch_result_in_scalar_stream() -> None:
 
     mock_rows = [SimpleNamespace(id=1, data="data1"), SimpleNamespace(id=3, data="data3")]
 
-    async def mock_stream_scalars(query: sa.Select[Any]) -> AsyncGenerator[Any, None]:
+    async def mock_stream_scalars(query: sa.Select[Any]) -> AsyncGenerator[Any]:
         for row in mock_rows:
             yield row
 

@@ -5,6 +5,7 @@ from typing import Any, Final, Self, override
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.stage.kernel_lifecycle.defs import LIBBAIHOOK_MOUNT_PATH
 from ai.backend.common.docker import RUNNER_RESERVED_ENVIRON_KEYS, KernelFeatures, LabelName
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
@@ -14,7 +15,6 @@ from ai.backend.common.types import (
     BinarySize,
     DeviceModelInfo,
     DeviceName,
-    KernelCreationConfig,
     SlotName,
     VFolderMount,
 )

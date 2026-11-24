@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.errors.permission import RoleNotFound
+from ai.backend.manager.errors.role import RoleNotFound
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
@@ -82,7 +82,7 @@ class TestBulkRolePermissions:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, BULK_PERMISSION_TABLES):
             yield database_connection
 

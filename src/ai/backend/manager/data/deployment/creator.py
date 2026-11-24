@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -209,3 +210,5 @@ class NewDeploymentCreator:
     # ``None`` defers to the resource group's ``default_deployment_options``
     # (snapshot-copied at create time). An explicit value overrides.
     options: DeploymentOptions | None = None
+    # Agents of the resource group the route sessions are placed on.
+    designated_agents: frozenset[AgentUUID] = frozenset()
