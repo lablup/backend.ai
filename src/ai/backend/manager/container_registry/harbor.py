@@ -153,8 +153,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if not project:
             raise ContainerRegistryProjectEmpty(self.registry_info.type, project)
 
-        repository = image.name
-        base_url = (
+        # Harbor takes the repository as a single path segment with its slashes encoded twice:
+        # once here, and once more when yarl encodes the percent sign.
+        repository = urllib.parse.quote(image.name, safe="")
+        artifact_url = (
             self.registry_url
             / "api"
             / "v2.0"
@@ -180,7 +182,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     self.credentials["password"],
                 )
 
-            async with sess.delete(base_url, allow_redirects=False, **rqst_args) as resp:
+            async with sess.delete(artifact_url, allow_redirects=False, **rqst_args) as resp:
                 try:
                     resp.raise_for_status()
                 except aiohttp.ClientResponseError as e:

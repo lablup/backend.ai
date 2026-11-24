@@ -63,6 +63,9 @@ from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
+from ai.backend.manager.services.entity_share.actions.lookup_answering_scope import (
+    LookupEntityShareAnsweringScopeAction,
+)
 from ai.backend.manager.services.entity_share.actions.search import (
     SearchEntitySharesAction,
 )
@@ -133,20 +136,18 @@ class EntityShareAdapter(BaseAdapter):
         ]
 
     async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         result = await self._entity_share.accept.run(
-            AcceptEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
+            AcceptEntityShareAction(
+                share_id=share_id, answering_scope=await self._answering_scope(share_id)
+            )
         )
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def reject(self, share_id: EntityShareID) -> EntitySharePayload:
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         result = await self._entity_share.reject.run(
-            RejectEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
+            RejectEntityShareAction(
+                share_id=share_id, answering_scope=await self._answering_scope(share_id)
+            )
         )
         return EntitySharePayload(share=self._to_node(result.data))
 
@@ -159,13 +160,20 @@ class EntityShareAdapter(BaseAdapter):
         return EntitySharePayload(share=self._to_node(result.data))
 
     async def leave(self, share_id: EntityShareID) -> EntitySharePayload:
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         result = await self._entity_share.leave.run(
-            LeaveEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
+            LeaveEntityShareAction(
+                share_id=share_id, answering_scope=await self._answering_scope(share_id)
+            )
         )
         return EntitySharePayload(share=self._to_node(result.data))
+
+    async def _answering_scope(self, share_id: EntityShareID) -> EntityIdentifier:
+        """The scope the share is addressed to, which answers it. The answer is checked
+        against it."""
+        result = await self._entity_share.lookup_answering_scope.run(
+            LookupEntityShareAnsweringScopeAction(share_id=share_id)
+        )
+        return result.answering_scope
 
     async def my_search(self, input: MySearchEntitySharesInput) -> SearchEntitySharesPayload:
         """Page through the shares the caller stands on a side of.

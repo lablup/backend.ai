@@ -29,7 +29,9 @@ __all__ = (
     "ResourceSlotEntryInfo",
     "ResourceSlotEntryInput",
     "ResourceSlotInfo",
+    "ServiceArgumentInterpolationDelimiterInfoDTO",
     "ServiceArgumentInterpolationDelimiterInput",
+    "ServiceArgumentInterpolationInfoDTO",
     "ServiceArgumentInterpolationInput",
     "VFolderHostPermissionEntryInfo",
     "String64",
@@ -248,5 +250,20 @@ class ServiceArgumentInterpolationDelimiterInput(BaseRequestModel):
 class ServiceArgumentInterpolationInput(BaseRequestModel):
     delimiters: list[ServiceArgumentInterpolationDelimiterInput] = Field(
         min_length=1,
+        description="Delimiters that mark the variables to fill in the service arguments.",
+    )
+
+
+class ServiceArgumentInterpolationDelimiterInfoDTO(BaseResponseModel):
+    start: str = Field(description="Opening delimiter.")
+    end: str = Field(description="Closing delimiter.")
+
+
+class ServiceArgumentInterpolationInfoDTO(BaseResponseModel):
+    delimiters: list[ServiceArgumentInterpolationDelimiterInfoDTO] = Field(
+        default_factory=lambda: [
+            ServiceArgumentInterpolationDelimiterInfoDTO(start="${{", end="}}"),
+            ServiceArgumentInterpolationDelimiterInfoDTO(start="{", end="}"),
+        ],
         description="Delimiters that mark the variables to fill in the service arguments.",
     )

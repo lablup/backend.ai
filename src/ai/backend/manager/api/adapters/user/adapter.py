@@ -112,6 +112,7 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
 from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
@@ -131,6 +132,8 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.ssh_key.actions.search import ScopedSearchSSHKeypairsAction
+from ai.backend.manager.services.ssh_key.processors import SSHKeyProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
@@ -170,7 +173,6 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     UpdateUserAction,
@@ -204,6 +206,7 @@ class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
     _user: UserProcessors
+    _ssh_key: SSHKeyProcessors
     _domain: DomainProcessors
     _auth_config: AuthConfig
     _key_provider_pool: KeyProviderPool
@@ -214,8 +217,10 @@ class UserAdapter(BaseAdapter):
         domain: DomainProcessors,
         auth_config: AuthConfig,
         key_provider_pool: KeyProviderPool,
+        ssh_key: SSHKeyProcessors,
     ) -> None:
         self._user = user
+        self._ssh_key = ssh_key
         self._domain = domain
         self._auth_config = auth_config
         self._key_provider_pool = key_provider_pool
@@ -980,9 +985,9 @@ class UserAdapter(BaseAdapter):
         unique_ids = list(dict.fromkeys(user_ids))
         if not unique_ids:
             return {}
-        result = await self._user.search_ssh_keypairs.run(
-            SearchSSHKeypairsAction(
-                user_ids=unique_ids,
+        result = await self._ssh_key.scoped_search.run(
+            ScopedSearchSSHKeypairsAction(
+                targets=[UserSSHKeypairTarget(user_id=user_id) for user_id in unique_ids],
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=len(unique_ids)),
                     conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],

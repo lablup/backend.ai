@@ -10,11 +10,11 @@ Scenario: complete
   - my_search: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
 - direct implementation (6)
-  - accept: success present 1 · rejection present 1 (scope)
+  - accept: success present 2 · rejection present 2 (scope)
   - cancel: success present 1 · rejection present 1 (single_entity)
   - create: success present 1 · rejection present 1 (scope)
-  - leave: success present 1 · rejection present 1 (scope)
-  - reject: success present 1 · rejection present 1 (scope)
+  - leave: success present 2 · rejection present 1 (scope)
+  - reject: success present 2 · rejection present 1 (scope)
   - revoke: success present 1 · rejection present 1 (single_entity)
 
 **batch_load_by_ids**
@@ -50,8 +50,10 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
+| [when a user who can answer shares in a project accepts an offer addressed to that project, the accepted share comes back whole](#answering-a-project-answerer-accepts-the-offer-to-the-project) | answered |
 | [when a user who can answer shares in their own scope accepts the offer, the accepted share comes back whole](#answering-the-recipient-accepts-the-offer) | answered |
-| [when a user granted nothing accepts the offer, the call is rejected for lack of permission](#answering-a-user-granted-nothing-may-not-accept-the-offer) | rejected |
+| [when a user who can only read shares in a project accepts an offer addressed to that project, the call is rejected for lack of permission](#answering-a-project-reader-may-not-accept-the-offer-to-the-project) | rejected |
+| [when a user granted nothing accepts the offer, it is rejected because the share cannot be resolved](#answering-a-user-granted-nothing-may-not-accept-the-offer) | rejected |
 
 **cancel**
 
@@ -71,15 +73,17 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
+| [when a user who can answer shares in a project leaves the share that project took, the revoked share comes back whole](#withdrawing-a-project-answerer-leaves-the-share-the-project-took) | answered |
 | [when the receiving side leaves the share in their own scope, the revoked share comes back whole](#withdrawing-the-recipient-leaves-the-share) | answered |
-| [when a user granted nothing leaves the share, the call is rejected for lack of permission](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | rejected |
+| [when a user granted nothing leaves the share, it is rejected because the share cannot be resolved](#withdrawing-a-user-granted-nothing-may-not-leave-the-share) | rejected |
 
 **reject**
 
 | scenario | verdict |
 |---|---|
+| [when a user who can answer shares in a project rejects an offer addressed to that project, the rejected share comes back whole](#answering-a-project-answerer-rejects-the-offer-to-the-project) | answered |
 | [when a user who can answer shares in their own scope rejects the offer, the rejected share comes back whole](#answering-the-recipient-rejects-the-offer) | answered |
-| [when a user granted nothing rejects the offer, the call is rejected for lack of permission](#answering-a-user-granted-nothing-may-not-reject-the-offer) | rejected |
+| [when a user granted nothing rejects the offer, it is rejected because the share cannot be resolved](#answering-a-user-granted-nothing-may-not-reject-the-offer) | rejected |
 
 **revoke**
 
@@ -112,11 +116,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -172,11 +178,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -233,11 +241,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -286,11 +296,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -345,11 +357,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -397,11 +411,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -466,11 +482,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -518,11 +536,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -587,11 +607,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -617,6 +639,73 @@ Then
 
 ### accept
 
+<a id="answering-a-project-answerer-accepts-the-offer-to-the-project"></a>
+
+#### [a-project-answerer-accepts-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
+
+when a user who can answer shares in a project accepts an offer addressed to that project, the accepted share comes back whole
+
+Given
+
+- one project folder with an offer to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare a user granted share permissions in the project scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+      - User resource policy user-policy-2: up to 10 folders per user
+      - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+      - regular user user-2: has their own keypair and personal project
+    - Role share-lender-1: applies only within the scope it is granted in
+    - Role share-lender-1: CREATE allowed on every entity_share
+    - Role share-lender-1: READ allowed on every entity_share
+    - Role share-lender-1: SOFT_DELETE allowed on every entity_share
+    - regular user user-1: holds Role share-lender-1
+    - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every entity_share
+    - Role share-recipient-2: UPDATE allowed on every entity_share
+    - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
+    - regular user user-2: holds Role share-recipient-2
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
+    - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
+    - Role share-recipient-1: READ allowed on every entity_share
+    - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Project borrowing-team-1
+  - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
+
+When
+
+- EntityShareAdapter.accept: user-2 accepts the offer of folder folder-1
+
+Then
+
+- the whole share comes back
+  - sharer_user_id: same as the id of the person lending the folder
+  - recipient_entity_type = 'project'
+  - recipient_entity_id: same as the id of the project the folder is lent to
+  - recipient_email = None
+  - target_entity_type = 'vfolder'
+  - target_entity_id: same as the id of the folder laid in advance
+  - permissions = []
+  - status = 'accepted'
+  - expires_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - id: same as the id of the share laid in advance
+  - entity_id: same as the id of the share laid in advance
+
 <a id="answering-the-recipient-accepts-the-offer"></a>
 
 #### [the-recipient-accepts-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
@@ -639,11 +728,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -676,11 +767,64 @@ Then
   - id: same as the id of the share laid in advance
   - entity_id: same as the id of the share laid in advance
 
+<a id="answering-a-project-reader-may-not-accept-the-offer-to-the-project"></a>
+
+#### [a-project-reader-may-not-accept-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
+
+when a user who can only read shares in a project accepts an offer addressed to that project, the call is rejected for lack of permission
+
+Given
+
+- one project folder with an offer to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare a user granted share permissions in the project scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+      - User resource policy user-policy-2: up to 10 folders per user
+      - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+      - regular user user-2: has their own keypair and personal project
+    - Role share-lender-1: applies only within the scope it is granted in
+    - Role share-lender-1: CREATE allowed on every entity_share
+    - Role share-lender-1: READ allowed on every entity_share
+    - Role share-lender-1: SOFT_DELETE allowed on every entity_share
+    - regular user user-1: holds Role share-lender-1
+    - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
+    - regular user user-2: holds Role share-recipient-2
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
+    - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
+    - Role share-recipient-1: READ allowed on every entity_share
+    - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Project borrowing-team-1
+  - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
+
+When
+
+- EntityShareAdapter.accept: user-2 accepts the offer of folder folder-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
 <a id="answering-a-user-granted-nothing-may-not-accept-the-offer"></a>
 
 #### [a-user-granted-nothing-may-not-accept-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user granted nothing accepts the offer, the call is rejected for lack of permission
+when a user granted nothing accepts the offer, it is rejected because the share cannot be resolved
 
 Given
 
@@ -698,11 +842,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -724,7 +870,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: GenericBadRequest
 
 ### cancel
 
@@ -750,11 +896,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -809,11 +957,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -861,11 +1011,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -919,11 +1071,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -948,6 +1102,74 @@ Then
 
 ### leave
 
+<a id="withdrawing-a-project-answerer-leaves-the-share-the-project-took"></a>
+
+#### [a-project-answerer-leaves-the-share-the-project-took](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
+
+when a user who can answer shares in a project leaves the share that project took, the revoked share comes back whole
+
+Given
+
+- one project folder with a share lent to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare a user granted share permissions in the project scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+      - User resource policy user-policy-2: up to 10 folders per user
+      - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+      - regular user user-2: has their own keypair and personal project
+    - Role share-lender-1: applies only within the scope it is granted in
+    - Role share-lender-1: CREATE allowed on every entity_share
+    - Role share-lender-1: READ allowed on every entity_share
+    - Role share-lender-1: SOFT_DELETE allowed on every entity_share
+    - regular user user-1: holds Role share-lender-1
+    - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every entity_share
+    - Role share-recipient-2: UPDATE allowed on every entity_share
+    - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
+    - regular user user-2: holds Role share-recipient-2
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
+    - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
+    - Role share-recipient-1: READ allowed on every entity_share
+    - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Project borrowing-team-1
+  - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
+  - vfolder share offer to a project project-share-1: the recipient accepts it
+
+When
+
+- EntityShareAdapter.leave: user-2 leaves the share it took of folder folder-1
+
+Then
+
+- the whole share comes back
+  - sharer_user_id: same as the id of the person lending the folder
+  - recipient_entity_type = 'project'
+  - recipient_entity_id: same as the id of the project the folder is lent to
+  - recipient_email = None
+  - target_entity_type = 'vfolder'
+  - target_entity_id: same as the id of the folder laid in advance
+  - permissions = []
+  - status = 'revoked'
+  - expires_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - id: same as the id of the share laid in advance
+  - entity_id: same as the id of the share laid in advance
+
 <a id="withdrawing-the-recipient-leaves-the-share"></a>
 
 #### [the-recipient-leaves-the-share](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
@@ -970,11 +1192,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1012,7 +1236,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-leave-the-share](/tests/scenario/bai_scenario/manager/entity_share/test_withdrawing.py): pass
 
-when a user granted nothing leaves the share, the call is rejected for lack of permission
+when a user granted nothing leaves the share, it is rejected because the share cannot be resolved
 
 Given
 
@@ -1030,11 +1254,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1056,9 +1282,76 @@ When
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: GenericBadRequest
 
 ### reject
+
+<a id="answering-a-project-answerer-rejects-the-offer-to-the-project"></a>
+
+#### [a-project-answerer-rejects-the-offer-to-the-project](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
+
+when a user who can answer shares in a project rejects an offer addressed to that project, the rejected share comes back whole
+
+Given
+
+- one project folder with an offer to another project, and a person granted share permissions in their own scope and in the project the folder is lent to
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare a user granted share permissions in the project scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+      - User resource policy user-policy-2: up to 10 folders per user
+      - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+      - regular user user-2: has their own keypair and personal project
+    - Role share-lender-1: applies only within the scope it is granted in
+    - Role share-lender-1: CREATE allowed on every entity_share
+    - Role share-lender-1: READ allowed on every entity_share
+    - Role share-lender-1: SOFT_DELETE allowed on every entity_share
+    - regular user user-1: holds Role share-lender-1
+    - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every entity_share
+    - Role share-recipient-2: UPDATE allowed on every entity_share
+    - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
+    - Role share-recipient-2: READ allowed on every project
+    - regular user user-2: holds Role share-recipient-2
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
+    - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
+    - Role share-recipient-1: READ allowed on every entity_share
+    - regular user user-1: holds Role share-recipient-1
+    - Role share-recipient-3: applies only within the scope it is granted in
+    - Role share-recipient-3: READ allowed on every user
+    - Role share-recipient-3: READ allowed on every entity_share
+    - Role share-recipient-3: UPDATE allowed on every entity_share
+    - Role share-recipient-3: SOFT_DELETE allowed on every entity_share
+    - regular user user-2: holds Role share-recipient-3
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Project borrowing-team-1
+  - vfolder share offer to a project project-share-1: offered with no ceiling on the permissions, not answered yet
+
+When
+
+- EntityShareAdapter.reject: user-2 rejects the offer of folder folder-1
+
+Then
+
+- the whole share comes back
+  - sharer_user_id: same as the id of the person lending the folder
+  - recipient_entity_type = 'project'
+  - recipient_entity_id: same as the id of the project the folder is lent to
+  - recipient_email = None
+  - target_entity_type = 'vfolder'
+  - target_entity_id: same as the id of the folder laid in advance
+  - permissions = []
+  - status = 'rejected'
+  - expires_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - id: same as the id of the share laid in advance
+  - entity_id: same as the id of the share laid in advance
 
 <a id="answering-the-recipient-rejects-the-offer"></a>
 
@@ -1082,11 +1375,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1123,7 +1418,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-reject-the-offer](/tests/scenario/bai_scenario/manager/entity_share/test_answering.py): pass
 
-when a user granted nothing rejects the offer, the call is rejected for lack of permission
+when a user granted nothing rejects the offer, it is rejected because the share cannot be resolved
 
 Given
 
@@ -1141,11 +1436,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1167,7 +1464,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: GenericBadRequest
 
 ### revoke
 
@@ -1193,11 +1490,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share
@@ -1253,11 +1552,13 @@ Given
     - Role share-lender-1: READ allowed on every entity_share
     - Role share-lender-1: SOFT_DELETE allowed on every entity_share
     - regular user user-1: holds Role share-lender-1
-  - Prepare a user granted share permissions in their own scope
+  - Prepare a user who can read themselves and is granted share permissions in their own scope
     - Role share-recipient-1: applies only within the scope it is granted in
+    - Role share-recipient-1: READ allowed on every user
     - Role share-recipient-1: READ allowed on every entity_share
     - regular user user-1: holds Role share-recipient-1
     - Role share-recipient-2: applies only within the scope it is granted in
+    - Role share-recipient-2: READ allowed on every user
     - Role share-recipient-2: READ allowed on every entity_share
     - Role share-recipient-2: UPDATE allowed on every entity_share
     - Role share-recipient-2: SOFT_DELETE allowed on every entity_share

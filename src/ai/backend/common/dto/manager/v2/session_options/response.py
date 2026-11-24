@@ -14,12 +14,16 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInfo,
+    ServiceArgumentInterpolationInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class HandlerOptionsInfo(BaseResponseModel):
@@ -149,4 +153,11 @@ class DefaultSessionOptionsInfo(BaseResponseModel):
     )
     agent_selection_policy: AgentSelectionPolicyEnum = Field(
         description="Default agent selection policy.",
+    )
+    interpolation: ServiceArgumentInterpolationInfoDTO = Field(
+        default_factory=ServiceArgumentInterpolationInfoDTO,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Default variable syntax of the service "
+            "arguments, frozen onto new sessions."
+        ),
     )

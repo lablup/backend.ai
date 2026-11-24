@@ -236,17 +236,85 @@ class TestWebAppLogin:
 
         mock_oauth2_client.create_authorization_url.assert_called_once()
 
-    async def _login_state(
+    async def _login_kwargs(
         self, plugin: OIDCWebAppPlugin, request: MagicMock, client: MagicMock
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         with patch(
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=client,
         ):
             await plugin.login(request)
-        kwargs = client.create_authorization_url.call_args.kwargs
-        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+        return dict(client.create_authorization_url.call_args.kwargs)
+
+    async def _login_state(
+        self, plugin: OIDCWebAppPlugin, request: MagicMock, client: MagicMock
+    ) -> dict[str, str]:
+        kwargs = await self._login_kwargs(plugin, request, client)
         return dict(urllib.parse.parse_qsl(kwargs["state"]))
+
+    async def test_login_calls_back_on_allowed_redirect_host(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
+        )
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://guest.example.com/dashboard"}
+        )
+
+        kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
+
+        assert kwargs["redirect_uri"] == "https://guest.example.com/func/openid/redirect"
+
+    async def test_login_calls_back_on_login_uri_without_allowed_hosts(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(plugin_config, local_config={})
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://coredev.example.com/dashboard"}
+        )
+
+        kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
+
+        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+
+    async def test_login_calls_back_on_login_uri_from_disallowed_host(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
+        )
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://evil.example.com/dashboard"}
+        )
+
+        kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
+
+        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+
+    async def test_login_calls_back_on_login_uri_without_redirect_to(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
+        )
+        login_request.post = AsyncMock(return_value={})
+
+        kwargs = await self._login_kwargs(plugin, login_request, mock_oauth2_client)
+
+        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
 
     async def test_login_keeps_allowed_redirect_host(
         self,
@@ -405,7 +473,7 @@ class TestWebAppRedirect:
             }),
         }
 
-    async def test_redirect_returns_to_allowed_host_through_login_uri_callback(
+    async def test_redirect_returns_to_allowed_host_through_its_own_callback(
         self,
         plugin_config: dict[str, Any],
         redirect_request: MagicMock,
@@ -421,7 +489,7 @@ class TestWebAppRedirect:
         assert str(location.with_query(None)) == "https://guest.example.com/dashboard"
         assert "sToken" in location.query
         fetch_kwargs = mock_oauth2_client.fetch_token.call_args.kwargs
-        assert fetch_kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+        assert fetch_kwargs["redirect_uri"] == "https://guest.example.com/func/openid/redirect"
 
     async def test_redirect_without_allowed_hosts_returns_to_any_host(
         self,

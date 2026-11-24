@@ -1627,6 +1627,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "host_ports": host_ports,
             "domain_socket_proxies": self.domain_socket_proxies,
             "block_service_ports": self.internal_data.get("block_service_ports", False),
+            "service_interpolation": self.internal_data.get("service_interpolation"),
         }
 
 

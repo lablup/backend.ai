@@ -7,7 +7,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
+from etcd_client import ClientError, CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -776,9 +776,13 @@ class TestRequestRetry:
             scope_prefix_map={ConfigScopes.GLOBAL: ""},
             request_retries=3,
             request_retry_intvl=0.05,
+            request_deadline=0.05,
         )
         etcd._communicator = communicator
         return etcd
+
+    async def _never_returns(self, *args: object, **kwargs: object) -> None:
+        await asyncio.Event().wait()
 
     def _err(self, code: GRPCStatusCode, message: str) -> GRPCStatusError:
         return GRPCStatusError({"code": code, "message": message})
@@ -836,6 +840,41 @@ class TestRequestRetry:
             assert await etcd.get_prefix("k", scope=ConfigScopes.GLOBAL) == {"a": "1"}
 
         assert communicator.get_prefix.call_count == 2
+
+    async def test_write_that_never_returns_fails_at_the_deadline(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.put.side_effect = self._never_returns
+
+        with pytest.raises(ClientError, match="deadline"):
+            await etcd.put("k", "v")
+
+        assert communicator.put.call_count == 1
+
+    async def test_read_that_never_returns_is_resent_after_the_deadline(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        hung = asyncio.Event()
+
+        async def _get(*args: object, **kwargs: object) -> bytes:
+            if communicator.get.call_count == 1:
+                await hung.wait()
+            return b"v"
+
+        communicator.get.side_effect = _get
+
+        assert await etcd.get("k", scope=ConfigScopes.GLOBAL) == "v"
+        assert communicator.get.call_count == 2
+
+    async def test_read_that_never_returns_fails_after_the_retry_limit(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.get.side_effect = self._never_returns
+
+        with pytest.raises(ClientError, match="deadline"):
+            await etcd.get("k", scope=ConfigScopes.GLOBAL)
+
+        assert communicator.get.call_count == 4
 
     async def test_timed_out_write_is_not_resent(
         self, etcd: AsyncEtcd, communicator: AsyncMock

@@ -127,7 +127,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
+from ai.backend.manager.api.gql.deployment.types.revision import (
+    EnvironmentVariablesGQL,
+    ServiceArgumentInterpolationInputGQL,
+)
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
 from ai.backend.manager.api.gql.entity_label.types.filters import (
@@ -1200,6 +1203,17 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
             description=(
                 "Session group UUID the session joins. The group must belong to the "
                 "session's owner and project."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
+
+    interpolation: ServiceArgumentInterpolationInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            description=(
+                "Variable syntax of the service arguments, fixed for the session. "
+                "Omit to use the resource group's `defaultSessionOptions`."
             ),
             added_version=NEXT_RELEASE_VERSION,
         ),

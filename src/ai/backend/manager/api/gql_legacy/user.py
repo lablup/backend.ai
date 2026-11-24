@@ -40,6 +40,7 @@ from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.scopes import UserSSHKeypairTarget
 from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
@@ -57,6 +58,7 @@ from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_query,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.ssh_key.actions.search import ScopedSearchSSHKeypairsAction
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -72,7 +74,6 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )
 from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
-from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 from ai.backend.manager.services.user.actions.update_user import (
     UpdateUserAction,
     UpdateUserActionResult,
@@ -1119,9 +1120,9 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         action: CreateUserAction = props.to_action(email, graph_ctx, domain_id)
 
         action_result = await graph_ctx.processors.user.create_user.run(action)
-        ssh_keypairs = await graph_ctx.processors.user.search_ssh_keypairs.run(
-            SearchSSHKeypairsAction(
-                user_ids=[UserID(action_result.data.user.id)],
+        ssh_keypairs = await graph_ctx.processors.ssh_key.scoped_search.run(
+            ScopedSearchSSHKeypairsAction(
+                targets=[UserSSHKeypairTarget(user_id=UserID(action_result.data.user.id))],
                 searcher=SSHKeypairSearcher(
                     pagination=OffsetPagination(limit=1),
                     conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],

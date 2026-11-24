@@ -68,6 +68,7 @@ from ai.backend.agent.errors import (
     InvalidChunkSizeError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.resources import KernelCreationInProgress
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
@@ -1598,7 +1599,12 @@ class AbstractAgent[
                                 ),
                             )
                     # Notify cleanup waiters after all state updates.
-                    if kernel_obj is not None and kernel_obj.clean_event is not None:
+                    # A failed clean has already put its exception on this future.
+                    if (
+                        kernel_obj is not None
+                        and kernel_obj.clean_event is not None
+                        and not kernel_obj.clean_event.done()
+                    ):
                         kernel_obj.clean_event.set_result(None)
                     ev.set_done_future_result(None)
         log.debug("clean event handled", container_id=ev.container_id)
@@ -2734,7 +2740,7 @@ class AbstractAgent[
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
                 log.debug("kernel creation already in progress")
-                raise ResourceError("Kernel creation already in progress")
+                raise KernelCreationInProgress("Kernel creation already in progress")
             if not restarting and kernel_id in self.kernel_registry:
                 # Replacing the registered object would orphan its runner, which keeps
                 # reconnecting to the address and steals the replies of whoever gets it next.

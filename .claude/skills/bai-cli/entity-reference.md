@@ -51,6 +51,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **keypair**: admin(search, get, create, update, delete) | my(search, create, issue, delete)
 - **login-history**: admin(search) | my(search)
 - **login-session**: admin(search, delete) | my(search, delete)
+- **ssh-key**: user(switch-default) | my(upload)
 
 ## Resource Management
 

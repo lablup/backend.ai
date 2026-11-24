@@ -20,6 +20,10 @@ from typing import Any, Protocol
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.config import (
+    ServiceArgumentInterpolation,
+    ServiceArgumentInterpolationDelimiter,
+)
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.types import (
     AgentId,
@@ -468,6 +472,15 @@ class DefaultSessionOptions(_OptionsBaseModel):
             "when the request does not override it."
         ),
     )
+    interpolation: ServiceArgumentInterpolation = Field(
+        default_factory=lambda: ServiceArgumentInterpolation(
+            delimiters=[
+                ServiceArgumentInterpolationDelimiter(start="${{", end="}}"),
+                ServiceArgumentInterpolationDelimiter(start="{", end="}"),
+            ]
+        ),
+        description="Default variable syntax of the service arguments, frozen onto new sessions.",
+    )
 
 
 class SessionStoredOptions(_OptionsBaseModel):
@@ -505,6 +518,13 @@ class SessionStoredOptions(_OptionsBaseModel):
             "Resolved `SchedulingTarget.agent_selection_policy`. "
             "Lives in the JSONB rather than its own column because "
             "existing queries never filter by this field."
+        ),
+    )
+    interpolation: ServiceArgumentInterpolation | None = Field(
+        default=None,
+        description=(
+            "Frozen variable syntax of the service arguments. `None` on sessions enqueued "
+            "before it was stored; their kernels use the legacy syntax."
         ),
     )
 
@@ -553,4 +573,8 @@ class SessionOptions(_OptionsBaseModel):
     )
     handler_options: SessionHandlerOptions = Field(
         description="Frozen handler-keyed scheduler policy (timeout + retry).",
+    )
+    interpolation: ServiceArgumentInterpolation | None = Field(
+        default=None,
+        description="Frozen variable syntax of the service arguments.",
     )

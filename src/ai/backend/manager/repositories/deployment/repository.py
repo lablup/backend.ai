@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -93,7 +94,13 @@ from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountAvailability,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+    VFolderStatusSet,
+    vfolder_status_map,
+)
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
@@ -117,8 +124,11 @@ from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
 from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
     DeploymentStorageSource,
@@ -1362,6 +1372,43 @@ class DeploymentRepository:
             DeploymentRevisionNotFound: If the revision does not exist.
         """
         return await self._db_source.get_revision(revision_id)
+
+    @deployment_repository_resilience.apply()
+    async def vfolder_mount_availability(
+        self,
+        vfolder_ids: Collection[VFolderUUID],
+    ) -> VFolderMountAvailability:
+        """Sort the vfolders among ``vfolder_ids`` that cannot be mounted by the reason."""
+        found: dict[VFolderUUID, VFolderOperationStatus] = {}
+        if vfolder_ids:
+            searcher = VFolderSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    VFolderSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=list(vfolder_ids), negated=False)
+                    ),
+                ],
+            )
+            async with self._reconcile_ops.read_ops() as r:
+                result = await r.search_in_global(searcher)
+            found = {vfolder.id: vfolder.status for vfolder in result.items}
+        mountable = vfolder_status_map[VFolderStatusSet.MOUNTABLE]
+        recoverable = vfolder_status_map[VFolderStatusSet.RECOVERABLE]
+        deleted = {
+            VFolderOperationStatus.DELETE_ONGOING,
+            VFolderOperationStatus.DELETE_COMPLETE,
+            VFolderOperationStatus.DELETE_ERROR,
+        }
+        return VFolderMountAvailability(
+            missing=frozenset(set(vfolder_ids) - found.keys()),
+            trashed=frozenset(vfid for vfid, status in found.items() if status in recoverable),
+            deleted=frozenset(vfid for vfid, status in found.items() if status in deleted),
+            not_ready=frozenset(
+                vfid
+                for vfid, status in found.items()
+                if status not in mountable | recoverable | deleted
+            ),
+        )
 
     @deployment_repository_resilience.apply()
     async def get_revision_by_route_id(

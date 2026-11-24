@@ -19,6 +19,10 @@ import uuid
 
 import pytest
 
+from ai.backend.common.config import (
+    ServiceArgumentInterpolation,
+    ServiceArgumentInterpolationDelimiter,
+)
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
@@ -87,6 +91,9 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
             startup_command="rg-start",
             bootstrap_script="rg-bootstrap",
         ),
+        interpolation=ServiceArgumentInterpolation(
+            delimiters=[ServiceArgumentInterpolationDelimiter(start="[[", end="]]")]
+        ),
     )
 
 
@@ -134,6 +141,9 @@ class TestMergeResourceGroupDefaultsRule:
             by_handler={"schedule-sessions": HandlerOptions(max_retry_count=1)},
         )
         assert opts.scheduling_target.agent_selection_policy == AgentSelectionPolicy.STRICT
+        assert opts.interpolation == ServiceArgumentInterpolation(
+            delimiters=[ServiceArgumentInterpolationDelimiter(start="[[", end="]]")]
+        )
 
     async def test_preserves_explicit_option_values(
         self,
@@ -148,10 +158,16 @@ class TestMergeResourceGroupDefaultsRule:
                 scheduling_target=SchedulingTargetDraft(
                     agent_selection_policy=AgentSelectionPolicy.PREFERRED,
                 ),
+                interpolation=ServiceArgumentInterpolation(
+                    delimiters=[ServiceArgumentInterpolationDelimiter(start="<<", end=">>")]
+                ),
             ),
         )
         result = await rule.prepare(draft, _context(rg_defaults))
         opts = result.options
+        assert opts.interpolation == ServiceArgumentInterpolation(
+            delimiters=[ServiceArgumentInterpolationDelimiter(start="<<", end=">>")]
+        )
         assert opts.priority == 99
         assert opts.cluster_mode == ClusterMode.SINGLE_NODE
         assert opts.scheduling_target.agent_selection_policy == AgentSelectionPolicy.PREFERRED

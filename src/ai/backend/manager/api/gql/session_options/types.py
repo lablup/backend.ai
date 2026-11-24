@@ -49,10 +49,15 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_added_resolver,
     gql_enum,
     gql_pydantic_input,
     gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.deployment.types.revision import (
+    ServiceArgumentInterpolationGQL,
+    ServiceArgumentInterpolationInputGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -323,6 +328,16 @@ class DefaultSessionOptionsInputGQL(PydanticInputMixin[DefaultSessionOptionsInpu
     default_kernel_execution_spec: DefaultSessionKernelExecutionSpecInputGQL | None = None
     handler_options: DefaultSessionHandlerOptionsPolicyInputGQL | None = None
     agent_selection_policy: AgentSelectionPolicyGQL | None = None
+    interpolation: ServiceArgumentInterpolationInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Variable syntax of the service arguments, frozen onto new sessions. "
+                "Omit to use the default `${{ }}` and `{ }`."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(
@@ -341,3 +356,9 @@ class DefaultSessionOptionsInfoGQL:
     default_kernel_execution_spec: DefaultSessionKernelExecutionSpecInfoGQL | None
     handler_options: DefaultSessionHandlerOptionsPolicyInfoGQL
     agent_selection_policy: AgentSelectionPolicyGQL
+    interpolation: ServiceArgumentInterpolationGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Default variable syntax of the service arguments, frozen onto new sessions.",
+        ),
+    )

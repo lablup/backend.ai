@@ -84,8 +84,8 @@ class TestCooldown:
         assert pool.acquire() == port
 
     def test_initial_unused_ports_bypass_cooldown(self, fake_clock: list[float]) -> None:
-        # Ports that were never acquired hold released_at=0.0 and should be
-        # immediately available even with a non-zero cooldown.
+        # The clock reads less than cooldown_sec when the host has just booted.
+        fake_clock[0] = 10.0
         pool = PortPool((30000, 30002), cooldown_sec=60)
         assert pool.acquire() == 30000
         assert pool.acquire() == 30001
