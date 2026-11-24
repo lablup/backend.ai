@@ -11733,6 +11733,20 @@ type KernelV2 implements Node
   schedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
 }
 
+"""Added in 26.10.0. A device (GPU, NPU and so on) attached to a kernel."""
+type KernelV2AttachedDevice
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of the compute device the device belongs to (e.g., 'cuda')."""
+  deviceName: String!
+
+  """The ID of the device on the agent."""
+  deviceId: String!
+
+  """The model name of the device."""
+  modelName: String!
+}
+
 """
 Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
 """
@@ -11869,6 +11883,9 @@ type KernelV2ResourceInfo
 
   """Additional resource options and configurations for this kernel."""
   resourceOpts: ResourceOpts
+
+  """Added in 26.10.0. The devices attached to this kernel."""
+  attachedDevices: [KernelV2AttachedDevice!]!
 }
 
 """Added in 26.2.0. Information about the session this kernel belongs to."""
