@@ -14,6 +14,7 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.kernel.request import KernelFilter, KernelOrder
 from ai.backend.common.dto.manager.v2.kernel.response import (
+    KernelAttachedDeviceInfo,
     KernelClusterInfoGQLDTO,
     KernelLifecycleInfoGQLDTO,
     KernelNetworkInfoGQLDTO,
@@ -255,6 +256,22 @@ class ResourceAllocationGQL(PydanticOutputMixin[ResourceAllocationGQLDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A device (GPU, NPU and so on) attached to a kernel.",
+    ),
+    model=KernelAttachedDeviceInfo,
+    name="KernelV2AttachedDevice",
+)
+class KernelV2AttachedDeviceGQL:
+    device_name: str = gql_field(
+        description="The name of the compute device the device belongs to (e.g., 'cuda')."
+    )
+    device_id: str = gql_field(description="The ID of the device on the agent.")
+    model_name: str = gql_field(description="The model name of the device.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.2.0",
         description="Resource allocation information for a kernel.",
     ),
@@ -279,6 +296,12 @@ class KernelV2ResourceInfoGQL:
     )
     resource_opts: ResourceOptsGQL | None = gql_field(
         description="Additional resource options and configurations for this kernel."
+    )
+    attached_devices: list[KernelV2AttachedDeviceGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The devices attached to this kernel.",
+        )
     )
 
 
