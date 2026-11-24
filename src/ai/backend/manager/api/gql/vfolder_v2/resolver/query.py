@@ -9,7 +9,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
@@ -137,8 +136,8 @@ async def scoped_vfolders_v2(
         VFolderMountPermissionFilterGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Filter by the mount policy of the current "
-                "user on the vfolder (`VFolder.mountPermission`)."
+                f"Added in {NEXT_RELEASE_VERSION}. Filter by the mount policy of the user in "
+                "`scope.user` on the vfolder. `scope.user` must name exactly one user."
             )
         ),
     ] = None,
@@ -152,9 +151,6 @@ async def scoped_vfolders_v2(
     offset: int | None = None,
 ) -> VFolderConnection | None:
     """Page through the virtual folders the named scopes reach."""
-    me = current_user()
-    if me is None:
-        raise UnreachableError("User context is not available")
     result = await info.context.adapters.vfolder.scoped_search(
         ScopedSearchVFoldersInput(
             scope=scope.to_pydantic(),
@@ -169,7 +165,6 @@ async def scoped_vfolders_v2(
             limit=limit,
             offset=offset,
         ),
-        UserID(me.user_id),
     )
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]

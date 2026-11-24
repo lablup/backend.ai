@@ -102,9 +102,9 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 
 ## 사용자 한 명 기준으로 계산한 값은 filter DTO 에 두지 않는다
 
-- 사용자의 vfolder 마운트 정책에는 column 이 없다. SQL 이 그 사용자의 역할과 정책 row 로 계산한다. 계산에 쓰는 값이 모두 query 가 읽을 수 있는 row 이므로 filter 로 둘 수 있다.
-- global search 와 scoped search 는 filter DTO 하나를 함께 쓴다. 이 값을 그 DTO 에 두면 global search 의 결과가 호출한 superadmin 에 따라 달라진다.
-- DTO 에 사용자 id 를 두면 요청이 다른 사용자를 지정할 수 있고, 호출자가 그 사용자의 정책을 읽을 수 있는지 검사하는 곳이 없다. 그래서 REST handler 와 GQL resolver 가 현재 사용자를 전달한다.
+- 사용자의 vfolder 마운트 정책에는 column 이 없다. SQL 이 그 사용자의 역할과 정책 row 로 계산한다. 계산에 사용하는 값이 모두 query 가 읽을 수 있는 row 이므로 filter 로 둘 수 있다.
+- global search 와 scoped search 는 filter DTO 하나를 함께 사용한다. global search 는 사용자를 지정하지 않으므로, 이 값을 그 DTO 에 두면 결과가 호출한 superadmin 에 따라 달라진다.
+- scoped search 는 스코프로 사용자를 지정하고, validator 가 읽기 전에 그 스코프에 대한 호출자의 권한을 검사한다. 요청의 다른 항목에 둔 사용자 id 에는 이런 검사가 없다.
 
 ## 다른 테이블의 field 는 펼치지 않고 nested 로 둔다
 

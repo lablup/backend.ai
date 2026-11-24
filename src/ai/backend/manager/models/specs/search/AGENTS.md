@@ -157,9 +157,10 @@ Depth follows the permission axis, not the foreign keys.
 A value that SQL computes from the rows of one user, such as the mount policy of a user on a vfolder.
 
 - Declare its filter under `linked`, built from the user id (`linked.mount_permission.of_user(user_id)`). Declare no order.
-- Do not put it in the filter DTO of the entity. The global search takes that DTO, so its result would depend on the caller.
+- Do not put it in the filter DTO of the entity. The global search takes that DTO and names no user.
 - Take it as a field of the scoped search input and an argument of the scoped query (`scopedVFoldersV2(mountPermission:)`).
-- The adapter operation takes the user id as an argument. The REST handler and GQL resolver pass the id of `current_user()`. Do not put the user id in a DTO.
+- The user is the one the scope names. The input rejects the filter unless the scope names exactly one user.
+- Do not take the user from `current_user()` or from an adapter argument. The result depends on the request alone.
 
 ## Usage between entities
 

@@ -487,10 +487,16 @@ class ScopedSearchVFoldersInput(SearchVFoldersInput):
     mount_permission: VFolderMountPermissionFilter | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Filter by the caller's mount policy on the "
-            "vfolder. wd matches rw."
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the mount policy of the scope user on "
+            "the vfolder. The scope must name exactly one user. wd matches rw."
         ),
     )
+
+    @model_validator(mode="after")
+    def _require_one_scope_user_for_mount_permission(self) -> Self:
+        if self.mount_permission is not None and len(self.scope.user or ()) != 1:
+            raise ValueError("mount_permission requires exactly one user in scope.user")
+        return self
 
 
 # ============================================================

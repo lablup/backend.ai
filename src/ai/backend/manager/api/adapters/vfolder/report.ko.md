@@ -67,7 +67,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | 성공 |
+| [자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | 성공 |
 | [vfolder 를 하나도 생성하지 않은 사용자가 자기 vfolder 를 조회하면, 응답은 비어 있습니다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 범위의 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | 거부 |
 
@@ -715,11 +715,11 @@ Then
 
 #### [a-search-narrows-to-the-matching-folder-in-order-and-page](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
 
-자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
+자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
 
 Given
 
-- 자기와 다른 사용자 한 명의 개인 프로젝트에서 vfolder READ 권한을 받은 사용자 한 명. 모든 vfolder 는 남에게 ro 로 마운트되며, 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 match 가 든 그 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나
+- 자기 스코프와 자기, 다른 사용자 한 명의 개인 프로젝트에서 vfolder READ 권한을 받은 사용자 한 명. 모든 vfolder 는 남에게 ro 로 마운트되며, 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 match 가 든 그 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -737,6 +737,10 @@ Given
   - 개인 vfolder other-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
   - 개인 vfolder match-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
   - 개인 vfolder match-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 자기 스코프에서 vfolder READ 권한을 받은 사용자 준비
+    - 역할 folder-holder-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-holder-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-holder-1 보유
   - vfolder 권한 부여
     - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 folder-writer-1: vfolder 전체에 READ 허용
@@ -747,7 +751,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search: user-1이 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
+- VFolderAdapter.scoped_search: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 

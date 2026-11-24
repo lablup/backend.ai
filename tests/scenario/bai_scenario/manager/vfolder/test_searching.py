@@ -10,7 +10,6 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -134,11 +133,11 @@ class SearchingByFragmentInOrder(
     @override
     def describe(self, laid: AReaderAndFoldersToSearch) -> str:
         return Says(
-            f"{laid.caller.username}이 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw로 "
+            f"{laid.caller.username}이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw로 "
             f"마운트하고 이름에 {self.fragment}가 든 vfolder 를 이름 오름차순으로 "
             f"{self.limit}개까지 조회합니다",
             english=(
-                f"{laid.caller.username} searches their own and another user's personal "
+                f"{laid.caller.username} searches their own scope and another user's personal "
                 f"project for vfolders they mount as rw whose name holds {self.fragment}, ordered "
                 f"by name ascending, up to {self.limit}"
             ),
@@ -152,10 +151,8 @@ class SearchingByFragmentInOrder(
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
                     scope=VFolderScope(
-                        project=[
-                            UUIDScope(value=laid.own_project_id),
-                            UUIDScope(value=laid.other_project_id),
-                        ]
+                        project=[UUIDScope(value=laid.other_project_id)],
+                        user=[UUIDScope(value=laid.caller.id)],
                     ),
                     mount_permission=VFolderMountPermissionFilter(
                         equals=VFolderPermissionField.READ_WRITE
@@ -165,8 +162,7 @@ class SearchingByFragmentInOrder(
                         VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
                     ],
                     limit=self.limit,
-                ),
-                UserID(laid.caller.id),
+                )
             )
 
 
@@ -376,11 +372,11 @@ class ASearchNarrowsOrdersAndPages(
     @override
     def describe(self) -> str:
         return Says(
-            "자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 "
+            "자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 "
             "rw로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 "
             "자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다",
             english=(
-                "when a user granted vfolder read in their own and another user's personal "
+                "when a user granted vfolder read in their own scope and another user's personal "
                 "project searches the vfolders they mount as rw by a name fragment, ordered by "
                 "name ascending and limited to one page, one page holding only their two matching "
                 "vfolders in name order comes back"

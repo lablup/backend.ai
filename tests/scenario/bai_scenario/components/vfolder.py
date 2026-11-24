@@ -1060,14 +1060,13 @@ class AReaderAndFoldersToSearch:
     excluded_by_name: VFolderData
     excluded_by_mount_policy: VFolderData
     outside: VFolderData
-    own_project_id: ProjectID
     other_project_id: ProjectID
     caller: UserData
 
 
 @dataclass(frozen=True)
 class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
-    """자기와 다른 사용자의 개인 프로젝트에서 검색하는 사용자와, 필터가 가려낼 폴더들.
+    """자기 스코프와 다른 사용자의 개인 프로젝트에서 검색하는 사용자와, 필터가 가려낼 폴더들.
 
     모든 폴더가 남에게 ``ro``로 마운트되므로, 그 사용자는 자기 폴더만 ``rw``로 마운트한다."""
 
@@ -1078,13 +1077,13 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
     def describe(self) -> str:
         names = ", ".join(permission.name or "" for permission in self.permissions)
         return Says(
-            f"자기와 다른 사용자 한 명의 개인 프로젝트에서 vfolder {names} 권한을 받은 "
+            f"자기 스코프와 자기, 다른 사용자 한 명의 개인 프로젝트에서 vfolder {names} 권한을 받은 "
             f"사용자 한 명. 모든 vfolder 는 남에게 ro로 마운트되며, 이름에 {self.fragment}가 든 "
             f"자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 {self.fragment}가 "
             "든 그 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나",
             english=(
-                f"one user granted the {names} permission on vfolders in their own and one other "
-                f"user's personal project. Every vfolder is mounted for others as ro: two "
+                f"one user granted the {names} permission on vfolders in their own scope, their own "
+                f"personal project and one other user's personal project. Every vfolder is mounted for others as ro: two "
                 f"personal vfolders of the user whose names hold {self.fragment}, one whose name "
                 f"does not, one of that other user and one of a third user whose names hold "
                 f"{self.fragment}"
@@ -1112,6 +1111,7 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
         own_project = await seeding.personal_project_of(caller)
         other_project = await seeding.personal_project_of(other)
         if self.permissions:
+            await seeding.within(SomeoneHoldingFolderPermissions(caller, self.permissions))
             for project in (own_project, other_project):
                 await seeding.within(
                     SomeoneGrantedOnFoldersIn(
@@ -1124,7 +1124,6 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
             excluded_by_name=seeding.made(excluded_by_name),
             excluded_by_mount_policy=seeding.made(excluded_by_mount_policy),
             outside=seeding.made(outside),
-            own_project_id=ProjectID(seeding.made(own_project).id),
             other_project_id=ProjectID(seeding.made(other_project).id),
             caller=seeding.made(caller),
         )

@@ -6,7 +6,6 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
@@ -73,11 +72,10 @@ class V2VFolderHandler:
 
     async def scoped_search(
         self,
-        user_ctx: UserContext,
         body: BodyParam[ScopedSearchVFoldersInput],
     ) -> APIResponse:
         """Search the vfolders the named scopes reach, combined with OR."""
-        result = await self._adapter.scoped_search(body.parsed, UserID(user_ctx.user_uuid))
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

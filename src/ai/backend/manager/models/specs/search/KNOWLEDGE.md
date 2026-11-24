@@ -119,8 +119,8 @@ This package replaces the condition functions and order methods written by hand 
 ## A value computed for one user stays out of the filter DTO
 
 - The mount policy of a user on a vfolder has no column: SQL computes it from the roles and the policy row of the user. It is a filter all the same, because every input is a row the query can read.
-- The global search and the scoped search take one filter DTO. In that DTO, the result of the global search would depend on the superadmin who calls it.
-- A user id in a DTO would let a request name another user, and nothing checks whether the caller can read the policy of that user. So the REST handler and GQL resolver pass the current user.
+- The global search and the scoped search take one filter DTO. The global search names no user, so in that DTO its result would depend on the superadmin who calls it.
+- The scoped search names its user in the scope, and the validator checks the permission of the caller on that scope before the read. A user id elsewhere in the request would have no such check.
 
 ## Fields of other tables are nested, not flattened
 

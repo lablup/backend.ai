@@ -67,7 +67,7 @@ Scenario: incomplete 5 / 30
 
 | scenario | verdict |
 |---|---|
-| [when a user granted vfolder read in their own and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | answered |
+| [when a user granted vfolder read in their own scope and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | answered |
 | [when a user who has created no vfolder lists their own vfolders, the answer is empty](#vfolder-a-user-who-has-made-no-folder-lists-none) | answered |
 | [when a user granted nothing tries to search the vfolders of their own scope, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | rejected |
 
@@ -715,11 +715,11 @@ Then
 
 #### [a-search-narrows-to-the-matching-folder-in-order-and-page](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
 
-when a user granted vfolder read in their own and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back
+when a user granted vfolder read in their own scope and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back
 
 Given
 
-- one user granted the READ permission on vfolders in their own and one other user's personal project. Every vfolder is mounted for others as ro: two personal vfolders of the user whose names hold match, one whose name does not, one of that other user and one of a third user whose names hold match
+- one user granted the READ permission on vfolders in their own scope, their own personal project and one other user's personal project. Every vfolder is mounted for others as ro: two personal vfolders of the user whose names hold match, one whose name does not, one of that other user and one of a third user whose names hold match
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -737,6 +737,10 @@ Given
   - Personal vfolder other-1: is placed in that person's personal project and is ready to use, is mounted for others as ro
   - Personal vfolder match-3: is placed in that person's personal project and is ready to use, is mounted for others as ro
   - Personal vfolder match-4: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Prepare a user granted the READ permission on vfolders in their own scope
+    - Role folder-holder-1: applies only within the scope it is granted in
+    - Role folder-holder-1: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-holder-1
   - Grant vfolder permissions
     - Role folder-writer-1: applies only within the scope it is granted in
     - Role folder-writer-1: READ allowed on every vfolder
@@ -747,7 +751,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search: user-1 searches their own and another user's personal project for vfolders they mount as rw whose name holds match, ordered by name ascending, up to 2
+- VFolderAdapter.scoped_search: user-1 searches their own scope and another user's personal project for vfolders they mount as rw whose name holds match, ordered by name ascending, up to 2
 
 Then
 
