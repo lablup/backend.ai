@@ -662,7 +662,9 @@ from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
     admin_session_lifecycle_handlers,
 )
 from ai.backend.manager.api.gql.ssh_key.resolver import (
+    my_ssh_keys,
     my_upload_ssh_key,
+    ssh_key,
     switch_default_ssh_key,
 )
 from ai.backend.manager.api.gql.storage_volume.resolver import (
@@ -942,6 +944,8 @@ class Query:
     scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
     scoped_auto_generated_files = scoped_auto_generated_files
     my_auto_generated_files = my_auto_generated_files
+    ssh_key = ssh_key
+    my_ssh_keys = my_ssh_keys
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments

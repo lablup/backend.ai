@@ -89,6 +89,7 @@ from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
+from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.storage_namespace import (
     StorageNamespaceEntityType,
     StorageNamespaceID,
@@ -258,6 +259,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.session_group.types import (  # pants: no-infer-dep
         SessionGroupGQL,
     )
+    from ai.backend.manager.api.gql.ssh_key.types import SSHKeyGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.storage_namespace import (  # pants: no-infer-dep
         StorageNamespace,
     )
@@ -990,6 +992,23 @@ class DataLoaders:
             dtos = await adapter.bulk_get_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else SGG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def ssh_key_loader(self) -> DataLoader[SSHKeypairID, SSHKeyGQL | None]:
+        adapter = self._adapters.ssh_key
+
+        async def load_fn(ids: list[SSHKeypairID]) -> list[SSHKeyGQL | Exception | None]:
+            from ai.backend.manager.api.gql.ssh_key.types import (  # pants: no-infer-dep
+                SSHKeyGQL as SK,
+            )
+
+            dtos = await adapter.bulk_get_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SK.from_pydantic(dto)
                 for dto in dtos
             ]
 

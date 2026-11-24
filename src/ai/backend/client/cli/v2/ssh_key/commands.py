@@ -30,3 +30,19 @@ def switch_default(ssh_key_id: UUID) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@ssh_key.command()
+@click.argument("ssh_key_id", type=click.UUID)
+def get(ssh_key_id: UUID) -> None:
+    """Read one SSH key."""
+    from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            print_result(await registry.ssh_key.get(SSHKeypairID(ssh_key_id)))
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
