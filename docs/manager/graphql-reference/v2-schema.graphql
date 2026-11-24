@@ -25186,7 +25186,7 @@ input VFolderFilter {
   autoMounts: VFolderAutoMountNestedFilter = null
 
   """
-  Added in 26.10.0. Filter by the mount policy of the scope user on the vfolder. Only a search whose scope names exactly one user takes it: `scopedVFoldersV2` with one `scope.user`, and `myVfolders`. Other searches reject it.
+  Added in 26.10.0. Filter by the mount policy of one user on the vfolder.
   """
   mountPermission: VFolderMountPermissionFilter = null
   AND: [VFolderFilter!] = null
@@ -25266,9 +25266,12 @@ enum VFolderMountPermission {
 }
 
 """
-Added in 26.10.0. Filter for the mount policy of the scope user on a vfolder. RW_DELETE matches READ_WRITE.
+Added in 26.10.0. Filter for the mount policy of one user on a vfolder. RW_DELETE matches READ_WRITE.
 """
 input VFolderMountPermissionFilter {
+  """The user whose mount policy is compared."""
+  userId: UUID!
+
   """Exact match."""
   equals: VFolderMountPermission = null
 

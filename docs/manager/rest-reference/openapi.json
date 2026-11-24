@@ -41174,7 +41174,7 @@
               }
             ],
             "default": null,
-            "description": "Added in 26.10.0. Filter by the mount policy of the scope user on the vfolder. A search whose scope does not name exactly one user rejects it. wd matches rw."
+            "description": "Added in 26.10.0. Filter by the mount policy of one user on the vfolder. wd matches rw."
           },
           "AND": {
             "anyOf": [
@@ -41286,8 +41286,17 @@
             "default": null,
             "description": "Exclude any of the provided values.",
             "title": "Not In"
+          },
+          "user_id": {
+            "description": "The user whose mount policy is compared.",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
           }
         },
+        "required": [
+          "user_id"
+        ],
         "title": "VFolderMountPermissionFilter",
         "type": "object"
       },
