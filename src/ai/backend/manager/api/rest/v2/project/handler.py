@@ -11,11 +11,13 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
+    CreateProjectContainerRegistryRelationsInput,
     CreateProjectInput,
     DeleteProjectInput,
     PartialBulkDeleteProjectsInput,
     PartialBulkRestoreProjectsInput,
     PartialBulkUpdateProjectsInput,
+    PurgeProjectContainerRegistryRelationsInput,
     PurgeProjectInput,
     RestoreProjectInput,
     ScopedSearchProjectsInput,
@@ -182,4 +184,20 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Unassign users from a project."""
         result = await self._adapter.unassign_users(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def create_container_registry_relations(
+        self,
+        body: BodyParam[CreateProjectContainerRegistryRelationsInput],
+    ) -> APIResponse:
+        """Create relations between projects and container registries."""
+        result = await self._adapter.create_container_registry_relations(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge_container_registry_relations(
+        self,
+        body: BodyParam[PurgeProjectContainerRegistryRelationsInput],
+    ) -> APIResponse:
+        """Purge relations between projects and container registries."""
+        result = await self._adapter.purge_container_registry_relations(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

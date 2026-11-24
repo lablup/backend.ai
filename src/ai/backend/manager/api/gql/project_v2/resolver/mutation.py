@@ -14,6 +14,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
 )
 from ai.backend.manager.api.gql.project_v2.types.mutations import (
+    CreateProjectContainerRegistryRelationsInputGQL,
+    CreateProjectContainerRegistryRelationsPayloadGQL,
     CreateProjectInputGQL,
     DeleteProjectPayloadGQL,
     PartialBulkDeleteProjectsInputGQL,
@@ -21,6 +23,8 @@ from ai.backend.manager.api.gql.project_v2.types.mutations import (
     PartialBulkRestoreProjectsInputGQL,
     PartialBulkUpdateProjectsInputGQL,
     ProjectPayloadGQL,
+    PurgeProjectContainerRegistryRelationsInputGQL,
+    PurgeProjectContainerRegistryRelationsPayloadGQL,
     PurgeProjectPayloadGQL,
     RestoreProjectPayloadGQL,
     UnassignUsersFromProjectInputGQL,
@@ -216,3 +220,41 @@ async def unassign_users_from_project_v2(
     ctx = info.context
     payload = await ctx.adapters.project.unassign_users(project_id, input.to_pydantic())
     return UnassignUsersFromProjectPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Create relations between projects and container registries. A relation that "
+            "already exists is left as it stands."
+        ),
+    )
+)
+async def create_project_container_registry_relations(
+    info: Info[StrawberryGQLContext],
+    input: CreateProjectContainerRegistryRelationsInputGQL,
+) -> CreateProjectContainerRegistryRelationsPayloadGQL | None:
+    payload = await info.context.adapters.project.create_container_registry_relations(
+        input.to_pydantic()
+    )
+    return CreateProjectContainerRegistryRelationsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Purge relations between projects and container registries. A relation that "
+            "does not exist is skipped."
+        ),
+    )
+)
+async def purge_project_container_registry_relations(
+    info: Info[StrawberryGQLContext],
+    input: PurgeProjectContainerRegistryRelationsInputGQL,
+) -> PurgeProjectContainerRegistryRelationsPayloadGQL | None:
+    payload = await info.context.adapters.project.purge_container_registry_relations(
+        input.to_pydantic()
+    )
+    return PurgeProjectContainerRegistryRelationsPayloadGQL.from_pydantic(payload)

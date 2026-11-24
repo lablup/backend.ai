@@ -36,6 +36,70 @@ def get(project_id: UUID) -> None:
     asyncio.run(_run())
 
 
+@project.command()
+@click.argument("project_id", type=click.UUID)
+@click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
+def create_container_registry_relations(
+    project_id: UUID, container_registry_ids: tuple[UUID, ...]
+) -> None:
+    """Create relations between a project and container registries."""
+    from ai.backend.common.dto.manager.v2.group.request import (
+        CreateProjectContainerRegistryRelationsInput,
+        ProjectContainerRegistryRelationInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.create_container_registry_relations(
+                CreateProjectContainerRegistryRelationsInput(
+                    items=[
+                        ProjectContainerRegistryRelationInput(
+                            project_id=project_id, container_registry_id=registry_id
+                        )
+                        for registry_id in container_registry_ids
+                    ]
+                )
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@project.command()
+@click.argument("project_id", type=click.UUID)
+@click.argument("container_registry_ids", type=click.UUID, nargs=-1, required=True)
+def purge_container_registry_relations(
+    project_id: UUID, container_registry_ids: tuple[UUID, ...]
+) -> None:
+    """Purge relations between a project and container registries."""
+    from ai.backend.common.dto.manager.v2.group.request import (
+        ProjectContainerRegistryRelationInput,
+        PurgeProjectContainerRegistryRelationsInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.purge_container_registry_relations(
+                PurgeProjectContainerRegistryRelationsInput(
+                    items=[
+                        ProjectContainerRegistryRelationInput(
+                            project_id=project_id, container_registry_id=registry_id
+                        )
+                        for registry_id in container_registry_ids
+                    ]
+                )
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @project.command(name="assign-users")
 @click.argument("project_id", type=click.UUID)
 @click.option(
