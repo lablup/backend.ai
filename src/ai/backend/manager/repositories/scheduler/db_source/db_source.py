@@ -216,6 +216,7 @@ from ai.backend.manager.views.sokovan.search import (
 )
 from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
+    SessionStatusTransition,
     SweptSessionInfo,
     TerminatingKernelData,
     TerminatingSessionData,
@@ -1261,26 +1262,27 @@ class ScheduleDBSource:
         async with self._db.begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
             # 1. Cancel pending sessions
-            cancelled_sessions = await self._cancel_pending_sessions(
-                db_sess, session_ids, reason, now
-            )
+            cancelled = await self._cancel_pending_sessions(db_sess, session_ids, reason, now)
 
             if forced:
                 # 2a. Force-terminate: set sessions directly to TERMINATED
-                force_terminated_sessions = await self._mark_sessions_as_force_terminated(
+                force_terminated = await self._mark_sessions_as_force_terminated(
                     db_sess, session_ids, reason, now
                 )
-                terminating_sessions: list[SessionId] = []
+                terminating: list[SessionStatusTransition] = []
             else:
                 # 2b. Normal: mark sessions as TERMINATING
-                force_terminated_sessions = []
-                terminating_sessions = await self._mark_sessions_as_terminating(
+                force_terminated = []
+                terminating = await self._mark_sessions_as_terminating(
                     db_sess,
                     session_ids,
                     reason,
                     now,
                     message=message,
                 )
+            cancelled_sessions = [t.session_id for t in cancelled]
+            terminating_sessions = [t.session_id for t in terminating]
+            force_terminated_sessions = [t.session_id for t in force_terminated]
 
             # 3. Mark unprocessed sessions as skipped
             processed_ids = (
@@ -1293,6 +1295,7 @@ class ScheduleDBSource:
                 terminating_sessions=terminating_sessions,
                 force_terminated_sessions=force_terminated_sessions,
                 skipped_sessions=skipped_sessions,
+                transitions=[*cancelled, *terminating, *force_terminated],
             )
 
     async def mark_sessions_status(
@@ -1300,7 +1303,7 @@ class ScheduleDBSource:
         session_ids: list[SessionId],
         to_status: SessionStatus,
         reason: KernelLifecycleEventReason,
-    ) -> list[SessionId]:
+    ) -> list[SessionStatusTransition]:
         """
         Move sessions to ``to_status`` and record the transition in the
         scheduling history, as every status transition does.
@@ -1312,26 +1315,13 @@ class ScheduleDBSource:
         :param session_ids: Sessions to transition
         :param to_status: Target session status
         :param reason: Status reason recorded on the transitioned sessions
-        :return: IDs of the sessions actually transitioned
+        :return: The status changes of the sessions actually transitioned
         """
         if not session_ids:
             return []
 
         async with self._db.begin_readonly_session_read_committed() as read_sess:
             now = await self._get_db_now_in_session(read_sess)
-            status_result = await read_sess.execute(
-                sa.select(SessionRow.id, SessionRow.status).where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status.not_in(SessionStatus.terminal_statuses()),
-                    )
-                )
-            )
-            source_statuses: dict[SessionId, SessionStatus] = {
-                cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
-            }
-        if not source_statuses:
-            return []
 
         phase = f"mark_{to_status.name.lower()}"
         updater = SessionStatusBatchUpdater(
@@ -1342,29 +1332,36 @@ class ScheduleDBSource:
             except_statuses=SessionStatus.terminal_statuses(),
         )
         async with self._reconcile_ops.write_ops() as w:
-            marked = await w.batch_update_in_global(updater)
-            marked_sessions = [SessionId(data.id) for data in marked]
-            if not marked_sessions:
+            changes = await w.batch_update_returning_previous(updater)
+            if not changes:
                 return []
+            transitions = [
+                SessionStatusTransition(
+                    session_id=SessionId(change.current.id),
+                    from_status=change.previous.status,
+                    to_status=change.current.status,
+                )
+                for change in changes
+            ]
             await w.apply_batch_transition(
                 BatchReconcileTransition(
                     histories=[
                         FieldToCreate(
-                            owner_id=SessionID(session_id),
+                            owner_id=SessionID(transition.session_id),
                             creator=SessionSchedulingHistoryCreator(
                                 phase=phase,
                                 result=SchedulingResult.SUCCESS,
                                 message=f"{phase} success",
-                                from_status=source_statuses.get(session_id),
+                                from_status=transition.from_status,
                                 to_status=to_status,
                             ),
                         )
-                        for session_id in marked_sessions
+                        for transition in transitions
                     ],
                     owner_column=SessionSchedulingHistoryRow.session_id,
                 )
             )
-            return marked_sessions
+            return transitions
 
     async def get_resource_group_preemption_mode(
         self, resource_group_id: ResourceGroupID
@@ -1532,13 +1529,17 @@ class ScheduleDBSource:
 
     async def _cancel_pending_sessions(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
-    ) -> list[SessionId]:
+    ) -> list[SessionStatusTransition]:
         """Cancel PENDING sessions and their kernels, and free the kernels'
         ``resource_allocations`` rows in the same transaction.
         """
-        # Capture from_statuses before update for history recording
-        status_query = sa.select(SessionRow.id, SessionRow.status).where(
-            sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
+        # Lock the rows and capture from_statuses before update
+        status_query = (
+            sa.select(SessionRow.id, SessionRow.status)
+            .where(
+                sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
+            )
+            .with_for_update()
         )
         status_result = await db_sess.execute(status_query)
         from_statuses: dict[SessionId, SessionStatus] = {
@@ -1601,7 +1602,12 @@ class ScheduleDBSource:
             ]
             await self._record_scheduling_history(db_sess, histories)
 
-        return cancelled_sessions
+        return [
+            SessionStatusTransition(
+                session_id=sid, from_status=from_statuses[sid], to_status=SessionStatus.CANCELLED
+            )
+            for sid in cancelled_sessions
+        ]
 
     async def _mark_sessions_as_terminating(
         self,
@@ -1610,14 +1616,18 @@ class ScheduleDBSource:
         reason: str,
         now: datetime,
         message: str,
-    ) -> list[SessionId]:
+    ) -> list[SessionStatusTransition]:
         """Mark terminatable sessions and their kernels as terminating."""
-        # Capture from_statuses before update
-        status_query = sa.select(SessionRow.id, SessionRow.status).where(
-            sa.and_(
-                SessionRow.id.in_(session_ids),
-                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+        # Lock the rows and capture from_statuses before update
+        status_query = (
+            sa.select(SessionRow.id, SessionRow.status)
+            .where(
+                sa.and_(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                )
             )
+            .with_for_update()
         )
         status_result = await db_sess.execute(status_query)
         from_statuses: dict[SessionId, SessionStatus] = {
@@ -1684,19 +1694,30 @@ class ScheduleDBSource:
             ]
             await self._record_scheduling_history(db_sess, histories)
 
-        return terminating_sessions
+        return [
+            SessionStatusTransition(
+                session_id=session_id,
+                from_status=from_statuses[session_id],
+                to_status=SessionStatus.TERMINATING,
+            )
+            for session_id in terminating_sessions
+        ]
 
     async def _mark_sessions_as_force_terminated(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
-    ) -> list[SessionId]:
+    ) -> list[SessionStatusTransition]:
         """Directly mark terminatable sessions and their kernels as TERMINATED (force-terminate)."""
         now_iso = now.isoformat()
-        # Capture from_statuses before update
-        status_query = sa.select(SessionRow.id, SessionRow.status).where(
-            sa.and_(
-                SessionRow.id.in_(session_ids),
-                SessionRow.status.in_(SessionStatus.force_terminatable_statuses()),
+        # Lock the rows and capture from_statuses before update
+        status_query = (
+            sa.select(SessionRow.id, SessionRow.status)
+            .where(
+                sa.and_(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status.in_(SessionStatus.force_terminatable_statuses()),
+                )
             )
+            .with_for_update()
         )
         status_result = await db_sess.execute(status_query)
         from_statuses: dict[SessionId, SessionStatus] = {
@@ -1784,7 +1805,12 @@ class ScheduleDBSource:
             ]
             await self._record_scheduling_history(db_sess, histories)
 
-        return force_terminated_sessions
+        return [
+            SessionStatusTransition(
+                session_id=sid, from_status=from_statuses[sid], to_status=SessionStatus.TERMINATED
+            )
+            for sid in force_terminated_sessions
+        ]
 
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
         """Get ids of all defined resource groups."""
@@ -3717,12 +3743,14 @@ class ScheduleDBSource:
 
             return {row.session_id for row in cancelled_rows}
 
-    async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
+    async def check_and_cancel_session_if_needed(
+        self, session_id: SessionId
+    ) -> SessionStatusTransition | None:
         """
         Check if a session should be cancelled when all its kernels are cancelled.
 
         :param session_id: The session ID to check
-        :return: True if session was cancelled, False otherwise
+        :return: The status change if the session was cancelled, None otherwise
         """
         async with self._db.begin_session_read_committed() as db_sess:
             # Check if all kernels for this session are cancelled
@@ -3737,34 +3765,43 @@ class ScheduleDBSource:
                 )
             )
             non_cancelled_count = kernel_check.scalar()
+            if non_cancelled_count != 0:
+                return None
 
-            if non_cancelled_count == 0:
-                # All kernels are cancelled, cancel the session
-                now = await self._get_db_now_in_session(db_sess)
-                stmt = (
-                    sa.update(SessionRow)
-                    .where(
-                        sa.and_(
-                            SessionRow.id == session_id,
-                            SessionRow.status.not_in([
-                                SessionStatus.CANCELLED,
-                                SessionStatus.TERMINATED,
-                            ]),
-                        )
-                    )
-                    .values(
-                        status=SessionStatus.CANCELLED,
-                        status_info="All kernels cancelled",
-                        status_history=sql_json_merge(
-                            SessionRow.__table__.c.status_history,
-                            (),
-                            {SessionStatus.CANCELLED.name: now.isoformat()},
-                        ),
-                    )
+            # All kernels are cancelled; lock the session and capture its status before update
+            cancellable = sa.and_(
+                SessionRow.id == session_id,
+                SessionRow.status.not_in([
+                    SessionStatus.CANCELLED,
+                    SessionStatus.TERMINATED,
+                ]),
+            )
+            from_status = (
+                await db_sess.execute(
+                    sa.select(SessionRow.status).where(cancellable).with_for_update()
                 )
-                result = await db_sess.execute(stmt)
-                return cast(CursorResult[Any], result).rowcount > 0
-        return False
+            ).scalar_one_or_none()
+            if from_status is None:
+                return None
+            now = await self._get_db_now_in_session(db_sess)
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .where(cancellable)
+                .values(
+                    status=SessionStatus.CANCELLED,
+                    status_info="All kernels cancelled",
+                    status_history=sql_json_merge(
+                        SessionRow.__table__.c.status_history,
+                        (),
+                        {SessionStatus.CANCELLED.name: now.isoformat()},
+                    ),
+                )
+            )
+            return SessionStatusTransition(
+                session_id=session_id,
+                from_status=SessionStatus(from_status),
+                to_status=SessionStatus.CANCELLED,
+            )
 
     async def check_available_image(self, image_id: ImageID, domain: str, user_uuid: UUID) -> None:
         """
@@ -4275,22 +4312,29 @@ class ScheduleDBSource:
         self,
         updater: SessionStatusBatchUpdater,
         histories: Sequence[SessionHistoryToCreate],
-    ) -> int:
+    ) -> list[SessionStatusTransition]:
         """Move the sessions the updater selects and record each transition, in one
         transaction. A repeated transition is counted onto the session's latest
         history row instead of inserting another.
 
-        Returns the number of sessions updated.
+        Returns the status change of each session updated, with the status it held before.
         """
         async with self._reconcile_ops.write_ops() as w:
-            updated = await w.apply_batch_transition(
+            changes = await w.batch_update_returning_previous(updater)
+            await w.apply_batch_transition(
                 BatchReconcileTransition(
                     histories=self._to_field_creations(histories),
                     owner_column=SessionSchedulingHistoryRow.session_id,
-                    status_updater=updater,
                 )
             )
-            return len(updated)
+            return [
+                SessionStatusTransition(
+                    session_id=SessionId(change.current.id),
+                    from_status=change.previous.status,
+                    to_status=change.current.status,
+                )
+                for change in changes
+            ]
 
     async def create_scheduling_history(
         self,

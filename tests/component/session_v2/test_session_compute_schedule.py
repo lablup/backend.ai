@@ -121,6 +121,7 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import create_agent_selector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -320,6 +321,7 @@ async def compute_session_processors(
             agent_selector=create_agent_selector(
                 config_provider.config.manager.agent_selection_resource_priority
             ),
+            post_transition_hooks=PostTransitionHookRegistry(),
         )
     )
     args = SessionServiceArgs(

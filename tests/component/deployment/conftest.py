@@ -64,6 +64,7 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentControllerArgs,
 )
 from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
 )
@@ -145,6 +146,7 @@ def deployment_processors(
             agent_selector=create_agent_selector(
                 config_provider.config.manager.agent_selection_resource_priority
             ),
+            post_transition_hooks=PostTransitionHookRegistry(),
         )
     )
     revision_draft_reader = RevisionDraftReader(deployment_repository=repo)

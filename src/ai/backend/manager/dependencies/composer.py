@@ -55,6 +55,9 @@ from ai.backend.manager.dependencies.system.composer import (
     SystemResources,
 )
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
 )
@@ -261,6 +264,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             bootstrap.config_provider.config.manager.agent_selection_resource_priority
         )
         agent_selector = create_agent_selector(resource_priority)
+        post_transition_hooks = PostTransitionHookRegistry()
 
         # Stage 8: Agents (controllers, client pools, agent registry)
         agents = await stack.enter_composer(
@@ -281,6 +285,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 deployment_revision_preset_repository=domain.repositories.deployment_revision_preset.repository,
                 runtime_variant_repository=domain.repositories.runtime_variant.repository,
                 agent_selector=agent_selector,
+                post_transition_hooks=post_transition_hooks,
                 ops_provider=domain.repositories.v2_ops_provider,
             ),
         )
@@ -313,6 +318,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 appproxy_client_pool=agents.appproxy_client_pool,
                 network_plugin_ctx=plugins.network_plugin_ctx,
                 agent_selector=agent_selector,
+                post_transition_hooks=post_transition_hooks,
                 scheduling_controller=agents.scheduling_controller,
                 deployment_controller=agents.deployment_controller,
                 route_controller=agents.route_controller,

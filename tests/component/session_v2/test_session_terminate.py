@@ -40,6 +40,7 @@ def stub_mark_terminating(scheduling_controller_mock: AsyncMock) -> AsyncMock:
             terminating_sessions=list(session_ids),
             force_terminated_sessions=[],
             skipped_sessions=[],
+            transitions=[],
         )
 
     scheduling_controller_mock.mark_sessions_for_termination.side_effect = _mark

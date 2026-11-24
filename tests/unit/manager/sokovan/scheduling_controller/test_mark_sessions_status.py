@@ -8,10 +8,12 @@ from unittest.mock import AsyncMock, MagicMock
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.manager.views.sokovan.session import SessionStatusTransition
 
 _REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
@@ -34,6 +36,7 @@ def _build_controller() -> tuple[SchedulingController, AsyncMock, MagicMock, Mag
             network_plugin_ctx=MagicMock(),
             hook_plugin_ctx=MagicMock(),
             agent_selector=MagicMock(),
+            post_transition_hooks=PostTransitionHookRegistry(),
         )
     )
     return controller, repository, valkey_schedule, event_producer
@@ -44,7 +47,14 @@ class TestMarkSessionsStatus:
         """Sessions the repository moved are broadcast with the target status."""
         controller, repository, _valkey_schedule, event_producer = _build_controller()
         victims = [SessionId(uuid.uuid4()), SessionId(uuid.uuid4())]
-        repository.mark_sessions_status.return_value = victims
+        repository.mark_sessions_status.return_value = [
+            SessionStatusTransition(
+                session_id=victim,
+                from_status=SessionStatus.RUNNING,
+                to_status=SessionStatus.PREEMPTED,
+            )
+            for victim in victims
+        ]
 
         result = await controller.mark_sessions_status(victims, SessionStatus.PREEMPTED, _REASON)
 

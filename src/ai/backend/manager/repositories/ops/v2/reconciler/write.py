@@ -72,8 +72,41 @@ class BatchReconcileTransition[
     status_updater: DataBatchUpdater[TStatusRow, TStatusData] | None = None
 
 
+@dataclass(frozen=True)
+class UpdatedRowChange[TData]:
+    """One row a batch update wrote, as it was before the update and after it."""
+
+    previous: TData
+    current: TData
+
+
 class ReconcileWriteOps(V2WriteOps):
     """The general v2 write ops plus the status-with-history transition."""
+
+    async def batch_update_returning_previous[TRow: Base, TData](
+        self, updater: DataBatchUpdater[TRow, TData]
+    ) -> list[UpdatedRowChange[TData]]:
+        """Update every row the spec selects, with NO scope filter, and return each
+        updated row before and after the update. The rows are locked when read, so
+        the previous value is the one the update replaced."""
+        row_class = updater.row_class
+        mapper = sa.inspect(row_class)
+        query = sa.select(*row_class.__table__.columns)
+        for condition in updater.conditions():
+            query = query.where(condition())
+        locked = await self._sess.execute(query.with_for_update())
+        previous: dict[tuple[Any, ...], TData] = {}
+        for record in locked.fetchall():
+            row = row_class(**dict(record._mapping))
+            previous[tuple(mapper.primary_key_from_instance(row))] = updater.to_data(row)
+        updated = await self._batch_update_returning_rows(None, updater)
+        return [
+            UpdatedRowChange(
+                previous=previous[tuple(mapper.primary_key_from_instance(row))],
+                current=updater.to_data(row),
+            )
+            for row in updated
+        ]
 
     async def apply_transitions(
         self, transitions: Sequence[ReconcileTransition[Any, Any, Any, Any, Any]]

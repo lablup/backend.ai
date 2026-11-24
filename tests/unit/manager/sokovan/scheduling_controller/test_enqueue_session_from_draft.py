@@ -83,6 +83,7 @@ from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -283,6 +284,7 @@ def _build_controller(
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
             agent_selector=MagicMock(),
+            post_transition_hooks=PostTransitionHookRegistry(),
         )
     )
     return controller, event_producer, hook_plugin_ctx

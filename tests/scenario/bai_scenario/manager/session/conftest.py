@@ -100,6 +100,7 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
 )
@@ -208,6 +209,7 @@ async def adapter(
                     agent_selector=create_agent_selector(
                         config.config.manager.agent_selection_resource_priority
                     ),
+                    post_transition_hooks=PostTransitionHookRegistry(),
                 )
             ),
             appproxy_client_pool=unwired(AppProxyClientPool, "only app routes reach it"),

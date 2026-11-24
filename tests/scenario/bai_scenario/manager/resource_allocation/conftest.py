@@ -115,6 +115,7 @@ from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -223,6 +224,7 @@ async def adapter(
                     # No plugin is loaded, so the pre-enqueue hook dispatches to nobody.
                     hook_plugin_ctx=HookPluginContext(MagicMock(spec=AbstractKVStore), {}),
                     agent_selector=unwired(AgentSelector, "only scheduling picks an agent"),
+                    post_transition_hooks=PostTransitionHookRegistry(),
                 )
             ),
             appproxy_client_pool=unwired(AppProxyClientPool, "only app routes reach it"),

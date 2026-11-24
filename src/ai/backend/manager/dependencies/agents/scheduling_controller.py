@@ -13,6 +13,9 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -32,6 +35,7 @@ class SchedulingControllerInput:
     network_plugin_ctx: NetworkPluginContext
     hook_plugin_ctx: HookPluginContext
     agent_selector: AgentSelector
+    post_transition_hooks: PostTransitionHookRegistry
 
 
 class SchedulingControllerDependency(
@@ -67,6 +71,7 @@ class SchedulingControllerDependency(
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
                 agent_selector=setup_input.agent_selector,
+                post_transition_hooks=setup_input.post_transition_hooks,
             )
         )
         yield controller

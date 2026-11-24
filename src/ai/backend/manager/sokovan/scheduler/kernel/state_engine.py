@@ -15,6 +15,9 @@ from ai.backend.common.events.event_types.kernel.types import (
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -32,14 +35,21 @@ class KernelStateEngine:
     """
 
     _repository: SchedulerRepository
+    _post_transition_hooks: PostTransitionHookRegistry
 
-    def __init__(self, repository: SchedulerRepository) -> None:
+    def __init__(
+        self,
+        repository: SchedulerRepository,
+        post_transition_hooks: PostTransitionHookRegistry,
+    ) -> None:
         """
         Initialize the KernelStateEngine with a repository.
 
         :param repository: SchedulerRepository for database operations
+        :param post_transition_hooks: Hooks run after a session is cancelled
         """
         self._repository = repository
+        self._post_transition_hooks = post_transition_hooks
 
     async def mark_kernel_pulling(
         self,
@@ -131,7 +141,9 @@ class KernelStateEngine:
 
         if success:
             # Check if the session should be cancelled when all kernels are cancelled
-            await self._repository.check_and_cancel_session_if_needed(session_id)
+            transition = await self._repository.check_and_cancel_session_if_needed(session_id)
+            if transition is not None:
+                await self._post_transition_hooks.notify([transition])
 
         return success
 
@@ -224,9 +236,10 @@ class KernelStateEngine:
         :param image_ref: Optional image reference
         :param image_id: Optional image UUID for precise matching
         """
-        await self._repository.cancel_kernels_for_failed_image(
+        cancelled = await self._repository.cancel_kernels_for_failed_image(
             agent_id, image, error_msg, image_ref, image_id=image_id
         )
+        await self._post_transition_hooks.notify(cancelled)
 
     async def reset_kernels_to_pending_for_sessions(
         self,

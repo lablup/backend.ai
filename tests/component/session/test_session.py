@@ -217,6 +217,7 @@ class TestSessionDestroy:
                 terminating_sessions=[],
                 force_terminated_sessions=[SessionId(terminated_session_seed.session_id)],
                 skipped_sessions=[],
+                transitions=[],
             )
         )
         result = await admin_registry.session.destroy(
@@ -239,6 +240,7 @@ class TestSessionDestroy:
                 terminating_sessions=[],
                 force_terminated_sessions=[SessionId(user_session_seed.session_id)],
                 skipped_sessions=[],
+                transitions=[],
             )
         )
         result = await user_registry.session.destroy(

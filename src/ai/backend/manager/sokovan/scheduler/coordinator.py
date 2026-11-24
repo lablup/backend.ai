@@ -85,6 +85,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 from .factory import CoordinatorHandlers
+from .hooks.post_transition import PostTransitionHookRegistry
 from .hooks.registry import HookRegistry
 from .results import (
     KernelExecutionResult,
@@ -183,6 +184,7 @@ class ScheduleCoordinator:
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
     _hook_registry: HookRegistry
+    _post_transition_hooks: PostTransitionHookRegistry
     _post_processors: Sequence[PostProcessor]
     _kernel_post_processors: Sequence[KernelPostProcessor]
 
@@ -206,10 +208,13 @@ class ScheduleCoordinator:
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize kernel state engine with the component's repository
-        self._kernel_state_engine = KernelStateEngine(components.repository)
+        self._kernel_state_engine = KernelStateEngine(
+            components.repository, components.post_transition_hooks
+        )
 
-        # Initialize hook registry from components
+        # Initialize hook registries from components
         self._hook_registry = components.hook_registry
+        self._post_transition_hooks = components.post_transition_hooks
 
         # Initialize post-processors for session handlers
         self._post_processors = create_session_post_processors(
@@ -1292,10 +1297,11 @@ class ScheduleCoordinator:
             updated = await self._repository.update_with_history(updater, histories)
             log.debug(
                 "session status updated",
-                session_count=updated,
+                session_count=len(updated),
                 to_status=transition.session,
                 scheduling_result=scheduling_result,
             )
+            await self._post_transition_hooks.notify(updated)
 
         # Kernel status reset if transitioning to PENDING
         if transition.kernel == KernelStatus.PENDING:

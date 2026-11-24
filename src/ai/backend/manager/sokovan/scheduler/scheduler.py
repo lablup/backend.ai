@@ -7,6 +7,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
+from .hooks.post_transition import PostTransitionHookRegistry
 from .hooks.registry import HookRegistry, HookRegistryArgs
 from .launcher.launcher import SessionLauncher
 from .provisioner.provisioner import SessionProvisioner
@@ -18,7 +19,7 @@ class SchedulerComponents:
     """Container for scheduler components used by Coordinator.
 
     This dataclass holds references to scheduler sub-components (provisioner, launcher,
-    terminator, hook_registry) that are accessed by Coordinator to initialize
+    terminator, hook_registry, post_transition_hooks) that are accessed by Coordinator to initialize
     lifecycle handlers.
     """
 
@@ -28,6 +29,7 @@ class SchedulerComponents:
     repository: SchedulerRepository
     config_provider: ManagerConfigProvider
     hook_registry: HookRegistry
+    post_transition_hooks: PostTransitionHookRegistry
 
 
 def create_scheduler_components(
@@ -38,6 +40,7 @@ def create_scheduler_components(
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
+    post_transition_hooks: PostTransitionHookRegistry,
 ) -> SchedulerComponents:
     """Create SchedulerComponents with all required dependencies."""
     hook_registry = HookRegistry(
@@ -54,4 +57,5 @@ def create_scheduler_components(
         repository=repository,
         config_provider=config_provider,
         hook_registry=hook_registry,
+        post_transition_hooks=post_transition_hooks,
     )
