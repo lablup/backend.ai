@@ -74,7 +74,6 @@ class TestSwitchDefaultDotfile:
                 entity_type=UserEntityType(),
                 entity_id=owner,
                 path=path,
-                perm="644",
                 is_default=is_default,
             )
             session.add(row)
