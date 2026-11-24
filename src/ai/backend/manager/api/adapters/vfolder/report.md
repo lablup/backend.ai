@@ -43,6 +43,7 @@ Scenario: incomplete 5 / 30
 |---|---|
 | [when a superadmin holding no role searches every vfolder, the vfolder seeded in advance comes back](#searching-a-superadmin-searches-every-folder) | answered |
 | [when a regular user tries to search every vfolder, it is rejected for lack of permission](#searching-a-regular-user-may-not-search-every-folder) | rejected |
+| [when a superadmin tries to search every vfolder for those mounted as rw, it is rejected because no user is named](#rejecting_mount_permission_filter-a-search-of-every-folder-rejects-the-mount-permission-filter) | rejected |
 
 **batch_load_by_ids**
 
@@ -61,6 +62,7 @@ Scenario: incomplete 5 / 30
 | scenario | verdict |
 |---|---|
 | [when a user granted vfolder read in a project lists the vfolders of that project, the vfolders of that project come back](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | answered |
+| [when a user granted vfolder read in a project tries to list its vfolders mounted as rw, it is rejected because no user is named](#rejecting_mount_permission_filter-a-project-search-rejects-the-mount-permission-filter) | rejected |
 | [when a user granted nothing tries to list the vfolders of a project, it is rejected for lack of permission](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | rejected |
 
 **scoped_search**
@@ -69,6 +71,7 @@ Scenario: incomplete 5 / 30
 |---|---|
 | [when a user granted vfolder read in their own scope and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | answered |
 | [when a user who has created no vfolder lists their own vfolders, the answer is empty](#vfolder-a-user-who-has-made-no-folder-lists-none) | answered |
+| [when a user granted vfolder read in a project tries to search vfolders mounted as rw with only that project as the scope, it is rejected because no user is named](#rejecting_mount_permission_filter-a-scope-without-a-user-rejects-the-mount-permission-filter) | rejected |
 | [when a user granted nothing tries to search the vfolders of their own scope, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | rejected |
 
 **batch_load_mount_permissions**
@@ -330,6 +333,35 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+<a id="rejecting_mount_permission_filter-a-search-of-every-folder-rejects-the-mount-permission-filter"></a>
+
+#### [a-search-of-every-folder-rejects-the-mount-permission-filter](/tests/scenario/bai_scenario/manager/vfolder/test_rejecting_mount_permission_filter.py): pass
+
+when a superadmin tries to search every vfolder for those mounted as rw, it is rejected because no user is named
+
+Given
+
+- one personal vfolder of another user and one superadmin holding no role
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+
+When
+
+- VFolderAdapter.admin_search: user-2 searches every vfolder for those mounted as rw
+
+Then
+
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 ### batch_load_by_ids
 
@@ -682,6 +714,37 @@ Then
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
 
+<a id="rejecting_mount_permission_filter-a-project-search-rejects-the-mount-permission-filter"></a>
+
+#### [a-project-search-rejects-the-mount-permission-filter](/tests/scenario/bai_scenario/manager/vfolder/test_rejecting_mount_permission_filter.py): pass
+
+when a user granted vfolder read in a project tries to list its vfolders mounted as rw, it is rejected because no user is named
+
+Given
+
+- a project with one vfolder and one user who can read vfolders in that project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Grant permission to read vfolders
+    - Role folder-reader-1: applies only within the scope it is granted in
+    - Role folder-reader-1: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-reader-1
+
+When
+
+- VFolderAdapter.project_search: user-1 lists the vfolders mounted as rw of the project the folder-1 vfolder is placed in
+
+Then
+
+- the call is rejected
+  - rejected: InvalidAPIParameters
+
 <a id="reaching-a-user-granted-nothing-may-not-list-a-projects-folders"></a>
 
 #### [a-user-granted-nothing-may-not-list-a-projects-folders](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
@@ -832,6 +895,37 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
+
+<a id="rejecting_mount_permission_filter-a-scope-without-a-user-rejects-the-mount-permission-filter"></a>
+
+#### [a-scope-without-a-user-rejects-the-mount-permission-filter](/tests/scenario/bai_scenario/manager/vfolder/test_rejecting_mount_permission_filter.py): pass
+
+when a user granted vfolder read in a project tries to search vfolders mounted as rw with only that project as the scope, it is rejected because no user is named
+
+Given
+
+- a project with one vfolder and one user who can read vfolders in that project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Grant permission to read vfolders
+    - Role folder-reader-1: applies only within the scope it is granted in
+    - Role folder-reader-1: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-reader-1
+
+When
+
+- VFolderAdapter.scoped_search: user-1 searches the vfolders mounted as rw with only the project the folder-1 vfolder is placed in as the scope
+
+Then
+
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="searching-a-user-granted-nothing-may-not-search-their-own-scope"></a>
 

@@ -43,6 +43,7 @@
 |---|---|
 | [아무 역할도 받지 않은 superadmin 이 모든 vfolder 를 조회하면, 심은 vfolder 가 응답으로 옵니다](#searching-a-superadmin-searches-every-folder) | 성공 |
 | [일반 사용자가 모든 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-regular-user-may-not-search-every-folder) | 거부 |
+| [superadmin 이 모든 vfolder 중 rw 로 마운트하는 것을 조회하려 하면, 기준이 될 사용자가 없어 거부됩니다](#rejecting_mount_permission_filter-a-search-of-every-folder-rejects-the-mount-permission-filter) | 거부 |
 
 **batch_load_by_ids**
 
@@ -61,6 +62,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [프로젝트에서 vfolder 읽기 권한을 받은 사용자가 그 프로젝트의 vfolder 를 조회하면, 그 프로젝트의 vfolder 가 응답으로 옵니다](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | 성공 |
+| [프로젝트에서 vfolder 읽기 권한을 받은 사용자가 그 프로젝트의 vfolder 중 rw 로 마운트하는 것을 조회하려 하면, 기준이 될 사용자가 없어 거부됩니다](#rejecting_mount_permission_filter-a-project-search-rejects-the-mount-permission-filter) | 거부 |
 | [아무 권한도 받지 않은 사용자가 프로젝트의 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | 거부 |
 
 **scoped_search**
@@ -69,6 +71,7 @@
 |---|---|
 | [자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 것을 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | 성공 |
 | [vfolder 를 하나도 생성하지 않은 사용자가 자기 vfolder 를 조회하면, 응답은 비어 있습니다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
+| [프로젝트에서 vfolder 읽기 권한을 받은 사용자가 그 프로젝트만 스코프로 지정해 rw 로 마운트하는 vfolder 를 조회하려 하면, 기준이 될 사용자가 없어 거부됩니다](#rejecting_mount_permission_filter-a-scope-without-a-user-rejects-the-mount-permission-filter) | 거부 |
 | [아무 권한도 받지 않은 사용자가 자기 범위의 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | 거부 |
 
 **batch_load_mount_permissions**
@@ -330,6 +333,35 @@ Then
 
 - 거부됩니다
   - 거부: InsufficientPrivilege
+
+<a id="rejecting_mount_permission_filter-a-search-of-every-folder-rejects-the-mount-permission-filter"></a>
+
+#### [a-search-of-every-folder-rejects-the-mount-permission-filter](/tests/scenario/bai_scenario/manager/vfolder/test_rejecting_mount_permission_filter.py): pass
+
+superadmin 이 모든 vfolder 중 rw 로 마운트하는 것을 조회하려 하면, 기준이 될 사용자가 없어 거부됩니다
+
+Given
+
+- 남의 개인 vfolder 하나와, 아무 역할도 받지 않은 superadmin 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+
+When
+
+- VFolderAdapter.admin_search: user-2이 모든 vfolder 중 rw 로 마운트하는 것을 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidAPIParameters
 
 ### batch_load_by_ids
 
@@ -682,6 +714,37 @@ Then
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
 
+<a id="rejecting_mount_permission_filter-a-project-search-rejects-the-mount-permission-filter"></a>
+
+#### [a-project-search-rejects-the-mount-permission-filter](/tests/scenario/bai_scenario/manager/vfolder/test_rejecting_mount_permission_filter.py): pass
+
+프로젝트에서 vfolder 읽기 권한을 받은 사용자가 그 프로젝트의 vfolder 중 rw 로 마운트하는 것을 조회하려 하면, 기준이 될 사용자가 없어 거부됩니다
+
+Given
+
+- vfolder 하나를 가진 프로젝트와, 그 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 project-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 읽기 권한 부여
+    - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.project_search: user-1이 folder-1 vfolder 가 놓인 프로젝트의 vfolder 중 rw 로 마운트하는 것을 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidAPIParameters
+
 <a id="reaching-a-user-granted-nothing-may-not-list-a-projects-folders"></a>
 
 #### [a-user-granted-nothing-may-not-list-a-projects-folders](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
@@ -832,6 +895,37 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
+
+<a id="rejecting_mount_permission_filter-a-scope-without-a-user-rejects-the-mount-permission-filter"></a>
+
+#### [a-scope-without-a-user-rejects-the-mount-permission-filter](/tests/scenario/bai_scenario/manager/vfolder/test_rejecting_mount_permission_filter.py): pass
+
+프로젝트에서 vfolder 읽기 권한을 받은 사용자가 그 프로젝트만 스코프로 지정해 rw 로 마운트하는 vfolder 를 조회하려 하면, 기준이 될 사용자가 없어 거부됩니다
+
+Given
+
+- vfolder 하나를 가진 프로젝트와, 그 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 project-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 읽기 권한 부여
+    - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.scoped_search: user-1이 folder-1 vfolder 가 놓인 프로젝트만 스코프로 지정해 rw 로 마운트하는 vfolder 를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidAPIParameters
 
 <a id="searching-a-user-granted-nothing-may-not-search-their-own-scope"></a>
 

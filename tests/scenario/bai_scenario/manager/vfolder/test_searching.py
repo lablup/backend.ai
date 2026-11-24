@@ -154,10 +154,12 @@ class SearchingByFragmentInOrder(
                         project=[UUIDScope(value=laid.other_project_id)],
                         user=[UUIDScope(value=laid.caller.id)],
                     ),
-                    mount_permission=VFolderMountPermissionFilter(
-                        equals=VFolderPermissionField.READ_WRITE
+                    filter=VFolderFilter(
+                        name=StringFilter(contains=self.fragment),
+                        mount_permission=VFolderMountPermissionFilter(
+                            equals=VFolderPermissionField.READ_WRITE
+                        ),
                     ),
-                    filter=VFolderFilter(name=StringFilter(contains=self.fragment)),
                     order=[
                         VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
                     ],

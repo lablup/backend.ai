@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -24,11 +23,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.api.gql.vfolder_v2.types.filters import (
-    VFolderFilterGQL,
-    VFolderMountPermissionFilterGQL,
-    VFolderOrderByGQL,
-)
+from ai.backend.manager.api.gql.vfolder_v2.types.filters import VFolderFilterGQL, VFolderOrderByGQL
 from ai.backend.manager.api.gql.vfolder_v2.types.mount_policy import VFolderMountPoliciesPayloadGQL
 from ai.backend.manager.api.gql.vfolder_v2.types.node import (
     VFolderConnection,
@@ -132,15 +127,6 @@ async def scoped_vfolders_v2(
             )
         ),
     ] = None,
-    mount_permission: Annotated[
-        VFolderMountPermissionFilterGQL | None,
-        strawberry.argument(
-            description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Filter by the mount policy of the user in "
-                "`scope.user` on the vfolder. `scope.user` must name exactly one user."
-            )
-        ),
-    ] = None,
     filter: VFolderFilterGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
@@ -154,7 +140,6 @@ async def scoped_vfolders_v2(
     result = await info.context.adapters.vfolder.scoped_search(
         ScopedSearchVFoldersInput(
             scope=scope.to_pydantic(),
-            mount_permission=mount_permission.to_pydantic() if mount_permission else None,
             usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

@@ -133,6 +133,17 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
         ),
         default=None,
     )
+    mount_permission: VFolderMountPermissionFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter by the mount policy of the scope user on the vfolder. Only a search whose "
+                "scope names exactly one user takes it: `scopedVFoldersV2` with one `scope.user`, "
+                "and `myVfolders`. Other searches reject it."
+            ),
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -307,24 +306,3 @@ class TestSearchVFoldersInputUsage:
             SearchVFoldersInput.model_validate({
                 "usage": {"used_by": {"deployment": ["not-a-uuid"]}}
             })
-
-
-class TestScopedSearchVFoldersInputMountPermission:
-    """Tests for the mount_permission of ScopedSearchVFoldersInput."""
-
-    @pytest.fixture
-    def body_with_mount_permission(self, scope_user_count: int) -> dict[str, Any]:
-        return {
-            "scope": {
-                "project": [{"value": str(uuid.uuid4())}],
-                "user": [{"value": str(uuid.uuid4())} for _ in range(scope_user_count)],
-            },
-            "mount_permission": {"equals": "rw"},
-        }
-
-    @pytest.mark.parametrize("scope_user_count", [0, 2])
-    def test_scope_without_exactly_one_user_is_rejected(
-        self, body_with_mount_permission: dict[str, Any]
-    ) -> None:
-        with pytest.raises((ValidationError, BackendAISchemaValidationFailed)):
-            ScopedSearchVFoldersInput.model_validate(body_with_mount_permission)
