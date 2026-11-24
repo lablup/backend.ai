@@ -135,6 +135,8 @@ def _node_types() -> list[type[Any]]:
     pending: list[type[PydanticNodeMixin[Any]]] = [PydanticNodeMixin]
     while pending:
         for subclass in pending.pop().__subclasses__():
+            if not subclass.__module__.startswith("ai.backend."):
+                continue  # defined by another test file of this process
             found.append(subclass)
             pending.append(subclass)
     return found

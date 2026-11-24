@@ -21,6 +21,15 @@ if [ ! -f "/usr/bin/scp" ]; then
   ln -s /opt/kernel/dropbearmulti /usr/bin/scp
 fi
 
+# Minimal images may lack the libraries that became empty stubs in glibc 2.34.
+# NOTE: The bundled stubs break older glibc, where those libraries hold the real implementations.
+#       Use them only when the Python runs with them and not without them.
+glibc_stub_path="/opt/kernel/glibc-stub${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if ! /opt/backend.ai/bin/python -V > /dev/null 2>&1 \
+  && LD_LIBRARY_PATH="$glibc_stub_path" /opt/backend.ai/bin/python -V > /dev/null 2>&1; then
+  export LD_LIBRARY_PATH="$glibc_stub_path"
+fi
+
 if [ $USER_ID -eq 0 ]; then
 
   echo "WARNING: Running the user codes as root is not recommended."

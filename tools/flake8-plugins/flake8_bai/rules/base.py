@@ -1,6 +1,6 @@
 import ast
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -15,12 +15,20 @@ class Violation:
 
 
 class SourcePath:
-    """The checked file's path, matched by its position under the repository root."""
+    """The checked file's path, matched by its position under the repository root, and its lines."""
 
+    _filename: str
     _parts: tuple[str, ...]
+    _lines: tuple[str, ...]
 
-    def __init__(self, filename: str) -> None:
+    def __init__(self, filename: str, lines: Sequence[str]) -> None:
+        self._filename = filename
         self._parts = PurePath(filename).parts
+        self._lines = tuple(lines)
+
+    @property
+    def filename(self) -> str:
+        return self._filename
 
     @property
     def name(self) -> str:
@@ -32,8 +40,17 @@ class SourcePath:
         width = len(prefix)
         return any(self._parts[i : i + width] == prefix for i in range(len(self._parts) - width))
 
+    def contains(self, text: str) -> bool:
+        """Whether a line of the file contains `text`."""
+        return any(text in line for line in self._lines)
+
 
 class Rule(ABC):
+    _path: SourcePath
+
+    def __init__(self, path: SourcePath) -> None:
+        self._path = path
+
     @abstractmethod
     def applies_to(self, path: SourcePath) -> bool:
         raise NotImplementedError

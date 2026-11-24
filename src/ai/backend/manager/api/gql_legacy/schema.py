@@ -444,7 +444,9 @@ class Mutation(graphene.ObjectType):  # type: ignore[misc]
     delete_resource_preset = DeleteResourcePreset.Field()
 
     # super-admin only
-    modify_service_config = ModifyServiceConfigNode.Field()
+    modify_service_config = ModifyServiceConfigNode.Field(
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. The manager no longer reads the config it writes to etcd."
+    )
 
     # super-admin only
     create_scaling_group = CreateScalingGroup.Field()

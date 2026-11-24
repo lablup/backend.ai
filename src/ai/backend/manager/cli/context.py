@@ -107,7 +107,6 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
     """
     from ai.backend.common.configs.loader import (
         ConfigOverrider,
-        EtcdConfigLoader,
         EtcdConfigWatcher,
         LoaderChain,
         TomlConfigLoader,
@@ -129,8 +128,6 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
         legacy_etcd_loader = LegacyEtcdLoader(etcd)
         loaders.append(legacy_etcd_loader)
         loaders.append(LegacyEtcdVolumesLoader(etcd))
-        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/common"))
-        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/manager"))
         overrides: list[tuple[tuple[str, ...], Any]] = [
             (("debug", "enabled"), cli_ctx.log_level == LogLevel.DEBUG),
         ]
@@ -173,6 +170,8 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+    from ai.backend.common.config import find_config_file
+    from ai.backend.common.configs.loader import TomlConfigLoader
     from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.defs import (
         REDIS_IMAGE_DB,
@@ -181,18 +180,14 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         REDIS_STREAM_DB,
         RedisRole,
     )
-    from ai.backend.common.etcd import AsyncEtcd
-    from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 
     from .types import RedisConnectionSet
 
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
-        loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
-        raw_redis_config = await loader.load()
-        redis_config = RedisConfig(**raw_redis_config)
-        redis_profile_target = redis_config.to_redis_profile_target()
+    # The Redis config is read only from the local config file.
+    config_path = cli_ctx.config_path or find_config_file("manager")
+    raw_config = await TomlConfigLoader(config_path, "manager").load()
+    redis_config = RedisConfig.model_validate(raw_config.get("redis", {}))
+    redis_profile_target = redis_config.to_redis_profile_target()
 
     live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
     stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()

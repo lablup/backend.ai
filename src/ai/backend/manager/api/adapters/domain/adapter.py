@@ -63,6 +63,7 @@ from ai.backend.manager.models.domain.deprecated_search import (
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.scopes import (
+    ContainerRegistryDomainTarget,
     ResourceGroupDomainTarget,
 )
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
@@ -220,8 +221,18 @@ class DomainAdapter(BaseAdapter):
             ScopedSearchDomainsAction(
                 searcher=ScopedSearcher(
                     scopes=[
-                        ResourceGroupDomainTarget(resource_group_id=ResourceGroupID(entry.value))
-                        for entry in input.scope.resource_group or ()
+                        *(
+                            ResourceGroupDomainTarget(
+                                resource_group_id=ResourceGroupID(entry.value)
+                            )
+                            for entry in input.scope.resource_group or ()
+                        ),
+                        *(
+                            ContainerRegistryDomainTarget(
+                                container_registry_id=ContainerRegistryID(entry.value)
+                            )
+                            for entry in input.scope.container_registry or ()
+                        ),
                     ],
                     used_by=(),
                     searcher=searcher,

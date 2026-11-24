@@ -37,3 +37,33 @@ def upload(public_key: str) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@ssh_key.command()
+@click.option(
+    "--default/--not-default",
+    "is_default",
+    default=None,
+    help="Filter by whether sessions use the SSH key.",
+)
+@click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
+@click.option("--offset", type=int, default=0, help="Number of items to skip.")
+def search(is_default: bool | None, limit: int, offset: int) -> None:
+    """Search my SSH keys."""
+    from ai.backend.common.dto.manager.v2.ssh_key.request import (
+        MySearchSSHKeysInput,
+        SSHKeyFilter,
+    )
+
+    request = MySearchSSHKeysInput(
+        filter=SSHKeyFilter(is_default=is_default), limit=limit, offset=offset
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            print_result(await registry.ssh_key.my_search(request))
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

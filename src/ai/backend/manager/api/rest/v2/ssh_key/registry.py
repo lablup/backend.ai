@@ -21,6 +21,8 @@ def register_v2_ssh_key_routes(
     registry = RouteRegistry.create("ssh-keys", route_deps.cors_options)
 
     registry.add("POST", "/my/upload", handler.my_upload, middlewares=[auth_required])
+    registry.add("POST", "/my/search", handler.my_search, middlewares=[auth_required])
+    registry.add("GET", "/{ssh_key_id}", handler.get, middlewares=[auth_required])
     registry.add(
         "POST", "/{ssh_key_id}/switch-default", handler.switch_default, middlewares=[auth_required]
     )

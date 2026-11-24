@@ -18,12 +18,12 @@ from ai.backend.common.metrics.safe import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_circuit_breaker() -> None:
-    """Reset global circuit breaker state before each test."""
-    safe_mod._metrics_disabled = False
-    safe_mod._error_logged = False
-    safe_mod._tripped_at = None
-    safe_mod._trip_error_message = None
+def _reset_circuit_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reset global circuit breaker state before each test and restore it after."""
+    monkeypatch.setattr(safe_mod, "_metrics_disabled", False)
+    monkeypatch.setattr(safe_mod, "_error_logged", False)
+    monkeypatch.setattr(safe_mod, "_tripped_at", None)
+    monkeypatch.setattr(safe_mod, "_trip_error_message", None)
 
 
 class TestCircuitBreakerState:

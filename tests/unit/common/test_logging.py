@@ -4,6 +4,7 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import override
 
@@ -62,6 +63,17 @@ class NotUnpicklableClass:
     @override
     def __reduce__(self) -> tuple[type[NotUnpicklableClass], tuple[int, ...]]:
         return type(self), (1,)
+
+
+@pytest.fixture(autouse=True)
+def restored_root_logger() -> Iterator[None]:
+    """Logger and LocalLogger leave their handlers and level on the root logger."""
+    root_logger = logging.getLogger()
+    handlers = list(root_logger.handlers)
+    level = root_logger.level
+    yield
+    root_logger.handlers[:] = handlers
+    root_logger.setLevel(level)
 
 
 def get_logger_thread() -> threading.Thread | None:

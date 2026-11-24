@@ -765,11 +765,15 @@ async def test_config_files(
     match scenario:
         case AUserWritesTheirOwnConfigFile():
             assert await config_files_left(engine) == [
-                (CONFIG_PATH, CONFIG_PERMISSION, True, [(1, CONFIG_DATA)])
+                (CONFIG_PATH, True, [(1, CONFIG_PERMISSION, CONFIG_DATA)])
             ]
         case AUserUpdatesTheirDefaultConfigFile():
             assert await config_files_left(engine) == [
-                (CONFIG_PATH, UPDATED_PERMISSION, True, [(1, CONFIG_DATA), (2, UPDATED_DATA)])
+                (
+                    CONFIG_PATH,
+                    True,
+                    [(1, CONFIG_PERMISSION, CONFIG_DATA), (2, UPDATED_PERMISSION, UPDATED_DATA)],
+                )
             ]
         case AUserDeletesTheirDefaultConfigFile():
             assert await config_files_left(engine) == []

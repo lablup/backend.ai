@@ -249,15 +249,15 @@ wheels = [
 
 [[package]]
 name = "aiotusclient"
-version = "0.1.4"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple/" }
 dependencies = [
     { name = "aiohttp" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/9e/1a2fa86e00168a035ce532b1e595298b397eed6de9e757470f1e2bf53b8d/aiotusclient-0.1.4.tar.gz", hash = "sha256:4e23704420b5273b0c417c92a8bae605f90fc8f9364caa91a80f2586c7d8f952", size = 8901, upload-time = "2020-09-15T05:40:19.426Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/f5/4e8c191aba2dc217cecbe4c987928643111873740032e04b9e135111ee98/aiotusclient-0.1.5.tar.gz", hash = "sha256:e51f9e8710c6823c4f0f4af9f97617243812b614581208af136e73f418678ae0", size = 11763, upload-time = "2026-11-24T06:29:08.179Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/d2/004c9f673df74ff0455f381e898ad522b5fbc05a2b7b99420f1998702a58/aiotusclient-0.1.4-py3-none-any.whl", hash = "sha256:69dad8a1bfb66c811a537014bda44e06188621df36e75566b97c4aaf373a389b", size = 9988, upload-time = "2020-09-15T05:40:18.212Z" },
+    { url = "https://files.pythonhosted.org/packages/61/2a/2d641533cce2ba88a2a2fcf7d260de42303b93e2fc4871ab800fb09211f1/aiotusclient-0.1.5-py3-none-any.whl", hash = "sha256:5ed5ccaee3f0c2598f9d473d5ea989620be1e7788b4277279313d51dbb56cd07", size = 10823, upload-time = "2026-11-24T06:29:06.803Z" },
 ]
 
 [[package]]
@@ -2126,7 +2126,7 @@ requires-dist = [
     { name = "aiomonitor", specifier = "~=0.7.0" },
     { name = "aiosqlite", specifier = "~=0.21.0" },
     { name = "aiotools", specifier = "~=2.2.3" },
-    { name = "aiotusclient", specifier = "~=0.1.4" },
+    { name = "aiotusclient", specifier = "~=0.1.5" },
     { name = "alembic", specifier = "~=1.13.2" },
     { name = "appdirs", specifier = "~=1.4.4" },
     { name = "async-timeout", specifier = "~=4.0" },

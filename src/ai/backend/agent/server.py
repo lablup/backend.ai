@@ -18,7 +18,6 @@ from collections.abc import (
     AsyncIterator,
     Callable,
     Coroutine,
-    Generator,
     Iterable,
     Mapping,
     Sequence,
@@ -82,7 +81,6 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
-from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -150,7 +148,6 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
     SessionId,
     aobject,
-    safe_print_redis_config,
 )
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -573,23 +570,6 @@ class AgentRPCServer(aobject):
         log.info("manager detected")
 
     async def read_agent_config(self) -> None:
-        # Fill up Redis configs from etcd and store as separate attributes
-        self._redis_config = config.redis_config_iv.check(
-            await self.etcd.get_prefix("config/redis"),
-        )
-
-        # Update local_config with redis settings
-        # Convert HostPortPair to dict format for compatibility
-        redis_config_dict = self._redis_config.copy()
-        if isinstance(self._redis_config.get("addr"), object):
-            addr = self._redis_config["addr"]
-            if addr is not None:
-                redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
-
-        redis_config = RedisConfig.model_validate(redis_config_dict)
-        log.info("redis configured", redis_config=safe_print_redis_config(redis_config))
-        self.local_config.overwrite(redis=redis_config)
-
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
         self._vfolder_config = config.vfolder_config_iv.check(
@@ -1662,6 +1642,7 @@ async def server_main(
     loop.set_debug(local_config.debug.asyncio)
     agent_server: AgentRPCServer | None = None
     agent_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await agent_init_stack.__aenter__()
     try:
         monitor = await agent_init_stack.enter_async_context(aiomonitor_ctx(local_config, pidx))
@@ -1682,9 +1663,10 @@ async def server_main(
 
         await agent_init_stack.enter_async_context(service_discovery_ctx(etcd, agent_server))
         log.info("agent service started")
-    except Exception:
+    except Exception as e:
         log.exception("agent initialization failed, shutting down")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
 
     # Run!
     stop_signal = signal.SIGTERM  # default termination signal
@@ -1695,6 +1677,8 @@ async def server_main(
         if agent_server is not None:
             agent_server.mark_stop_signal(stop_signal)
         await agent_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 _PID_FILE_LOCK_ATTEMPTS: Final = 5
@@ -1881,17 +1865,6 @@ def main(
                 child_statuses = tuple(ChildStatus() for _ in range(_NUM_WORKERS))
                 child_exit_monitor = ChildExitMonitor(child_statuses)
 
-                @aiotools.main_context
-                def server_main_ctx() -> Generator[None, signal.Signals]:
-                    """Tear the supervisor down when a worker dies outside the shutdown
-                    path, so that the service manager sees a failed unit instead of a
-                    supervisor with no worker."""
-                    child_exit_monitor.start()
-                    try:
-                        yield
-                    finally:
-                        child_exit_monitor.disarm()
-
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
@@ -1906,7 +1879,7 @@ def main(
                         runner = asyncio.run
                 aiotools.start_server(
                     server_main_logwrapper,
-                    main_ctxmgr=server_main_ctx,
+                    main_ctxmgr=child_exit_monitor.main_context(),
                     num_workers=_NUM_WORKERS,
                     args=(server_config, log_endpoint, child_statuses),
                     wait_timeout=5.0,
