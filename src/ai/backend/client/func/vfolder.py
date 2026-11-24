@@ -431,6 +431,11 @@ class VFolderByName(BaseFunction):
                                     await writer_fut
                                     q.close()
                                     await q.wait_closed()
+                    except aiohttp.ClientConnectorCertificateError as e:
+                        raise BackendClientError(
+                            "Failed to verify the TLS certificate of the storage proxy "
+                            f"at {e.host}:{e.port}.\n\u279c {e.certificate_error}"
+                        ) from e
                     except (
                         ResponseFailed,
                         aiohttp.ClientPayloadError,
