@@ -16987,16 +16987,14 @@ type Query {
   ): VFolderConnection
 
   """
-  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+  Added in 26.10.0. Page through the virtual folders the named scopes reach, selected by the level the current user mounts them at (`VFolder.mountPermission`).
   """
-  vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload
+  scopedVFoldersByMountPermission(
+    scope: VFolderScope!
+    mountPermission: VFolderMountPermissionFilter!
 
-  """
-  Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
-  """
-  myVfolders(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
     filter: VFolderFilter = null
@@ -17010,14 +17008,16 @@ type Query {
   ): VFolderConnection
 
   """
-  Added in 26.10.0. Page through the virtual folders the named scopes reach, selected by the level the current user mounts them at (`VFolder.mountPermission`).
+  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
   """
-  myVfoldersByMountPermission(
-    scope: VFolderScope!
-    mountPermission: VFolderMountPermissionFilter!
+  vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload
 
+  """
+  Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
+  """
+  myVfolders(
     """
-    Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
     filter: VFolderFilter = null
