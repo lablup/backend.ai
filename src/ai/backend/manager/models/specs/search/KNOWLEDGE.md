@@ -334,7 +334,7 @@ The tables below state, for each entity package under `models/`, which scopes it
 
 | Package | READ relations | public | Existing Targets | Missing Targets |
 |---|---|---|---|---|
-| `domain` | Linked resource groups | n/a | `ResourceGroupDomainTarget` | None |
+| `domain` | Linked resource groups, related container registries | n/a | `ResourceGroupDomainTarget`, `ContainerRegistryDomainTarget` | None |
 | `resource_group` | Linked domains, projects and users (through keypairs) | n/a. `is_public` is a hiding filter column, unrelated to membership in public | `DomainResourceGroupTarget`, `ProjectResourceGroupTarget`, `UserResourceGroupTarget` | None |
 | `container_registry` | Linked projects | Membership (per row, `is_global`) | None | `ProjectContainerRegistryTarget`, `PublicContainerRegistryTarget` |
 | `resource_preset` | None | Membership (per row, the rows whose `scaling_group_name` is NULL) | None | `PublicResourcePresetTarget`, and a `ResourceGroupResourcePresetTarget` taking the bound rows (planned) |

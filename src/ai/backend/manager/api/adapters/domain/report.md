@@ -110,8 +110,11 @@ Scenario: incomplete 3 / 17
 | scenario | verdict |
 |---|---|
 | [when a user granted the domain read role in a resource group scope searches in that scope, the same domains as the superadmin sees come back](#scoped_searching-a-user-granted-read-in-the-group-searches-its-domains) | answered |
+| [when a user granted the domain read role in a registry scope searches in that scope, only the domains related to the registry come back](#scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-domains) | answered |
+| [searching in the scope of a registry with no relation returns an empty list](#scoped_searching_by_registry-a-user-searches-the-domains-of-a-registry-with-no-relation) | answered |
 | [when the superadmin searches in a resource group scope, only the domains that can use the group come back](#scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group) | answered |
 | [when a user granted nothing searches in a resource group scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group) | rejected |
+| [when a user granted only the registry read role, not the domain read role, in a registry scope searches, the call is rejected for lack of permission](#scoped_searching_by_registry-a-user-without-domain-read-may-not-search-the-domains-of-a-registry) | rejected |
 
 **update**
 
@@ -1254,6 +1257,80 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+<a id="scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-domains"></a>
+
+#### [a-user-granted-read-in-the-registry-searches-its-domains](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching_by_registry.py): pass
+
+when a user granted the domain read role in a registry scope searches in that scope, only the domains related to the registry come back
+
+Given
+
+- one registry, 2 domains related to it and one that is not, and one user granted the domain read role in the registry scope
+  - Domain home-1
+  - Container registry host-1: image source
+  - Domain related-1
+  - Domain related-2
+  - Domain related-1 allows Container registry host-1
+  - Domain related-2 allows Container registry host-1
+  - Container registry other-1: image source
+  - Domain home-1 allows Container registry other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-registry permission
+    - Role read-in-registry-1: applies only within the scope it is granted in
+    - Role read-in-registry-1: READ allowed on every domain
+    - regular user user-1: holds Role read-in-registry-1
+
+When
+
+- DomainAdapter.scoped_search: user-1 searches in the registry host-1
+
+Then
+
+- only the domains related to the registry are left
+  - items = ['related-1', 'related-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_registry-a-user-searches-the-domains-of-a-registry-with-no-relation"></a>
+
+#### [a-user-searches-the-domains-of-a-registry-with-no-relation](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching_by_registry.py): pass
+
+searching in the scope of a registry with no relation returns an empty list
+
+Given
+
+- one registry, 0 domains related to it and one that is not, and one user granted the domain read role in the registry scope
+  - Domain home-1
+  - Container registry host-1: image source
+  - Container registry other-1: image source
+  - Domain home-1 allows Container registry other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-registry permission
+    - Role read-in-registry-1: applies only within the scope it is granted in
+    - Role read-in-registry-1: READ allowed on every domain
+    - regular user user-1: holds Role read-in-registry-1
+
+When
+
+- DomainAdapter.scoped_search: user-1 searches in the registry host-1
+
+Then
+
+- only the domains related to the registry are left
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group"></a>
 
 #### [the-superadmin-searches-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
@@ -1311,6 +1388,42 @@ Given
 When
 
 - DomainAdapter.scoped_search: user-1 searches in the resource group resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="scoped_searching_by_registry-a-user-without-domain-read-may-not-search-the-domains-of-a-registry"></a>
+
+#### [a-user-without-domain-read-may-not-search-the-domains-of-a-registry](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching_by_registry.py): pass
+
+when a user granted only the registry read role, not the domain read role, in a registry scope searches, the call is rejected for lack of permission
+
+Given
+
+- one registry, 2 domains related to it and one that is not, and one user granted the registry read role in the registry scope
+  - Domain home-1
+  - Container registry host-1: image source
+  - Domain related-1
+  - Domain related-2
+  - Domain related-1 allows Container registry host-1
+  - Domain related-2 allows Container registry host-1
+  - Container registry other-1: image source
+  - Domain home-1 allows Container registry other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-registry permission
+    - Role read-in-registry-1: applies only within the scope it is granted in
+    - Role read-in-registry-1: READ allowed on every container_registry
+    - regular user user-1: holds Role read-in-registry-1
+
+When
+
+- DomainAdapter.scoped_search: user-1 searches in the registry host-1
 
 Then
 

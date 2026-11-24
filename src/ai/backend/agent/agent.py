@@ -248,7 +248,11 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
-from .defs import FALLBACK_KERNEL_PYTHON_VERSION
+from .defs import (
+    FALLBACK_KERNEL_PYTHON_VERSION,
+    GLIBC_STUB_CONTAINER_DIR,
+    GLIBC_STUB_LIBRARIES,
+)
 from .errors import (
     ContainerCreationError,
     ContainerCreationFailedError,
@@ -695,6 +699,11 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         if matched_libc_style == "musl":
             terminfo_path = self.resolve_krunner_filepath("runner/terminfo.alpine3.8")
             _mount(MountTypes.BIND, terminfo_path, "/home/work/.terminfo")
+        else:
+            for library in GLIBC_STUB_LIBRARIES:
+                mount_static_binary(
+                    f"glibc-stub.{library}.{arch}.so", f"{GLIBC_STUB_CONTAINER_DIR}/{library}"
+                )
 
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")

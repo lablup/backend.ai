@@ -4,18 +4,21 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import Any, Self, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -23,6 +26,13 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.filters import (
+        DomainV2Filter,
+        DomainV2OrderBy,
+    )
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2Connection
 
 
 @gql_enum(
@@ -79,6 +89,75 @@ class ContainerRegistryGQL(PydanticNodeMixin[ContainerRegistryNode]):
     extra: JSON | None = gql_field(
         description="Extra metadata for the container registry", default=None
     )
+
+    @gql_added_resolver(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Domains this container registry is related to.",
+        )
+    )
+    async def domains(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            DomainV2Filter, strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.filters")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                DomainV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            DomainV2Connection, strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node")
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.domain.request import ScopedSearchDomainsInput
+        from ai.backend.common.dto.manager.v2.domain.types import DomainScope
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.domain_v2.types.node import (
+            DomainV2Connection,
+            DomainV2GQL,
+        )
+
+        payload = await info.context.adapters.domain.scoped_search(
+            ScopedSearchDomainsInput(
+                scope=DomainScope(container_registry=[UUIDScope(value=self.entity_id)]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
+        edges = [Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return DomainV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
 
     @classmethod
     @override

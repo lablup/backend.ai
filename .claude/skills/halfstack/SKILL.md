@@ -299,7 +299,6 @@ docker exec $ETCD_CONTAINER etcdctl get --prefix "" --keys-only
 docker exec $ETCD_CONTAINER etcdctl get <key>
 
 # Common key prefixes
-docker exec $ETCD_CONTAINER etcdctl get --prefix "config/redis"
 docker exec $ETCD_CONTAINER etcdctl get --prefix "volumes"
 
 # Health check (needs no credentials; `endpoint health` fails once auth is enabled)
@@ -310,9 +309,10 @@ Or via Backend.AI CLI:
 
 ```bash
 ./backend.ai mgr etcd get --prefix ''
-./backend.ai mgr etcd get config/redis/addr
-./backend.ai mgr etcd put config/redis/addr "127.0.0.1:8111"
+./backend.ai mgr etcd get --prefix volumes
 ```
+
+The Valkey config is not in etcd: each component reads it from the `[redis]` table of its own TOML file (`manager.toml`, `agent.toml`, `storage-proxy.toml`).
 
 ### MinIO
 

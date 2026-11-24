@@ -110,8 +110,11 @@
 | 시나리오 | 판정 |
 |---|---|
 | [리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, superadmin 과 같은 도메인들이 응답으로 옵니다](#scoped_searching-a-user-granted-read-in-the-group-searches-its-domains) | 성공 |
+| [레지스트리 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 그 레지스트리와 relation 이 있는 도메인만 응답으로 옵니다](#scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-domains) | 성공 |
+| [relation 이 없는 레지스트리 범위에서 search 하면 빈 목록이 옵니다](#scoped_searching_by_registry-a-user-searches-the-domains-of-a-registry-with-no-relation) | 성공 |
 | [superadmin 이 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 응답으로 옵니다](#scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group) | 성공 |
 | [아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group) | 거부 |
+| [레지스트리 범위에서 도메인 읽기 역할 없이 레지스트리 읽기 역할만 받은 사용자가 search 하면 권한 부족으로 거부됩니다](#scoped_searching_by_registry-a-user-without-domain-read-may-not-search-the-domains-of-a-registry) | 거부 |
 
 **update**
 
@@ -1254,6 +1257,80 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+<a id="scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-domains"></a>
+
+#### [a-user-granted-read-in-the-registry-searches-its-domains](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching_by_registry.py): pass
+
+레지스트리 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 그 레지스트리와 relation 이 있는 도메인만 응답으로 옵니다
+
+Given
+
+- 레지스트리 하나, 그 레지스트리와 relation 이 있는 도메인 2개와 없는 도메인 하나, 그리고 그 레지스트리 범위의 도메인 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 related-1
+  - 도메인 related-2
+  - 도메인 related-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인 related-2 가 허용한 컨테이너 레지스트리 host-1
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-registry 권한을 받은 사용자 준비
+    - 역할 read-in-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-registry-1: domain 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-registry-1 보유
+
+When
+
+- DomainAdapter.scoped_search: user-1이 레지스트리 host-1 범위에서 search 합니다
+
+Then
+
+- 그 레지스트리와 relation 이 있는 도메인만 남습니다
+  - items = ['related-1', 'related-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_registry-a-user-searches-the-domains-of-a-registry-with-no-relation"></a>
+
+#### [a-user-searches-the-domains-of-a-registry-with-no-relation](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching_by_registry.py): pass
+
+relation 이 없는 레지스트리 범위에서 search 하면 빈 목록이 옵니다
+
+Given
+
+- 레지스트리 하나, 그 레지스트리와 relation 이 있는 도메인 0개와 없는 도메인 하나, 그리고 그 레지스트리 범위의 도메인 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-registry 권한을 받은 사용자 준비
+    - 역할 read-in-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-registry-1: domain 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-registry-1 보유
+
+When
+
+- DomainAdapter.scoped_search: user-1이 레지스트리 host-1 범위에서 search 합니다
+
+Then
+
+- 그 레지스트리와 relation 이 있는 도메인만 남습니다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group"></a>
 
 #### [the-superadmin-searches-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
@@ -1311,6 +1388,42 @@ Given
 When
 
 - DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 search 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="scoped_searching_by_registry-a-user-without-domain-read-may-not-search-the-domains-of-a-registry"></a>
+
+#### [a-user-without-domain-read-may-not-search-the-domains-of-a-registry](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching_by_registry.py): pass
+
+레지스트리 범위에서 도메인 읽기 역할 없이 레지스트리 읽기 역할만 받은 사용자가 search 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 레지스트리 하나, 그 레지스트리와 relation 이 있는 도메인 2개와 없는 도메인 하나, 그리고 그 레지스트리 범위의 레지스트리 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인 related-1
+  - 도메인 related-2
+  - 도메인 related-1 가 허용한 컨테이너 레지스트리 host-1
+  - 도메인 related-2 가 허용한 컨테이너 레지스트리 host-1
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-registry 권한을 받은 사용자 준비
+    - 역할 read-in-registry-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-registry-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-registry-1 보유
+
+When
+
+- DomainAdapter.scoped_search: user-1이 레지스트리 host-1 범위에서 search 합니다
 
 Then
 

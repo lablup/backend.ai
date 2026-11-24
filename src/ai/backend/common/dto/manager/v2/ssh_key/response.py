@@ -9,7 +9,10 @@ from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
-__all__ = ("SSHKeyNode",)
+__all__ = (
+    "SSHKeyNode",
+    "SearchSSHKeysPayload",
+)
 
 
 class SSHKeyNode(BaseResponseModel):
@@ -22,3 +25,12 @@ class SSHKeyNode(BaseResponseModel):
     user_id: UserID = Field(description="The id of the user the SSH key belongs to.")
     public_key: str = Field(description="The SSH public key.")
     is_default: bool = Field(description="Whether sessions use this SSH key.")
+
+
+class SearchSSHKeysPayload(BaseResponseModel):
+    """Payload for paginated SSH key search results."""
+
+    items: list[SSHKeyNode] = Field(description="List of SSH key nodes.")
+    total_count: int = Field(description="Total number of SSH keys matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

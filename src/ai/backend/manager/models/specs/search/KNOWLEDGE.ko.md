@@ -361,7 +361,7 @@ filter 를 여는 이유와 order 를 열지 않는 이유는 다르다.
 
 | package | READ relation | public | 기존 Target | 빠진 Target |
 |---|---|---|---|---|
-| `domain` | 연결된 resource group | 해당 없음 | `ResourceGroupDomainTarget` | 없음 |
+| `domain` | 연결된 resource group, relation이 있는 container registry | 해당 없음 | `ResourceGroupDomainTarget`, `ContainerRegistryDomainTarget` | 없음 |
 | `resource_group` | 연결된 domain, project, user(keypair 를 통해) | 해당 없음. `is_public` 은 숨김 filter column 이며 public membership 과 무관하다 | `DomainResourceGroupTarget`, `ProjectResourceGroupTarget`, `UserResourceGroupTarget` | 없음 |
 | `container_registry` | 연결된 project | membership(row 별, `is_global`) | 없음 | `ProjectContainerRegistryTarget`, `PublicContainerRegistryTarget` |
 | `resource_preset` | 없음 | membership(row 별, `scaling_group_name` 이 NULL 인 row) | 없음 | `PublicResourcePresetTarget`, 그리고 묶인 row 를 받는 `ResourceGroupResourcePresetTarget`(계획) |

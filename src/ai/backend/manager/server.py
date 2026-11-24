@@ -48,6 +48,7 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -264,6 +265,7 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
     loop.set_debug(boostrap_config.debug.asyncio)
     manager_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     drain_notifier = ServerDrainNotifier()
 
     @asynccontextmanager
@@ -477,9 +479,10 @@ async def server_main(
             log.info("changed the process uid and gid", uid=uid, gid=gid)
 
         log.info("started the manager service")
-    except Exception:
+    except Exception as e:
         log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
 
     try:
         yield
@@ -487,6 +490,8 @@ async def server_main(
         _error_monitor_ref = None
         log.info("shutting down")
         await manager_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @aiotools.server_context
@@ -496,6 +501,8 @@ async def server_main_logwrapper(
     tuple_args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
+    child_status: ChildStatus = tuple_args[4][pidx]
+    child_status.publish_pid()
     args = ServerMainArgs(
         bootstrap_cfg=tuple_args[0],
         bootstrap_cfg_path=tuple_args[1],
@@ -515,6 +522,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -589,16 +597,26 @@ def main(
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                child_statuses = tuple(ChildStatus() for _ in range(bootstrap_cfg.manager.num_proc))
+                child_exit_monitor = ChildExitMonitor(child_statuses)
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
-                        args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
+                        main_ctxmgr=child_exit_monitor.main_context(),
+                        args=(
+                            bootstrap_cfg,
+                            discovered_cfg_path,
+                            log_endpoint,
+                            log_level,
+                            child_statuses,
+                        ),
                         wait_timeout=(
                             bootstrap_cfg.manager.shutdown_grace_period + SHUTDOWN_CLEANUP_MARGIN
                         ),
                         runner=runner,
                     )
+                    child_exit_monitor.raise_system_exit()
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated")
