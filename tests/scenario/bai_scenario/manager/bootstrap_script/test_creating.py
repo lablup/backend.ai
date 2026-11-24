@@ -57,8 +57,7 @@ class AddingMyScript(
     ) -> BootstrapScriptRevisionNode:
         with ActingAs(laid.caller):
             payload = await adapter.create(
-                CreateBootstrapScriptInput(user_id=laid.caller.id, script=NEW_SCRIPT),
-                UserID(laid.caller.id),
+                CreateBootstrapScriptInput(user_id=UserID(laid.caller.id), script=NEW_SCRIPT)
             )
         return payload.revision
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.bootstrap_script.request import (
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.v2.bootstrap_script.response import (
 )
 from ai.backend.common.dto.manager.v2.bootstrap_script.types import BootstrapScriptOrderField
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.bootstrap_script.types import (
@@ -118,29 +120,33 @@ class BootstrapScriptAdapter(BaseAdapter):
         result = await self._bootstrap_script.get.run(GetBootstrapScriptAction(script_id=script_id))
         return GetBootstrapScriptPayload(bootstrap_script=self._to_node(result.data))
 
-    async def create(
-        self, input: CreateBootstrapScriptInput, creator_id: UserID
-    ) -> CreateBootstrapScriptPayload:
+    async def create(self, input: CreateBootstrapScriptInput) -> CreateBootstrapScriptPayload:
         """Add a script that is not the user's default, with its first revision."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         result = await self._bootstrap_script.create.run(
             CreateBootstrapScriptAction(
-                user_id=UserID(input.user_id),
+                user_id=input.user_id,
                 script=self._normalize(input.script),
-                creator_id=creator_id,
+                creator_id=UserID(me.user_id),
             )
         )
         return CreateBootstrapScriptPayload(revision=self._to_revision_node(result.revision))
 
     async def add_revision(
-        self, input: AddBootstrapScriptRevisionInput, creator_id: UserID
+        self, input: AddBootstrapScriptRevisionInput
     ) -> AddBootstrapScriptRevisionPayload:
         """Append the next revision; it becomes the script's content."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         result = await self._bootstrap_script.add_revision.run(
             AddBootstrapScriptRevisionAction(
                 creator=BootstrapScriptRevisionCreator(
                     script_id=input.id,
                     script=self._normalize(input.script),
-                    creator_id=creator_id,
+                    creator_id=UserID(me.user_id),
                 )
             )
         )
@@ -151,7 +157,7 @@ class BootstrapScriptAdapter(BaseAdapter):
     ) -> SwitchDefaultBootstrapScriptPayload:
         """Make a script the user's default; the previous default stops being one."""
         result = await self._bootstrap_script.switch_default.run(
-            SwitchDefaultBootstrapScriptAction(user_id=UserID(input.user_id), script_id=input.id)
+            SwitchDefaultBootstrapScriptAction(user_id=input.user_id, script_id=input.id)
         )
         return SwitchDefaultBootstrapScriptPayload(bootstrap_script=self._to_node(result.script))
 
@@ -232,7 +238,7 @@ class BootstrapScriptAdapter(BaseAdapter):
         return BootstrapScriptNode(
             id=data.id,
             field_id=data.id,
-            user_id=data.entity,
+            user_id=UserID(data.entity),
             created_at=data.created_at,
         )
 

@@ -7,6 +7,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.user import UserID
 
 
 class BootstrapScriptRevisionNode(BaseResponseModel):
@@ -15,14 +16,14 @@ class BootstrapScriptRevisionNode(BaseResponseModel):
     script_id: BootstrapScriptID = Field(description="ID of the script.")
     revision_number: int = Field(description="Number of the revision, counted from 1.")
     script: str = Field(description="Content of the script.")
-    creator_id: UUID | None = Field(description="ID of the user who wrote the revision.")
+    creator_id: UserID | None = Field(description="ID of the user who wrote the revision.")
     created_at: datetime = Field(description="Creation timestamp.")
 
 
 class BootstrapScriptNode(BaseResponseModel):
     id: BootstrapScriptID
     field_id: BootstrapScriptID = Field(description="ID of the script.")
-    user_id: UUID = Field(description="ID of the user the script is set on.")
+    user_id: UserID = Field(description="ID of the user the script is set on.")
     created_at: datetime = Field(description="Creation timestamp.")
 
 

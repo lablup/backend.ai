@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
@@ -21,7 +20,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 class CreateBootstrapScriptInput(BaseRequestModel):
     """Add a bootstrap script to a user. The script is not the user's default."""
 
-    user_id: UUID = Field(description="ID of the user the script is set on.")
+    user_id: UserID = Field(description="ID of the user the script is set on.")
     script: str = Field(
         max_length=MAXIMUM_DOTFILE_SIZE, description="Content of the first revision."
     )
@@ -37,7 +36,7 @@ class AddBootstrapScriptRevisionInput(BaseRequestModel):
 class SwitchDefaultBootstrapScriptInput(BaseRequestModel):
     """Make a script the default of the user it is set on."""
 
-    user_id: UUID = Field(description="ID of the user the script is set on.")
+    user_id: UserID = Field(description="ID of the user the script is set on.")
     id: BootstrapScriptID = Field(description="ID of the script.")
 
 

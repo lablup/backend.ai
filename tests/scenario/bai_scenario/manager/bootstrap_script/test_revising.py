@@ -8,7 +8,6 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.bootstrap_script.request import (
     AddBootstrapScriptRevisionInput,
 )
@@ -53,8 +52,7 @@ class RevisingMyExtraScript(
     ) -> BootstrapScriptRevisionNode:
         with ActingAs(laid.caller):
             payload = await adapter.add_revision(
-                AddBootstrapScriptRevisionInput(id=laid.extra.script_id, script=NEW_SCRIPT),
-                UserID(laid.caller.id),
+                AddBootstrapScriptRevisionInput(id=laid.extra.script_id, script=NEW_SCRIPT)
             )
         return payload.revision
 
