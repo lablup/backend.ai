@@ -1173,8 +1173,8 @@ async def server_main(
         ]
         if config.service.trusted_proxies:
             log.debug(
-                "trusting the forwarding headers set by proxies",
-                trusted_proxies=", ".join(config.service.trusted_proxies),
+                "trusting the forwarding headers set by proxies: {}",
+                ", ".join(config.service.trusted_proxies),
             )
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         app["manager_pool"] = await web_init_stack.enter_async_context(

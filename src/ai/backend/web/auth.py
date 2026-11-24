@@ -12,12 +12,7 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.jwt.signer import JWTSigner
 from ai.backend.common.jwt.types import JWTUserContext
-<<<<<<< HEAD
-from ai.backend.common.types import AccessKey
-=======
-from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.types import AccessKey, ReadableCIDR
->>>>>>> 8f2af8dd (fix(BA-7374): trust X-Forwarded-For only from configured proxies in the webserver (#17265))
 from ai.backend.common.web.session import get_session
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 from ai.backend.web.config.unified import WebServerUnifiedConfig
@@ -151,18 +146,9 @@ def build_forwarding_headers(request: web.Request) -> CIMultiDict[str]:
         "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
         "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.scheme),
     })
-<<<<<<< HEAD
-    client_ip = get_client_ip(request)
-    if client_ip:
-        headers["X-Forwarded-For"] = client_ip
-=======
     chain = _forwarded_for_chain(request)
     if chain:
         headers["X-Forwarded-For"] = ", ".join(chain)
-    request_id = current_request_id()
-    if request_id is not None:
-        headers[REQUEST_ID_HEADER] = request_id
->>>>>>> 8f2af8dd (fix(BA-7374): trust X-Forwarded-For only from configured proxies in the webserver (#17265))
     return headers
 
 

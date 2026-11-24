@@ -25,11 +25,7 @@ from ai.backend.common.configs import (
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
-<<<<<<< HEAD
-=======
-from ai.backend.common.endpoint_pool.strategy import EndpointSelectionPolicy
 from ai.backend.common.exception import InvalidIpAddressValue
->>>>>>> 8f2af8dd (fix(BA-7374): trust X-Forwarded-For only from configured proxies in the webserver (#17265))
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
     CompositeType,
@@ -121,7 +117,7 @@ class ServiceConfig(BaseConfigSchema):
                 "If empty (default), the first X-Forwarded-For entry is taken as the client IP, "
                 "as the manager does, which is deprecated."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
         ),
     ]
