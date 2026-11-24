@@ -245,10 +245,9 @@ class HTTPBackend(BaseBackend):
                     async for data in backend_response.content.iter_any():
                         recv_len += len(data)
                         await frontend_response.write(data)
-                except aiohttp.ClientPayloadError as e:
+                except aiohttp.ClientPayloadError:
                     log.exception(
-                        "{!r} (recv-len: {}, content-length: {}, headers: {!r})",
-                        e,
+                        "(recv-len: {}, content-length: {}, headers: {!r})",
                         recv_len,
                         backend_response.content_length,
                         frontend_resp_hdrs,
