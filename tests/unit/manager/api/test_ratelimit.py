@@ -60,7 +60,9 @@ class TestRlimMiddleware:
     @pytest.fixture
     def mock_config_provider(self, rate_limit_window_seconds: int) -> MagicMock:
         config_provider = MagicMock(spec=ManagerConfigProvider)
-        config_provider.config.api = APIConfig(rate_limit_window_seconds=rate_limit_window_seconds)
+        config_provider.config.api = APIConfig.model_validate({
+            "rate-limit-window-seconds": rate_limit_window_seconds
+        })
         return config_provider
 
     @pytest.fixture
