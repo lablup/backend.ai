@@ -6,16 +6,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
 
 import pytest
 import yarl
 
-from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.docker import ImageRef
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
 
 @dataclass(frozen=True)
@@ -35,13 +31,7 @@ class TestHarborRegistryV2Untag:
             registry=HarborRegistry_v2(
                 MagicMock(),
                 "harbor.example.com",
-                ContainerRegistryRow(
-                    id=ContainerRegistryID(uuid4()),
-                    url="https://harbor.example.com",
-                    registry_name="harbor.example.com",
-                    type=ContainerRegistryType.HARBOR2,
-                    project="stable",
-                ),
+                MagicMock(url="https://harbor.example.com", username=None, password=None),
             ),
             image=ImageRef(
                 name="ngc/pytorch",

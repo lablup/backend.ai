@@ -160,6 +160,9 @@ async def purge_image(
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
             )
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.purge_entity(ImagePurger(image_id=image.id))
+
             if remove_from_registry:
                 registry_info = await session.get(ContainerRegistryRow, image.registry_id)
                 if registry_info is None:
@@ -170,9 +173,6 @@ async def purge_image(
                     )
                 scanner = HarborRegistry_v2(db, image.image_ref.registry, registry_info)
                 await scanner.untag(image.image_ref)
-
-            async with V2DBOpsProvider(db).write_ops() as w:
-                await w.purge_entity(ImagePurger(image_id=image.id))
 
         except UnknownImageReference:
             log.exception("image not found", image_ref=canonical_or_alias)

@@ -302,7 +302,7 @@ class ImageDBSource:
         Used by the repository to orchestrate a registry untag without holding a
         DB session open across the external registry call.
         """
-        image = await self._fetch_image(image_id, ())
+        image = await self._fetch_image(image_id, [ImageStatus.ALIVE])
         async with self._db.begin_readonly_session() as session:
             registry_row = await session.get(ContainerRegistryRow, image.registry_id)
         if registry_row is None:
