@@ -8,6 +8,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.bootstrap_script.request import (
     SwitchDefaultBootstrapScriptInput,
 )
@@ -51,7 +52,9 @@ class SwitchingToMyExtraScript(
     ) -> BootstrapScriptNode:
         with ActingAs(laid.caller):
             payload = await adapter.switch_default(
-                SwitchDefaultBootstrapScriptInput(user_id=laid.caller.id, id=laid.extra.script_id)
+                SwitchDefaultBootstrapScriptInput(
+                    user_id=UserID(laid.caller.id), id=laid.extra.script_id
+                )
             )
         return payload.bootstrap_script
 
