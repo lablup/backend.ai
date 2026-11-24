@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decide which targets each CI job runs and across which shards, without Pants.
 
-    plan-ci-targets.py --base-ref <rev> [--full-run] --out <dir>
+    plan-ci-targets.py --base-ref <rev> [--full-run] [--durations <file>] --out <dir>
 
 Writes one spec file per job into <dir> and prints ``KEY=value`` lines for a job
 output:
@@ -53,10 +53,17 @@ Changed files that are not Python source:
   document (a ``BUILD`` under ``tests/`` included): the ``.py`` files of its directory
   count as changed
 
-A suite gets one shard per ``SHARD_FLOOR`` tests, at most ``SHARD_LIMIT``. A test of
-``unit`` or ``component`` goes to the shard ``crc32(path) % N``, which
-``run-pytest-shard.py`` selects; Pants assigns a test of the other suites to
-``crc32(address) % N``. A shard no test lands in is left out.
+A suite gets one shard per ``SHARD_FLOOR`` tests, at most ``SHARD_LIMIT``. Pants assigns
+a test of ``integration`` and ``scenario`` to the shard ``crc32(address) % N``. A shard no
+test lands in is left out.
+
+The files of ``unit`` and ``component`` go to the shards by run time, longest first, each to
+the shard with the smallest total so far. ``--durations`` names the ``test-durations.json``
+that ``test-record.yml`` saves, ``{"<suite>": {"<path>": <seconds>}}``. A file it does not
+hold counts as the mean of its suite's record; without the option, a missing file or an
+empty suite record, every file counts as 1 second. The files of shard ``k`` of ``N`` are
+written to ``<suite>.<k>.txt``, which ``ci-pytest.yml`` runs; ``<suite>.txt`` holds all of
+them.
 
 Run it from the repository root with ``uv`` on the path:
 
@@ -374,12 +381,37 @@ def scenario_tests(transitive: set[str], tests: Iterable[str]) -> list[str]:
     return sorted(f for f in tests if any(f.startswith(f"{d}/") for d in directories))
 
 
+def shard_count(tests: list[str], limit: int, floor: int) -> int:
+    return min(limit, math.ceil(len(tests) / floor)) if tests else 0
+
+
 def plan_shards(tests: list[str], limit: int, floor: int) -> list[str]:
-    if not tests:
-        return []
-    count = min(limit, math.ceil(len(tests) / floor))
+    count = shard_count(tests, limit, floor)
     filled = sorted({zlib.crc32(t.encode()) % count for t in tests})
     return [f"{k}/{count}" for k in filled]
+
+
+def read_durations(path: pathlib.Path | None) -> dict[str, dict[str, float]]:
+    """The seconds per file of each suite; empty when there is no record."""
+    if path is None or not path.is_file():
+        return {}
+    raw = json.loads(path.read_text())
+    return {suite: dict(raw.get(suite, {})) for suite in PYTEST_SUITES}
+
+
+def assign_by_duration(
+    files: list[str], count: int, durations: dict[str, float]
+) -> list[list[str]]:
+    """Longest file first, each to the shard with the smallest total so far."""
+    mean = sum(durations.values()) / len(durations) if durations else 1.0
+    weight = {f: durations.get(f, mean) for f in files}
+    shards: list[list[str]] = [[] for _ in range(count)]
+    totals = [0.0] * count
+    for f in sorted(files, key=lambda f: (-weight[f], f)):
+        k = min(range(count), key=lambda i: (totals[i], i))
+        shards[k].append(f)
+        totals[k] += weight[f]
+    return [sorted(s) for s in shards]
 
 
 def main() -> int:
@@ -391,6 +423,11 @@ def main() -> int:
     )
     parser.add_argument(
         "--full-run", action="store_true", help="run every test instead of the changed ones"
+    )
+    parser.add_argument(
+        "--durations",
+        type=pathlib.Path,
+        help="the test-durations.json to assign the unit and component files by",
     )
     parser.add_argument(
         "--out", required=True, type=pathlib.Path, help="the directory to write the spec files into"
@@ -446,9 +483,25 @@ def main() -> int:
     for name, lines in addresses.items():
         (args.out / f"{name}.txt").write_text("".join(f"{line}\n" for line in lines))
 
+    durations = read_durations(args.durations)
     sys.stdout.write(f"typecheck={'true' if addresses['typecheck'] else 'false'}\n")
     for suite in SUITES:
-        shards = plan_shards(addresses[suite], SHARD_LIMIT[suite], SHARD_FLOOR[suite])
+        if suite in PYTEST_SUITES:
+            count = shard_count(addresses[suite], SHARD_LIMIT[suite], SHARD_FLOOR[suite])
+            assigned = assign_by_duration(addresses[suite], count, durations.get(suite, {}))
+            shards = []
+            for k, shard_files in enumerate(assigned):
+                if shard_files:
+                    (args.out / f"{suite}.{k}.txt").write_text(
+                        "".join(f"{f}\n" for f in shard_files)
+                    )
+                    shards.append(f"{k}/{count}")
+        else:
+            shards = (
+                plan_shards(addresses[suite], SHARD_LIMIT[suite], SHARD_FLOOR[suite])
+                if addresses[suite]
+                else []
+            )
         sys.stdout.write(f"{suite}-shards={json.dumps(shards, separators=(',', ':'))}\n")
     return 0
 

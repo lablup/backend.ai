@@ -174,6 +174,13 @@ jobs:
         lfs: false
     - name: Install uv
       run: pip install uv
+    - name: Restore the test durations
+      id: durations
+      uses: actions/cache/restore@v5
+      with:
+        path: test-durations.json
+        key: test-durations-main-${{ github.sha }}
+        restore-keys: test-durations-main-
     - name: Plan the targets and shards
       id: plan
       env:
@@ -182,6 +189,7 @@ jobs:
       run: |
         flags=()
         if [ "$FULL_RUN" == "true" ]; then flags=(--full-run); fi
+        if [ -f test-durations.json ]; then flags+=(--durations test-durations.json); fi
         .github/scripts/plan-ci-targets.py --base-ref "$BASE_REF" "${flags[@]}" \
           --out dist/ci-targets | tee -a "$GITHUB_OUTPUT"
     - name: Upload the targets
