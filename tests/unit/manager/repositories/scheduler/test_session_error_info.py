@@ -8,20 +8,14 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
-from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
 
@@ -37,19 +31,13 @@ _ERROR_INFO: ErrorStatusInfo = {
 class TestUpdateSessionErrorInfo:
     @pytest.fixture
     def db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ScheduleDBSource:
-        return ScheduleDBSource(
-            db_with_cleanup,
-            ReconcileOpsProvider(db_with_cleanup),
-            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-        )
+        return ScheduleDBSource(db_with_cleanup)
 
     @pytest.fixture
     async def prepared_session(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_id: DomainID,
-        test_domain: DomainFixtureData,
-        test_scaling_group_id: ResourceGroupID,
+        test_domain_name: str,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -59,10 +47,8 @@ class TestUpdateSessionErrorInfo:
     ) -> tuple[SessionId, KernelId]:
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_id=test_domain_id,
-            domain_name=test_domain.domain_name,
-            resource_group_id=test_scaling_group_id,
-            resource_group_name=test_scaling_group_name,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
