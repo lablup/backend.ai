@@ -309,7 +309,14 @@ class ImageDBSource:
             # Call the original scan function
             return await scan_single_image(self._db, registry_key, registry_row, image_canonical)
 
+<<<<<<< HEAD
     async def remove_tag_from_registry(self, image_id: UUID) -> ImageData:
+=======
+        Used by the repository to orchestrate a registry untag without holding a
+        DB session open across the external registry call.
+        """
+        image = await self._fetch_image(image_id, ())
+>>>>>>> 585f30b7c (fix(BA-9069): untag before purging an image with remove_from_registry (#17309))
         async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
             if not image_row:
