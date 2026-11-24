@@ -42014,7 +42014,7 @@
         "title": "ScopedSearchVFoldersInput",
         "type": "object"
       },
-      "UserVFolderFilter": {
+      "UserVFolderMountFilter": {
         "description": "Filter criteria for searching pairs of a user and a vfolder.",
         "properties": {
           "mount_permission": {
@@ -42045,7 +42045,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/UserVFolderFilter"
+                  "$ref": "#/components/schemas/UserVFolderMountFilter"
                 },
                 "type": "array"
               },
@@ -42061,7 +42061,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/UserVFolderFilter"
+                  "$ref": "#/components/schemas/UserVFolderMountFilter"
                 },
                 "type": "array"
               },
@@ -42077,7 +42077,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/UserVFolderFilter"
+                  "$ref": "#/components/schemas/UserVFolderMountFilter"
                 },
                 "type": "array"
               },
@@ -42090,11 +42090,11 @@
             "title": "Not"
           }
         },
-        "title": "UserVFolderFilter",
+        "title": "UserVFolderMountFilter",
         "type": "object"
       },
-      "UserVFolderOrder": {
-        "description": "Order specification for user vfolder search results, by the vfolder of the pair.",
+      "UserVFolderMountOrder": {
+        "description": "Order specification for user vfolder mount search results, by the vfolder of the pair.",
         "properties": {
           "field": {
             "$ref": "#/components/schemas/VFolderOrderField"
@@ -42107,11 +42107,11 @@
           "field",
           "direction"
         ],
-        "title": "UserVFolderOrder",
+        "title": "UserVFolderMountOrder",
         "type": "object"
       },
-      "UserVFolderScope": {
-        "description": "Scope for the scoped user vfolder query: one user, and the vfolders paired with them.\n\nThe vfolders of the user, the domains and the projects are combined with OR.",
+      "UserVFolderMountScope": {
+        "description": "Scope for the scoped user vfolder mount query: one user, and the vfolders paired with them.\n\nThe vfolders of the user, the domains and the projects are combined with OR.",
         "properties": {
           "user": {
             "description": "The user paired with each vfolder, exactly one. Their vfolders are read too.",
@@ -42159,7 +42159,7 @@
         "required": [
           "user"
         ],
-        "title": "UserVFolderScope",
+        "title": "UserVFolderMountScope",
         "type": "object"
       },
       "VFolderMountPermissionFilter": {
@@ -42236,17 +42236,17 @@
         "title": "VFolderPermissionField",
         "type": "string"
       },
-      "ScopedSearchUserVFoldersInput": {
+      "ScopedSearchUserVFolderMountsInput": {
         "description": "Input for searching the pairs of one user and the vfolders the named scopes reach.",
         "properties": {
           "scope": {
-            "$ref": "#/components/schemas/UserVFolderScope",
+            "$ref": "#/components/schemas/UserVFolderMountScope",
             "description": "The user and the scopes of the vfolders."
           },
           "filter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserVFolderFilter"
+                "$ref": "#/components/schemas/UserVFolderMountFilter"
               },
               {
                 "type": "null"
@@ -42259,7 +42259,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/UserVFolderOrder"
+                  "$ref": "#/components/schemas/UserVFolderMountOrder"
                 },
                 "type": "array"
               },
@@ -42353,7 +42353,7 @@
         "required": [
           "scope"
         ],
-        "title": "ScopedSearchUserVFoldersInput",
+        "title": "ScopedSearchUserVFolderMountsInput",
         "type": "object"
       },
       "CreateVFolderInput": {
@@ -69569,9 +69569,9 @@
         "description": "Search the vfolders the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/vfolders/user-vfolders/scoped/search": {
+    "/v2/vfolders/user-vfolder-mounts/scoped/search": {
       "post": {
-        "operationId": "v2/vfolders.scoped_search_user_vfolders",
+        "operationId": "v2/vfolders.scoped_search_user_vfolder_mounts",
         "tags": [
           "v2/vfolders"
         ],
@@ -69589,7 +69589,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScopedSearchUserVFoldersInput"
+                "$ref": "#/components/schemas/ScopedSearchUserVFolderMountsInput"
               }
             }
           }

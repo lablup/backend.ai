@@ -22870,7 +22870,7 @@ type Query
   """
   Added in 26.10.0. Page through the virtual folders the named scopes reach, each paired with the scope user. Every scope is authorized before the read runs.
   """
-  scopedUserVFolders(scope: UserVFolderScope!, filter: UserVFolderFilter = null, orderBy: [UserVFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserVFolderConnection @join__field(graph: STRAWBERRY)
+  scopedUserVFolderMounts(scope: UserVFolderMountScope!, filter: UserVFolderMountFilter = null, orderBy: [UserVFolderMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserVFolderMountConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
@@ -32311,8 +32311,8 @@ type UserV2StatusInfo
   needPasswordChange: Boolean
 }
 
-"""Added in 26.10.0. One user paired with one virtual folder."""
-type UserVFolder implements Node
+"""Added in 26.10.0. The mount policy of one user on one virtual folder."""
+type UserVFolderMount implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
@@ -32340,32 +32340,32 @@ type UserVFolder implements Node
 """
 Added in 26.10.0. Paginated connection for pairs of a user and a virtual folder.
 """
-type UserVFolderConnection
+type UserVFolderMountConnection
   @join__type(graph: STRAWBERRY)
 {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [UserVFolderEdge!]!
+  edges: [UserVFolderMountEdge!]!
 
   """Total number of pairs matching the query criteria."""
   count: Int!
 }
 
 """An edge in a connection."""
-type UserVFolderEdge
+type UserVFolderMountEdge
   @join__type(graph: STRAWBERRY)
 {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: UserVFolder!
+  node: UserVFolderMount!
 }
 
 """Added in 26.10.0. Filter for pairs of a user and a virtual folder."""
-input UserVFolderFilter
+input UserVFolderMountFilter
   @join__type(graph: STRAWBERRY)
 {
   """Filter by the mount policy of the user on the folder."""
@@ -32373,15 +32373,15 @@ input UserVFolderFilter
 
   """Filter by the folder of the pair."""
   vfolder: VFolderFilter = null
-  AND: [UserVFolderFilter!] = null
-  OR: [UserVFolderFilter!] = null
-  NOT: [UserVFolderFilter!] = null
+  AND: [UserVFolderMountFilter!] = null
+  OR: [UserVFolderMountFilter!] = null
+  NOT: [UserVFolderMountFilter!] = null
 }
 
 """
 Added in 26.10.0. Ordering for pairs of a user and a virtual folder, by the folder of the pair.
 """
-input UserVFolderOrderBy
+input UserVFolderMountOrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: VFolderOrderField! = CREATED_AT
@@ -32389,9 +32389,9 @@ input UserVFolderOrderBy
 }
 
 """
-Added in 26.10.0. Scope for the scoped user virtual folder query: one user, and the virtual folders paired with them. The folders of the user, the domains and the projects are OR'd, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped user virtual folder mount query: one user, and the virtual folders paired with them. The folders of the user, the domains and the projects are OR'd, and every scope named is authorized before the read runs.
 """
-input UserVFolderScope
+input UserVFolderMountScope
   @join__type(graph: STRAWBERRY)
 {
   """
