@@ -26,6 +26,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
@@ -1114,4 +1115,76 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
             excluded=seeding.made(excluded),
             outside=seeding.made(outside),
             caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class AReaderAndProjectsToSearch(AReaderAndFoldersToSearch):
+    """검색하는 사람과, 검색할 스코프인 개인 프로젝트 둘."""
+
+    own_project_id: ProjectID
+    other_project_id: ProjectID
+
+
+@dataclass(frozen=True)
+class SomeoneWithFoldersAtTwoMountLevels(Given[Any, AReaderAndProjectsToSearch]):
+    """두 개인 프로젝트를 검색하는 사용자와, 마운트 레벨이 갈리는 폴더들.
+
+    모든 폴더는 남에게 ``ro``로 마운트되므로, 그 사용자의 폴더 둘만 그 사용자에게 ``rw``로
+    마운트된다. 세 번째 사용자의 폴더는 검색할 두 프로젝트 밖에 있다.
+    """
+
+    granted: bool
+
+    @override
+    def describe(self) -> str:
+        grant_ko = (
+            "자기와 다른 사용자 한 명의 개인 프로젝트에서 vfolder 를 읽을 수 있는"
+            if self.granted
+            else "아무 권한도 받지 않은"
+        )
+        grant_en = (
+            "who can read vfolders in their own and one other user's personal project"
+            if self.granted
+            else "holding no permission"
+        )
+        return Says(
+            "남에게 ro로 마운트되는 개인 vfolder 를 각각 가진 다른 사용자 두 명과, 그런 vfolder "
+            f"둘을 가진, {grant_ko} 사용자 한 명",
+            english=(
+                "two other users with one personal vfolder each that is mounted for others as ro, "
+                f"and one user with two such vfolders, {grant_en}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AReaderAndProjectsToSearch:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        third = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        mounted_for_others_as_ro = TestSeedPersonalVFolder(
+            host=STORAGE_HOST, default_mount_permission=VFolderMountPolicy.READ_ONLY
+        )
+        first = await seeding.creating_from(mounted_for_others_as_ro, caller)
+        second = await seeding.creating_from(mounted_for_others_as_ro, caller)
+        excluded = await seeding.creating_from(mounted_for_others_as_ro, other)
+        outside = await seeding.creating_from(mounted_for_others_as_ro, third)
+        own_project = await seeding.personal_project_of(caller)
+        other_project = await seeding.personal_project_of(other)
+        if self.granted:
+            for project in (own_project, other_project):
+                await seeding.within(
+                    SomeoneReadingFoldersIn(project, lambda p: ProjectID(p.id), caller)
+                )
+        return AReaderAndProjectsToSearch(
+            first=seeding.made(first),
+            second=seeding.made(second),
+            excluded=seeding.made(excluded),
+            outside=seeding.made(outside),
+            caller=seeding.made(caller),
+            own_project_id=ProjectID(seeding.made(own_project).id),
+            other_project_id=ProjectID(seeding.made(other_project).id),
         )

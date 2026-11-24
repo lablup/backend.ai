@@ -741,6 +741,7 @@ from ai.backend.manager.api.gql.vfolder_v2.resolver.mutation import (
 from ai.backend.manager.api.gql.vfolder_v2.resolver.query import (
     admin_vfolders_v2,
     my_vfolders,
+    my_vfolders_by_mount_permission,
     project_vfolders,
     scoped_vfolders_v2,
     vfolder_mount_policies,
@@ -1112,6 +1113,7 @@ class Query:
     scoped_vfolders_v2 = scoped_vfolders_v2
     vfolder_mount_policies = vfolder_mount_policies
     my_vfolders = my_vfolders
+    my_vfolders_by_mount_permission = my_vfolders_by_mount_permission
 
 
 @strawberry.type

@@ -445,13 +445,6 @@ class VFolderFilter(BaseRequestModel):
         default=None,
         description=f"Added in {NEXT_RELEASE_VERSION}. Filter by vfolder ID.",
     )
-    mount_permission: VFolderMountPermissionFilter | None = Field(
-        default=None,
-        description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Filter by the level the caller mounts the "
-            "vfolder at. wd matches rw."
-        ),
-    )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
     NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
@@ -491,6 +484,17 @@ class ScopedSearchVFoldersInput(SearchVFoldersInput):
     """Input for searching the vfolders the named scopes reach."""
 
     scope: VFolderScope = Field(description="Scope (OR across all items).")
+
+
+class ScopedSearchVFoldersByMountPermissionInput(ScopedSearchVFoldersInput):
+    """Input for searching the vfolders the named scopes reach by the level one user mounts them at."""
+
+    mount_permission: VFolderMountPermissionFilter = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the level the user mounts the vfolder "
+            "at. wd matches rw."
+        )
+    )
 
 
 # ============================================================

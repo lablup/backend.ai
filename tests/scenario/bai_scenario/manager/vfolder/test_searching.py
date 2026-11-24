@@ -1,4 +1,4 @@
-"""폴더 검색 — 전체 훑기, 내 범위 훑기, 걸러내기와 정렬."""
+"""폴더 검색 — 전체 훑기, 내 범위 훑기, 걸러내기와 정렬, 마운트 레벨로 걸러내기."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    ScopedSearchVFoldersByMountPermissionInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     VFolderFilter,
@@ -22,7 +23,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.response import SearchVFoldersPayload
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
+    VFolderMountPermissionFilter,
     VFolderOrderField,
+    VFolderPermissionField,
     VFolderScope,
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -46,8 +49,10 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder import (
     AFolderAndItsReader,
     AReaderAndFoldersToSearch,
+    AReaderAndProjectsToSearch,
     SomeonesFolderAndTheSuperadmin,
     SomeoneWithAFolderOfTheirOwn,
+    SomeoneWithFoldersAtTwoMountLevels,
     SomeoneWithFoldersToSearch,
     VFolderNodeLook,
 )
@@ -63,6 +68,9 @@ type ScopeStep = Scenario[
 ]
 type PairStep = Scenario[
     TestSeedingSession, AReaderAndFoldersToSearch, VFolderAdapter, SearchVFoldersPayload
+]
+type MountLevelStep = Scenario[
+    TestSeedingSession, AReaderAndProjectsToSearch, VFolderAdapter, SearchVFoldersPayload
 ]
 
 
@@ -86,7 +94,7 @@ class SearchingEveryFolder(When[AFolderAndItsReader, VFolderAdapter, SearchVFold
         self, adapter: VFolderAdapter, laid: AFolderAndItsReader
     ) -> SearchVFoldersPayload:
         with ActingAs(laid.caller):
-            return await adapter.admin_search(SearchVFoldersInput(), UserID(laid.caller.id))
+            return await adapter.admin_search(SearchVFoldersInput())
 
 
 @dataclass(frozen=True)
@@ -112,8 +120,7 @@ class SearchingMyOwnScope(When[AFolderAndItsReader, VFolderAdapter, SearchVFolde
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
                     scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)])
-                ),
-                UserID(laid.caller.id),
+                )
             )
 
 
@@ -154,8 +161,55 @@ class SearchingByFragmentInOrder(
                         VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
                     ],
                     limit=self.limit,
-                ),
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingFoldersMountedReadWrite(
+    When[AReaderAndProjectsToSearch, VFolderAdapter, SearchVFoldersPayload]
+):
+    """두 프로젝트에서 자기가 rw로 마운트하는 폴더를 이름 오름차순으로, 크기만큼만 훑는다."""
+
+    limit: int
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search_by_mount_permission"
+
+    @override
+    def describe(self, laid: AReaderAndProjectsToSearch) -> str:
+        return Says(
+            f"{laid.caller.username}이 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw로 "
+            f"마운트하는 vfolder 를 이름 오름차순으로 {self.limit}개까지 조회합니다",
+            english=(
+                f"{laid.caller.username} searches their own and the other user's personal project "
+                f"for the vfolders they mount as rw, ordered by name ascending, up to {self.limit}"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: VFolderAdapter, laid: AReaderAndProjectsToSearch
+    ) -> SearchVFoldersPayload:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search_by_mount_permission(
                 UserID(laid.caller.id),
+                ScopedSearchVFoldersByMountPermissionInput(
+                    scope=VFolderScope(
+                        project=[
+                            UUIDScope(value=laid.own_project_id),
+                            UUIDScope(value=laid.other_project_id),
+                        ]
+                    ),
+                    mount_permission=VFolderMountPermissionFilter(
+                        equals=VFolderPermissionField.READ_WRITE
+                    ),
+                    order=[
+                        VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
+                    ],
+                    limit=self.limit,
+                ),
             )
 
 
@@ -388,6 +442,76 @@ class ASearchNarrowsOrdersAndPages(
         return TheMatchingFoldersInOrder(started=self.started)
 
 
+@dataclass(frozen=True)
+class ASearchSelectsTheFoldersTheCallerMountsReadWrite(
+    Scenario[TestSeedingSession, AReaderAndProjectsToSearch, VFolderAdapter, SearchVFoldersPayload]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-search-selects-the-folders-the-caller-mounts-read-write"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자기와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw로 "
+            "마운트하는 vfolder 를 이름 오름차순으로 한 페이지 조회하면, 남에게는 ro로 마운트되는 "
+            "자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다",
+            english=(
+                "when a user granted vfolder read in their own and another user's personal "
+                "project searches the vfolders they mount as rw, ordered by name ascending and "
+                "limited to one page, one page holding only their own two vfolders, mounted for "
+                "others as ro, in name order comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndProjectsToSearch]:
+        return SomeoneWithFoldersAtTwoMountLevels(granted=True)
+
+    @override
+    def when(self) -> When[AReaderAndProjectsToSearch, VFolderAdapter, SearchVFoldersPayload]:
+        return SearchingFoldersMountedReadWrite(limit=2)
+
+    @override
+    def then(self) -> Then[AReaderAndProjectsToSearch, SearchVFoldersPayload]:
+        return TheMatchingFoldersInOrder(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotSearchByMountLevel(
+    Scenario[TestSeedingSession, AReaderAndProjectsToSearch, VFolderAdapter, SearchVFoldersPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-search-by-mount-level"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 자기와 다른 사용자의 개인 프로젝트에서 자기가 rw로 "
+            "마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to search their own and another user's "
+                "personal project for the vfolders they mount as rw, it is rejected for lack of "
+                "permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndProjectsToSearch]:
+        return SomeoneWithFoldersAtTwoMountLevels(granted=False)
+
+    @override
+    def when(self) -> When[AReaderAndProjectsToSearch, VFolderAdapter, SearchVFoldersPayload]:
+        return SearchingFoldersMountedReadWrite(limit=2)
+
+    @override
+    def then(self) -> Then[AReaderAndProjectsToSearch, SearchVFoldersPayload]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 ADMIN: list[AdminStep] = [
     ASuperadminSearchesEveryFolder(started=datetime.now(UTC)),
     ARegularUserMayNotSearchEveryFolder(),
@@ -399,6 +523,11 @@ SCOPE: list[ScopeStep] = [
 
 PAIRS: list[PairStep] = [
     ASearchNarrowsOrdersAndPages(started=datetime.now(UTC)),
+]
+
+MOUNT_LEVELS: list[MountLevelStep] = [
+    ASearchSelectsTheFoldersTheCallerMountsReadWrite(started=datetime.now(UTC)),
+    AUserGrantedNothingMayNotSearchByMountLevel(),
 ]
 
 
@@ -419,5 +548,12 @@ async def test_scoped_searching(
 @pytest.mark.parametrize("scenario", PAIRS, ids=lambda s: s.summary())
 async def test_pair_searching(
     scenario: PairStep, adapter: VFolderAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)
+
+
+@pytest.mark.parametrize("scenario", MOUNT_LEVELS, ids=lambda s: s.summary())
+async def test_mount_level_searching(
+    scenario: MountLevelStep, adapter: VFolderAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

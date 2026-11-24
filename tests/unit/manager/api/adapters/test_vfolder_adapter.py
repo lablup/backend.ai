@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    ScopedSearchVFoldersByMountPermissionInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     VFolderFilter,
@@ -45,8 +46,6 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageActionResult,
 )
-
-_CALLER_ID = UserID(uuid.UUID("00000000-0000-0000-0000-0000000000ca"))
 
 
 def _scoped_result(items: list[VFolderData]) -> SimpleNamespace:
@@ -116,8 +115,7 @@ class TestVFolderAdapterUserScopedSearch:
         await adapter.scoped_search(
             ScopedSearchVFoldersInput(
                 scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
-            ),
-            UserID(user_id),
+            )
         )
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
@@ -138,8 +136,7 @@ class TestVFolderAdapterUserScopedSearch:
                 usage=VFolderUsage(used_by=VFolderUsedBy(session=[session_id])),
                 limit=10,
                 offset=0,
-            ),
-            UserID(user_id),
+            )
         )
 
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
@@ -153,14 +150,50 @@ class TestVFolderAdapterUserScopedSearch:
         result = await adapter.scoped_search(
             ScopedSearchVFoldersInput(
                 scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
-            ),
-            UserID(user_id),
+            )
         )
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
+
+
+class TestVFolderAdapterScopedSearchByMountPermission:
+    """Tests for VFolderAdapter.scoped_search_by_mount_permission()."""
+
+    @pytest.fixture
+    def user_id(self) -> UserID:
+        return UserID(uuid4())
+
+    @pytest.fixture
+    def scoped_search_run(self) -> AsyncMock:
+        return AsyncMock(return_value=_scoped_result([]))
+
+    @pytest.fixture
+    def adapter(self, scoped_search_run: AsyncMock) -> VFolderAdapter:
+        vfolder_processors = MagicMock()
+        vfolder_processors.scoped_search.run = scoped_search_run
+        return VFolderAdapter(
+            vfolder_processors, MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        )
+
+    async def test_rw_delete_matches_read_write(
+        self, adapter: VFolderAdapter, scoped_search_run: AsyncMock, user_id: UserID
+    ) -> None:
+        for level in (VFolderPermissionField.RW_DELETE, VFolderPermissionField.READ_WRITE):
+            await adapter.scoped_search_by_mount_permission(
+                user_id,
+                ScopedSearchVFoldersByMountPermissionInput(
+                    scope=VFolderScope(user=[UUIDScope(value=user_id)]),
+                    mount_permission=VFolderMountPermissionFilter(equals=level),
+                ),
+            )
+
+        [rw_delete], [read_write] = (
+            call.args[0].searcher.searcher.conditions for call in scoped_search_run.call_args_list
+        )
+        assert rw_delete().compile().params == read_write().compile().params
 
 
 class TestVFolderAdapterProjectSearch:
@@ -225,7 +258,7 @@ class TestVFolderAdapterProjectSearch:
         """project_search names the project as the one scope it reads within."""
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
-        await adapter.project_search(project_id, input_dto, _CALLER_ID)
+        await adapter.project_search(project_id, input_dto)
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
@@ -240,7 +273,7 @@ class TestVFolderAdapterProjectSearch:
         """project_search should return SearchVFoldersPayload with items."""
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
-        result = await adapter.project_search(project_id, input_dto, _CALLER_ID)
+        result = await adapter.project_search(project_id, input_dto)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -261,20 +294,20 @@ class TestVFolderAdapterConvertFilter:
     ) -> None:
         """cloneable filter produces exactly one callable condition."""
         f = VFolderFilter(cloneable=value)
-        conditions = adapter._convert_vfolder_filter(f, _CALLER_ID)
+        conditions = adapter._convert_vfolder_filter(f)
         assert len(conditions) == 1
         assert callable(conditions[0])
 
     def test_no_cloneable_produces_no_conditions(self, adapter: VFolderAdapter) -> None:
         """No cloneable filter produces no conditions."""
         f = VFolderFilter()
-        conditions = adapter._convert_vfolder_filter(f, _CALLER_ID)
+        conditions = adapter._convert_vfolder_filter(f)
         assert len(conditions) == 0
 
     def test_cloneable_true_sql_references_column(self, adapter: VFolderAdapter) -> None:
         """cloneable=True generates SQL referencing vfolders.cloneable."""
         f = VFolderFilter(cloneable=True)
-        conditions = adapter._convert_vfolder_filter(f, _CALLER_ID)
+        conditions = adapter._convert_vfolder_filter(f)
         sql = str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
         assert "vfolders.cloneable" in sql
 
@@ -295,30 +328,13 @@ class TestVFolderAdapterConvertAutoMountsFilter:
                 auto_mounts=VFolderAutoMountNestedFilter(
                     some=VFolderAutoMountFilter(scope_id=UUIDFilter(equals=_SCOPE_ID))
                 )
-            ),
-            _CALLER_ID,
+            )
         )
         assert len(conditions) == 1
         sql = str(conditions[0]())
         assert "vfolder_auto_mounts.vfolder_id = vfolders.id" in sql
         assert "vfolder_auto_mounts.scope_id = :" in sql
         assert "vfolder_auto_mounts.deleted_at" not in sql
-
-
-class TestVFolderAdapterConvertMountPermissionFilter:
-    @pytest.fixture
-    def adapter(self) -> VFolderAdapter:
-        return VFolderAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
-
-    def test_rw_delete_matches_read_write(self, adapter: VFolderAdapter) -> None:
-        [rw_delete], [read_write] = (
-            adapter._convert_vfolder_filter(
-                VFolderFilter(mount_permission=VFolderMountPermissionFilter(equals=level)),
-                _CALLER_ID,
-            )
-            for level in (VFolderPermissionField.RW_DELETE, VFolderPermissionField.READ_WRITE)
-        )
-        assert rw_delete().compile().params == read_write().compile().params
 
 
 class TestVFolderAdapterGetFolderUsage:

@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
+    ScopedSearchVFoldersByMountPermissionInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
@@ -67,30 +68,36 @@ class V2VFolderHandler:
                 before=body.parsed.before,
                 limit=body.parsed.limit,
                 offset=body.parsed.offset,
-            ),
-            UserID(user_ctx.user_uuid),
+            )
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_search_by_mount_permission(
+        self,
+        user_ctx: UserContext,
+        body: BodyParam[ScopedSearchVFoldersByMountPermissionInput],
+    ) -> APIResponse:
+        """Search the vfolders the named scopes reach by the level the current user mounts them at."""
+        result = await self._adapter.scoped_search_by_mount_permission(
+            UserID(user_ctx.user_uuid), body.parsed
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(
         self,
-        user_ctx: UserContext,
         body: BodyParam[ScopedSearchVFoldersInput],
     ) -> APIResponse:
         """Search the vfolders the named scopes reach, combined with OR."""
-        result = await self._adapter.scoped_search(body.parsed, UserID(user_ctx.user_uuid))
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(
         self,
-        user_ctx: UserContext,
         path: PathParam[ProjectIdPathParam],
         body: BodyParam[SearchVFoldersInput],
     ) -> APIResponse:
         """Search vfolders within a project."""
-        result = await self._adapter.project_search(
-            path.parsed.project_id, body.parsed, UserID(user_ctx.user_uuid)
-        )
+        result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def create(
@@ -112,11 +119,10 @@ class V2VFolderHandler:
 
     async def admin_search(
         self,
-        user_ctx: UserContext,
         body: BodyParam[SearchVFoldersInput],
     ) -> APIResponse:
         """Search all vfolders (superadmin only)."""
-        result = await self._adapter.admin_search(body.parsed, UserID(user_ctx.user_uuid))
+        result = await self._adapter.admin_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get(

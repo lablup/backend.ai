@@ -133,3 +133,8 @@ def resource_policy() -> None:
 )
 def storage_host() -> None:
     """My storage host commands."""
+
+
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.vfolder:vfolder")
+def vfolder() -> None:
+    """My vfolder commands."""

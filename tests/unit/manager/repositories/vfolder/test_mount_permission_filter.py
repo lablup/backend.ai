@@ -30,10 +30,11 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.queries import mount_permission_of_user
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -269,8 +270,8 @@ class TestMountPermissionFilter:
         db_with_cleanup: ExtendedAsyncSAEngine,
         mount_permission_situation: _MountPermissionSituation,
     ) -> None:
-        conditions = VFolderSearchableFields.linked.mount_permission.of_user(
-            mount_permission_situation.caller_id
+        conditions = EnumConditions(
+            mount_permission_of_user(mount_permission_situation.caller_id), VFolderMountPolicy
         )
         async with db_with_cleanup.begin_readonly_session() as sess:
             matched_levels = [

@@ -2,13 +2,14 @@
 
 [background](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-Scenario: incomplete 5 / 30
+Scenario: incomplete 5 / 31
 
-- built from ops (4)
+- built from ops (5)
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - project_search: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
+  - scoped_search_by_mount_permission: representative success ✓ · representative rejection ✓
 - direct implementation (26)
   - batch_load_mount_permissions: success present 1 · rejection present 1 (partial_bulk)
   - batch_load_permissions: success present 1 · rejection present 1 (partial_bulk)
@@ -70,6 +71,13 @@ Scenario: incomplete 5 / 30
 | [when a user granted vfolder read in their own scope searches by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | answered |
 | [when a user who has created no vfolder lists their own vfolders, the answer is empty](#vfolder-a-user-who-has-made-no-folder-lists-none) | answered |
 | [when a user granted nothing tries to search the vfolders of their own scope, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | rejected |
+
+**scoped_search_by_mount_permission**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted vfolder read in their own and another user's personal project searches the vfolders they mount as rw, ordered by name ascending and limited to one page, one page holding only their own two vfolders, mounted for others as ro, in name order comes back](#searching-a-search-selects-the-folders-the-caller-mounts-read-write) | answered |
+| [when a user granted nothing tries to search their own and another user's personal project for the vfolders they mount as rw, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-by-mount-level) | rejected |
 
 **batch_load_mount_permissions**
 
@@ -842,6 +850,127 @@ Given
 When
 
 - VFolderAdapter.scoped_search: user-1 searches the vfolders of their own scope
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### scoped_search_by_mount_permission
+
+<a id="searching-a-search-selects-the-folders-the-caller-mounts-read-write"></a>
+
+#### [a-search-selects-the-folders-the-caller-mounts-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
+
+when a user granted vfolder read in their own and another user's personal project searches the vfolders they mount as rw, ordered by name ascending and limited to one page, one page holding only their own two vfolders, mounted for others as ro, in name order comes back
+
+Given
+
+- two other users with one personal vfolder each that is mounted for others as ro, and one user with two such vfolders, who can read vfolders in their own and one other user's personal project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-3: has their own keypair and personal project
+  - Personal vfolder folder-1: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Personal vfolder folder-2: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Personal vfolder folder-3: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Personal vfolder folder-4: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Grant permission to read vfolders
+    - Role folder-reader-1: applies only within the scope it is granted in
+    - Role folder-reader-1: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-reader-1
+    - Role folder-reader-2: applies only within the scope it is granted in
+    - Role folder-reader-2: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-reader-2
+
+When
+
+- VFolderAdapter.scoped_search_by_mount_permission: user-1 searches their own and the other user's personal project for the vfolders they mount as rw, ordered by name ascending, up to 2
+
+Then
+
+- one page holding only their two matching vfolders in name order comes back
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items.length = 2
+  - items[0].id: same as the vfolder seeded in advance
+  - items[0].entity_id: same as the id in the answer
+  - items[0].host = 'local:volume1'
+  - items[0].status = 'ready'
+  - items[0].metadata.name = 'folder-1'
+  - items[0].metadata.cloneable = False
+  - items[0].metadata.last_used = None
+  - items[0].access_control.ownership_type = 'user'
+  - items[0].ownership.user_id: same as the vfolder owner
+  - items[0].ownership.project_id: same as the project the vfolder is placed in
+  - items[0].ownership.creator_id: same as the user who created the vfolder
+  - items[0].ownership.creator_email = 'user-1@scenario.local'
+  - items[0].unmanaged_path = None
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - items[0].access_control.permission = 'ro'
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
+  - items[0].metadata.created_at: the time this run wrote
+  - items[1].id: same as the vfolder seeded in advance
+  - items[1].entity_id: same as the id in the answer
+  - items[1].host = 'local:volume1'
+  - items[1].status = 'ready'
+  - items[1].metadata.name = 'folder-2'
+  - items[1].metadata.cloneable = False
+  - items[1].metadata.last_used = None
+  - items[1].access_control.ownership_type = 'user'
+  - items[1].ownership.user_id: same as the vfolder owner
+  - items[1].ownership.project_id: same as the project the vfolder is placed in
+  - items[1].ownership.creator_id: same as the user who created the vfolder
+  - items[1].ownership.creator_email = 'user-1@scenario.local'
+  - items[1].unmanaged_path = None
+  - items[1].metadata.usage_mode = 'general'
+  - items[1].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - items[1].access_control.permission = 'ro'
+  - items[1].quota.max_size = None
+  - items[1].quota.max_files = 1000
+  - items[1].metadata.created_at: the time this run wrote
+  - items ids: their two matching vfolders
+
+<a id="searching-a-user-granted-nothing-may-not-search-by-mount-level"></a>
+
+#### [a-user-granted-nothing-may-not-search-by-mount-level](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
+
+when a user granted nothing tries to search their own and another user's personal project for the vfolders they mount as rw, it is rejected for lack of permission
+
+Given
+
+- two other users with one personal vfolder each that is mounted for others as ro, and one user with two such vfolders, holding no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-3: has their own keypair and personal project
+  - Personal vfolder folder-1: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Personal vfolder folder-2: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Personal vfolder folder-3: is placed in that person's personal project and is ready to use, is mounted for others as ro
+  - Personal vfolder folder-4: is placed in that person's personal project and is ready to use, is mounted for others as ro
+
+When
+
+- VFolderAdapter.scoped_search_by_mount_permission: user-1 searches their own and the other user's personal project for the vfolders they mount as rw, ordered by name ascending, up to 2
 
 Then
 

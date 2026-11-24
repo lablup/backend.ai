@@ -63,7 +63,7 @@ Check options with `--help`.
 
 ### Storage
 
-- **vfolder**: user(my-search, project-search, admin-search, create, project-create, get, upload, download, delete, purge, restore, ls, mkdir, mv, rm, clone, deploy, bulk-delete, bulk-purge)
+- **vfolder**: user(my-search, project-search, admin-search, create, project-create, get, upload, download, delete, purge, restore, ls, mkdir, mv, rm, clone, deploy, bulk-delete, bulk-purge) | my(search-by-mount-permission)
 - **vfs-storage**: user(create, get, search, list-all, update, delete)
 - **storage-namespace**: user(register, unregister, search, get-by-storage)
 - **object-storage**: user(create, get, search, update, delete)
