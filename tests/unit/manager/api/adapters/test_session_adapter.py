@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -19,7 +20,10 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput,
     ResourceSlotInfo,
 )
-from ai.backend.common.dto.manager.v2.kernel.response import ResourceAllocationGQLDTO
+from ai.backend.common.dto.manager.v2.kernel.response import (
+    KernelAttachedDeviceInfo,
+    ResourceAllocationGQLDTO,
+)
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     BatchConfigInput,
@@ -261,7 +265,9 @@ async def _no_designations(
     )
 
 
-def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:
+def _create_kernel_info(
+    kernel_id: KernelId, *, attached_devices: dict[str, Any] | None = None
+) -> KernelInfo:
     return KernelInfo(
         id=kernel_id,
         session=RelatedSessionInfo(
@@ -305,7 +311,7 @@ def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:
             agent_addr=None,
             container_id=None,
             occupied_shares={},
-            attached_devices={},
+            attached_devices=attached_devices or {},
             resource_opts={},
         ),
         runtime=RuntimeConfig(
@@ -605,6 +611,52 @@ class TestBatchResourceAllocationBySession:
         )
         assert refused is denial
         assert empty == _create_allocation()
+
+
+class TestKernelInfoToNode:
+    def test_each_attached_device_reaches_the_node_with_its_device_name(self) -> None:
+        info = _create_kernel_info(
+            KernelId(uuid4()),
+            attached_devices={
+                "cuda": [
+                    {"device_id": "0", "model_name": "NVIDIA A100", "data": {"mem": 1, "proc": 1}},
+                    {"device_id": "1", "model_name": "NVIDIA A100", "data": {"mem": 1, "proc": 1}},
+                ],
+                "furiosa": [
+                    {"device_id": "npu0", "model_name": "RNGD", "data": {"mem": 1, "proc": 1}},
+                ],
+            },
+        )
+
+        node = SessionAdapter._kernel_info_to_node(info, _create_allocation())
+
+        assert node.resource.attached_devices == [
+            KernelAttachedDeviceInfo(device_name="cuda", device_id="0", model_name="NVIDIA A100"),
+            KernelAttachedDeviceInfo(device_name="cuda", device_id="1", model_name="NVIDIA A100"),
+            KernelAttachedDeviceInfo(device_name="furiosa", device_id="npu0", model_name="RNGD"),
+        ]
+
+    def test_a_device_without_a_model_name_is_left_out(self) -> None:
+        info = _create_kernel_info(
+            KernelId(uuid4()),
+            attached_devices={
+                "cpu": [{"device_id": "0", "model_name": "", "data": {"mem": None, "proc": None}}],
+                "mem": [
+                    {"device_id": "root", "model_name": "", "data": {"mem": None, "proc": None}}
+                ],
+            },
+        )
+
+        node = SessionAdapter._kernel_info_to_node(info, _create_allocation())
+
+        assert node.resource.attached_devices == []
+
+    def test_a_kernel_without_devices_answers_an_empty_list(self) -> None:
+        node = SessionAdapter._kernel_info_to_node(
+            _create_kernel_info(KernelId(uuid4())), _create_allocation()
+        )
+
+        assert node.resource.attached_devices == []
 
 
 class TestBatchLoadKernels:
