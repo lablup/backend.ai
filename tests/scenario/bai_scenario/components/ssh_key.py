@@ -48,6 +48,7 @@ class SSHKeyholder:
     caller: UserData
     default: SSHKeypairData | None
     extra: SSHKeypairData | None
+    stranger: SSHKeypairData | None = None
 
     def default_key(self) -> SSHKeypairData:
         if self.default is None:
@@ -59,6 +60,11 @@ class SSHKeyholder:
             raise LookupError("the extra SSH key was not seeded")
         return self.extra
 
+    def stranger_key(self) -> SSHKeypairData:
+        if self.stranger is None:
+            raise LookupError("the other user's SSH key was not seeded")
+        return self.stranger
+
 
 @dataclass(frozen=True)
 class SomeoneWithSSHKeys(Given[Any, SSHKeyholder]):
@@ -66,6 +72,7 @@ class SomeoneWithSSHKeys(Given[Any, SSHKeyholder]):
 
     permissions: Sequence[Permission] = ()
     holds_keys: bool = True
+    with_stranger: bool = False
 
     @override
     def describe(self) -> str:
@@ -84,6 +91,13 @@ class SomeoneWithSSHKeys(Given[Any, SSHKeyholder]):
             )
         else:
             keys = Says("SSH 키가 없는 사용자 한 명", english="one user holding no SSH key")
+        if self.with_stranger:
+            keys = Says(
+                f"{keys}, default SSH 키를 가진 다른 사용자 한 명",
+                english=(
+                    f"{in_language(keys, Language.ENGLISH)}, another user holding a default SSH key"
+                ),
+            )
         return Says(
             f"도메인 하나와 {keys}, 그 사용자는 {granted}",
             english=(
@@ -104,12 +118,19 @@ class SomeoneWithSSHKeys(Given[Any, SSHKeyholder]):
             extra = await seeding.adding(
                 TestSeedSSHKeyOf(public_key=EXTRA_PUBLIC_KEY, is_default=False), caller
             )
+        stranger = None
+        if self.with_stranger:
+            other = await seeding.within(SomeoneOf(domain))
+            stranger = await seeding.adding(
+                TestSeedSSHKeyOf(public_key=DEFAULT_PUBLIC_KEY, is_default=True), other
+            )
         if self.permissions:
             await seeding.within(AGrant.on_user(caller, caller, *self.permissions))
         return SSHKeyholder(
             caller=seeding.made(caller),
             default=seeding.made(default) if default is not None else None,
             extra=seeding.made(extra) if extra is not None else None,
+            stranger=seeding.made(stranger) if stranger is not None else None,
         )
 
 

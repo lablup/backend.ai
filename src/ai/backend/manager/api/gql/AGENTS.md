@@ -146,7 +146,7 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 
 ## Admin and scope
 
-- superadmin-only resolvers: call `check_admin_only()` on the first line.
+- superadmin-only resolvers: call `check_admin_only()` on the first line (`BAI402`).
 
 **search: three variants:**
 - `adminFoosV2`: superadmin only, no scope: the entire system.

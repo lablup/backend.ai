@@ -938,18 +938,19 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.purge_image_by_id.run(
-            PurgeImageByIdAction(
-                image_id=ImageID(image_uuid),
-            )
-        )
-
+        # The untag reads the image row, so it runs while the row still exists.
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.run(
                 UntagImageFromRegistryAction(
                     image_id=ImageID(image_uuid),
                 )
             )
+
+        result = await ctx.processors.image.purge_image_by_id.run(
+            PurgeImageByIdAction(
+                image_id=ImageID(image_uuid),
+            )
+        )
 
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 

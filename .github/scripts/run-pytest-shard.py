@@ -162,7 +162,7 @@ def main() -> int:
     root = pathlib.Path.cwd()
     env = {
         **os.environ,
-        "PYTHONPATH": f"{root}/src:{root}/tests/scenario:{root}",
+        "PYTHONPATH": f"{root}/src:{root}/tests/scenario:{root}/tools/flake8-plugins:{root}",
         "BACKEND_BUILD_ROOT": str(root),
     }
     command = [

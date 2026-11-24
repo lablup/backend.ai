@@ -77,6 +77,8 @@ from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -110,6 +112,7 @@ from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_poli
 
 from . import __version__, user_agent
 from .auth import (
+    TRUSTED_PROXY_NETWORKS_KEY,
     build_forwarding_headers,
     fill_forwarding_hdrs_to_api_session,
     get_api_session,
@@ -775,6 +778,8 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
+    child_status: ChildStatus = _args[2][pidx]
+    child_status.publish_pid()
     config: WebServerUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
@@ -790,6 +795,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -1185,6 +1191,7 @@ async def server_main(
 ) -> AsyncIterator[Any]:
     config: WebServerUnifiedConfig = args[0]
     web_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await web_init_stack.__aenter__()
     try:
         app = web.Application(
@@ -1201,6 +1208,14 @@ async def server_main(
                 0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
             )
         app["config"] = config
+        app[TRUSTED_PROXY_NETWORKS_KEY] = [
+            ReadableCIDR(raw) for raw in config.service.trusted_proxies
+        ]
+        if config.service.trusted_proxies:
+            log.debug(
+                "trusting the forwarding headers set by proxies",
+                trusted_proxies=", ".join(config.service.trusted_proxies),
+            )
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         app["manager_pool"] = await web_init_stack.enter_async_context(
             manager_pool_ctx(config, app)
@@ -1249,14 +1264,17 @@ async def server_main(
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
         log.info("started the web gateway service")
-    except Exception:
+    except Exception as e:
         log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
     try:
         yield
     finally:
         log.info("shutting down")
         await web_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @click.command()
@@ -1342,13 +1360,18 @@ def main(
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                num_workers = min(4, os.cpu_count() or 1)
+                child_statuses = tuple(ChildStatus() for _ in range(num_workers))
+                child_exit_monitor = ChildExitMonitor(child_statuses)
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
-                        num_workers=min(4, os.cpu_count() or 1),
-                        args=(server_config, log_endpoint),
+                        num_workers=num_workers,
+                        main_ctxmgr=child_exit_monitor.main_context(),
+                        args=(server_config, log_endpoint, child_statuses),
                         runner=runner,
                     )
+                    child_exit_monitor.raise_system_exit()
                 finally:
                     log.info("terminated")
         finally:

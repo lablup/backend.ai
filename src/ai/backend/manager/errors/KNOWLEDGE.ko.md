@@ -47,7 +47,7 @@
 | `NoUpdatesToApply` | 아무것도 변경하지 않은 modifier 이고, row 는 호출자가 변경하던 row 다 |
 | `AppServiceStartFailed` | session 안에서 시작한 app 은 row 가 아니고 `ActionOperationType` 에 `start` 가 없다 |
 | `AppProxyConnectionError`, `AppProxyResponseError` | `AGENTS.md` 표에서 AppProxy 는 system 도메인이다 |
-| `NotificationProcessingFailure`, `NotificationTemplateRenderingFailure` | notification 을 렌더링해 전달하고 나오는 메시지는 row 가 아니다. 타입이 있는 것은 notification 테이블 둘뿐이다 |
+| `NotificationProcessingFailure`, `NotificationDeliveryFailure`, `NotificationTemplateRenderingFailure`, `WebhookConnectionFailure` | notification 을 렌더링해 전달하고 나오는 메시지는 row 가 아니다. 타입이 있는 것은 notification 테이블 둘뿐이다 |
 | `InvalidSecretKeyMaterial`, `SecretEncryptionMisconfigured` | 설정된 암호화 key 와 key provider 이고, 저장된 secret 을 읽어 접근하는 값이 아니다 |
 | `ExportReportNotFound`, `InvalidExportFieldKeys` | report 는 코드에 선언된 registry 의 `ReportDef` 이고 row 가 아니며, 그 field key 도 마찬가지다 |
 | `RetentionCategoryNotSupportedError` | cleanup 이 연결되지 않은 `RetentionCategory` 이고, row 가 아니라 이 build 의 공백이다 |

@@ -97,12 +97,12 @@ class AReaderOfAnOrganizationsFile(Given[Any, AnOrganizationsFileAndAReader]):
             holder = await seeding.creating_from_two(TestSeedProject(), domain, policy)
             owner = ProjectID(seeding.made(holder).id)
         file = await seeding.creating_from(
-            TestSeedConfigFileOf(lambda _: owner, path=CONFIG_PATH, perm=CONFIG_PERMISSION),
+            TestSeedConfigFileOf(lambda _: owner, path=CONFIG_PATH),
             holder,
         )
         await seeding.adding(
             TestSeedConfigFileRevisionOf(
-                data=CONFIG_DATA, creator_id=UserID(seeding.made(reader).id)
+                data=CONFIG_DATA, perm=CONFIG_PERMISSION, creator_id=UserID(seeding.made(reader).id)
             ),
             file,
         )
