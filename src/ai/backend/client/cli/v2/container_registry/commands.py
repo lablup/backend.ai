@@ -74,6 +74,8 @@ def scoped_search(
     order_by: tuple[str, ...],
 ) -> None:
     """Search the container registries the given domains and projects are related to."""
+    if not domain_ids and not project_ids:
+        raise click.UsageError("Give at least one --domain or --project.")
     from ai.backend.common.container_registry import ContainerRegistryType
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.container_registry.request import (
