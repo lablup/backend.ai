@@ -128,7 +128,7 @@
     "types-toml",
     "types-tqdm<4.70",
     "typing_extensions~=4.11",
-    "uvloop~=0.22.1; sys_platform != \"Windows\"",
+    "uvloop~=0.23.0; sys_platform != \"Windows\"",
     "valkey-glide~=2.5.2",
     "yarl~=1.25.1",
     "zipstream-new~=1.1.8"
