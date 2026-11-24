@@ -331,8 +331,8 @@ class SearchVFoldersPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
-class UserVFolderNode(BaseResponseModel):
-    """Node model representing one user paired with one vfolder."""
+class UserVFolderMountNode(BaseResponseModel):
+    """Node model representing the mount policy of one user on one vfolder."""
 
     id: str = Field(description="Node ID (format: '{user_id}:{vfolder_id}').")
     user_id: UserID = Field(description="ID of the user.")
@@ -342,10 +342,10 @@ class UserVFolderNode(BaseResponseModel):
     )
 
 
-class SearchUserVFoldersPayload(BaseResponseModel):
-    """Payload for user vfolder search."""
+class SearchUserVFolderMountsPayload(BaseResponseModel):
+    """Payload for user vfolder mount search."""
 
-    items: list[UserVFolderNode] = Field(description="List of user vfolder nodes.")
+    items: list[UserVFolderMountNode] = Field(description="List of user vfolder mount nodes.")
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")

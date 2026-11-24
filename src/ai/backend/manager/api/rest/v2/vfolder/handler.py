@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
-    ScopedSearchUserVFoldersInput,
+    ScopedSearchUserVFolderMountsInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
@@ -79,12 +79,12 @@ class V2VFolderHandler:
         result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def scoped_search_user_vfolders(
+    async def scoped_search_user_vfolder_mounts(
         self,
-        body: BodyParam[ScopedSearchUserVFoldersInput],
+        body: BodyParam[ScopedSearchUserVFolderMountsInput],
     ) -> APIResponse:
         """Search the pairs of one user and the vfolders the named scopes reach."""
-        result = await self._adapter.scoped_search_user_vfolders(body.parsed)
+        result = await self._adapter.scoped_search_user_vfolder_mounts(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

@@ -95,12 +95,12 @@ def project_search(
     asyncio.run(_run())
 
 
-@vfolder.group(name="user-vfolder")
-def user_vfolder() -> None:
-    """Pairs of a user and a vfolder."""
+@vfolder.group(name="user-vfolder-mount")
+def user_vfolder_mount() -> None:
+    """Mount policies of a user on vfolders."""
 
 
-@user_vfolder.command(name="scoped-search")
+@user_vfolder_mount.command(name="scoped-search")
 @click.argument("user_id", type=click.UUID)
 @click.option(
     "--project", "projects", multiple=True, type=click.UUID, help="Project ID (repeatable)."
@@ -119,7 +119,7 @@ def user_vfolder() -> None:
 @click.option(
     "--order-by", multiple=True, help="Order by field:direction (e.g., name:asc, created_at:desc)."
 )
-def scoped_search_user_vfolders(
+def scoped_search_user_vfolder_mounts(
     user_id: UUID,
     projects: tuple[UUID, ...],
     domains: tuple[UUID, ...],
@@ -134,25 +134,25 @@ def scoped_search_user_vfolders(
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
     from ai.backend.common.dto.manager.v2.vfolder.request import (
-        ScopedSearchUserVFoldersInput,
-        UserVFolderFilter,
-        UserVFolderOrder,
+        ScopedSearchUserVFolderMountsInput,
+        UserVFolderMountFilter,
+        UserVFolderMountOrder,
         VFolderFilter,
     )
     from ai.backend.common.dto.manager.v2.vfolder.types import (
-        UserVFolderScope,
+        UserVFolderMountScope,
         VFolderMountPermissionFilter,
         VFolderOrderField,
         VFolderPermissionField,
     )
 
-    request = ScopedSearchUserVFoldersInput(
-        scope=UserVFolderScope(
+    request = ScopedSearchUserVFolderMountsInput(
+        scope=UserVFolderMountScope(
             user=[UUIDScope(value=user_id)],
             project=[UUIDScope(value=project_id) for project_id in projects] or None,
             domain=[UUIDScope(value=domain_id) for domain_id in domains] or None,
         ),
-        filter=UserVFolderFilter(
+        filter=UserVFolderMountFilter(
             mount_permission=(
                 VFolderMountPermissionFilter(
                     in_=[VFolderPermissionField(level) for level in mount_permissions]
@@ -167,7 +167,9 @@ def scoped_search_user_vfolders(
             ),
         ),
         order=(
-            parse_order_options(order_by, VFolderOrderField, UserVFolderOrder) if order_by else None
+            parse_order_options(order_by, VFolderOrderField, UserVFolderMountOrder)
+            if order_by
+            else None
         ),
         limit=limit,
         offset=offset,
@@ -176,7 +178,7 @@ def scoped_search_user_vfolders(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            print_result(await registry.vfolder.scoped_search_user_vfolders(request))
+            print_result(await registry.vfolder.scoped_search_user_vfolder_mounts(request))
         finally:
             await registry.close()
 

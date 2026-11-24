@@ -10,9 +10,9 @@ from ai.backend.manager.services.vfolder.actions.mount_policy import (
     UnsetVFolderMountPolicyAction,
     UnsetVFolderMountPolicyActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolders import (
-    ScopedSearchUserVFoldersAction,
-    ScopedSearchUserVFoldersActionResult,
+from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolder_mounts import (
+    ScopedSearchUserVFolderMountsAction,
+    ScopedSearchUserVFolderMountsActionResult,
 )
 from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 
@@ -25,8 +25,8 @@ class VFolderMountPolicyProcessors:
     list: SingleEntityActionProcessor[
         ListVFolderMountPoliciesAction, ListVFolderMountPoliciesActionResult
     ]
-    scoped_search_user_vfolders: ScopeActionProcessor[
-        ScopedSearchUserVFoldersAction, ScopedSearchUserVFoldersActionResult
+    scoped_search_user_vfolder_mounts: ScopeActionProcessor[
+        ScopedSearchUserVFolderMountsAction, ScopedSearchUserVFolderMountsActionResult
     ]
 
     def __init__(
@@ -35,6 +35,6 @@ class VFolderMountPolicyProcessors:
         self.set = group.single_entity(SetVFolderMountPolicyAction, service.set)
         self.unset = group.single_entity(UnsetVFolderMountPolicyAction, service.unset)
         self.list = group.single_entity(ListVFolderMountPoliciesAction, service.list)
-        self.scoped_search_user_vfolders = group.scope(
-            ScopedSearchUserVFoldersAction, service.scoped_search_user_vfolders
+        self.scoped_search_user_vfolder_mounts = group.scope(
+            ScopedSearchUserVFolderMountsAction, service.scoped_search_user_vfolder_mounts
         )

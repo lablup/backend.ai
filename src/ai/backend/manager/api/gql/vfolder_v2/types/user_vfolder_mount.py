@@ -1,4 +1,4 @@
-"""GraphQL types for one user paired with one virtual folder."""
+"""GraphQL types for the mount policy of one user on one virtual folder."""
 
 from __future__ import annotations
 
@@ -12,10 +12,13 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.v2.vfolder.request import UserVFolderFilter, UserVFolderOrder
-from ai.backend.common.dto.manager.v2.vfolder.response import UserVFolderNode
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    UserVFolderMountFilter,
+    UserVFolderMountOrder,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import UserVFolderMountNode
 from ai.backend.common.dto.manager.v2.vfolder.types import (
-    UserVFolderScope,
+    UserVFolderMountScope,
     VFolderMountPermissionFilter,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -45,11 +48,11 @@ if TYPE_CHECKING:
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="One user paired with one virtual folder.",
+        description="The mount policy of one user on one virtual folder.",
     ),
-    name="UserVFolder",
+    name="UserVFolderMount",
 )
-class UserVFolderGQL(PydanticNodeMixin[UserVFolderNode]):
+class UserVFolderMountGQL(PydanticNodeMixin[UserVFolderMountNode]):
     id: NodeID[str]
     user_id: UUID = gql_field(description="ID of the user.")
     vfolder_id: UUID = gql_field(description="ID of the virtual folder.")
@@ -96,10 +99,10 @@ class UserVFolderGQL(PydanticNodeMixin[UserVFolderNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> list[Self]:
-        raise NotImplementedAPI("User vfolder node resolution is not implemented.")
+        raise NotImplementedAPI("User vfolder mount node resolution is not implemented.")
 
 
-UserVFolderEdgeGQL = Edge[UserVFolderGQL]
+UserVFolderMountEdgeGQL = Edge[UserVFolderMountGQL]
 
 
 @gql_connection_type(
@@ -107,9 +110,9 @@ UserVFolderEdgeGQL = Edge[UserVFolderGQL]
         added_version=NEXT_RELEASE_VERSION,
         description="Paginated connection for pairs of a user and a virtual folder.",
     ),
-    name="UserVFolderConnection",
+    name="UserVFolderMountConnection",
 )
-class UserVFolderConnectionGQL(Connection[UserVFolderGQL]):
+class UserVFolderMountConnectionGQL(Connection[UserVFolderMountGQL]):
     count: int = gql_field(description="Total number of pairs matching the query criteria.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
@@ -121,14 +124,14 @@ class UserVFolderConnectionGQL(Connection[UserVFolderGQL]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Scope for the scoped user virtual folder query: one user, and the virtual folders "
+            "Scope for the scoped user virtual folder mount query: one user, and the virtual folders "
             "paired with them. The folders of the user, the domains and the projects are OR'd, "
             "and every scope named is authorized before the read runs."
         ),
     ),
-    name="UserVFolderScope",
+    name="UserVFolderMountScope",
 )
-class UserVFolderScopeGQL(PydanticInputMixin[UserVFolderScope]):
+class UserVFolderMountScopeGQL(PydanticInputMixin[UserVFolderMountScope]):
     user: list[UUIDScopeGQL] = gql_field(
         description="The user paired with each folder, exactly one. Their folders are read too."
     )
@@ -168,9 +171,9 @@ class VFolderMountPermissionFilterGQL(PydanticInputMixin[VFolderMountPermissionF
         added_version=NEXT_RELEASE_VERSION,
         description="Filter for pairs of a user and a virtual folder.",
     ),
-    name="UserVFolderFilter",
+    name="UserVFolderMountFilter",
 )
-class UserVFolderFilterGQL(PydanticInputMixin[UserVFolderFilter]):
+class UserVFolderMountFilterGQL(PydanticInputMixin[UserVFolderMountFilter]):
     mount_permission: VFolderMountPermissionFilterGQL | None = gql_field(
         description="Filter by the mount policy of the user on the folder.", default=None
     )
@@ -188,8 +191,8 @@ class UserVFolderFilterGQL(PydanticInputMixin[UserVFolderFilter]):
         added_version=NEXT_RELEASE_VERSION,
         description="Ordering for pairs of a user and a virtual folder, by the folder of the pair.",
     ),
-    name="UserVFolderOrderBy",
+    name="UserVFolderMountOrderBy",
 )
-class UserVFolderOrderByGQL(PydanticInputMixin[UserVFolderOrder]):
+class UserVFolderMountOrderByGQL(PydanticInputMixin[UserVFolderMountOrder]):
     field: VFolderOrderFieldGQL = VFolderOrderFieldGQL.CREATED_AT
     direction: OrderDirection = OrderDirection.DESC

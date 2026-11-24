@@ -1,4 +1,4 @@
-"""The mount permission filter of a user vfolder search, against the level each user mounts at."""
+"""The mount permission filter of a user vfolder mount search, against the level each user mounts at."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
-from ai.backend.manager.models.vfolder.searchable_fields import UserVFolderSearchableFields
+from ai.backend.manager.models.vfolder.searchable_fields import UserVFolderMountSearchableFields
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -269,7 +269,7 @@ class TestMountPermissionFilter:
         db_with_cleanup: ExtendedAsyncSAEngine,
         mount_permission_situation: _MountPermissionSituation,
     ) -> None:
-        mount_permission = UserVFolderSearchableFields.mount_permission
+        mount_permission = UserVFolderMountSearchableFields.mount_permission
         pair = sa.select(VFolderRow.id).select_from(
             sa.join(VFolderRow, UserRow, UserRow.uuid == mount_permission_situation.caller_id)
         )

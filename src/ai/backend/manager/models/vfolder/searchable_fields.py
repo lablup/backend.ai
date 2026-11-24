@@ -335,7 +335,7 @@ class VFolderSearchableFields:
     linked = _VFolderLinkedEntities
 
 
-class UserVFolderSearchableFields:
+class UserVFolderMountSearchableFields:
     """Filters over pairs of a user and a vfolder; the query joins ``users`` to ``vfolders``."""
 
     mount_permission = _UserVFolderMountPermission().conditions()

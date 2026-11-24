@@ -33,7 +33,7 @@
   - partial_bulk_update: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - purge: 성공 있음 1 · 거부 있음 2 (single_entity)
   - restore: 성공 있음 1 · 거부 있음 1 (single_entity)
-  - scoped_search_user_vfolders: 성공 있음 1 · 거부 있음 1 (scope)
+  - scoped_search_user_vfolder_mounts: 성공 있음 1 · 거부 있음 1 (scope)
   - set_mount_policy: 성공 있음 1 · 거부 있음 2 (single_entity)
   - unset_mount_policy: 성공 있음 1 · 거부 있음 1 (single_entity)
   - update: 성공 있음 1 · 거부 있음 2 (single_entity)
@@ -226,12 +226,12 @@
 | [자기 개인 프로젝트에서 vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 자기 vfolder 를 되살리면, 그 vfolder 의 id 가 응답으로 옵니다](#restoring-a-user-granted-soft-delete-restores-their-trashed-folder) | 성공 |
 | [아무 권한도 받지 않은 사용자가 휴지통에 있는 자기 vfolder 를 되살리려 하면 권한 부족으로 거부됩니다](#restoring-a-user-granted-nothing-may-not-restore-their-folder) | 거부 |
 
-**scoped_search_user_vfolders**
+**scoped_search_user_vfolder_mounts**
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘과의 쌍만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#user_vfolders-a-user-searches-the-folders-they-mount-read-write) | 성공 |
-| [아무 권한도 받지 않은 사용자가 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#user_vfolders-a-user-granted-nothing-may-not-search-the-folders-they-mount) | 거부 |
+| [자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘과의 쌍만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#user_vfolder_mounts-a-user-searches-the-folders-they-mount-read-write) | 성공 |
+| [아무 권한도 받지 않은 사용자가 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#user_vfolder_mounts-a-user-granted-nothing-may-not-search-the-folders-they-mount) | 거부 |
 
 **set_mount_policy**
 
@@ -2704,11 +2704,11 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### scoped_search_user_vfolders
+### scoped_search_user_vfolder_mounts
 
-<a id="user_vfolders-a-user-searches-the-folders-they-mount-read-write"></a>
+<a id="user_vfolder_mounts-a-user-searches-the-folders-they-mount-read-write"></a>
 
-#### [a-user-searches-the-folders-they-mount-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolders.py): pass
+#### [a-user-searches-the-folders-they-mount-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolder_mounts.py): pass
 
 자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘과의 쌍만 이름 순서로 실린 한 페이지가 응답으로 옵니다
 
@@ -2746,7 +2746,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search_user_vfolders: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
+- VFolderAdapter.scoped_search_user_vfolder_mounts: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 
@@ -2764,9 +2764,9 @@ Then
   - items[1].vfolder_id: 미리 저장한 vfolder 와 같다
   - items[1].mount_permission = 'rw'
 
-<a id="user_vfolders-a-user-granted-nothing-may-not-search-the-folders-they-mount"></a>
+<a id="user_vfolder_mounts-a-user-granted-nothing-may-not-search-the-folders-they-mount"></a>
 
-#### [a-user-granted-nothing-may-not-search-the-folders-they-mount](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolders.py): pass
+#### [a-user-granted-nothing-may-not-search-the-folders-they-mount](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolder_mounts.py): pass
 
 아무 권한도 받지 않은 사용자가 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다
 
@@ -2793,7 +2793,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search_user_vfolders: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
+- VFolderAdapter.scoped_search_user_vfolder_mounts: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 

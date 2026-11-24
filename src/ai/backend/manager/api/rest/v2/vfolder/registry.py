@@ -34,8 +34,8 @@ def register_v2_vfolder_routes(
     )
     registry.add(
         "POST",
-        "/user-vfolders/scoped/search",
-        handler.scoped_search_user_vfolders,
+        "/user-vfolder-mounts/scoped/search",
+        handler.scoped_search_user_vfolder_mounts,
         middlewares=[auth_required],
     )
     registry.add(

@@ -35,7 +35,7 @@ class VFolderSearcher(Searcher[VFolderRow, VFolderData]):
 
 
 @dataclass
-class UserVFolderSearcher(Searcher[VFolderRow, VFolderData]):
+class UserVFolderMountSearcher(Searcher[VFolderRow, VFolderData]):
     """The vfolders of the pairs of one user; a condition may read the user's row."""
 
     user_id: UserID = field(kw_only=True)

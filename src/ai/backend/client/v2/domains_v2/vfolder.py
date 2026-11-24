@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
-    ScopedSearchUserVFoldersInput,
+    ScopedSearchUserVFolderMountsInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
@@ -44,7 +44,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     MoveFilePayload,
     PurgeVFolderPayload,
     RestoreVFolderPayload,
-    SearchUserVFoldersPayload,
+    SearchUserVFolderMountsPayload,
     SearchVFoldersPayload,
     SetVFolderMountPolicyPayload,
     UnsetVFolderMountPolicyPayload,
@@ -84,16 +84,16 @@ class V2VFolderClient(BaseDomainClient):
             response_model=SearchVFoldersPayload,
         )
 
-    async def scoped_search_user_vfolders(
+    async def scoped_search_user_vfolder_mounts(
         self,
-        request: ScopedSearchUserVFoldersInput,
-    ) -> SearchUserVFoldersPayload:
+        request: ScopedSearchUserVFolderMountsInput,
+    ) -> SearchUserVFolderMountsPayload:
         """Search the pairs of one user and the vfolders the named scopes reach."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/user-vfolders/scoped/search",
+            f"{_PATH}/user-vfolder-mounts/scoped/search",
             request=request,
-            response_model=SearchUserVFoldersPayload,
+            response_model=SearchUserVFolderMountsPayload,
         )
 
     async def create(self, request: CreateVFolderInput) -> CreateVFolderPayload:

@@ -26,7 +26,7 @@ __all__ = (
     "FileEntryType",
     "OrderDirection",
     "VFolderInvitationState",
-    "UserVFolderScope",
+    "UserVFolderMountScope",
     "VFolderMetadataInfo",
     "VFolderMountPermissionFilter",
     "VFolderOperationStatusField",
@@ -180,8 +180,8 @@ class VFolderScope(BaseRequestModel):
         return self
 
 
-class UserVFolderScope(BaseRequestModel):
-    """Scope for the scoped user vfolder query: one user, and the vfolders paired with them.
+class UserVFolderMountScope(BaseRequestModel):
+    """Scope for the scoped user vfolder mount query: one user, and the vfolders paired with them.
 
     The vfolders of the user, the domains and the projects are combined with OR.
     """

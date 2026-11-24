@@ -14,7 +14,7 @@ from ai.backend.manager.models.specs.searcher import SearcherResult
 
 __all__ = (
     "BulkVFolderPurgeResult",
-    "UserVFolderPage",
+    "UserVFolderMountPage",
     "VFolderPurgeFailure",
 )
 
@@ -36,7 +36,7 @@ class BulkVFolderPurgeResult:
 
 
 @dataclass(frozen=True)
-class UserVFolderPage:
+class UserVFolderMountPage:
     """A page of vfolders, and the mount policy rows one user holds on them.
 
     A vfolder the user holds no row on is absent from ``policies``.

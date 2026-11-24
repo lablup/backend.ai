@@ -156,9 +156,9 @@ Depth follows the permission axis, not the foreign keys.
 
 A value that SQL computes for two entities together, such as the mount policy of a user on a vfolder.
 
-- Declare its filter on an entry of the pair (`UserVFolderSearchableFields`), not on the entry of either entity. Declare no order.
-- Expose it through a type of the pair with its own query, filter DTO and scope (`scopedUserVFolders`). Do not put it in the filter DTO of either entity.
-- The scope names the entity the value is computed for. The searcher joins its row (`UserVFolderSearcher`), so the filter conversion takes the filter only.
+- Declare its filter on an entry of the pair (`UserVFolderMountSearchableFields`), not on the entry of either entity. Declare no order.
+- Expose it through a type of the pair with its own query, filter DTO and scope (`scopedUserVFolderMounts`). Do not put it in the filter DTO of either entity.
+- The scope names the entity the value is computed for. The searcher joins its row (`UserVFolderMountSearcher`), so the filter conversion takes the filter only.
 
 ## Usage between entities
 

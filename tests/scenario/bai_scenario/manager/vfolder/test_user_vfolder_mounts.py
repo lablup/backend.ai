@@ -11,15 +11,15 @@ import pytest
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    ScopedSearchUserVFoldersInput,
-    UserVFolderFilter,
-    UserVFolderOrder,
+    ScopedSearchUserVFolderMountsInput,
+    UserVFolderMountFilter,
+    UserVFolderMountOrder,
     VFolderFilter,
 )
-from ai.backend.common.dto.manager.v2.vfolder.response import SearchUserVFoldersPayload
+from ai.backend.common.dto.manager.v2.vfolder.response import SearchUserVFolderMountsPayload
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
-    UserVFolderScope,
+    UserVFolderMountScope,
     VFolderMountPermissionFilter,
     VFolderOrderField,
     VFolderPermissionField,
@@ -46,14 +46,14 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type UserVFolderStep = Scenario[
-    TestSeedingSession, AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFoldersPayload
+type UserVFolderMountStep = Scenario[
+    TestSeedingSession, AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFolderMountsPayload
 ]
 
 
 @dataclass(frozen=True)
 class SearchingFoldersTheUserMountsReadWrite(
-    When[AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFoldersPayload]
+    When[AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFolderMountsPayload]
 ):
     """자기가 rw로 마운트하는 폴더를 이름 조각으로 걸러 이름 오름차순으로, 크기만큼만 훑는다."""
 
@@ -62,7 +62,7 @@ class SearchingFoldersTheUserMountsReadWrite(
 
     @override
     def operation(self) -> str:
-        return "scoped_search_user_vfolders"
+        return "scoped_search_user_vfolder_mounts"
 
     @override
     def describe(self, laid: AReaderAndFoldersToMount) -> str:
@@ -80,22 +80,24 @@ class SearchingFoldersTheUserMountsReadWrite(
     @override
     async def call(
         self, adapter: VFolderAdapter, laid: AReaderAndFoldersToMount
-    ) -> SearchUserVFoldersPayload:
+    ) -> SearchUserVFolderMountsPayload:
         with ActingAs(laid.caller):
-            return await adapter.scoped_search_user_vfolders(
-                ScopedSearchUserVFoldersInput(
-                    scope=UserVFolderScope(
+            return await adapter.scoped_search_user_vfolder_mounts(
+                ScopedSearchUserVFolderMountsInput(
+                    scope=UserVFolderMountScope(
                         user=[UUIDScope(value=laid.caller.id)],
                         project=[UUIDScope(value=laid.other_project_id)],
                     ),
-                    filter=UserVFolderFilter(
+                    filter=UserVFolderMountFilter(
                         mount_permission=VFolderMountPermissionFilter(
                             equals=VFolderPermissionField.READ_WRITE
                         ),
                         vfolder=VFolderFilter(name=StringFilter(contains=self.fragment)),
                     ),
                     order=[
-                        UserVFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
+                        UserVFolderMountOrder(
+                            field=VFolderOrderField.NAME, direction=OrderDirection.ASC
+                        )
                     ],
                     limit=self.limit,
                 )
@@ -104,7 +106,7 @@ class SearchingFoldersTheUserMountsReadWrite(
 
 @dataclass(frozen=True)
 class TheUserAndTheFoldersTheyMountReadWrite(
-    Then[AReaderAndFoldersToMount, SearchUserVFoldersPayload]
+    Then[AReaderAndFoldersToMount, SearchUserVFolderMountsPayload]
 ):
     """rw로 마운트하는 자기 폴더 둘과의 쌍만 이름 순서로 실린 한 페이지가 온다."""
 
@@ -120,7 +122,7 @@ class TheUserAndTheFoldersTheyMountReadWrite(
 
     @override
     def look(
-        self, laid: AReaderAndFoldersToMount, answered: Answered[SearchUserVFoldersPayload]
+        self, laid: AReaderAndFoldersToMount, answered: Answered[SearchUserVFolderMountsPayload]
     ) -> list[Verdict]:
         page = answered.response
         if page is None:
@@ -166,7 +168,7 @@ class TheUserAndTheFoldersTheyMountReadWrite(
 @dataclass(frozen=True)
 class AUserSearchesTheFoldersTheyMountReadWrite(
     Scenario[
-        TestSeedingSession, AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFoldersPayload
+        TestSeedingSession, AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFolderMountsPayload
     ]
 ):
     @override
@@ -193,18 +195,20 @@ class AUserSearchesTheFoldersTheyMountReadWrite(
         return SomeoneWithFoldersToMount(granted=True, fragment="match")
 
     @override
-    def when(self) -> When[AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFoldersPayload]:
+    def when(
+        self,
+    ) -> When[AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFolderMountsPayload]:
         return SearchingFoldersTheUserMountsReadWrite(fragment="match", limit=2)
 
     @override
-    def then(self) -> Then[AReaderAndFoldersToMount, SearchUserVFoldersPayload]:
+    def then(self) -> Then[AReaderAndFoldersToMount, SearchUserVFolderMountsPayload]:
         return TheUserAndTheFoldersTheyMountReadWrite()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheFoldersTheyMount(
     Scenario[
-        TestSeedingSession, AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFoldersPayload
+        TestSeedingSession, AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFolderMountsPayload
     ]
 ):
     @override
@@ -228,22 +232,24 @@ class AUserGrantedNothingMayNotSearchTheFoldersTheyMount(
         return SomeoneWithFoldersToMount(granted=False, fragment="match")
 
     @override
-    def when(self) -> When[AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFoldersPayload]:
+    def when(
+        self,
+    ) -> When[AReaderAndFoldersToMount, VFolderAdapter, SearchUserVFolderMountsPayload]:
         return SearchingFoldersTheUserMountsReadWrite(fragment="match", limit=2)
 
     @override
-    def then(self) -> Then[AReaderAndFoldersToMount, SearchUserVFoldersPayload]:
+    def then(self) -> Then[AReaderAndFoldersToMount, SearchUserVFolderMountsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
-SCENARIOS: list[UserVFolderStep] = [
+SCENARIOS: list[UserVFolderMountStep] = [
     AUserSearchesTheFoldersTheyMountReadWrite(),
     AUserGrantedNothingMayNotSearchTheFoldersTheyMount(),
 ]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_searching_user_vfolders(
-    scenario: UserVFolderStep, adapter: VFolderAdapter, engine: ExtendedAsyncSAEngine
+async def test_searching_user_vfolder_mounts(
+    scenario: UserVFolderMountStep, adapter: VFolderAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

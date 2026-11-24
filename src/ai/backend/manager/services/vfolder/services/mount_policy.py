@@ -11,7 +11,7 @@ from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
-from ai.backend.manager.data.vfolder.types import UserVFolderData, VFolderData
+from ai.backend.manager.data.vfolder.types import UserVFolderMountData, VFolderData
 from ai.backend.manager.errors.storage import (
     VFolderMountPolicyNotApplicable,
     VFolderMountPolicyTooWide,
@@ -29,9 +29,9 @@ from ai.backend.manager.services.vfolder.actions.mount_policy import (
     UnsetVFolderMountPolicyAction,
     UnsetVFolderMountPolicyActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolders import (
-    ScopedSearchUserVFoldersAction,
-    ScopedSearchUserVFoldersActionResult,
+from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolder_mounts import (
+    ScopedSearchUserVFolderMountsAction,
+    ScopedSearchUserVFolderMountsActionResult,
 )
 
 
@@ -84,19 +84,19 @@ class VFolderMountPolicyService:
         policies = await self._vfolder_repository.list_user_mount_policies(action.vfolder_uuid)
         return ListVFolderMountPoliciesActionResult(policies=policies)
 
-    async def scoped_search_user_vfolders(
-        self, action: ScopedSearchUserVFoldersAction
-    ) -> ScopedSearchUserVFoldersActionResult:
-        found = await self._vfolder_repository.scoped_search_user_vfolders(
+    async def scoped_search_user_vfolder_mounts(
+        self, action: ScopedSearchUserVFolderMountsAction
+    ) -> ScopedSearchUserVFolderMountsActionResult:
+        found = await self._vfolder_repository.scoped_search_user_vfolder_mounts(
             action.searcher, action.user_id
         )
         vfolders = found.page.items
         held = await self._permission_check.held_permissions(
             action.user_id, [vfolder.id for vfolder in vfolders]
         )
-        return ScopedSearchUserVFoldersActionResult(
+        return ScopedSearchUserVFolderMountsActionResult(
             items=[
-                UserVFolderData(
+                UserVFolderMountData(
                     user_id=action.user_id,
                     vfolder_id=vfolder.id,
                     mount_permission=resolve_mount_policy(

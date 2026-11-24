@@ -33,7 +33,7 @@ Scenario: incomplete 5 / 31
   - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
   - purge: success present 1 · rejection present 2 (single_entity)
   - restore: success present 1 · rejection present 1 (single_entity)
-  - scoped_search_user_vfolders: success present 1 · rejection present 1 (scope)
+  - scoped_search_user_vfolder_mounts: success present 1 · rejection present 1 (scope)
   - set_mount_policy: success present 1 · rejection present 2 (single_entity)
   - unset_mount_policy: success present 1 · rejection present 1 (single_entity)
   - update: success present 1 · rejection present 2 (single_entity)
@@ -226,12 +226,12 @@ Scenario: incomplete 5 / 31
 | [when a user granted vfolder soft delete restores their trashed vfolder, the id of that vfolder comes back](#restoring-a-user-granted-soft-delete-restores-their-trashed-folder) | answered |
 | [when a user granted nothing tries to restore their trashed vfolder, it is rejected for lack of permission](#restoring-a-user-granted-nothing-may-not-restore-their-folder) | rejected |
 
-**scoped_search_user_vfolders**
+**scoped_search_user_vfolder_mounts**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted vfolder read in their own scope and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only the pairs with their own two vfolders, mounted for others as ro, in name order comes back](#user_vfolders-a-user-searches-the-folders-they-mount-read-write) | answered |
-| [when a user granted nothing tries to search their own scope and another user's personal project for vfolders they mount as rw, it is rejected for lack of permission](#user_vfolders-a-user-granted-nothing-may-not-search-the-folders-they-mount) | rejected |
+| [when a user granted vfolder read in their own scope and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only the pairs with their own two vfolders, mounted for others as ro, in name order comes back](#user_vfolder_mounts-a-user-searches-the-folders-they-mount-read-write) | answered |
+| [when a user granted nothing tries to search their own scope and another user's personal project for vfolders they mount as rw, it is rejected for lack of permission](#user_vfolder_mounts-a-user-granted-nothing-may-not-search-the-folders-they-mount) | rejected |
 
 **set_mount_policy**
 
@@ -2704,11 +2704,11 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### scoped_search_user_vfolders
+### scoped_search_user_vfolder_mounts
 
-<a id="user_vfolders-a-user-searches-the-folders-they-mount-read-write"></a>
+<a id="user_vfolder_mounts-a-user-searches-the-folders-they-mount-read-write"></a>
 
-#### [a-user-searches-the-folders-they-mount-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolders.py): pass
+#### [a-user-searches-the-folders-they-mount-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolder_mounts.py): pass
 
 when a user granted vfolder read in their own scope and another user's personal project searches the vfolders they mount as rw by a name fragment, ordered by name ascending and limited to one page, one page holding only the pairs with their own two vfolders, mounted for others as ro, in name order comes back
 
@@ -2746,7 +2746,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search_user_vfolders: user-1 searches their own scope and another user's personal project for vfolders they mount as rw whose name holds match, ordered by name ascending, up to 2
+- VFolderAdapter.scoped_search_user_vfolder_mounts: user-1 searches their own scope and another user's personal project for vfolders they mount as rw whose name holds match, ordered by name ascending, up to 2
 
 Then
 
@@ -2764,9 +2764,9 @@ Then
   - items[1].vfolder_id: same as the vfolder seeded in advance
   - items[1].mount_permission = 'rw'
 
-<a id="user_vfolders-a-user-granted-nothing-may-not-search-the-folders-they-mount"></a>
+<a id="user_vfolder_mounts-a-user-granted-nothing-may-not-search-the-folders-they-mount"></a>
 
-#### [a-user-granted-nothing-may-not-search-the-folders-they-mount](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolders.py): pass
+#### [a-user-granted-nothing-may-not-search-the-folders-they-mount](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolder_mounts.py): pass
 
 when a user granted nothing tries to search their own scope and another user's personal project for vfolders they mount as rw, it is rejected for lack of permission
 
@@ -2793,7 +2793,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search_user_vfolders: user-1 searches their own scope and another user's personal project for vfolders they mount as rw whose name holds match, ordered by name ascending, up to 2
+- VFolderAdapter.scoped_search_user_vfolder_mounts: user-1 searches their own scope and another user's personal project for vfolders they mount as rw whose name holds match, ordered by name ascending, up to 2
 
 Then
 

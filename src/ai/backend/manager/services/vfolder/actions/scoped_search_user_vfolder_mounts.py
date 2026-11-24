@@ -12,18 +12,18 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.data.vfolder.types import UserVFolderData, VFolderData
+from ai.backend.manager.data.vfolder.types import UserVFolderMountData, VFolderData
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.vfolder.row import VFolderRow
 
 __all__ = (
-    "ScopedSearchUserVFoldersAction",
-    "ScopedSearchUserVFoldersActionResult",
+    "ScopedSearchUserVFolderMountsAction",
+    "ScopedSearchUserVFolderMountsActionResult",
 )
 
 
 @dataclass(frozen=True)
-class ScopedSearchUserVFoldersAction(BaseScopeAction):
+class ScopedSearchUserVFolderMountsAction(BaseScopeAction):
     """Page through the vfolders the named scopes reach, each paired with one user.
 
     Every scope is authorized before the read runs, so a caller reaching for one they
@@ -46,7 +46,7 @@ class ScopedSearchUserVFoldersAction(BaseScopeAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "scoped_search_user_vfolders"
+        return "scoped_search_user_vfolder_mounts"
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
@@ -54,10 +54,10 @@ class ScopedSearchUserVFoldersAction(BaseScopeAction):
 
 
 @dataclass(frozen=True)
-class ScopedSearchUserVFoldersActionResult(BaseScopeActionResult):
+class ScopedSearchUserVFolderMountsActionResult(BaseScopeActionResult):
     """A page of pairs. What the read reached is the vfolders of the pairs."""
 
-    items: list[UserVFolderData]
+    items: list[UserVFolderMountData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

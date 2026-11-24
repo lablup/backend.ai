@@ -38,13 +38,13 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PartialBulkRestoreVFoldersInput,
     PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
-    ScopedSearchUserVFoldersInput,
+    ScopedSearchUserVFolderMountsInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
     UpdateVFolderInput,
-    UserVFolderFilter,
+    UserVFolderMountFilter,
     VFolderFilter,
     VFolderOrder,
 )
@@ -66,12 +66,12 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     MoveFilePayload,
     PurgeVFolderPayload,
     RestoreVFolderPayload,
-    SearchUserVFoldersPayload,
+    SearchUserVFolderMountsPayload,
     SearchVFoldersPayload,
     SetVFolderMountPolicyPayload,
     UnsetVFolderMountPolicyPayload,
     UpdateVFolderPayload,
-    UserVFolderNode,
+    UserVFolderMountNode,
     VFolderMountPoliciesPayload,
     VFolderMountPolicyNode,
     VFolderNode,
@@ -117,7 +117,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
 )
 from ai.backend.manager.data.vfolder.types import (
-    UserVFolderData,
+    UserVFolderMountData,
     VFolderData,
     VFolderMountPolicyData,
 )
@@ -143,10 +143,10 @@ from ai.backend.manager.models.vfolder.scopes import (
     UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.searchable_fields import (
-    UserVFolderSearchableFields,
+    UserVFolderMountSearchableFields,
     VFolderSearchableFields,
 )
-from ai.backend.manager.models.vfolder.searchers import UserVFolderSearcher, VFolderSearcher
+from ai.backend.manager.models.vfolder.searchers import UserVFolderMountSearcher, VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
     VFolderAutoMountSearchableFields,
@@ -195,8 +195,8 @@ from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders im
     PartialBulkUpdateVFoldersAction,
 )
 from ai.backend.manager.services.vfolder.actions.scoped_search import ScopedSearchVFoldersAction
-from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolders import (
-    ScopedSearchUserVFoldersAction,
+from ai.backend.manager.services.vfolder.actions.scoped_search_user_vfolder_mounts import (
+    ScopedSearchUserVFolderMountsAction,
 )
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
@@ -495,14 +495,16 @@ class VFolderAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-    async def scoped_search_user_vfolders(
-        self, input: ScopedSearchUserVFoldersInput
-    ) -> SearchUserVFoldersPayload:
+    async def scoped_search_user_vfolder_mounts(
+        self, input: ScopedSearchUserVFolderMountsInput
+    ) -> SearchUserVFolderMountsPayload:
         """Search the pairs of the scope user and the vfolders the named scopes reach."""
         user_id = UserID(input.scope.user[0].value)
         vfolder_searcher = self._build_searcher(
             VFolderSearcher,
-            conditions=self._convert_user_vfolder_filter(input.filter) if input.filter else [],
+            conditions=self._convert_user_vfolder_mount_filter(input.filter)
+            if input.filter
+            else [],
             orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
@@ -512,8 +514,8 @@ class VFolderAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._mount_policy.scoped_search_user_vfolders.run(
-            ScopedSearchUserVFoldersAction(
+        action_result = await self._mount_policy.scoped_search_user_vfolder_mounts.run(
+            ScopedSearchUserVFolderMountsAction(
                 user_id=user_id,
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(
@@ -524,7 +526,7 @@ class VFolderAdapter(BaseAdapter):
                         )
                     ),
                     used_by=(),
-                    searcher=UserVFolderSearcher(
+                    searcher=UserVFolderMountSearcher(
                         pagination=vfolder_searcher.pagination,
                         conditions=vfolder_searcher.conditions,
                         orders=vfolder_searcher.orders,
@@ -533,8 +535,8 @@ class VFolderAdapter(BaseAdapter):
                 ),
             )
         )
-        return SearchUserVFoldersPayload(
-            items=[self._user_vfolder_data_to_node(item) for item in action_result.items],
+        return SearchUserVFolderMountsPayload(
+            items=[self._user_vfolder_mount_data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -666,8 +668,8 @@ class VFolderAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _user_vfolder_data_to_node(data: UserVFolderData) -> UserVFolderNode:
-        return UserVFolderNode(
+    def _user_vfolder_mount_data_to_node(data: UserVFolderMountData) -> UserVFolderMountNode:
+        return UserVFolderMountNode(
             id=f"{data.user_id}:{data.vfolder_id}",
             user_id=data.user_id,
             vfolder_id=data.vfolder_id,
@@ -1078,27 +1080,27 @@ class VFolderAdapter(BaseAdapter):
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    def _convert_user_vfolder_filter(self, f: UserVFolderFilter) -> list[QueryCondition]:
+    def _convert_user_vfolder_mount_filter(self, f: UserVFolderMountFilter) -> list[QueryCondition]:
         conditions = [
             *self.apply_enum_filter(
-                f.mount_permission, UserVFolderSearchableFields.mount_permission
+                f.mount_permission, UserVFolderMountSearchableFields.mount_permission
             ),
             *(self._convert_vfolder_filter(f.vfolder) if f.vfolder else []),
         ]
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_user_vfolder_filter(sub))
+                conditions.extend(self._convert_user_vfolder_mount_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                sub_conditions = self._convert_user_vfolder_filter(sub)
+                sub_conditions = self._convert_user_vfolder_mount_filter(sub)
                 if sub_conditions:
                     or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             for sub in f.NOT:
-                sub_conditions = self._convert_user_vfolder_filter(sub)
+                sub_conditions = self._convert_user_vfolder_mount_filter(sub)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions

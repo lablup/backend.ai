@@ -371,7 +371,7 @@ class VFolderMountPolicyData(FieldData):
 
 
 @dataclass(frozen=True)
-class UserVFolderData:
+class UserVFolderMountData:
     """One user paired with one vfolder, and the level the user mounts it at."""
 
     user_id: UserID

@@ -181,7 +181,7 @@ from ai.backend.manager.repositories.vfolder.quota_scope import (
 )
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
-    UserVFolderPage,
+    UserVFolderMountPage,
     VFolderPurgeFailure,
 )
 from ai.backend.manager.views.user import UserResourceInfo
@@ -1953,9 +1953,9 @@ class VfolderRepository:
             return result.items
 
     @vfolder_repository_resilience.apply()
-    async def scoped_search_user_vfolders(
+    async def scoped_search_user_vfolder_mounts(
         self, scoped: ScopedSearcher[VFolderRow, VFolderData], user_id: UserID
-    ) -> UserVFolderPage:
+    ) -> UserVFolderMountPage:
         """A page of the vfolders the scopes reach, with the mount policy rows the user
         holds on them."""
         async with self._v2_ops.read_ops() as r:
@@ -1964,7 +1964,7 @@ class VfolderRepository:
                 VFolderUserMountPolicyQuerier(user_id=user_id),
                 [vfolder.id for vfolder in page.items],
             )
-            return UserVFolderPage(
+            return UserVFolderMountPage(
                 page=page,
                 policies={vfolder_id: data.permission for vfolder_id, data in rows.items()},
             )
