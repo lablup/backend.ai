@@ -2,22 +2,53 @@
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 import asyncio
+=======
+import errno
+>>>>>>> 12338279 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
 import logging
 import smtplib
+import socket
+import ssl
 from email.mime.text import MIMEText
 from functools import partial
 from typing import override
 
 from ai.backend.common.data.notification.types import EmailSpec
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
+=======
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.errors.notification import (
+    NotificationDeliveryFailure,
+    NotificationProcessingFailure,
+)
+>>>>>>> 12338279 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_NOTIFICATION_SUBJECT = "Notification from Backend.AI"
+
+
+_UNREACHABLE_ERRNOS = frozenset({
+    errno.EHOSTUNREACH,
+    errno.ENETUNREACH,
+    errno.EHOSTDOWN,
+    errno.ENETDOWN,
+})
+
+
+def _is_smtp_destination_failure(error: OSError) -> bool:
+    """Whether the SMTP host could not be reached or presented a certificate that fails to verify."""
+    if isinstance(
+        error, (socket.gaierror, ConnectionError, TimeoutError, ssl.SSLCertVerificationError)
+    ):
+        return True
+    return error.errno in _UNREACHABLE_ERRNOS
 
 
 class EmailChannel(AbstractNotificationChannel):
@@ -41,7 +72,8 @@ class EmailChannel(AbstractNotificationChannel):
             SendResult indicating success
 
         Raises:
-            NotificationProcessingFailure: If email delivery fails
+            NotificationDeliveryFailure: If the SMTP server cannot be reached or rejects the message
+            NotificationProcessingFailure: If email delivery fails for any other reason
         """
         # Determine subject (priority: spec template > first line of message)
         if self._spec.message.subject_template:
@@ -93,6 +125,7 @@ class EmailChannel(AbstractNotificationChannel):
                     to_addrs=msg.to_emails,
                 )
         except smtplib.SMTPConnectError as e:
+<<<<<<< HEAD
             log.error(
                 "Failed to connect to SMTP server {}:{}: {}",
                 smtp.host,
@@ -110,6 +143,17 @@ class EmailChannel(AbstractNotificationChannel):
         except smtplib.SMTPException as e:
             log.error("SMTP error while sending email: {}", str(e))
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
+=======
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
+        except smtplib.SMTPAuthenticationError as e:
+            raise NotificationDeliveryFailure(f"SMTP authentication failed: {e!s}") from e
+        except smtplib.SMTPException as e:
+            raise NotificationDeliveryFailure(f"Email delivery failed: {e!s}") from e
+        except OSError as e:
+            if not _is_smtp_destination_failure(e):
+                raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
+>>>>>>> 12338279 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
         except Exception as e:
             log.error("Unexpected error sending email: {}", str(e))
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

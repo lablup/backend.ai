@@ -13,13 +13,16 @@ from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.common.data.notification.types import WebhookSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.notification import (
-    NotificationProcessingFailure,
+    NotificationDeliveryFailure,
     WebhookConnectionFailure,
 )
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# How much of a failed response's body is read and quoted in the error.
+_FAILURE_BODY_LIMIT = 200
 
 __all__ = ("WebhookChannel",)
 
@@ -57,7 +60,7 @@ class WebhookChannel(AbstractNotificationChannel):
 
         Raises:
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If the webhook responds with a failure status
+            NotificationDeliveryFailure: If the webhook responds with a failure status
         """
         webhook_url = self._webhook_spec.url
 
@@ -94,6 +97,7 @@ class WebhookChannel(AbstractNotificationChannel):
                     return SendResult(
                         message=f"Webhook sent successfully (status: {response.status})",
                     )
+<<<<<<< HEAD
                 response_text = await response.text()
                 log.warning(
                     "Webhook request failed with status {}: {}",
@@ -102,6 +106,14 @@ class WebhookChannel(AbstractNotificationChannel):
                 )
                 raise NotificationProcessingFailure(
                     f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
+=======
+                # Bounded, and decoded leniently: a body in another charset must not escape
+                # as a decoding error.
+                body = await response.content.read(_FAILURE_BODY_LIMIT)
+                raise NotificationDeliveryFailure(
+                    f"Webhook delivery failed with status {response.status}: "
+                    f"{body.decode('utf-8', errors='replace')}"
+>>>>>>> 12338279 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
                 )
         except (aiohttp.ClientError, TimeoutError) as e:
             raise WebhookConnectionFailure(

@@ -10,6 +10,14 @@ from typing import TYPE_CHECKING
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
+<<<<<<< HEAD
+=======
+from ai.backend.manager.errors.notification import (
+    NotificationDeliveryFailure,
+    NotificationTemplateRenderingFailure,
+    WebhookConnectionFailure,
+)
+>>>>>>> 12338279 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
 from ai.backend.manager.notification.types import ProcessRuleParams
 
 from .actions import (
@@ -95,7 +103,8 @@ class NotificationService:
         Raises:
             NotificationChannelNotFound: If the channel does not exist
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If sending the test message fails
+            NotificationDeliveryFailure: If the channel's destination rejects the test message
+            NotificationProcessingFailure: If sending the test message fails for any other reason
         """
         channel_data = await self._repository.get_channel_by_id(action.channel_id)
         await self._notification_center.validate_channel(channel_data, action.test_message)
@@ -119,7 +128,8 @@ class NotificationService:
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If sending the rendered message fails
+            NotificationDeliveryFailure: If the channel's destination rejects the rendered message
+            NotificationProcessingFailure: If sending the rendered message fails for any other reason
         """
         # Fetch the rule to know its rule_type, then the channel it names. The rule
         # carries the channel's id, not the channel — reading both is this method's
@@ -190,6 +200,18 @@ class NotificationService:
             errors=result.errors,
         )
 
+<<<<<<< HEAD
+=======
+    def _is_user_side_failure(
+        self, channel_type: NotificationChannelType, error: BaseException
+    ) -> bool:
+        if isinstance(error, NotificationTemplateRenderingFailure):
+            return True
+        if channel_type == NotificationChannelType.WEBHOOK:
+            return isinstance(error, (NotificationDeliveryFailure, WebhookConnectionFailure))
+        return False
+
+>>>>>>> 12338279 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
     async def _process_rules(
         self,
         matches: Sequence[MatchingNotificationRuleData],
