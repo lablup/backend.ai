@@ -11,7 +11,8 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 download_github_release() {
     local repo=$1
     local binary_name=$2
-    local tag=$3
+    local asset_suffix=$3
+    local tag=$4
 
     if [ -z "$tag" ]; then
         echo "Fetching latest release tag for ${repo}..."
@@ -20,7 +21,7 @@ download_github_release() {
     echo "Downloading ${binary_name} ${tag} from ${repo}..."
 
     for ARCH in aarch64 x86_64; do
-        local url="https://github.com/${repo}/releases/download/${tag}/${binary_name}-linux-${ARCH}-musl.tar.gz"
+        local url="https://github.com/${repo}/releases/download/${tag}/${binary_name}-linux-${ARCH}${asset_suffix}.tar.gz"
         local extract_dir="${WORK_DIR}/${binary_name}-${ARCH}"
         mkdir -p "${extract_dir}"
         echo "  ${ARCH}: ${url}"
@@ -40,10 +41,11 @@ download_github_release() {
 echo "=== Updating external tool binaries ==="
 
 # bssh (SSH server for Backend.AI)
-download_github_release "lablup/bssh" "bssh" "${BSSH_VERSION:-}"
+download_github_release "lablup/bssh" "bssh" "-musl" "${BSSH_VERSION:-}"
 
 # all-smi (GPU monitoring tool)
-download_github_release "lablup/all-smi" "all-smi" "${ALL_SMI_VERSION:-}"
+# The glibc build has no suffix. The static musl build cannot dlopen libnvidia-ml.so.1.
+download_github_release "lablup/all-smi" "all-smi" "" "${ALL_SMI_VERSION:-}"
 
 echo "=== All external tools updated ==="
 git add "${TARGET_DIR}"/*.bin "${TARGET_DIR}"/*.1 2>/dev/null || true
