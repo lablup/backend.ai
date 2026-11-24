@@ -41164,6 +41164,18 @@
             "default": null,
             "description": "Added in 26.10.0. Filter by vfolder ID."
           },
+          "mount_permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderMountPermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the level the caller mounts the vfolder at. wd matches rw."
+          },
           "AND": {
             "anyOf": [
               {
@@ -41216,6 +41228,69 @@
         "title": "VFolderFilter",
         "type": "object"
       },
+      "VFolderMountPermissionFilter": {
+        "description": "Filter for the level the caller mounts a vfolder at.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderMountPermissionFilter",
+        "type": "object"
+      },
       "VFolderOperationStatusField": {
         "enum": [
           "ready",
@@ -41259,6 +41334,17 @@
           "host"
         ],
         "title": "VFolderOrderField",
+        "type": "string"
+      },
+      "VFolderPermissionField": {
+        "enum": [
+          "none",
+          "ro",
+          "rw",
+          "wd",
+          "wd"
+        ],
+        "title": "VFolderPermissionField",
         "type": "string"
       },
       "VFolderStatusFilter": {
@@ -41785,17 +41871,6 @@
         ],
         "title": "ScopedSearchVFoldersInput",
         "type": "object"
-      },
-      "VFolderPermissionField": {
-        "enum": [
-          "none",
-          "ro",
-          "rw",
-          "wd",
-          "wd"
-        ],
-        "title": "VFolderPermissionField",
-        "type": "string"
       },
       "CreateVFolderInput": {
         "description": "Input for creating a virtual folder.",

@@ -32664,6 +32664,11 @@ input VFolderFilter
 
   """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
   autoMounts: VFolderAutoMountNestedFilter = null
+
+  """
+  Added in 26.10.0. Filter by the level the current user mounts the vfolder at (`VFolder.mountPermission`).
+  """
+  mountPermission: VFolderMountPermissionFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
@@ -32748,6 +32753,25 @@ enum VFolderMountPermission
   READ_ONLY @join__enumValue(graph: STRAWBERRY)
   READ_WRITE @join__enumValue(graph: STRAWBERRY)
   RW_DELETE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for the level the current user mounts a vfolder at. RW_DELETE matches READ_WRITE.
+"""
+input VFolderMountPermissionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: VFolderMountPermission = null
+
+  """Match any of the given levels."""
+  in: [VFolderMountPermission!] = null
+
+  """Exclude an exact match."""
+  notEquals: VFolderMountPermission = null
+
+  """Exclude any of the given levels."""
+  notIn: [VFolderMountPermission!] = null
 }
 
 """
