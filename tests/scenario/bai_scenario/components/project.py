@@ -11,10 +11,15 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
@@ -32,7 +37,10 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import LinkToProject, TestSeedResourceGroup
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 
 @dataclass(frozen=True)
@@ -160,3 +168,87 @@ class NoProjectIsProcessed(Then[ManyProjectsAndACaller, PartialBulkPayload[Proje
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
+
+
+@dataclass(frozen=True)
+class SomeoneReadingProjectsOfTheGroup(TestSeedNest[Laid[None]]):
+    """그 리소스 그룹 범위에서 프로젝트를 읽을 수 있는 사용자."""
+
+    group: Laid[ResourceGroupData]
+    user: Laid[UserData]
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "리소스 그룹 범위의 프로젝트 읽기 역할을 받은 사용자 준비",
+            english="Prepare a user granted the project read role in the resource group scope",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(
+            TestSeedRole(lambda g: ResourceGroupID(g.id), name_hint="project-reader"), self.group
+        )
+        seed.adding(
+            TestSeedPermission(entity_type=ProjectEntityType(), permission=Permission.READ), role
+        )
+        return seed.granting(
+            role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+
+
+@dataclass(frozen=True)
+class ProjectsOfAGroupAndACaller:
+    """리소스 그룹 하나, 그 그룹을 쓸 수 있는 프로젝트들, 그리고 부를 사람."""
+
+    group: ResourceGroupData
+    linked: tuple[ProjectData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ProjectsOfAGroupAndSomeone(Given[Any, ProjectsOfAGroupAndACaller]):
+    """리소스 그룹 하나와 프로젝트 셋. 그중 둘만 그 그룹을 쓸 수 있다.
+
+    ``reading``이면 호출자가 그 그룹 범위에서 프로젝트 읽기 역할을 받는다.
+    """
+
+    role: UserRole = UserRole.USER
+    reading: bool = False
+
+    @override
+    def describe(self) -> str:
+        role = self.role.value
+        if self.reading:
+            who_ko = f"그 그룹 범위의 프로젝트 읽기 역할을 받은 {role}"
+            who_en = f"the {role} granted the project read role in the resource group scope"
+        else:
+            who_ko = role
+            who_en = f"one {role}"
+        return Says(
+            f"리소스 그룹 하나, 그 그룹을 쓸 수 있는 프로젝트 둘과 쓸 수 없는 하나, 그리고 {who_ko} 한 명",
+            english=(
+                f"one resource group, two projects that can use it and one that cannot, and {who_en}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ProjectsOfAGroupAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        group = await seeding.creating(TestSeedResourceGroup())
+        linked = [
+            await seeding.creating_from_two(TestSeedProject(name_hint="linked"), home, policy)
+            for _ in range(2)
+        ]
+        await seeding.creating_from_two(TestSeedProject(name_hint="unlinked"), home, policy)
+        for one in linked:
+            await seeding.linking(LinkToProject(), one, group)
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.reading:
+            await seeding.within(SomeoneReadingProjectsOfTheGroup(group, caller))
+        return ProjectsOfAGroupAndACaller(
+            group=seeding.made(group),
+            linked=tuple(seeding.made(one) for one in linked),
+            caller=seeding.made(caller),
+        )

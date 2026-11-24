@@ -8,6 +8,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -79,6 +80,7 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
     ProjectTarget,
+    ResourceGroupProjectTarget,
     UserProjectTarget,
 )
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
@@ -446,6 +448,10 @@ class ProjectAdapter(BaseAdapter):
             DomainProjectTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
         targets.extend(UserProjectTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        targets.extend(
+            ResourceGroupProjectTarget(resource_group_id=ResourceGroupID(entry.value))
+            for entry in scope.resource_group or ()
+        )
         return targets
 
     async def scoped_search(
