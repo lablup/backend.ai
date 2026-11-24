@@ -118,7 +118,7 @@ current, see `AGENTS.md` in this directory.
 
 | Directory | Contents |
 |---|---|
-| `agent/` | Cross-build recipes for the static binaries bundled into the kernel runner (dropbear, ttyd, tmux, sftp-server, socket-relay, suexec) and agent-side deployment helpers |
+| `agent/` | Cross-build recipes for the static binaries bundled into the kernel runner (dropbear, ttyd, tmux, sftp-server, socket-relay, suexec), the glibc stub libraries, and agent-side deployment helpers |
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
 | `knowledge/` | `KNOWLEDGE.md` tooling: shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py`, `check_words.py`, `check_bep_length.py` |

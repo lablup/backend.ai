@@ -1,0 +1,15 @@
+GLIBC_2.2.5 { __backendai_glibc_stub_2_2_5; };
+GLIBC_2.2.6 { __backendai_glibc_stub_2_2_6; };
+GLIBC_2.3.2 { __backendai_glibc_stub_2_3_2; };
+GLIBC_2.3.3 { __backendai_glibc_stub_2_3_3; };
+GLIBC_2.3.4 { __backendai_glibc_stub_2_3_4; };
+GLIBC_2.4 { __backendai_glibc_stub_2_4; };
+GLIBC_2.5 { __backendai_glibc_stub_2_5; };
+GLIBC_2.7 { __backendai_glibc_stub_2_7; };
+GLIBC_2.11 { __backendai_glibc_stub_2_11; };
+GLIBC_2.12 { __backendai_glibc_stub_2_12; };
+GLIBC_2.17 { __backendai_glibc_stub_2_17; };
+GLIBC_2.18 { __backendai_glibc_stub_2_18; };
+GLIBC_2.28 { __backendai_glibc_stub_2_28; };
+GLIBC_2.30 { __backendai_glibc_stub_2_30; };
+GLIBC_2.31 { global: __backendai_glibc_stub_2_31; local: *; };
