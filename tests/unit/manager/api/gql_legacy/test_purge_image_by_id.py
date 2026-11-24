@@ -17,8 +17,8 @@ class TestPurgeImageById:
     def info_of_a_request_whose_untag_fails(self) -> MagicMock:
         info = MagicMock()
         image_processors = info.context.processors.image
-        image_processors.purge_image_by_id.run = AsyncMock()
-        image_processors.untag_image_from_registry.run = AsyncMock(
+        image_processors.purge_image_by_id.wait_for_complete = AsyncMock()
+        image_processors.untag_image_from_registry.wait_for_complete = AsyncMock(
             side_effect=PassthroughError.from_http_status(
                 503,
                 domain=ErrorDomain.CONTAINER_REGISTRY,
@@ -38,4 +38,4 @@ class TestPurgeImageById:
                 PurgeImageOptions(remove_from_registry=True),
             )
 
-        info_of_a_request_whose_untag_fails.context.processors.image.purge_image_by_id.run.assert_not_called()
+        info_of_a_request_whose_untag_fails.context.processors.image.purge_image_by_id.wait_for_complete.assert_not_called()

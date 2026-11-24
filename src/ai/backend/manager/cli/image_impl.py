@@ -135,16 +135,10 @@ async def purge_image(
                 ],
                 filter_by_statuses=None,
             )
-<<<<<<< HEAD
-            await session.delete(image_row)
-
-=======
->>>>>>> 585f30b7c (fix(BA-9069): untag before purging an image with remove_from_registry (#17309))
             if remove_from_registry:
                 await image_row.untag_image_from_registry(db=db, session=session)
 
-            async with V2DBOpsProvider(db).write_ops() as w:
-                await w.purge_entity(ImagePurger(image_id=image.id))
+            await session.delete(image_row)
 
         except UnknownImageReference:
             log.exception("Image not found.")
