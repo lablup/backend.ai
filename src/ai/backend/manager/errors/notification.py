@@ -17,6 +17,7 @@ __all__ = (
     "InvalidNotificationSpec",
     "NotificationChannelConflict",
     "NotificationChannelNotFound",
+    "NotificationDeliveryFailure",
     "NotificationProcessingFailure",
     "NotificationRuleConflict",
     "NotificationRuleNotFound",
@@ -112,7 +113,26 @@ class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
+<<<<<<< HEAD
 class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
+=======
+class NotificationDeliveryFailure(BackendAIError, web.HTTPBadRequest):
+    """Raised when the channel's destination rejects the message: a webhook failure status or an SMTP error."""
+
+    error_type = "https://api.backend.ai/probs/notification-delivery-failure"
+    error_title = "The notification channel did not accept the message."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidNotificationChannelType(EntityError, web.HTTPBadRequest):
+>>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
     error_type = "https://api.backend.ai/probs/invalid-notification-channel-type"
     error_title = "Invalid notification channel type."
 
