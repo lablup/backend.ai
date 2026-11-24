@@ -32346,14 +32346,14 @@ type UserVFolderMountConnection
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
-  """Contains the nodes in this connection"""
+  """Contains the nodes in this connection."""
   edges: [UserVFolderMountEdge!]!
 
   """Total number of pairs matching the query criteria."""
   count: Int!
 }
 
-"""An edge in a connection."""
+"""Added in 26.10.0. One mount policy of a user within a connection."""
 type UserVFolderMountEdge
   @join__type(graph: STRAWBERRY)
 {
