@@ -27,7 +27,7 @@
   # not one of them when walking the chain inwards from the peer of the
   # connection. If empty (default), the first X-Forwarded-For entry is taken as
   # the client IP, as the manager does, which is deprecated.
-  # Added in 26.10.0
+  # Added in 26.4.21
   trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Enable SSL/TLS encryption for the webserver. When enabled, all HTTP
   # connections are served over HTTPS. Requires ssl_cert and ssl_privkey to be
