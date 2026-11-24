@@ -28,7 +28,7 @@ class MockTask(PeriodicTask):
         interval: float = 1.0,
         initial_delay: float = 0.0,
         run_func: AsyncMock | None = None,
-    ):
+    ) -> None:
         self._name = name
         self._interval = interval
         self._initial_delay = initial_delay

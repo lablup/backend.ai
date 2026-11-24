@@ -163,7 +163,7 @@ def dbshell(
             ),
             *_psql_args,
         ]
-        subprocess.run(cmd)
+        subprocess.run(cmd, check=False)
         return
     # Use the container to start the psql client command
     _get_logger().info("using the db container", container_name=container_name)
@@ -180,7 +180,7 @@ def dbshell(
         db_config.name,
         *_psql_args,
     ]
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=False)
 
 
 @main.command()

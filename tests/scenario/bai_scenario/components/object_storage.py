@@ -38,9 +38,9 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     in_language,
 )
-from bai_scenario.components.answers import TheFailedItemIsRefused
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf
 from bai_scenario.components.system import KEPT, Kept, role_named
+from bai_scenario.components.the_failed_item_is_refused import TheFailedItemIsRefused
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.object_storage.object_storage import TestSeedObjectStorage
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole

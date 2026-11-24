@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.common import (
     MountItemInput,
     NonEmptyList,
     ResourceSlotEntryInput,
+    ServiceArgumentInterpolationInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.kernel_group.request import (
@@ -495,6 +496,14 @@ class EnqueueSessionInput(BaseRequestModel):
     tag: str | None = Field(default=None, max_length=64, description="User-defined tag.")
     callback_url: str | None = Field(
         default=None, description="Webhook URL for session lifecycle events."
+    )
+
+    interpolation: ServiceArgumentInterpolationInput | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Variable syntax of the service arguments, fixed "
+            "for the session. Omit to use the resource group's `default_session_options`."
+        ),
     )
 
     # Batch-only

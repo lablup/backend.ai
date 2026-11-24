@@ -327,6 +327,19 @@ class DotfileNotFound(ObjectNotFound):
         )
 
 
+class DefaultDotfilePurgeForbidden(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/default-dotfile-purge-forbidden"
+    error_title = "The default auto-generated file of a path cannot be purged."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOTFILE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class DotfileVFolderPathConflict(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/dotfile-vfolder-path-conflict"
     error_title = "The dotfile path conflicts with a virtual folder path."

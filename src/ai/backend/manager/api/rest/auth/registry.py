@@ -36,6 +36,5 @@ def register_auth_routes(handler: AuthHandler, route_deps: RouteDeps) -> RouteRe
     reg.add("POST", "/update-password", handler.update_password, middlewares=[auth_required])
     reg.add("POST", "/update-full-name", handler.update_full_name, middlewares=[auth_required])
     reg.add("GET", "/ssh-keypair", handler.get_ssh_keypair, middlewares=[auth_required])
-    reg.add("PATCH", "/ssh-keypair", handler.generate_ssh_keypair, middlewares=[auth_required])
     reg.add("POST", "/ssh-keypair", handler.upload_ssh_keypair, middlewares=[auth_required])
     return reg

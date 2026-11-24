@@ -143,9 +143,9 @@ def build_exception_middleware(
                     method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
                 ) from ex
             raise GenericBadRequest from ex
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             log.trace("request cancelled", http_method=method, route_path=endpoint)
-            raise e
+            raise
         except Exception as e:
             if is_client_disconnect(request, e):
                 log.trace(

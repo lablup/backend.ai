@@ -46,6 +46,7 @@ from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController, CgroupResolutionFailed
 from ai.backend.common.json import dump_json
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -54,7 +55,6 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceModelInfo,
     DeviceName,
-    KernelCreationConfig,
     MetricKey,
     SlotName,
     SlotTypes,
@@ -250,7 +250,7 @@ class CPUPlugin(AbstractComputePlugin):
         total_cpu_used = cast(
             Decimal, sum((Decimal(c.user + c.system) * 1000).quantize(q) for c in _cstat)
         )
-        now, raw_interval = ctx.update_timestamp("cpu-node")
+        _now, raw_interval = ctx.update_timestamp("cpu-node")
         interval = Decimal(raw_interval * 1000).quantize(q)
 
         return [
@@ -753,7 +753,7 @@ class MemoryPlugin(AbstractComputePlugin):
                         ):
                             if line.startswith("Total "):
                                 continue
-                            dev, op, nbytes = line.strip().split()
+                            _dev, op, nbytes = line.strip().split()
                             if op == "Read":
                                 io_read_bytes += int(nbytes)
                             elif op == "Write":

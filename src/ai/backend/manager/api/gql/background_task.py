@@ -119,7 +119,7 @@ class BackgroundTaskEventPayloadGQL:
 async def background_task_events(
     task_id: strawberry.ID,
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[BackgroundTaskEventPayloadGQL, None]:
+) -> AsyncGenerator[BackgroundTaskEventPayloadGQL]:
     """Subscribe to background task events for a specific task.
 
     Streams events for a background task, including:

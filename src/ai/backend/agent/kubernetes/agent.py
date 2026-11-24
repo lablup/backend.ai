@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import functools
 import hashlib
 import logging
@@ -58,6 +59,7 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+from ai.backend.agent.utils import SECRET_MASK
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
@@ -66,6 +68,7 @@ from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -77,7 +80,6 @@ from ai.backend.common.types import (
     DeviceName,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
@@ -728,7 +730,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         if self.local_config.debug.log_kernel_config:
-            log.debug("initial container config built", container_config=str(deployment))
+            # env carries the session's environ, so only the variable names are logged.
+            dumped = copy.deepcopy(deployment)
+            for container in dumped["spec"]["template"]["spec"]["containers"]:
+                for env in container.get("env", []):
+                    env["value"] = SECRET_MASK
+            log.debug("initial container config built", container_config=str(dumped))
 
         expose_service = Service(
             str(self.kernel_id),
@@ -841,6 +848,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             "assigned_ports": assigned_ports,
             # 'domain_socket_proxies': self.domain_socket_proxies,
             "block_service_ports": self.internal_data.get("block_service_ports", False),
+            "service_interpolation": self.internal_data.get("service_interpolation"),
         }
 
 
@@ -944,10 +952,7 @@ class KubernetesAgent(
                     f"Scratch type {self.local_config.container.scratch_type} is not supported",
                 )
 
-            try:
-                await core_api.create_persistent_volume(body=new_pv.to_dict())
-            except Exception:
-                raise
+            await core_api.create_persistent_volume(body=new_pv.to_dict())
 
         pvc = await core_api.list_persistent_volume_claim_for_all_namespaces(
             label_selector="backend.ai/backend-ai-scratch-volume",

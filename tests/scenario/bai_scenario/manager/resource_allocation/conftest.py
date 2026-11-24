@@ -8,13 +8,14 @@ dependencies the session tables use and the rest named unwired.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
@@ -30,11 +31,14 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
@@ -51,6 +55,7 @@ from ai.backend.manager.data.kernel_group.types import (
     KernelGroupEnvironData,
     KernelGroupResourceSlotData,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -75,6 +80,7 @@ from ai.backend.manager.repositories.resource_preset.repository import ResourceP
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_environ_owner import (
@@ -114,6 +120,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.testutils.bootstrap import flush_redis
 from bai_scenario.fakes.events import SilentEventProducer
 from bai_scenario.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
@@ -121,6 +128,22 @@ from bai_scenario.fakes.storage_proxy import (
 )
 from bai_scenario.runner.unwired import unwired
 from bai_scenario.valkey import ScenarioValkey
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
 
 
 @pytest.fixture
@@ -159,6 +182,7 @@ async def adapter(
         config,
         FakeStorageSessionManager({"local": storage}),
         RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     session_group = registry.group(GroupMeta(SessionEntityType()))
     resource_allocation = ResourceAllocationProcessors(
@@ -237,6 +261,8 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
+            registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+            registry.group(GroupMeta(ContainerRegistryEntityType())),
             DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
         config,

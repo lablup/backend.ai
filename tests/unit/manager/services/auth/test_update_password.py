@@ -1,4 +1,5 @@
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -6,8 +7,10 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -18,6 +21,8 @@ from ai.backend.manager.services.auth.actions.update_password import (
 )
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.views.auth import UserCredential
+
+_PASSWORD_CHANGED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -31,6 +36,7 @@ def auth_service(
     mock_auth_repository: AsyncMock,
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
+    mock_auto_generated_file_repository: AsyncMock,
     mock_group_repository: AsyncMock,
     mock_client_ip_masking_repository: AsyncMock,
     mock_valkey_session_client: AsyncMock,
@@ -46,6 +52,7 @@ def auth_service(
         ssh_key_validator=AsyncMock(),
         client_ip_masking_repository=mock_client_ip_masking_repository,
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        auto_generated_file_repository=mock_auto_generated_file_repository,
     )
 
 
@@ -57,13 +64,11 @@ async def test_update_password_successful(
 ) -> None:
     """Test successful password update"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="old_password",
         new_password="new_secure_password",
-        new_password_confirm="new_secure_password",
     )
 
     # Setup hook to pass password format verification
@@ -77,6 +82,9 @@ async def test_update_password_successful(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
 
     # Password update succeeds
@@ -97,45 +105,6 @@ async def test_update_password_successful(
     mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with(deleted_tokens)
 
 
-async def test_update_password_fails_when_new_passwords_dont_match(
-    mock_hook_plugin_ctx: AsyncMock,
-    mock_auth_repository: AsyncMock,
-    auth_service: AuthService,
-) -> None:
-    """Test password update fails when new passwords don't match"""
-    action = UpdatePasswordAction(
-        request=MagicMock(),
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        domain_name="default",
-        email="user@example.com",
-        old_password="old_password",
-        new_password="new_password1",
-        new_password_confirm="new_password2",
-    )
-
-    # Setup hook to pass password format verification
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED,
-        result=None,
-        reason=None,
-    )
-
-    # Valid old password
-    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        hashed_password="hashed_password",
-    )
-
-    result = await auth_service.update_password(action)
-
-    assert result.success is False
-    assert result.message == "new password mismatch"
-    # When passwords don't match, we return early without checking old password
-    mock_auth_repository.check_credential_without_migration.assert_not_called()
-    # Password update should not be called when passwords don't match
-    mock_auth_repository.update_user_password.assert_not_called()
-
-
 async def test_update_password_fails_with_incorrect_old_password(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -143,13 +112,11 @@ async def test_update_password_fails_with_incorrect_old_password(
 ) -> None:
     """Test password update fails with incorrect old password"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="wrong_old_password",
         new_password="new_password",
-        new_password_confirm="new_password",
     )
 
     # Setup hook to pass password format verification
@@ -179,19 +146,20 @@ async def test_update_password_with_hook_rejection(
 ) -> None:
     """Test password update fails when hook rejects password format"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         old_password="correct_old_password",
         new_password="weak",
-        new_password_confirm="weak",
     )
 
     # Valid old password
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
 
     # Hook rejects the new password format
@@ -214,19 +182,20 @@ async def test_update_password_repository_call(
 ) -> None:
     """Test that password update calls repository with correct parameters"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="test-domain",
         email="update@example.com",
         old_password="old_pass",
         new_password="new_pass123",
-        new_password_confirm="new_pass123",
     )
 
     # Setup successful scenario
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
@@ -252,8 +221,14 @@ async def test_update_password_repository_call(
 
     # Verify hook was called
     mock_hook_plugin_ctx.dispatch.assert_called_once()
-    hook_call = mock_hook_plugin_ctx.dispatch.call_args
-    assert hook_call[0][0] == "VERIFY_PASSWORD_FORMAT"
+    assert mock_hook_plugin_ctx.dispatch.call_args.args == (
+        "VERIFY_PASSWORD_FORMAT",
+        (
+            VerifyPasswordFormatHookArgs(
+                email="update@example.com", username="test-user", password="new_pass123"
+            ),
+        ),
+    )
 
     assert result.success is True
     assert result.message == "Password updated successfully"

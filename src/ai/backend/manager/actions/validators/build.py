@@ -18,7 +18,7 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,

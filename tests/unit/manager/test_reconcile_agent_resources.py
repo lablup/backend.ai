@@ -72,7 +72,7 @@ class TestReconcileAgentResources:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -98,7 +98,7 @@ class TestReconcileAgentResources:
     async def registry(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[AgentRegistry, None]:
+    ) -> AsyncGenerator[AgentRegistry]:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
@@ -477,7 +477,7 @@ class TestOrphanedAllocationCleanup:
     async def db(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -503,7 +503,7 @@ class TestOrphanedAllocationCleanup:
     async def registry(
         self,
         db: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[AgentRegistry, None]:
+    ) -> AsyncGenerator[AgentRegistry]:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
@@ -947,7 +947,7 @@ class TestTerminalSessionKernelReconciliation:
     async def db(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -973,7 +973,7 @@ class TestTerminalSessionKernelReconciliation:
     async def registry(
         self,
         db: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[AgentRegistry, None]:
+    ) -> AsyncGenerator[AgentRegistry]:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 

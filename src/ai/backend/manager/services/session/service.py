@@ -475,7 +475,6 @@ class SessionService:
         tag = action.tag
 
         template = await self._session_repository.get_template_by_id(template_id)
-        log.debug("task template: {}", template)
         if not template:
             raise SessionTemplateNotFound
 
@@ -638,8 +637,6 @@ class SessionService:
         if isinstance(template, str):
             template = load_json(template)
 
-        log.debug("session template: {}", template)
-
         param_from_template = {
             "image": template["spec"]["kernel"]["image"],
             "architecture": template["spec"]["kernel"]["architecture"],
@@ -682,12 +679,6 @@ class SessionService:
         override_config = drop_undefined(dict(action.params.config))
         override_params = drop_undefined(dict(asdict(action.params)))
 
-        log.debug("default config: {}", config_from_template)
-        log.debug("default params: {}", param_from_template)
-
-        log.debug("override config: {}", override_config)
-        log.debug("override params: {}", override_params)
-
         if override_config:
             config_from_template.update(override_config)
         if override_params:
@@ -700,8 +691,6 @@ class SessionService:
         except t.DataError as e2:
             raise InvalidAPIParameters("Error while validating template") from e2
         params["config"] = config_from_template
-
-        log.debug("updated params: {}", params)
 
         if git := template["spec"]["kernel"]["git"]:
             if _dest := git.get("dest_dir"):
@@ -1327,17 +1316,16 @@ class SessionService:
                             f"Service {service} does not open the port number {port}."
                         ) from e
                     host_port = sport["host_ports"][hport_idx]
+                # using the default (primary) port of the app
+                elif "host_ports" not in sport:
+                    host_port = sport["host_port"]  # legacy kernels
                 else:
-                    # using the default (primary) port of the app
-                    if "host_ports" not in sport:
-                        host_port = sport["host_port"]  # legacy kernels
-                    else:
-                        host_port = sport["host_ports"][0]
+                    host_port = sport["host_ports"][0]
                 break
         else:
             raise AppNotFound(f"{session_data.name}:{service}")
 
-        opts: MutableMapping[str, None | str | list[str]] = {}
+        opts: MutableMapping[str, Any] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
@@ -1662,6 +1650,7 @@ class SessionService:
                         ),
                         kernel_groups=kernel_groups,
                         handler_options=None,
+                        interpolation=action.interpolation,
                     ),
                 ),
                 internal_data_extras=InternalDataExtras(

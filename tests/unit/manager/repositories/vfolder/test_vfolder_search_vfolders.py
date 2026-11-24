@@ -21,7 +21,6 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -58,7 +57,7 @@ class TestVfolderSearchVfolders:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -70,7 +69,6 @@ class TestVfolderSearchVfolders:
                 KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
-                ImageRow,
                 VFolderRow,
                 ModelCardRow,
             ],
@@ -88,7 +86,7 @@ class TestVfolderSearchVfolders:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create two projects with vfolders: project_a has 2 vfolders, project_b has 1."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
@@ -233,7 +231,7 @@ class TestVfolderSearchVfolders:
     async def empty_test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create domain, user, keypair, and project rows but NO vfolders."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"

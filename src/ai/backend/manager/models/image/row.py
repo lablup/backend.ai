@@ -29,6 +29,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
@@ -56,9 +57,12 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -505,10 +509,11 @@ class ImageAccessCriteria:
     """
 
     user_id: UUID
-    allowed_registries: set[str]
+    allowed_registries: set[ContainerRegistryID]
+    """The registries the user's domain is related to."""
 
     def is_accessible_image(self, image: ImageRow) -> bool:
-        if image.registry not in self.allowed_registries:
+        if image.registry_id not in self.allowed_registries:
             return False
         if not image.customized:
             return True
@@ -624,7 +629,7 @@ class ImagePermissionContextBuilder(
 
     async def _get_allowed_registries_for_user(
         self, _ctx: ClientContext, user_id: UUID
-    ) -> set[str]:
+    ) -> set[ContainerRegistryID]:
         user_query_stmt = (
             sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
         )
@@ -633,7 +638,10 @@ class ImagePermissionContextBuilder(
             raise InvalidScope(f"User not found (id:{user_id})")
         if user_row.domain is None:
             raise InvalidScope(f"User domain not found (id:{user_id})")
-        return set(user_row.domain.allowed_docker_registries)
+        stmt = sa.select(DomainContainerRegistryRelationRow.container_registry_id).where(
+            DomainContainerRegistryRelationRow.domain_id == user_row.domain.id
+        )
+        return set(await self.db_session.scalars(stmt))
 
     def _get_effective_user_id_in_user_scope(self, ctx: ClientContext, scope: UserScope) -> UUID:
         """
@@ -661,7 +669,12 @@ class ImagePermissionContextBuilder(
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
             .options(
-                load_only(ImageRow.id, ImageRow.registry, ImageRow.customized, ImageRow.creator_id)
+                load_only(
+                    ImageRow.id,
+                    ImageRow.registry_id,
+                    ImageRow.customized,
+                    ImageRow.creator_id,
+                )
             )
             .where(ContainerRegistryRow.is_global == true())
         )
@@ -698,13 +711,21 @@ class ImagePermissionContextBuilder(
         if domain_row is None:
             raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
 
-        allowed_registries: set[str] = set(domain_row.allowed_docker_registries)
+        allowed_registries_stmt = sa.select(
+            DomainContainerRegistryRelationRow.container_registry_id
+        ).where(DomainContainerRegistryRelationRow.domain_id == domain_row.id)
+        allowed_registries = set(await self.db_session.scalars(allowed_registries_stmt))
 
         img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
             .options(
-                load_only(ImageRow.id, ImageRow.registry, ImageRow.customized, ImageRow.creator_id)
+                load_only(
+                    ImageRow.id,
+                    ImageRow.registry_id,
+                    ImageRow.customized,
+                    ImageRow.creator_id,
+                )
             )
             .where(ContainerRegistryRow.is_global == true())
         )

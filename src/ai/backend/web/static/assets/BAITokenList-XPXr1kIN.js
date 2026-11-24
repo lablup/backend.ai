@@ -1,0 +1,8 @@
+import{t as e}from"./jsx-runtime-BapUIyWk.js";import{R as t}from"./usePressFeedback-BIoIGSxE.js";import{at as n}from"./DefaultProviders-BFjPhnQa.js";import{t as r}from"./VStack-DaUzGF31.js";import{u as i}from"./Skeleton-D35z7Ria.js";import{t as a}from"./Badge-8q4sdq1t.js";import{t as o}from"./Token-D5_yAVQ_.js";import{t as s}from"./Popover-BpJL-xE6.js";import{t as c}from"./HoverCard-BvL5EUBB.js";var l=e();function u({items:e,maxInline:u=3,emptyText:d=`-`,variant:f=`token`,trigger:p=`hover`}){if(e.length===0)return(0,l.jsx)(l.Fragment,{children:d});let m=e.slice(0,u),h=e.slice(u),g=h.length,_=(0,l.jsx)(r,{align:`start`,className:`uic-token-list__rest`,children:h.map((e,n)=>(0,l.jsx)(t,{children:e},`${e}-${n}`))}),v=p===`hover`?(0,l.jsx)(c,{content:_,touchTrigger:`tap`,children:f===`text`?(0,l.jsx)(a,{variant:`neutral`,label:`+${g}`,tabIndex:0,className:`uic-token-list__count`}):(0,l.jsxs)(n,{children:[`+`,g]})}):(0,l.jsx)(s,{label:`+${g}`,content:_,hasCloseButton:!1,hasAutoFocus:!1,role:`none`,children:(0,l.jsxs)(n,{children:[`+`,g]})});return f===`text`?(0,l.jsxs)(i,{gap:1,align:`center`,className:`uic-token-list uic-token-list--text`,children:[m.map((e,t)=>(0,l.jsx)(`span`,{className:`uic-token-list__text`,children:e},`${e}-${t}`)),g>0&&v]}):(0,l.jsxs)(`span`,{children:[(0,l.jsx)(i,{gap:2,align:`center`,wrap:`wrap`,className:`uic-token-list`,children:m.map((e,t)=>(0,l.jsx)(o,{label:String(e)},`${e}-${t}`))}),g>0&&(0,l.jsxs)(l.Fragment,{children:[`\xA0`,v]})]})}u.displayName=`TokenList`;
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ui-common `TokenList` under its BUI name; the props are identical.
+*/
+var d=u;export{d as t};

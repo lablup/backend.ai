@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
+from etcd_client import ClientError, CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -171,6 +171,24 @@ async def test_unquote_for_get_prefix(etcd: AsyncEtcd) -> None:
 
     v = await etcd.get_prefix("obj/aa%3Acc")
     assert dict(v) == {"": "wow"}
+
+
+@pytest.fixture
+async def gateway_etcd(
+    etcd_container: tuple[str, HostPortPairModel],
+    test_ns: str,
+) -> AsyncIterator[AsyncEtcd]:
+    async with AsyncEtcd(
+        addrs=[etcd_container[1].to_legacy()],
+        namespace=test_ns,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "",
+        },
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+    ) as etcd:
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+        yield etcd
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
 
 
 async def test_scope_empty_prefix(gateway_etcd: AsyncEtcd) -> None:
@@ -529,7 +547,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -557,7 +575,7 @@ class TestWatchExponentialBackoff:
             "message": "h2 protocol error: error reading a body from connection",
         })
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -579,7 +597,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -608,7 +626,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_initial_failures:
@@ -642,7 +660,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -670,7 +688,7 @@ class TestWatchExponentialBackoff:
         call_count = 0
         err = self._unavail_err()
 
-        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event]:
             nonlocal call_count
             call_count += 1
             if call_count <= n_failures:
@@ -724,6 +742,27 @@ async def test_etcd_not_opened_connects_per_request(
     await etcd.close()
 
 
+class TestAuthTokenRefresh:
+    @pytest.fixture
+    def connect_options_cls(self) -> Any:
+        with (
+            patch("ai.backend.common.etcd.ConnectOptions") as connect_options_cls,
+            patch("ai.backend.common.etcd.EtcdClient"),
+        ):
+            yield connect_options_cls
+
+    def test_credentials_turn_on_auto_token_refresh(self, connect_options_cls: MagicMock) -> None:
+        AsyncEtcd(
+            addrs=HostPortPair("127.0.0.1", 2379),
+            namespace="test-auth",
+            scope_prefix_map={ConfigScopes.GLOBAL: ""},
+            credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+        )
+
+        connect_options_with_user = connect_options_cls.return_value.with_user.return_value
+        connect_options_with_user.with_auto_token_refresh.assert_called_once_with(True)
+
+
 class TestRequestRetry:
     @pytest.fixture
     def communicator(self) -> AsyncMock:
@@ -737,9 +776,13 @@ class TestRequestRetry:
             scope_prefix_map={ConfigScopes.GLOBAL: ""},
             request_retries=3,
             request_retry_intvl=0.05,
+            request_deadline=0.05,
         )
         etcd._communicator = communicator
         return etcd
+
+    async def _never_returns(self, *args: object, **kwargs: object) -> None:
+        await asyncio.Event().wait()
 
     def _err(self, code: GRPCStatusCode, message: str) -> GRPCStatusError:
         return GRPCStatusError({"code": code, "message": message})
@@ -797,6 +840,41 @@ class TestRequestRetry:
             assert await etcd.get_prefix("k", scope=ConfigScopes.GLOBAL) == {"a": "1"}
 
         assert communicator.get_prefix.call_count == 2
+
+    async def test_write_that_never_returns_fails_at_the_deadline(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.put.side_effect = self._never_returns
+
+        with pytest.raises(ClientError, match="deadline"):
+            await etcd.put("k", "v")
+
+        assert communicator.put.call_count == 1
+
+    async def test_read_that_never_returns_is_resent_after_the_deadline(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        hung = asyncio.Event()
+
+        async def _get(*args: object, **kwargs: object) -> bytes:
+            if communicator.get.call_count == 1:
+                await hung.wait()
+            return b"v"
+
+        communicator.get.side_effect = _get
+
+        assert await etcd.get("k", scope=ConfigScopes.GLOBAL) == "v"
+        assert communicator.get.call_count == 2
+
+    async def test_read_that_never_returns_fails_after_the_retry_limit(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.get.side_effect = self._never_returns
+
+        with pytest.raises(ClientError, match="deadline"):
+            await etcd.get("k", scope=ConfigScopes.GLOBAL)
+
+        assert communicator.get.call_count == 4
 
     async def test_timed_out_write_is_not_resent(
         self, etcd: AsyncEtcd, communicator: AsyncMock

@@ -3,14 +3,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import ProcessorDependencies
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
     RefusingGlobalActionValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 
 @pytest.fixture
@@ -20,6 +19,6 @@ def processor_registry() -> ProcessorRegistry[Any]:
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(global_scope=[RefusingGlobalActionValidator()]),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )

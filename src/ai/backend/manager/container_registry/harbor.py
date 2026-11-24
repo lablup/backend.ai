@@ -153,8 +153,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if not project:
             raise ContainerRegistryProjectEmpty(self.registry_info.type, project)
 
-        repository = image.name
-        base_url = (
+        # Harbor takes the repository as a single path segment with its slashes encoded twice:
+        # once here, and once more when yarl encodes the percent sign.
+        repository = urllib.parse.quote(image.name, safe="")
+        artifact_url = (
             self.registry_url
             / "api"
             / "v2.0"
@@ -172,7 +174,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if password is not None:
             self.credentials["password"] = password
 
-        async with self.prepare_client_session() as (url, sess):
+        async with self.prepare_client_session() as (_url, sess):
             rqst_args: dict[str, Any] = {}
             if self.credentials:
                 rqst_args["auth"] = aiohttp.BasicAuth(
@@ -180,7 +182,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     self.credentials["password"],
                 )
 
-            async with sess.delete(base_url, allow_redirects=False, **rqst_args) as resp:
+            async with sess.delete(artifact_url, allow_redirects=False, **rqst_args) as resp:
                 try:
                     resp.raise_for_status()
                 except aiohttp.ClientResponseError as e:
@@ -476,11 +478,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         architecture = config_data.get("architecture")
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
+        elif tag.endswith(("-arm64", "-aarch64")):
+            architecture = "aarch64"
         else:
-            if tag.endswith(("-arm64", "-aarch64")):
-                architecture = "aarch64"
-            else:
-                architecture = "x86_64"
+            architecture = "x86_64"
 
         manifests = {
             architecture: {

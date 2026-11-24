@@ -43,12 +43,12 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
-from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
@@ -505,11 +505,10 @@ class StreamHandler:
                             f"Service {service} does not open the port number {params.port}."
                         ) from e
                     host_port = sport["host_ports"][hport_idx]
+                elif "host_ports" not in sport:
+                    host_port = sport["host_port"]
                 else:
-                    if "host_ports" not in sport:
-                        host_port = sport["host_port"]
-                    else:
-                        host_port = sport["host_ports"][0]
+                    host_port = sport["host_ports"][0]
                 dest = (kernel_host, host_port)
                 break
         else:
@@ -653,7 +652,7 @@ class StreamHandler:
 
 
 async def handle_kernel_terminating(
-    kernel: KernelRow,
+    kernel: KernelInfo,
     *,
     app_ctx: PrivateContext,
 ) -> None:

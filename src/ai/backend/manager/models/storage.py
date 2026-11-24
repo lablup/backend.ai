@@ -10,8 +10,7 @@ from typing import (
 import sqlalchemy as sa
 
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
-
-from .rbac import (
+from ai.backend.manager.models.rbac.base import (
     AbstractPermissionContext,
 )
 

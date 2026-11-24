@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import sqlalchemy as sa
@@ -20,6 +20,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.auth.request import (
@@ -36,10 +37,10 @@ from ai.backend.common.dto.manager.auth.response import (
     AuthorizeResponse,
     GetSSHKeypairResponse,
     SignupResponse,
-    SSHKeypairResponse,
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -53,6 +54,7 @@ from ai.backend.manager.models.project.row import (
     ProjectType,
     association_groups_users,
 )
+from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.row import UserRole, users
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -61,6 +63,9 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
+
+if TYPE_CHECKING:
+    from tests.component.conftest import UserFixtureData
 
 # ---------------------------------------------------------------------------
 # Helper types
@@ -100,12 +105,6 @@ class _CrossDomainFixtureData:
     admin: _CrossDomainUserData
     user: _CrossDomainUserData
     group_id: uuid.UUID
-
-
-@dataclass
-class _RSAKeypairData:
-    public_key: str
-    private_key: str
 
 
 @dataclass
@@ -486,18 +485,13 @@ async def cross_domain_admin_registry(
 
 
 @pytest.fixture()
-def rsa_keypair() -> _RSAKeypairData:
-    """Generate an RSA keypair for testing SSH keypair upload."""
+def rsa_public_key() -> str:
+    """Generate an RSA public key for testing SSH public key upload."""
     private_key: RSAPrivateKey = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
     )
-    private_key_pem = private_key.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.TraditionalOpenSSL,
-        serialization.NoEncryption(),
-    ).decode()
-    public_key_openssh = (
+    return (
         private_key.public_key()
         .public_bytes(
             serialization.Encoding.OpenSSH,
@@ -506,7 +500,29 @@ def rsa_keypair() -> _RSAKeypairData:
         .decode()
         .strip()
     )
-    return _RSAKeypairData(public_key=public_key_openssh, private_key=private_key_pem)
+
+
+@pytest.fixture()
+async def regular_user_public_key_already_stored(
+    db_engine: SAEngine,
+    regular_user_fixture: UserFixtureData,
+) -> AsyncIterator[str]:
+    """The regular user's default SSH keypair row, holding only a public key."""
+    public_key, _ = generate_ssh_keypair()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(SSHKeypairRow).values(
+                user_id=regular_user_fixture.user_uuid,
+                public_key=public_key,
+                private_key=None,
+                is_default=True,
+            )
+        )
+    yield public_key
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.delete(SSHKeypairRow).where(SSHKeypairRow.user_id == regular_user_fixture.user_uuid)
+        )
 
 
 # ============================================================================
@@ -754,12 +770,11 @@ class TestPasswordChange:
         auth_user_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
     ) -> None:
-        """When new_password and new_password2 (confirmation) do not match,
-        InvalidRequestError (400) must be raised.
-        This prevents accidental password changes caused by typos."""
+        """Reject mismatched password confirmation at the HTTP API boundary."""
         with pytest.raises(InvalidRequestError):
             await auth_user_registry.auth.update_password(
-                UpdatePasswordRequest(
+                # Send invalid input to verify server-side validation.
+                UpdatePasswordRequest.model_construct(
                     old_password=auth_user_fixture.password,
                     new_password="NewP@ssw0rd!",
                     new_password2="MismatchP@ss!",
@@ -928,15 +943,13 @@ class TestPasswordExpiry:
 
 
 class TestSSHKeypair:
-    """SSH keypair generate, get, and upload (overwrite) operations.
+    """SSH public key get and upload (overwrite) operations.
 
-    Scenario: Verify the full CRUD lifecycle of SSH keypairs.
-    - An empty public key is returned when no keypair has been generated yet
-    - The server generates a valid SSH keypair with non-empty public and private keys
-    - A generated keypair can be retrieved and matches the original
-    - A user can upload a custom RSA keypair instead of using server-generated ones
-    - Uploading a new keypair overwrites the previously stored one (one keypair per user)
-    - Regenerating a keypair replaces the previous one
+    Scenario: Verify the lifecycle of the public key a user registers.
+    - An empty public key is returned when no public key has been registered yet
+    - A stored public key is returned by get_ssh_keypair
+    - A user can upload their own public key
+    - Uploading a public key overwrites the previously stored one (one keypair per user)
     - SSH keypairs are independent between different users
     """
 
@@ -944,97 +957,61 @@ class TestSSHKeypair:
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        """When a user who has never generated an SSH keypair calls get_ssh_keypair,
+        """When a user who has never registered an SSH public key calls get_ssh_keypair,
         an empty string should be returned. This verifies the correct initial state."""
         result = await user_registry.auth.get_ssh_keypair()
         assert isinstance(result, GetSSHKeypairResponse)
         assert result.ssh_public_key == ""
 
-    async def test_generate_ssh_keypair(
+    async def test_get_ssh_keypair_returns_stored_public_key(
         self,
         user_registry: BackendAIClientRegistry,
+        regular_user_public_key_already_stored: str,
     ) -> None:
-        """Calling generate_ssh_keypair should make the server create an RSA keypair
-        and return both public and private keys as non-empty strings."""
-        result = await user_registry.auth.generate_ssh_keypair()
-        assert isinstance(result, SSHKeypairResponse)
-        assert result.ssh_public_key != ""
-        assert result.ssh_private_key != ""
-
-    async def test_get_ssh_keypair_after_generate(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """After generating a keypair, the public key returned by get_ssh_keypair
-        must match the one returned at generation time.
-        This confirms the generated key is correctly persisted in the database."""
-        generated = await user_registry.auth.generate_ssh_keypair()
+        """get_ssh_keypair returns the public key of the user's default SSH keypair."""
         fetched = await user_registry.auth.get_ssh_keypair()
-        assert fetched.ssh_public_key.strip() == generated.ssh_public_key.strip()
+        assert fetched.ssh_public_key.strip() == regular_user_public_key_already_stored.strip()
 
-    async def test_upload_custom_ssh_keypair(
+    async def test_upload_ssh_public_key(
         self,
         user_registry: BackendAIClientRegistry,
-        rsa_keypair: _RSAKeypairData,
+        rsa_public_key: str,
     ) -> None:
-        """When a user uploads a locally generated RSA keypair via upload_ssh_keypair,
-        the server should store it and return the same public/private key pair.
-        This validates the scenario where users register their own keys
-        instead of using server-generated ones."""
+        """When a user uploads only a locally generated public key via upload_ssh_keypair,
+        the server should store it and return the same public key.
+        This validates the scenario where users keep their private key to themselves."""
         result = await user_registry.auth.upload_ssh_keypair(
-            UploadSSHKeypairRequest(pubkey=rsa_keypair.public_key, privkey=rsa_keypair.private_key),
+            UploadSSHKeypairRequest(pubkey=rsa_public_key),
         )
-        assert isinstance(result, SSHKeypairResponse)
-        assert result.ssh_public_key.strip() == rsa_keypair.public_key
-        assert result.ssh_private_key == rsa_keypair.private_key
+        assert isinstance(result, UploadSSHKeypairResponse)
+        assert result.ssh_public_key.strip() == rsa_public_key
 
-    async def test_upload_overwrites_existing_keypair(
+    async def test_upload_overwrites_existing_public_key(
         self,
         user_registry: BackendAIClientRegistry,
-        rsa_keypair: _RSAKeypairData,
+        regular_user_public_key_already_stored: str,
+        rsa_public_key: str,
     ) -> None:
-        """When a new custom keypair is uploaded while a server-generated keypair already exists,
-        the existing keypair must be fully replaced by the new one.
-        This validates the one-keypair-per-user policy."""
-        await user_registry.auth.generate_ssh_keypair()
-
+        """When a public key is uploaded while another one is already stored,
+        the stored public key must be replaced by the uploaded one."""
         await user_registry.auth.upload_ssh_keypair(
-            UploadSSHKeypairRequest(pubkey=rsa_keypair.public_key, privkey=rsa_keypair.private_key),
+            UploadSSHKeypairRequest(pubkey=rsa_public_key),
         )
 
         fetched = await user_registry.auth.get_ssh_keypair()
-        assert fetched.ssh_public_key.strip() == rsa_keypair.public_key
-
-    async def test_regenerate_replaces_previous_keypair(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Calling generate_ssh_keypair twice should produce different keys,
-        and the second one must replace the first.
-        Fetching always returns the most recently generated keypair."""
-        first = await user_registry.auth.generate_ssh_keypair()
-        second = await user_registry.auth.generate_ssh_keypair()
-        assert second.ssh_public_key != first.ssh_public_key
-
-        fetched = await user_registry.auth.get_ssh_keypair()
-        assert fetched.ssh_public_key.strip() == second.ssh_public_key.strip()
+        assert fetched.ssh_public_key.strip() == rsa_public_key
 
     async def test_each_user_has_independent_keypair(
         self,
         admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
+        regular_user_public_key_already_stored: str,
     ) -> None:
-        """When admin and regular user each generate SSH keypairs, they should produce
-        different keys, and each user's keypair must be stored/retrieved independently.
+        """The public key stored for the regular user is not returned to another user.
         This confirms SSH keypair isolation between users."""
-        admin_kp = await admin_registry.auth.generate_ssh_keypair()
-        user_kp = await user_registry.auth.generate_ssh_keypair()
-        assert admin_kp.ssh_public_key != user_kp.ssh_public_key
-
         admin_fetched = await admin_registry.auth.get_ssh_keypair()
-        user_fetched = await user_registry.auth.get_ssh_keypair()
-        assert admin_fetched.ssh_public_key.strip() == admin_kp.ssh_public_key.strip()
-        assert user_fetched.ssh_public_key.strip() == user_kp.ssh_public_key.strip()
+        assert (
+            admin_fetched.ssh_public_key.strip() != regular_user_public_key_already_stored.strip()
+        )
 
 
 class TestSignup:

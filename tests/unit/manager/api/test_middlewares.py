@@ -9,12 +9,11 @@ from ai.backend.manager.api.utils import method_placeholder
 
 
 async def test_api_method_override(aiohttp_client: Any) -> None:
-    observed_method = None
+    observed_methods: list[str] = []
     app = web.Application()
 
     async def service_handler(request: web.Request) -> web.Response:
-        nonlocal observed_method
-        observed_method = request.method
+        observed_methods.append(request.method)
         return web.Response(body=b"test")
 
     app.router.add_route("POST", r"/test", method_placeholder("REPORT"))
@@ -26,10 +25,10 @@ async def test_api_method_override(aiohttp_client: Any) -> None:
     resp = await client.request("REPORT", "/test")
     assert resp.status == 200
     assert (await resp.read()) == b"test"
-    assert observed_method == "REPORT"
+    assert observed_methods == ["REPORT"]
 
     # overriden method
-    observed_method = None
+    observed_methods.clear()
     resp = await client.post(
         "/test",
         headers={
@@ -38,33 +37,31 @@ async def test_api_method_override(aiohttp_client: Any) -> None:
     )
     assert resp.status == 200
     assert (await resp.read()) == b"test"
-    assert observed_method == "REPORT"
+    assert observed_methods == ["REPORT"]
 
     # calling placeholder
-    observed_method = None
+    observed_methods.clear()
     resp = await client.post("/test")
     assert resp.status == 405
-    assert observed_method is None
+    assert observed_methods == []
 
     # calling with non-relevant method
-    observed_method = None
+    observed_methods.clear()
     resp = await client.delete("/test")
     assert resp.status == 405
-    assert observed_method is None
+    assert observed_methods == []
 
 
 async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> None:
-    observed_method = None
+    observed_methods: list[str] = []
     app = web.Application()
 
     async def op1_handler(request: web.Request) -> web.Response:
-        nonlocal observed_method
-        observed_method = request.method
+        observed_methods.append(request.method)
         return web.Response(body=b"op1")
 
     async def op2_handler(request: web.Request) -> web.Response:
-        nonlocal observed_method
-        observed_method = request.method
+        observed_methods.append(request.method)
         return web.Response(body=b"op2")
 
     app.router.add_route("POST", r"/test", op1_handler)
@@ -76,17 +73,17 @@ async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> No
     resp = await client.request("POST", "/test")
     assert resp.status == 200
     assert (await resp.read()) == b"op1"
-    assert observed_method == "POST"
+    assert observed_methods == ["POST"]
 
     # native method
-    observed_method = None
+    observed_methods.clear()
     resp = await client.request("REPORT", "/test")
     assert resp.status == 200
     assert (await resp.read()) == b"op2"
-    assert observed_method == "REPORT"
+    assert observed_methods == ["REPORT"]
 
     # overriden method
-    observed_method = None
+    observed_methods.clear()
     resp = await client.request(
         "REPORT",
         "/test",
@@ -96,10 +93,10 @@ async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> No
     )
     assert resp.status == 200
     assert (await resp.read()) == b"op1"
-    assert observed_method == "POST"
+    assert observed_methods == ["POST"]
 
     # overriden method
-    observed_method = None
+    observed_methods.clear()
     resp = await client.request(
         "POST",
         "/test",
@@ -109,7 +106,7 @@ async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> No
     )
     assert resp.status == 200
     assert (await resp.read()) == b"op2"
-    assert observed_method == "REPORT"
+    assert observed_methods == ["REPORT"]
 
 
 async def test_api_ver(aiohttp_client: Any) -> None:

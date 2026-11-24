@@ -23,7 +23,6 @@ from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
 )
 from ai.backend.common.health_checker.probe import HealthProbe
-from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.health.handler import HealthHandler
 from ai.backend.manager.api.rest.internal.health.handler import InternalHealthHandler
 from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
@@ -116,14 +115,12 @@ class TestPublicHealthHandler:
         handler: HealthHandler,
         mock_request_ctx: MagicMock,
     ) -> None:
-        """Verify hello returns HTTP 200 with status=ok and version."""
+        """Verify hello returns HTTP 200 with status=ok and no release version."""
         response = await handler.hello(mock_request_ctx)
 
         assert response.status == 200
         assert isinstance(response.body, bytes)
-        body = json.loads(response.body)
-        assert body["status"] == "ok"
-        assert body["version"] == __version__
+        assert json.loads(response.body) == {"status": "ok"}
 
     async def test_sets_do_not_print_access_log(
         self,
@@ -221,18 +218,17 @@ class TestInternalHealthHandler:
         assert body["status"] == "degraded"
         assert body["connectivity"]["overall_healthy"] is False
 
-    async def test_includes_version_and_component(
+    async def test_includes_component_without_version(
         self,
         handler: InternalHealthHandler,
         mock_request_ctx: MagicMock,
     ) -> None:
-        """Verify hello includes version and component fields."""
         response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response.body, bytes)
         body = json.loads(response.body)
-        assert body["version"] == __version__
         assert body["component"] == "manager"
+        assert "version" not in body
 
     async def test_sets_do_not_print_access_log(
         self,

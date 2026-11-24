@@ -704,7 +704,7 @@ type DomainNode implements Node @key(fields: "id") {
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  dotfiles: Bytes
+  dotfiles: Bytes @deprecated(reason: "Use the auto-generated file API.")
   integration_id: String
   scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection
 }
@@ -1222,7 +1222,9 @@ type KeyPair implements Item {
   rolling_count: Int
   user: UUID
   projects: [String]
-  ssh_public_key: String
+
+  """The public key of the owner's default SSH keypair."""
+  ssh_public_key: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
   vfolders: [VirtualFolder]
   compute_sessions(status: String): [ComputeSession]
   concurrency_used: Int
@@ -2677,6 +2679,8 @@ input CreateDomainNodeInput {
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
   integration_id: String = null
+
+  """Deprecated: use the auto-generated file API."""
   dotfiles: Bytes = "90"
   scaling_groups: [String]
 }
@@ -2698,6 +2702,8 @@ input ModifyDomainNodeInput {
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
   integration_id: String
+
+  """Deprecated: use the auto-generated file API."""
   dotfiles: Bytes
   sgroups_to_add: [String]
   sgroups_to_remove: [String]

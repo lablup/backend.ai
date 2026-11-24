@@ -13,5 +13,5 @@ One task per file in `tasks/`. Base classes are in `ai.backend.common.bgtask.tas
 
 ## Rules
 
-- Raise `BgtaskFailedError` / `BgtaskCancelledError` (from `common.exception`), not generic exceptions.
+- Raise `BgtaskFailedError` / `BgtaskCancelledError` (from `common.errors.bgtask`), not generic exceptions.
 - Progress reporting (`common/bgtask/reporter.py`) is not yet wired into manager handlers: do not create a task that depends on it.

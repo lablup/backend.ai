@@ -7,7 +7,6 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
@@ -39,9 +38,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
-from ai.backend.manager.models.rbac_models.role.scopes import (
-    ScopedRoleTarget,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -105,10 +101,7 @@ class V2RBACHandler:
         body: BodyParam[SearchRolesInput],
     ) -> APIResponse:
         """Search roles registered in a project scope."""
-        result = await self._adapter.search_roles_in_scope(
-            [ScopedRoleTarget(scope=ProjectID(path.parsed.project_id))],
-            body.parsed,
-        )
+        result = await self._adapter.project_search_roles(path.parsed.project_id, body.parsed)
         payload = AdminSearchRolesPayload(
             items=result.items,
             total_count=result.total_count,

@@ -9,7 +9,7 @@ import traceback
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, cast, override
+from typing import Any, override
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
@@ -52,10 +52,10 @@ def format_exception(
     match ei:
         case (str(), *_):
             # Already foramtted from the source process for ease of serialization
-            s = "".join(cast(Sequence[str], ei))  # cast is required for mypy
-        case (type(), BaseException(), _):
+            s = "".join(ei)
+        case (_, exc, _) if isinstance(exc, BaseException):
             # A live exc_info object from the current process
-            s = "".join(traceback.format_exception(*ei))
+            s = "".join(traceback.format_exception(exc))
         case _:
             s = "<exception-info-unavailable>"
     return s.rstrip("\n")

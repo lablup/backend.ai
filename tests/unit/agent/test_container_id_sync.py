@@ -57,7 +57,8 @@ class TestSetContainerId:
 
     def test_sets_both_instance_attr_and_data_dict(self, mock_kernel_obj: DockerKernel) -> None:
         """set_container_id() should update both the instance attribute and data dict."""
-        assert mock_kernel_obj.container_id is None
+        initial_container_id = mock_kernel_obj.container_id
+        assert initial_container_id is None
         assert "container_id" not in mock_kernel_obj.data
 
         cid = ContainerId("test-container-abc123")

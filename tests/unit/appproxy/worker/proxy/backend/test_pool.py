@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from uuid import UUID
 
 import pytest
@@ -32,7 +34,37 @@ _TARGET_A_MOVED = _TARGET_A.model_copy(update={"host": "10.0.0.9"})
 _SPEC = RoutePoolSpec(failure_threshold=1, health_check_interval=3600.0)
 
 
+@dataclass(frozen=True)
+class _PoolThatRanProbesWhileATargetHadNoWeight:
+    pool: RoutePool
+    unreachable_target: SessionIngressTarget
+
+
 class TestRoutePool:
+    @pytest.fixture
+    async def pool_that_ran_probes_while_a_target_had_no_weight(
+        self, unused_tcp_port: int
+    ) -> AsyncIterator[_PoolThatRanProbesWhileATargetHadNoWeight]:
+        unreachable_target = SessionIngressTarget(
+            host="127.0.0.1",
+            port=unused_tcp_port,
+            session_id=SessionId(UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
+        )
+        pool = RoutePool(
+            IngressBackend(
+                id=_BACKEND_ID,
+                target_groups=[
+                    IngressTargetGroup(id=_GROUP_ID, weight=0, targets=[unreachable_target])
+                ],
+            ),
+            spec=RoutePoolSpec(health_check_interval=0.01),
+        )
+        await asyncio.sleep(0.1)
+        yield _PoolThatRanProbesWhileATargetHadNoWeight(
+            pool=pool, unreachable_target=unreachable_target
+        )
+        await pool.close()
+
     @pytest.fixture
     async def pool_with_a_weighted_and_an_unweighted_group(self) -> AsyncIterator[RoutePool]:
         pool = RoutePool(
@@ -104,3 +136,20 @@ class TestRoutePool:
             )
         )
         assert await pool.select() == _TARGET_B
+
+    async def test_a_target_given_weight_starts_healthy_since_no_weight_kept_it_unprobed(
+        self,
+        pool_that_ran_probes_while_a_target_had_no_weight: _PoolThatRanProbesWhileATargetHadNoWeight,
+    ) -> None:
+        situation = pool_that_ran_probes_while_a_target_had_no_weight
+        await situation.pool.update(
+            IngressBackend(
+                id=_BACKEND_ID,
+                target_groups=[
+                    IngressTargetGroup(
+                        id=_GROUP_ID, weight=100, targets=[situation.unreachable_target]
+                    )
+                ],
+            )
+        )
+        assert await situation.pool.select() == situation.unreachable_target

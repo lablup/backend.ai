@@ -36,8 +36,9 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.nothing_is_found import NothingIsFound
 from bai_scenario.components.vfolder import (
     STORAGE_HOST,
     AFolderMakerAndTheirDomain,

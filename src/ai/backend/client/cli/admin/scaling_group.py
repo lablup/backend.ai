@@ -12,7 +12,7 @@ from ai.backend.client.func.scaling_group import _default_detail_fields, _defaul
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
 
-from . import admin
+from ._group import admin
 
 
 @admin.group("scaling-group")

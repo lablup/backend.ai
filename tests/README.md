@@ -75,7 +75,7 @@ pants test tests/integration/::
 
 # Run specific component
 pants test tests/unit/manager/::
-pants test tests/component/agent/::
+pants test tests/component/vfolder/::
 
 # Run changed tests only
 pants test --changed-since=HEAD~1
@@ -85,7 +85,8 @@ pants test --changed-since=HEAD~1
 
 The `etcd_container`, `redis_container` and `postgres_container` fixtures in
 `src/ai/backend/testutils/bootstrap.py` take their containers from a pool with one
-container per (role, Pants execution slot). Pants runs one pytest process per slot at a
+container per (role, execution slot `BACKEND_TEST_EXEC_SLOT`). Pants, and CI's
+`run-pytest-shard.py` for the unit and component suites, run one pytest process per slot at a
 time, so a process reuses the containers that the previous process in its slot left
 running instead of starting new ones. The pool is keyed by checkout path, so worktrees do
 not share it.
@@ -93,7 +94,7 @@ not share it.
 | Step | Who |
 |---|---|
 | Create a slot's container | The first process in that slot; later processes in the slot reuse it |
-| Reset between processes | postgres: per-process database `test_db_<token>`; etcd: per-process namespace; redis: FLUSHALL on attach |
+| Reset between processes | postgres: per-file database `test_db_<token>`; etcd: per-process namespace; redis: FLUSHALL on attach |
 | Remove the pool | A detached reaper (flock on `tmp/backend.ai/test-pool/holders`) once no process has held the pool for 20 s |
 
 `BACKEND_TEST_SHARE_CONTAINERS=0` makes each process start and remove its own containers
@@ -101,14 +102,14 @@ instead.
 
 ## Test batches
 
-`tests/component/BUILD` sets `batch_compatibility_tag="component"` for every
-`python_tests` target under it, so Pants runs up to `[test].batch_size` files in one
-pytest process. Files in a batch share one database, etcd namespace and redis, so a
+`tests/component/BUILD` and `tests/unit/common/BUILD` set `batch_compatibility_tag`
+(`component`, `unit-common`) for every `python_tests` target under them, so Pants runs
+up to `[test].batch_size` files in one pytest process. Files in a batch share one database, etcd namespace and redis, so a
 test must clean up what its fixtures wrote.
 
 | Rule | |
 |---|---|
-| A tag names an infrastructure set | `component` = postgres + etcd + redis; `component-agent` = pulled docker images |
+| A tag names an infrastructure set | `component` = postgres + etcd + redis |
 | Set it once, in the subtree's top `__defaults__` | Do not set it on an individual `python_tests` target |
 | A new tag needs a different infrastructure set | Write the reason in that BUILD file |
 | State leaking between files is a fixture bug | Fix the fixture; do not split the tag or pull the file out of the batch |

@@ -180,7 +180,7 @@ class RedisConsumer(AbstractConsumer):
         )
 
     @override
-    async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore[override]
+    async def consume_queue(self) -> AsyncGenerator[MQMessage]:  # type: ignore[override]
         """
         Consume messages from the queue.
 
@@ -472,10 +472,9 @@ class RedisConsumer(AbstractConsumer):
             )
             try:
                 await self._client.make_consumer_group(stream_key, self._group_name)
-            except Exception as internal_exception:
-                log.error(
+            except Exception:
+                log.exception(
                     "consumer group creation failed",
-                    exc_info=internal_exception,
                     group_name=self._group_name,
                     stream_key=stream_key,
                 )

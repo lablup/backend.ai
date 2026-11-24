@@ -14,10 +14,12 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
 )
-from ai.backend.common.exception import (
-    FailedToGetMetric,
+from ai.backend.common.errors.prometheus import (
     PrometheusQueryEvaluationFailed,
     PrometheusQueryPresetNotFound,
+)
+from ai.backend.common.exception import (
+    FailedToGetMetric,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset.types import (
@@ -77,7 +79,7 @@ class TestPrometheusQueryPresetRepository:
     async def db_with_cleanup(
         self,
         global_entity_ids: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             global_entity_ids,
             [

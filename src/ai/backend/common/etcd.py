@@ -43,6 +43,9 @@ from etcd_client import (
     Client as EtcdClient,
 )
 from etcd_client import (
+    ClientError as EtcdClientError,
+)
+from etcd_client import (
     Communicator as EtcdCommunicator,
 )
 from etcd_client import (
@@ -52,6 +55,7 @@ from etcd_client import (
     ConnectOptions,
     GRPCStatusCode,
     GRPCStatusError,
+    TlsOptions,
     TxnOp,
     Watch,
 )
@@ -59,7 +63,7 @@ from etcd_client import (
     Txn as EtcdTransactionAction,
 )
 
-from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
 from ai.backend.common.exception import InvalidConfigError
 from ai.backend.logging.structured import StructuredLogger
 
@@ -316,7 +320,7 @@ class AbstractKVStore(ABC):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         pass
 
     @abstractmethod
@@ -330,7 +334,7 @@ class AbstractKVStore(ABC):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         pass
 
 
@@ -340,6 +344,7 @@ class AsyncEtcd(AbstractKVStore):
     _request_options: ConnectOptions
     _connection: EtcdClient | None
     _communicator: EtcdCommunicator | None
+    request_deadline: float
 
     def __init__(
         self,
@@ -348,12 +353,14 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
         credentials: dict[str, str] | None = None,
+        tls: EtcdTLSConfigData | None = None,
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
         watch_reconnect_max_intvl: float = 30.0,
         request_timeout: float = 5.0,
         request_retries: int = 3,
         request_retry_intvl: float = 0.05,
+        request_deadline: float = 30.0,
         keep_alive_interval: float = 5.0,
         keep_alive_timeout: float = 3.0,
     ) -> None:
@@ -364,11 +371,19 @@ class AsyncEtcd(AbstractKVStore):
         }).check(scope_prefix_map)
 
         if credentials is not None:
-            self._connect_options = ConnectOptions().with_user(
-                credentials["user"], credentials["password"]
+            self._connect_options = (
+                ConnectOptions()
+                .with_user(credentials["user"], credentials["password"])
+                .with_auto_token_refresh(True)
             )
         else:
             self._connect_options = None
+        scheme = "http"
+        if tls is not None and tls.enabled:
+            scheme = "https"
+            tls_options = self._tls_options_from_cert_files(tls)
+            connect_options = self._connect_options or ConnectOptions()
+            self._connect_options = connect_options.with_tls(tls_options)
         self._request_options = (
             (self._connect_options or ConnectOptions())
             .with_timeout(request_timeout)
@@ -392,10 +407,25 @@ class AsyncEtcd(AbstractKVStore):
         self.watch_reconnect_max_intvl = watch_reconnect_max_intvl
         self.request_retries = request_retries
         self.request_retry_intvl = request_retry_intvl
+        self.request_deadline = request_deadline
         self.etcd = EtcdClient(
-            [f"http://{addr.host}:{addr.port}" for addr in addrs],
+            [f"{scheme}://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
         )
+
+    @staticmethod
+    def _tls_options_from_cert_files(tls: EtcdTLSConfigData) -> TlsOptions:
+        tls_options = TlsOptions()
+        if tls.ca_cert is not None:
+            ca_cert_pem = tls.ca_cert.read_bytes()
+            tls_options = tls_options.with_ca_certificate(ca_cert_pem)
+        if tls.handshake_timeout is not None:
+            tls_options = tls_options.with_handshake_timeout(tls.handshake_timeout)
+        if tls.client_cert is None or tls.client_key is None:
+            return tls_options
+        client_cert_pem = tls.client_cert.read_bytes()
+        client_key_pem = tls.client_key.read_bytes()
+        return tls_options.with_identity(client_cert_pem, client_key_pem)
 
     def _should_rewatch(self, e: GRPCStatusError) -> bool:
         """A watch stream cut by a lost connection ends with ``UNAVAILABLE`` or ``UNKNOWN``."""
@@ -426,6 +456,7 @@ class AsyncEtcd(AbstractKVStore):
             etcd_config.namespace,
             scope_prefix_map or {ConfigScopes.GLOBAL: ""},
             credentials={"user": etcd_config.user, "password": etcd_config.password},
+            tls=etcd_config.tls,
             keep_alive_interval=etcd_config.keep_alive_interval,
             keep_alive_timeout=etcd_config.keep_alive_timeout,
         )
@@ -490,8 +521,20 @@ class AsyncEtcd(AbstractKVStore):
         attempt = 0
         while True:
             try:
-                async with self._connect() as communicator:
-                    return await request(communicator)
+                # A request on a lost channel can stay pending past ``request_timeout``;
+                # the deadline bounds one attempt, connecting included.
+                async with asyncio.timeout(self.request_deadline):
+                    async with self._connect() as communicator:
+                        return await request(communicator)
+            except TimeoutError as e:
+                if attempt >= self.request_retries or not read:
+                    # A ClientError like any other etcd failure, so that callers handle it too.
+                    raise EtcdClientError(
+                        f"etcd request passed its deadline of {self.request_deadline}s"
+                    ) from e
+                attempt += 1
+                log.warning("etcd request passed its deadline, retrying", retry_count=attempt)
+                continue
             except GRPCStatusError as e:
                 if attempt >= self.request_retries or not self._should_retry(
                     e, conditional=conditional, read=read
@@ -860,7 +903,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
-    ) -> AsyncGenerator[tuple[str, str], None]:
+    ) -> AsyncGenerator[tuple[str, str]]:
         """Every key under one scope's prefix with its raw value, in key order, from one read."""
         scope_prefix = _slash(self._merge_scope_prefix_map(scope_prefix_map)[scope])
         mangled_prefix = self._mangle_key(f"{scope_prefix}{key_prefix}")
@@ -1096,7 +1139,7 @@ class AsyncEtcd(AbstractKVStore):
         once: bool,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         try:
             async with self._connect() as communicator:
                 iterator = iterator_factory(communicator)
@@ -1129,7 +1172,7 @@ class AsyncEtcd(AbstractKVStore):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -1186,7 +1229,7 @@ class AsyncEtcd(AbstractKVStore):
         ready_event: CondVar | None = None,
         cleanup_event: CondVar | None = None,
         wait_timeout: float | None = None,
-    ) -> AsyncGenerator[QueueSentinel | Event, None]:
+    ) -> AsyncGenerator[QueueSentinel | Event]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")

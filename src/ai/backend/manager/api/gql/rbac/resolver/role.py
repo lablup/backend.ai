@@ -9,7 +9,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -55,16 +54,13 @@ from ai.backend.manager.api.gql.rbac.types.role import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.rbac_models.role.scopes import (
-    ScopedRoleTarget,
-)
 
 # ==================== Query Resolvers ====================
 
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.3.0", description="Get a single role by ID (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_role(
     info: Info[StrawberryGQLContext],
     id: uuid.UUID,
@@ -78,7 +74,7 @@ async def admin_role(
     BackendAIGQLMeta(
         added_version="26.3.0", description="List roles with filtering and pagination (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_roles(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -135,7 +131,7 @@ async def admin_roles(
         added_version="26.3.0",
         description="List role assignments with filtering and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_role_assignments(
     info: Info[StrawberryGQLContext],
     filter: RoleAssignmentFilter | None = None,
@@ -192,7 +188,7 @@ async def admin_role_assignments(
     deprecation_reason=(
         "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves."
     ),
-)  # type: ignore[misc]
+)
 async def my_roles(
     info: Info[StrawberryGQLContext],
     filter: RoleAssignmentFilter | None = None,
@@ -246,7 +242,7 @@ async def my_roles(
         added_version="26.9.0",
         description="List the roles the current authenticated user holds.",
     )
-)  # type: ignore[misc]
+)
 async def my_roles_v2(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -302,7 +298,7 @@ async def my_roles_v2(
         added_version="26.4.2",
         description="List roles registered in a project scope.",
     )
-)  # type: ignore[misc]
+)
 async def project_roles(
     info: Info[StrawberryGQLContext],
     project_id: uuid.UUID,
@@ -325,8 +321,8 @@ async def project_roles(
     limit: int | None = None,
     offset: int | None = None,
 ) -> RoleConnection | None:
-    result = await info.context.adapters.rbac.search_roles_in_scope(
-        [ScopedRoleTarget(scope=ProjectID(project_id))],
+    result = await info.context.adapters.rbac.project_search_roles(
+        project_id,
         SearchRolesInput(
             usage=usage.to_pydantic() if usage is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,

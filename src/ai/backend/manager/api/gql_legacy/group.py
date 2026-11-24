@@ -40,7 +40,11 @@ from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
-from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import (
+    EnumFieldItem,
+    FieldSpecItem,
+    OrderSpecItem,
+)
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.creators import ProjectCreator
@@ -56,7 +60,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.base import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.virtual_entity.queries import (
@@ -102,7 +106,7 @@ from .gql_relay import (
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac import ContainerRegistryScope, ScopeType
+    from ai.backend.manager.models.rbac.base import ContainerRegistryScope, ScopeType
 
     from .scaling_group import ScalingGroup
     from .schema import GraphQueryContext
@@ -817,6 +821,12 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
         project_id = ProjectID(gid)
+        if (
+            graph_ctx.user["role"] != UserRole.SUPERADMIN
+            and isinstance(props.domain_name, str)
+            and props.domain_name != graph_ctx.user["domain_name"]
+        ):
+            return cls(False, "only a superadmin can move a project to another domain", None)
 
         # Resolved before anything is written, so a registry that is not there changes
         # nothing. The default is set after the edit, as a run of its own.

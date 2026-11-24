@@ -83,7 +83,7 @@ class TestSessionSearchInProject:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -117,7 +117,7 @@ class TestSessionSearchInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[str, uuid.UUID]]:
         """Create two projects with sessions: project_a has 2 sessions, project_b has 1."""
         domain_name = "test-domain"
         user_id = uuid.uuid4()

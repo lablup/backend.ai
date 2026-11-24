@@ -660,6 +660,10 @@ class SocketPair:
             await self.input_sock.socket.send_multipart(msg_parts)
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
+                if self.input_sock.closed:
+                    # Closed with its runner: nothing would close a new socket, and it would
+                    # reconnect to whichever kernel gets the address next.
+                    raise InvalidSocket from e
                 log.warning(
                     "code runner socket invalid, recreating",
                     socket_addr=self.input_sock.addr,
@@ -1097,7 +1101,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     console_items.append(("media", (o["type"], o["data"])))
                 elif rec.msg_type in outgoing_msg_types:
                     # FIXME: currently mypy cannot handle dynamic specialization of literals.
-                    console_items.append((rec.msg_type, rec.data))  # type: ignore
+                    console_items.append((cast(ConsoleItemType, rec.msg_type), cast(str, rec.data)))
 
             if last_stdout.tell():
                 console_items.append(("stdout", last_stdout.getvalue()))
@@ -1227,15 +1231,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         )
         if self.output_queue is None:
             self.output_queue = q
+        elif self.current_run_id == run_id:
+            # No need to wait if we are continuing.
+            pass
         else:
-            if self.current_run_id == run_id:
-                # No need to wait if we are continuing.
-                pass
-            else:
-                # If there is an outstanding ongoning execution,
-                # wait until it has "finished".
-                await activated.wait()
-                activated.clear()
+            # If there is an outstanding ongoning execution,
+            # wait until it has "finished".
+            await activated.wait()
+            activated.clear()
         self.current_run_id = run_id
         if self.output_queue is not q:
             raise OutputQueueMismatchError

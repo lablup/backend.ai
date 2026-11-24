@@ -27,7 +27,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityTy
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
@@ -68,7 +68,6 @@ from ai.backend.manager.models.runtime_variant_preset.searchers import (
 from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.login_client_type.actions.scoped_search import (
     ScopedSearchLoginClientTypesAction,
 )
@@ -226,7 +225,7 @@ def registry(denying_scope: _DenyingScopeValidator) -> ProcessorRegistry[Any]:
                 scope=[denying_scope],
                 global_scope=[RefusingGlobalActionValidator()],
             ),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 

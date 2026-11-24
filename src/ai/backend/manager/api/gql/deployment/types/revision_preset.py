@@ -127,6 +127,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -424,12 +425,12 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         description="Timestamp of the last modification to this deployment preset."
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="The runtime variant this preset is designed for.",
         )
-    )  # type: ignore[misc]
+    )
     async def runtime_variant(
         self,
         info: Info[StrawberryGQLContext],
@@ -444,12 +445,12 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
             RuntimeVariantID(self.runtime_variant_id)
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="The container image used to run the inference server. None when the preset does not specify an image.",
         )
-    )  # type: ignore[misc]
+    )
     async def image(
         self,
         info: Info[StrawberryGQLContext],
@@ -464,12 +465,12 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
             return None
         return await info.context.data_loaders.image_loader.load(ImageID(self.execution.image_id))
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.2",
             description="Resource slot allocations for this preset.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],

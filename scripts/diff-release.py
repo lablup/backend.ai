@@ -10,7 +10,7 @@ rx_oneline = re.compile(
 def do_diff_release(ref_old, ref_new):
     # To ensure latest information from the repository, first fetch all branches
     # and use the "origin" refspec prefix.
-    subprocess.run(["git", "fetch"], capture_output=True)
+    subprocess.run(["git", "fetch"], check=False, capture_output=True)
 
     proc = subprocess.run(
         [
@@ -19,6 +19,7 @@ def do_diff_release(ref_old, ref_new):
             ref_old,
             ref_new,
         ],
+        check=False,
         capture_output=True,
     )
     common_ancestor = proc.stdout.strip().decode()
@@ -30,6 +31,7 @@ def do_diff_release(ref_old, ref_new):
             "--pretty=oneline",
             f"{common_ancestor}..{ref_old}",
         ],
+        check=False,
         capture_output=True,
     )
     old_rev_list = proc.stdout.decode().splitlines()
@@ -41,6 +43,7 @@ def do_diff_release(ref_old, ref_new):
             "--pretty=oneline",
             f"{common_ancestor}..{ref_new}",
         ],
+        check=False,
         capture_output=True,
     )
     new_rev_list = proc.stdout.decode().splitlines()

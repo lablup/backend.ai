@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import aiohttp
 import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
@@ -214,17 +213,12 @@ async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
-    cookie_jar: aiohttp.CookieJar | None = None
-    if config.cookie_file is not None:
-        cookie_jar = aiohttp.CookieJar(unsafe=True)
-        cookie_jar.load(config.cookie_file)
-
     client_config = ClientConfig(
         endpoint=config.endpoint,
         endpoint_type=config.endpoint_type,
         api_version=config.api_version,
         skip_ssl_verification=config.skip_ssl_verification,
-        cookie_jar=cookie_jar,
+        cookie_file=config.cookie_file,
     )
 
     if config.endpoint_type == "session":

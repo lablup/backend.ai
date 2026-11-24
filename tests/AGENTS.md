@@ -12,6 +12,8 @@
 | E2E user scenarios (Client SDK v2) | `tests/integration/` |
 | One adapter call against a real DB and Valkey, seeded per scenario | `tests/scenario/` |
 
+- Do not add tests to `tests/component/` for a manager component that has `tests/scenario/bai_scenario/manager/<component>/`. Its scenario tests verify its behavior.
+
 Each directory keeps its setup patterns in its own `AGENTS.md`.
 
 ## Test strategy

@@ -29,10 +29,6 @@ from ai.backend.manager.services.auth.actions.bulk_get_login_history import (
 from ai.backend.manager.services.auth.actions.bulk_get_login_sessions import (
     BulkGetLoginSessionsAction,
 )
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-    GenerateSSHKeypairActionResult,
-)
 from ai.backend.manager.services.auth.actions.get_role import (
     GetRoleAction,
     GetRoleActionResult,
@@ -128,9 +124,6 @@ class AuthProcessors:
     update_full_name: SingleEntityActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
     update_password: SingleEntityActionProcessor[UpdatePasswordAction, UpdatePasswordActionResult]
     get_ssh_keypair: SingleEntityActionProcessor[GetSSHKeypairAction, GetSSHKeypairActionResult]
-    generate_ssh_keypair: SingleEntityActionProcessor[
-        GenerateSSHKeypairAction, GenerateSSHKeypairActionResult
-    ]
     upload_ssh_keypair: SingleEntityActionProcessor[
         UploadSSHKeypairAction, UploadSSHKeypairActionResult
     ]
@@ -189,9 +182,6 @@ class AuthProcessors:
         )
         self.get_ssh_keypair = user_group.single_entity(
             GetSSHKeypairAction, service.get_ssh_keypair
-        )
-        self.generate_ssh_keypair = user_group.single_entity(
-            GenerateSSHKeypairAction, service.generate_ssh_keypair
         )
         self.upload_ssh_keypair = user_group.single_entity(
             UploadSSHKeypairAction, service.upload_ssh_keypair

@@ -5,7 +5,7 @@ from __future__ import annotations
 import dataclasses
 
 from ai.backend.manager.actions.v2.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 

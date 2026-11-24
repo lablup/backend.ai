@@ -32,10 +32,10 @@ def queue_args() -> RedisMQArgs:
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def redis_queue(
     redis_container: tuple[str, HostPortPair], queue_args: RedisMQArgs
-) -> AsyncGenerator[RedisQueue, None]:
+) -> AsyncGenerator[RedisQueue]:
     # Create consumer group if not exists
     addr = redis_container[1]
     redis_target = RedisTarget(

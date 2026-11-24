@@ -10,10 +10,16 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.entity.adapter import EntityAdapter
 from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
@@ -45,6 +51,8 @@ async def adapter(
     registry = _registry(engine, monitors, validators)
     DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     return EntityAdapter(WiredEntityTypes(registry))

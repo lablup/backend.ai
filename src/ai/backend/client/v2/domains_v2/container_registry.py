@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     CreateContainerRegistryInput,
     DeleteContainerRegistryInput,
     PartialBulkPurgeContainerRegistriesInput,
+    ScopedSearchContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     CreateContainerRegistryPayload,
     DeleteContainerRegistryPayload,
     PurgeContainerRegistryPayload,
+    ScopedSearchContainerRegistriesPayload,
     UpdateContainerRegistryPayload,
 )
 
@@ -38,6 +40,17 @@ class V2ContainerRegistryClient(BaseDomainClient):
             f"{_PATH}/search",
             request=request,
             response_model=AdminSearchContainerRegistriesPayload,
+        )
+
+    async def scoped_search(
+        self, request: ScopedSearchContainerRegistriesInput
+    ) -> ScopedSearchContainerRegistriesPayload:
+        """Search the container registries the named domains are related to."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/scoped/search",
+            request=request,
+            response_model=ScopedSearchContainerRegistriesPayload,
         )
 
     async def admin_create(

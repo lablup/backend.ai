@@ -12,6 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -31,6 +32,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
@@ -85,12 +87,17 @@ class AppProxyClient:
         self._address = address
         self._token = token
 
+    def _headers(self, headers: dict[str, str]) -> dict[str, str]:
+        if (request_id := current_request_id()) is not None:
+            headers[REQUEST_ID_HEADER] = request_id
+        return headers
+
     @appproxy_client_resilience.apply()
     async def fetch_status(self) -> AppProxyStatusResponse:
         try:
             async with self._client_session.get(
                 "/status",
-                headers={"Accept": "application/json"},
+                headers=self._headers({"Accept": "application/json"}),
             ) as resp:
                 data = await resp.json()
                 return AppProxyStatusResponse.model_validate(data)
@@ -112,10 +119,10 @@ class AppProxyClient:
         async with self._client_session.post(
             f"/v2/endpoints/{endpoint_id}",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             result: dict[str, Any] = await resp.json()
@@ -136,10 +143,10 @@ class AppProxyClient:
         async with self._client_session.post(
             "/v2/endpoints/bulk",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
@@ -152,10 +159,10 @@ class AppProxyClient:
     ) -> None:
         async with self._client_session.delete(
             f"/v2/endpoints/{endpoint_id}",
-            headers={
+            headers=self._headers({
                 "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ):
             pass
 
@@ -175,9 +182,9 @@ class AppProxyClient:
         async with self._client_session.post(
             "/v2/endpoints/bulk/routes",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
@@ -200,9 +207,9 @@ class AppProxyClient:
         async with self._client_session.post(
             "/v2/endpoints/bulk/routes/register",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
@@ -224,9 +231,9 @@ class AppProxyClient:
         async with self._client_session.post(
             "/v2/endpoints/bulk/routes/unregister",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
@@ -249,9 +256,9 @@ class AppProxyClient:
         async with self._client_session.post(
             f"/v2/endpoints/{endpoint_id}/token",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
@@ -272,10 +279,10 @@ class AppProxyClient:
             "DELETE",
             "/v2/endpoints/bulk",
             json=body.model_dump(mode="json"),
-            headers={
+            headers=self._headers({
                 "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
-            },
+            }),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()

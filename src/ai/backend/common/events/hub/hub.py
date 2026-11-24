@@ -198,11 +198,10 @@ class EventHub:
                 self._wildcard_alias[domain].discard(propagator_id)
                 if not self._wildcard_alias[domain]:
                     del self._wildcard_alias[domain]
-        else:
-            if alias_key in self._key_alias:
-                self._key_alias[alias_key].discard(propagator_id)
-                if not self._key_alias[alias_key]:
-                    del self._key_alias[alias_key]
+        elif alias_key in self._key_alias:
+            self._key_alias[alias_key].discard(propagator_id)
+            if not self._key_alias[alias_key]:
+                del self._key_alias[alias_key]
 
     async def shutdown(self) -> None:
         """

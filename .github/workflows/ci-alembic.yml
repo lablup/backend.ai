@@ -34,6 +34,8 @@ jobs:
       uses: ./.github/actions/pants-caches
       with:
         mode: restore
+    - name: Install the Pants launcher
+      uses: ./.github/actions/pants-launcher
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:

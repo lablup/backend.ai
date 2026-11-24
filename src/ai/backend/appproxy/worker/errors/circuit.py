@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class InvalidCircuitDataError(BackendAIError):
+class InvalidCircuitDataError(BackendAIError, web.HTTPInternalServerError):
     """Raised when circuit data is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/invalid-circuit-data"
@@ -30,7 +32,7 @@ class InvalidCircuitDataError(BackendAIError):
         )
 
 
-class InvalidFrontendTypeError(BackendAIError):
+class InvalidFrontendTypeError(BackendAIError, web.HTTPInternalServerError):
     """Raised when frontend type is invalid."""
 
     error_type = "https://api.backend.ai/probs/appproxy-worker/invalid-frontend-type"

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.auth.response import (
     GetSSHKeypairPayload,
     SignoutPayload,
     SignupPayload,
-    SSHKeypairPayload,
     UpdateFullNamePayload,
     UpdatePasswordNoAuthPayload,
     UpdatePasswordPayload,
@@ -31,7 +30,6 @@ from ai.backend.common.dto.manager.v2.auth.types import (
     AuthTokenType,
     PasswordChangeInfo,
     RoleInfo,
-    SSHKeypairInfo,
     TwoFactorInfo,
     TwoFactorType,
 )
@@ -43,7 +41,6 @@ __all__ = (
     "AuthTokenType",
     "PasswordChangeInfo",
     "RoleInfo",
-    "SSHKeypairInfo",
     "TwoFactorInfo",
     "TwoFactorType",
     # Input models (request)
@@ -62,7 +59,6 @@ __all__ = (
     "GetSSHKeypairPayload",
     "SignoutPayload",
     "SignupPayload",
-    "SSHKeypairPayload",
     "UpdateFullNamePayload",
     "UpdatePasswordNoAuthPayload",
     "UpdatePasswordPayload",

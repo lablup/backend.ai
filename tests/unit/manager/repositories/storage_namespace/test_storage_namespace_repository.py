@@ -34,7 +34,7 @@ class TestStorageNamespaceRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -68,7 +68,7 @@ class TestStorageNamespaceRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_storage_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[uuid.UUID]:
         """Create sample storage namespace directly in DB and return its ID"""
         namespace_id = uuid.uuid4()
 
@@ -87,7 +87,7 @@ class TestStorageNamespaceRepository:
     async def sample_storage_namespaces_for_filtering(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[uuid.UUID, uuid.UUID], None]:
+    ) -> AsyncGenerator[dict[uuid.UUID, uuid.UUID]]:
         """Create sample storage namespaces with different storage_ids for filter testing"""
         namespace_map: dict[uuid.UUID, uuid.UUID] = {}
         storage_ids = [uuid.uuid4(), uuid.uuid4()]
@@ -111,7 +111,7 @@ class TestStorageNamespaceRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_storage_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create sample storage namespaces with predictable names for ordering tests"""
         namespace_ids = []
         names = ["alpha-ns", "beta-ns", "gamma-ns", "delta-ns"]
@@ -135,7 +135,7 @@ class TestStorageNamespaceRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_storage_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> AsyncGenerator[list[uuid.UUID]]:
         """Create 25 storage namespaces for pagination testing"""
         namespace_ids = []
 

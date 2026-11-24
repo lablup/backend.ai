@@ -25,7 +25,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -63,7 +62,7 @@ class TestSchedulingHistoryRepository:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup.
 
         Note: SQLAlchemy ORM mapper initialization requires all related Row models
@@ -83,7 +82,6 @@ class TestSchedulingHistoryRepository:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -113,7 +111,7 @@ class TestSchedulingHistoryRepository:
     async def scheduling_history_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[SchedulingHistoryRepository, None]:
+    ) -> AsyncGenerator[SchedulingHistoryRepository]:
         """Create SchedulingHistoryRepository instance with database"""
         repo = SchedulingHistoryRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo

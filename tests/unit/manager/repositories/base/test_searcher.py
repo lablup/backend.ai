@@ -104,7 +104,7 @@ class TestSearcher:
     async def database(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, [ItemRow]):
             yield database_connection
 
@@ -112,7 +112,7 @@ class TestSearcher:
     async def sample_items(
         self,
         database: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+    ) -> AsyncGenerator[list[dict[str, int | str]]]:
         data: list[dict[str, int | str]] = [
             {"id": 1, "name": "item-a", "category": "cat1"},
             {"id": 2, "name": "item-b", "category": "cat1"},
@@ -273,7 +273,7 @@ class TestPassThroughDomainWiring:
     async def database(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, [RolePresetRow]):
             yield database_connection
 
@@ -281,7 +281,7 @@ class TestPassThroughDomainWiring:
     async def sample_presets(
         self,
         database: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[RolePresetID], None]:
+    ) -> AsyncGenerator[list[RolePresetID]]:
         preset_ids = [RolePresetID(uuid4()) for _ in range(3)]
         async with database.begin_session() as db_sess:
             await db_sess.execute(

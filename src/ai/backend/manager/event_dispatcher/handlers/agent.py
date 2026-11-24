@@ -144,7 +144,8 @@ class AgentEventHandler:
         await self._agent_repository.sync_installed_images(agent_id=source)
         await self._registry.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
-            (source, agent_info.scaling_group, agent_info.available_resource_slots),
+            # No handler reads arguments; pass a dataclass from plugin/hook_args.py once one does.
+            (),
         )
 
     # For compatibility with redis key made with image canonical strings

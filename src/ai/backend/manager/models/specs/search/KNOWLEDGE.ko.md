@@ -93,9 +93,10 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 |---|---|---|
 | own | 엔티티 자신의 column | 엔티티의 field cap |
 | nested | 엔티티가 소유하는 다른 테이블의 row | 엔티티의 field cap(path `labels.key`) |
-| linked | 다른 엔티티와의 연결 | 스코프, 다른 엔티티의 권한 |
+| linked | 외래 키가 다른 엔티티 쪽에 있는 연결, 계산된 관계 | 스코프, 다른 엔티티의 권한 |
 
 - 나누는 기준은 소유이지 테이블이 아니다. label 은 다른 테이블에 있지만 vfolder 의 data 다.
+- 외래 키가 search 대상 row 에 있으면 own, 소유한 row 에 있으면 nested 의 filter 다. 다른 엔티티 쪽에 있을 때만 linked 다.
 - 진입점이 하나이므로 sweep test 와 권한 검사가 한 곳에서 시작한다. 뒤의 class 는 이름으로 참조하지
   않으므로 private 이다.
 
@@ -200,8 +201,9 @@ filter 를 여는 이유와 order 를 열지 않는 이유는 다르다.
 - own + cap(share)은 엔티티별 권한으로 퍼지지 않지만, scoped search 의 접근 범위는 cap 을 무시하므로
   목록이 새어 나간다.
 - 그래서 사용은 좁히기만 하고 아무것도 부여하지 않는다. 진실의 원천은 외래 키 column 하나다.
-- column 이 어느 테이블에 있는지는 사용인지 결정하지 않는다. `roles.role_preset_id` 는 search 대상 row 에
-  있고 사용이다.
+- 외래 키가 search 대상 row 나 소유한 row 에 있으면 사용으로 선언하지 않는다. `roles.role_preset_id` 는
+  role 의 field 이고 role 의 field cap 아래에서 filter 로 거른다.
+- 수명 조건이 붙은 관계(배포의 현재 revision 이 쓰는 image)는 nested filter 로 표현되지 않아 사용으로 둔다.
 - JSON 값 안의 id(`extra_mounts`, `vfolder_mounts`)는 외래 키가 아니고 사용도 아니다. 외래 키를 가진
   row 로 정규화된 뒤에 사용이 된다.
 
@@ -222,8 +224,8 @@ filter 를 여는 이유와 order 를 열지 않는 이유는 다르다.
 - global search 는 지정한 엔티티를 검사하지 않는다. 스코프 없는 읽기는 SUPERADMIN gate 가 판정한다.
 - 두 방향이 하나의 묶음에 있는 것은 검사와 좁힘이 같기 때문이다. 어느 방향이든 지정한 엔티티의 READ 를
   검사하고 결과를 AND 로 좁힌다. 방향이 정하는 것은 조건이 어느 column 에 걸리는지다.
-- 일반 column filter 로 이를 대신할 수 없다. 지정한 엔티티의 권한을 검사하지 않으므로 결과가 돌아오는지가
-  호출자에게 읽을 수 없는 row 의 존재를 알려 준다.
+- 외래 키가 다른 엔티티 쪽에 있으면 column filter 로 이를 대신할 수 없다. 그 연결은 다른 엔티티의 data 라
+  search 대상의 field cap 으로 차단할 수 없고, 결과가 돌아오는지가 읽을 수 없는 row 의 존재를 알려 준다.
 - "내 resource 를 누가 사용하는가" 는 `uses` 로 반환한다. 사용하는 쪽을 search 하고 사용되는 엔티티의 id 로
   좁힌다.
 - 방향에 이름을 붙이는 이유는 search 대상 쪽 이름만으로는 어느 쪽이 어느 쪽을 사용하는지 알 수 없기

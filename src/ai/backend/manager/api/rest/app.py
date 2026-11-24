@@ -17,7 +17,7 @@ from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.common.web.reserved_response_headers import setup_reserved_response_headers
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager import __version__
+from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.middleware.client_ip import client_ip_middleware
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.errors.common import (
@@ -25,6 +25,7 @@ from ai.backend.manager.errors.common import (
     InternalServerError,
     ServerMisconfiguredError,
 )
+from ai.backend.manager.version import __version__
 
 from .routing import RouteRegistry
 
@@ -65,9 +66,10 @@ LATEST_API_VERSION: Final = (
 )
 
 
+@auth_required
 async def hello(_request: web.Request) -> web.Response:
     """
-    Returns the API version number.
+    Returns the API version and the manager release version.
     """
     return web.json_response({
         "version": LATEST_API_VERSION,

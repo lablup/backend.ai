@@ -74,6 +74,19 @@ class InvalidTemplateValueError(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
+    error_type = "https://api.backend.ai/probs/too-many-requests"
+    error_title = "Too many failed login attempts"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class ManagerConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     """Raised when no Manager endpoint in the pool is currently healthy."""
 

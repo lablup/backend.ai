@@ -24,8 +24,8 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceMetadata,
 )
 from ai.backend.common.types import ServiceDiscoveryType, ValkeyProfileTarget
-from ai.backend.manager import __version__
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.version import __version__
 
 
 @dataclass

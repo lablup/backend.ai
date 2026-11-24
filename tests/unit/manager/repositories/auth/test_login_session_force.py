@@ -63,7 +63,7 @@ class TestLoginSessionForce:
     @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -90,7 +90,7 @@ class TestLoginSessionForce:
     @pytest.fixture
     async def sample_user(
         self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[SampleUserData, None]:
+    ) -> AsyncGenerator[SampleUserData]:
         """Create a user with domain, resource policies, and keypair."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4()}"

@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.common.data.entity.types import FieldData
-from ai.backend.manager.actions.types import ActionKind, OperationStatus
+from ai.backend.manager.actions.spec import ActionKind
+from ai.backend.manager.actions.types import OperationStatus
 
 
 @dataclass

@@ -7,8 +7,7 @@ from lark.lexer import Token
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-from . import (
+from ai.backend.manager.models.minilang.field_spec import (
     ArrayFieldItem,
     EnumFieldItem,
     FieldSpecItem,

@@ -99,14 +99,6 @@ class AuthRepository:
         await self._db_source.mark_user_and_keypairs_inactive(email)
 
     @auth_repository_resilience.apply()
-    async def get_ssh_public_key(self, access_key: str) -> str | None:
-        return await self._db_source.fetch_ssh_public_key(access_key)
-
-    @auth_repository_resilience.apply()
-    async def update_ssh_keypair(self, access_key: str, public_key: str, private_key: str) -> None:
-        await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
-
-    @auth_repository_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
         """Whether an active keypair holds the given secret key."""
         return await self._db_source.verify_keypair_secret(access_key, secret_key)

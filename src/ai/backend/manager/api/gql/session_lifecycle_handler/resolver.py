@@ -22,7 +22,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
             "``DefaultSessionOptionsInfo.handlerOptions.byHandler``."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_session_lifecycle_handlers(
     info: Info[StrawberryGQLContext],
 ) -> list[SessionLifecycleHandlerNodeGQL] | None:

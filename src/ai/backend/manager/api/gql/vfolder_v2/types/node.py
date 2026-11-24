@@ -25,6 +25,7 @@ from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
+    gql_added_resolver,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -122,7 +123,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
@@ -134,7 +135,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
                 "Null for unmanaged vfolders."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def usage(
         self,
         info: Info[StrawberryGQLContext],
@@ -147,7 +148,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             used_bytes=BinarySizeInfoGQL.from_pydantic(result.used_bytes),
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Model cards backed by this vfolder.",
@@ -157,7 +158,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         deprecation_reason=(
             "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`."
         ),
-    )  # type: ignore[misc]
+    )
     async def model_cards(
         self,
         info: Info[StrawberryGQLContext],
@@ -200,12 +201,12 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             count=result.total_count,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="The labels on this vfolder.",
         )
-    )  # type: ignore[misc]
+    )
     async def entity_labels(
         self,
         info: Info[StrawberryGQLContext],
@@ -231,7 +232,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             offset=offset,
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version="26.9.0",
             description=(
@@ -240,7 +241,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
                 "mount level (`mountPermission`)."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def permissions(
         self,
         info: Info[StrawberryGQLContext],
@@ -249,7 +250,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             VFolderUUID(UUID(self.id))
         )
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -258,7 +259,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
                 "or the folder's default (`accessControl.permission`)."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def mount_permission(
         self,
         info: Info[StrawberryGQLContext],
@@ -270,14 +271,14 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             return None
         return VFolderMountPermissionGQL(mount_permission.value)
 
-    @gql_added_field(
+    @gql_added_resolver(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "The auto-mounts set on this vfolder, in every project or user they are set on."
             ),
         )
-    )  # type: ignore[misc]
+    )
     async def vfolder_auto_mounts(
         self,
         info: Info[StrawberryGQLContext],

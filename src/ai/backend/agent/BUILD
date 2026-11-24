@@ -46,6 +46,7 @@ python_distribution(
         ":src-watcher",
         "src/ai/backend/cli:src",  # install requirement: provides the `backend.ai` console script
         "src/ai/backend/kernel:src",  # included only in binary dists
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -82,6 +83,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
         *_common_pex_dependencies,
     ],
@@ -93,6 +95,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
         *_common_pex_dependencies,
     ],
@@ -105,6 +108,7 @@ pex_binary(
         ":src-watcher",
         ":buildscript",
         ":resources",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )
@@ -116,6 +120,7 @@ pex_binary(
         ":src-watcher",
         ":buildscript",
         ":resources",
+        "!!stubs/aiomonitor:stubs",
         "!!stubs/trafaret:stubs",
     ],
 )

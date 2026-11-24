@@ -45,7 +45,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Search runtime variants.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variants(
     info: Info[StrawberryGQLContext],
     usage: Annotated[
@@ -114,7 +114,7 @@ async def runtime_variants(
         added_version="26.4.2",
         description="Get a single runtime variant by ID.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,

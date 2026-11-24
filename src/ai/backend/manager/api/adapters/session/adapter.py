@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.config import ServiceArgumentInterpolation
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
@@ -463,6 +464,11 @@ class SessionAdapter(BaseAdapter):
             session_group_id=(
                 SessionGroupID(input.session_group_id)
                 if input.session_group_id is not None
+                else None
+            ),
+            interpolation=(
+                ServiceArgumentInterpolation.model_validate(input.interpolation.model_dump())
+                if input.interpolation is not None
                 else None
             ),
             user_id=UserID(user_id),

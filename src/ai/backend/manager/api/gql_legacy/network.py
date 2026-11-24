@@ -27,7 +27,7 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network.creators import NetworkCreator

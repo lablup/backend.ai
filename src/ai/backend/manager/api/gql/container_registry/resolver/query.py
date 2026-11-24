@@ -31,7 +31,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="List container registries with filtering, ordering, and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_container_registries_v2(
     info: Info[StrawberryGQLContext],
     filter: ContainerRegistryV2Filter | None = None,

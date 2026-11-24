@@ -24,7 +24,7 @@
   - delegate_scan: 성공 없음 · 거부 있음 1 (global_scope): SCENARIO-GAP
   - delete_artifacts: 성공 있음 1 · 거부 있음 1 (global_scope)
   - get: 성공 있음 1 · 거부 있음 1 (single_entity)
-  - import_revision: 성공 없음 · 거부 있음 2 (single_field): SCENARIO-GAP
+  - import_revision: 성공 없음 · 거부 있음 3 (single_field): SCENARIO-GAP
   - reject_revision: 성공 있음 1 · 거부 있음 1 (single_field)
   - restore_artifacts: 성공 있음 1 · 거부 있음 1 (global_scope)
   - retrieve_models: 성공 없음 · 거부 있음 1 (global_scope): SCENARIO-GAP
@@ -164,6 +164,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [읽기 권한만 받은 사용자가 리비전을 가져오려 하면 권한 부족으로 거부됩니다](#revision_transitions-a-user-granted-read-but-not-create-may-not-import-a-revision) | 거부 |
+| [가져오는 중인 리비전을 다시 가져오려 하면, 이미 가져오는 중이라는 것으로 거부됩니다](#revision_transitions-importing-a-revision-being-pulled-is-refused) | 거부 |
 | [Reservoir 설정 없이 리비전을 가져오려 하면, 서버가 설정되지 않았다는 것으로 거부됩니다](#revision_transitions-importing-without-reservoir-configuration-is-refused) | 거부 |
 
 **reject_revision**
@@ -1712,6 +1713,38 @@ Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+<a id="revision_transitions-importing-a-revision-being-pulled-is-refused"></a>
+
+#### [importing-a-revision-being-pulled-is-refused](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+
+가져오는 중인 리비전을 다시 가져오려 하면, 이미 가져오는 중이라는 것으로 거부됩니다
+
+Given
+
+- 아티팩트 하나와 리비전 1개, 그리고 아티팩트에 READ, CREATE 권한을 받은 user 한 명
+  - 도메인 home-1
+  - 아티팩트 artifact-1: 허깅 페이스 레지스트리에서 스캔한 모델
+  - 아티팩트 artifact-1: 리비전 1.0
+  - global 에서 아티팩트 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 artifact-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 artifact-keeper-1: artifact 전체에 READ 허용
+    - 역할 artifact-keeper-1: artifact 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 artifact-keeper-1 보유
+
+When
+
+- ArtifactAdapter.import_revision: user-1이 리비전 1.0을 가져옵니다
+
+Then
+
+- 거부됩니다
+  - 거부: ArtifactRevisionImportInProgressError
 
 <a id="revision_transitions-importing-without-reservoir-configuration-is-refused"></a>
 

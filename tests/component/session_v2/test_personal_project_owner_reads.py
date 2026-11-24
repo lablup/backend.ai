@@ -5,23 +5,32 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pytest
 import sqlalchemy as sa
+from dateutil.tz import tzutc
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -30,11 +39,108 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-    from tests.component.conftest import KeypairFixtureData, ProvisionedUserData
+    from tests.component.conftest import (
+        KeypairFixtureData,
+        ProvisionedUserData,
+        VirtualEntitySeeder,
+    )
 
 type ProvisionUser = Callable[[], Coroutine[Any, Any, ProvisionedUserData]]
 type PlaceSession = Callable[[ProvisionedUserData], Coroutine[Any, Any, SessionID]]
 type RegistryFor = Callable[[KeypairFixtureData], Coroutine[Any, Any, V2ClientRegistry]]
+
+
+@pytest.fixture()
+async def place_personal_session(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
+    virtual_entity_seeder: VirtualEntitySeeder,
+) -> AsyncIterator[PlaceSession]:
+    """Seed a RUNNING session in a user's personal project, with the graph rows creating
+    it writes: the user and the project each own and govern it."""
+    placed: list[SessionID] = []
+
+    async def place(owner: ProvisionedUserData) -> SessionID:
+        unique = secrets.token_hex(4)
+        session_id = SessionID(uuid.uuid4())
+        session_name = f"test-session-{unique}"
+        now = datetime.now(tzutc())
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(SessionRow.__table__).values(
+                    id=session_id,
+                    creation_id=f"cid-{unique}",
+                    name=session_name,
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_size=1,
+                    cluster_mode="single-node",
+                    domain_name=domain_fixture.domain_name,
+                    domain_id=domain_fixture.domain_id,
+                    group_id=owner.personal_project_id,
+                    user_uuid=owner.user_id,
+                    access_key=owner.keypair.access_key,
+                    scaling_group_name=resource_group_name,
+                    resource_group_id=resource_group_id,
+                    status=SessionStatus.RUNNING,
+                    status_info="",
+                    status_history={
+                        SessionStatus.PENDING.name: now.isoformat(),
+                        SessionStatus.RUNNING.name: now.isoformat(),
+                    },
+                    created_at=now,
+                )
+            )
+            await conn.execute(
+                sa.insert(kernels).values(
+                    id=uuid.uuid4(),
+                    session_id=session_id,
+                    session_creation_id=f"cid-{unique}",
+                    session_name=session_name,
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_role="main",
+                    cluster_idx=0,
+                    cluster_hostname="main0",
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    domain_name=domain_fixture.domain_name,
+                    group_id=owner.personal_project_id,
+                    user_uuid=owner.user_id,
+                    access_key=owner.keypair.access_key,
+                    scaling_group=resource_group_name,
+                    resource_group_id=resource_group_id,
+                    status=KernelStatus.RUNNING,
+                    status_info="",
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    created_at=now,
+                )
+            )
+            await virtual_entity_seeder.place_entity(
+                conn,
+                SessionEntityType(),
+                session_id,
+                [
+                    (UserEntityType(), owner.user_id),
+                    (ProjectEntityType(), owner.personal_project_id),
+                ],
+            )
+        placed.append(session_id)
+        return session_id
+
+    yield place
+    ve = VirtualEntityRow.__table__
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ve.delete().where(ve.c.entity_type == SessionEntityType(), ve.c.entity_id.in_(placed))
+        )
+        await conn.execute(kernels.delete().where(kernels.c.session_id.in_(placed)))
+        await conn.execute(
+            SessionRow.__table__.delete().where(SessionRow.__table__.c.id.in_(placed))
+        )
 
 
 @pytest.fixture()

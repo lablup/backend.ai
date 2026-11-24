@@ -32,7 +32,7 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 
 - Group semantically related fields into submodels (for example, `UserBasicInfo`, `UserSecurityInfo`).
 - Use a flat structure only when there are fewer than 5 fields and no logical grouping.
-- Nested submodels must also inherit from `BaseResponseModel`.
+- Nested submodels must also inherit from `BaseResponseModel` (flake8 `BAI202`, on or off in `tools/flake8-plugins/README.md`).
 - Avoid nesting deeper than 2 levels to keep serialization predictable.
 
 ## Validation
@@ -43,6 +43,6 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 
 ## Conversion
 
-- DTOs are pure data structures: no conversion logic inside DTOs.
+- DTOs are pure data structures: no conversion logic inside DTOs (flake8 `BAI203`, on or off in `tools/flake8-plugins/README.md`).
 - Domain Data type → DTO conversion happens in the Adapter layer (`manager/api/adapters/{domain}.py`).
 - Do not import DB models or domain Data types directly in DTO modules.

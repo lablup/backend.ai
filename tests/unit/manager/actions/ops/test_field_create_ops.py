@@ -20,7 +20,8 @@ from ai.backend.manager.actions.types import ActionOperationType, OperationStatu
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.errors.base.not_found import NotFoundError
-from ai.backend.manager.errors.permission import NotEnoughPermission, PermissionAlreadyGranted
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.permission_field import PermissionAlreadyGranted
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow

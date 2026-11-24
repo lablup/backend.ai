@@ -8,7 +8,7 @@ from uuid import UUID
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from sqlalchemy.orm import selectinload
 
 from ai.backend.appproxy.common.types import (
@@ -34,7 +34,8 @@ if TYPE_CHECKING:
 class BulkRemoveCircuitsRequestModel(BackendAISchema):
     circuit_ids: Annotated[list[UUID], Field(description="Comma separated list of Circuit UUIDs.")]
 
-    @validator("circuit_ids", pre=True)
+    @field_validator("circuit_ids", mode="before")
+    @classmethod
     def split_comma_separated(cls, v: object) -> object:
         if isinstance(v, str):
             v = v.strip()

@@ -14,9 +14,10 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.errors.permission import RoleNotFound, VirtualEntityNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError, RepositoryIntegrityError
 from ai.backend.manager.errors.resource import ProjectMemberNotJoinableError
+from ai.backend.manager.errors.role import RoleNotFound
+from ai.backend.manager.errors.virtual_entity import VirtualEntityNotFound
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow

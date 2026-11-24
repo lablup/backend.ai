@@ -129,12 +129,12 @@ class TestQueryUserinfo:
     @pytest.fixture
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, ALL_ROWS):
             yield database_connection
 
     @pytest.fixture
-    async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
+    async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData]:
         """Create a normal user who is a member of a group."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
@@ -261,7 +261,7 @@ class TestQueryUserinfo:
     @pytest.fixture
     async def non_member_group(
         self, db: ExtendedAsyncSAEngine, seed: SeedData
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """A group in the same domain that the seed user is NOT a member of."""
         name = f"other-group-{uuid.uuid4().hex[:8]}"
         async with db.begin_session() as sess:
@@ -281,7 +281,7 @@ class TestQueryUserinfo:
     @pytest.fixture
     async def inactive_domain_user(
         self, db: ExtendedAsyncSAEngine, seed: SeedData
-    ) -> AsyncGenerator[ExtraUserData, None]:
+    ) -> AsyncGenerator[ExtraUserData]:
         """A user belonging to an inactive domain."""
         domain = f"inactive-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
@@ -338,7 +338,7 @@ class TestQueryUserinfo:
     @pytest.fixture
     async def superadmin(
         self, db: ExtendedAsyncSAEngine, seed: SeedData
-    ) -> AsyncGenerator[ExtraUserData, None]:
+    ) -> AsyncGenerator[ExtraUserData]:
         """A superadmin in the same domain as seed."""
         admin_uuid = uuid.uuid4()
         admin_ak = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
@@ -529,12 +529,12 @@ class TestQueryUserinfoFromSession:
     @pytest.fixture
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, ALL_ROWS):
             yield database_connection
 
     @pytest.fixture
-    async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
+    async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         group_id = uuid.uuid4()

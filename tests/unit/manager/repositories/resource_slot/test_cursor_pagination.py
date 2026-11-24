@@ -91,7 +91,7 @@ class TestSlotTypePagination:
     @pytest.fixture
     async def database(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, [ResourceSlotTypeRow]):
             yield database_connection
 
@@ -159,7 +159,7 @@ class TestAgentResourcePagination:
     @pytest.fixture
     async def database(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [ResourceGroupRow, AgentRow, ResourceSlotTypeRow, AgentResourceRow],
@@ -269,7 +269,7 @@ class TestResourceAllocationPagination:
     @pytest.fixture
     async def database(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [

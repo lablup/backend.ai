@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -109,7 +109,7 @@ def registry(
     policy = AuditLogPolicy([ActionOperationType.SEARCH])
     return ProcessorRegistry(
         ProcessorDependencies(
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
             monitors=ActionMonitors(
                 scope=[ScopeActionAuditLogMonitor(audit_repository, policy, masking)],
             ),

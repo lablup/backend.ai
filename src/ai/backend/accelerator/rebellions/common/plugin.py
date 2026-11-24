@@ -14,15 +14,7 @@ import trafaret as t
 from aiodocker import Docker
 
 from ai.backend.accelerator.rebellions import __version__
-
-from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
-from .types import AbstractATOMDevice
-
-try:
-    from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
-except ImportError:
-    from ai.backend.agent.docker.resources import get_resource_spec_from_container
-
+from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -50,6 +42,9 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
+
+from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
+from .types import AbstractATOMDevice
 
 _atom_config_iv = t.Dict({
     "general": t.Dict({

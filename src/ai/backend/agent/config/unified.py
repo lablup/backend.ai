@@ -663,7 +663,7 @@ class DebugConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Logs the kernel configuration sent to containers at startup. "
-                "Shows environment variables, mount points, and execution settings. "
+                "Shows environment variable names (values masked), mount points, and execution settings. "
                 "Helpful for debugging container initialization or configuration issues."
             ),
             added_version="25.12.0",

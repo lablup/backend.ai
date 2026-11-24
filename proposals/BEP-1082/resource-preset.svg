@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="860" height="230" fill="#ffffff"/>
+  <rect x="20" y="30" width="260" height="180" rx="4" fill="#f8fafc" stroke="#64748b"/>
+  <text x="32" y="52" fill="#0f172a" font-weight="bold">resource_presets columns</text>
+  <text x="32" y="76" fill="#334155">id</text>
+  <text x="32" y="98" fill="#334155">name</text>
+  <text x="32" y="120" fill="#334155">resource_slots</text>
+  <text x="32" y="142" fill="#334155">shared_memory</text>
+  <text x="32" y="164" fill="#334155">scaling_group_name</text>
+
+  <rect x="320" y="30" width="260" height="180" rx="4" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="332" y="52" fill="#1e1b4b" font-weight="bold">ResourcePresetPartialData</text>
+  <text x="332" y="76" fill="#1e1b4b">id (always read)</text>
+  <text x="332" y="98" fill="#1e1b4b">name</text>
+  <text x="332" y="120" fill="#1e1b4b">resource_slots</text>
+  <text x="332" y="142" fill="#1e1b4b">shared_memory</text>
+  <text x="332" y="164" fill="#1e1b4b">resource_group_name</text>
+
+  <rect x="620" y="30" width="220" height="180" rx="4" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
+  <text x="632" y="52" fill="#0f172a" font-weight="bold">ResourcePresetV2 (GQL)</text>
+  <text x="632" y="76" fill="#334155">id, entityId</text>
+  <text x="632" y="98" fill="#334155">name</text>
+  <text x="632" y="120" fill="#334155">resourceSlots</text>
+  <text x="632" y="142" fill="#334155">sharedMemory</text>
+  <text x="632" y="164" fill="#334155">resourceGroupName,</text>
+  <text x="632" y="182" fill="#334155">resourceGroup</text>
+
+  <line x1="280" y1="120" x2="318" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="580" y1="120" x2="618" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+</svg>

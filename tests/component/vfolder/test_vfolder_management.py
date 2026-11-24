@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
 
 import pytest
@@ -10,6 +10,21 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
+)
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     AcceptInvitationReq,
@@ -26,15 +41,131 @@ from ai.backend.common.dto.manager.vfolder import (
     UpdateVFolderOptionsReq,
 )
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow, vfolders
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 InvitationFixtureData = dict[str, Any]
 InvitationFactory = Callable[..., Coroutine[Any, Any, InvitationFixtureData]]
+
+
+_OWNER_ACCESSIBLE_ENTITY_TYPES: tuple[EntityType, ...] = (
+    VFolderEntityType(),
+    ImageEntityType(),
+    SessionEntityType(),
+    ArtifactEntityType(),
+    ArtifactRegistryEntityType(),
+    AppConfigFragmentEntityType(),
+    NotificationChannelEntityType(),
+    NotificationRuleEntityType(),
+    DeploymentEntityType(),
+    ModelCardEntityType(),
+)
+
+
+@pytest.fixture()
+async def invitation_factory(
+    db_engine: SAEngine,
+    admin_user_fixture: Any,
+) -> AsyncIterator[InvitationFactory]:
+    """Factory that inserts vfolder offers into ``entity_shares`` directly.
+
+    Defaults to a PENDING offer from the admin user to the given invitee.
+    Cleans up all created rows on teardown.
+    """
+    created_ids: list[uuid.UUID] = []
+
+    async def _create(
+        vfolder_id: uuid.UUID,
+        invitee_email: str,
+        **overrides: Any,
+    ) -> InvitationFixtureData:
+        inv_id = uuid.uuid4()
+        defaults: dict[str, Any] = {
+            "id": inv_id,
+            "permission_cap": Permission.READ,
+            "sharer_user_id": admin_user_fixture.user_uuid,
+            "recipient_email": invitee_email,
+            "status": EntityShareStatus.PENDING,
+            "target_entity_type": VFolderEntityType(),
+            "target_entity_id": vfolder_id,
+        }
+        defaults.update(overrides)
+        async with db_engine.begin() as conn:
+            await conn.execute(sa.insert(EntityShareRow.__table__).values(**defaults))
+        created_ids.append(inv_id)
+        return defaults
+
+    yield _create
+
+    async with db_engine.begin() as conn:
+        for inv_id in reversed(created_ids):
+            await conn.execute(
+                EntityShareRow.__table__.delete().where(EntityShareRow.__table__.c.id == inv_id)
+            )
+
+
+@pytest.fixture()
+async def user_system_role(
+    db_engine: SAEngine,
+    regular_user_fixture: Any,
+) -> AsyncIterator[uuid.UUID]:
+    """Provision the RBAC SYSTEM role for the regular user.
+
+    Replicates what user provisioning does at user-creation time:
+    RoleRow (source=SYSTEM) + UserRoleRow + scope mapping + owner PermissionRows.
+    The base regular_user_fixture inserts user rows directly and skips this, so
+    flows that resolve the user's system role (e.g. accept_invitation) require it.
+    """
+    role_id = uuid.uuid4()
+    user_uuid = regular_user_fixture.user_uuid
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(RoleRow.__table__).values(
+                id=role_id,
+                name=f"user-{str(user_uuid)[:8]}",
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+                scope_type=UserEntityType(),
+                scope_id=user_uuid,
+            )
+        )
+        await conn.execute(
+            sa.insert(UserRoleRow.__table__).values(
+                user_id=user_uuid,
+                role_id=role_id,
+            )
+        )
+        for entity_type in _OWNER_ACCESSIBLE_ENTITY_TYPES:
+            for bit in Permission:
+                if not bit:
+                    continue
+                await conn.execute(
+                    sa.insert(PermissionRow.__table__).values(
+                        role_id=role_id,
+                        entity_type=entity_type,
+                        permission=bit,
+                    )
+                )
+
+    yield role_id
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
 
 
 class TestVFolderRename:

@@ -6,7 +6,7 @@ This document holds guidelines for designing SQLAlchemy ORM models in the Backen
 
 ### Responsibility Scope
 
-- **models**: Table schema definition, column types, relationships, indexes, and `to_data()` conversion methods
+- **models**: Table schema definition, column types, relationships, and indexes
 - **repositories**: All query logic (create, get, update, delete, retrieval, aggregation, and the like)
 
 Query methods such as `get_by_id` and `list_by_condition` belong in repositories, not models.
@@ -20,8 +20,8 @@ Query methods such as `get_by_id` and `list_by_condition` belong in repositories
 
 ### Primary Key
 
-- Prefer `IDColumn()`.
-- Domain-specific ID types ensure type safety: `SessionIDColumn()`, `KernelIDColumn()`, `EndpointIDColumn()`.
+- Follow "Id column defaults" in `AGENTS.md`: a `server_default` of `uuid_generate_v7()`.
+- Do not use `IDColumn()`, `SessionIDColumn()` or `KernelIDColumn()` for a new table.
 
 ### Reference Columns
 
@@ -101,12 +101,8 @@ Index types:
 
 ## Data Conversion
 
-### to_data() Method
-
-Implement `to_data()` to convert an ORM Row to a dataclass.
-
-- Convert Enum values to the appropriate types.
-- Convert JSONB data to structured models with Pydantic `model_validate()`.
+- New Row classes do not add `to_data()`. `{Entity}SearchableFields.own.to_data(row)` builds the data
+  (`specs/search/AGENTS.md`).
 
 ## Naming Conventions
 
@@ -125,12 +121,12 @@ Implement `to_data()` to convert an ORM Row to a dataclass.
 When adding a new model:
 
 - [ ] Inherit `Base` and define `__tablename__`.
-- [ ] Primary key: `IDColumn()` or a domain-specific ID
+- [ ] Primary key: `server_default` of `uuid_generate_v7()`
 - [ ] Reference columns: ID (UUID) based, with no DB-level foreign key constraint
 - [ ] Set `nullable` explicitly
 - [ ] Set `server_default` or `default`, one only
 - [ ] Include a `created_at` column (cursor pagination)
 - [ ] Add the necessary indexes (consider WHERE and ORDER BY)
 - [ ] No `relationship()` attributes: related rows come from repository queries
-- [ ] Implement the `to_data()` conversion method
+- [ ] Declare `{Entity}SearchableFields` in `searchable_fields.py`
 - [ ] Generate an Alembic migration

@@ -1,28 +1,21 @@
 from __future__ import annotations
 
-import logging
 import re
-import uuid
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
-import yarl
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
+from ai.backend.common.errors.container_registry import InvalidContainerRegistryURL
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -33,8 +26,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.association_container_registries_groups.row import (
         AssociationContainerRegistriesGroupsRow,
     )
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ContainerRegistryRow",
@@ -50,6 +41,8 @@ class ContainerRegistryValidatorArgs:
     project: str | None
 
 
+# Used by ContainerRegistryRepository.modify_registry, gql_legacy and the registry seed.
+# Move it out of models once the place of the modify_registry check is settled.
 # TODO: Refactor this using inheritance
 class ContainerRegistryValidator:
     """
@@ -141,6 +134,8 @@ class ContainerRegistryRow(Base):
         "extra", sa.JSON, nullable=True, default=None
     )
 
+    # Read only by the legacy RBAC (ImagePermissionContextBuilder in models/image/row.py).
+    # Delete it together with the join condition in the models/rbac cleanup.
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
@@ -172,19 +167,8 @@ class ContainerRegistryRow(Base):
         self.is_global = is_global
         self.extra = extra
 
-    @classmethod
-    async def get(
-        cls,
-        session: AsyncSession,
-        id: str | uuid.UUID,
-    ) -> ContainerRegistryRow:
-        query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == id)
-        result = await session.execute(query)
-        row = result.scalar()
-        if row is None:
-            raise NoResultFound
-        return row
-
+    # Called only by gql_legacy (container_registry.py).
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list_by_registry_name(
         cls,
@@ -201,51 +185,9 @@ class ContainerRegistryRow(Base):
         return rows
 
     @classmethod
-    async def get_known_container_registries(
-        cls,
-        session: AsyncSession,
-    ) -> Mapping[str, Mapping[str, yarl.URL]]:
-        query_stmt = sa.select(ContainerRegistryRow).options(
-            load_only(
-                ContainerRegistryRow.project,
-                ContainerRegistryRow.registry_name,
-                ContainerRegistryRow.url,
-            )
-        )
-        registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt)).all())
-        result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
-        for registry_row in registries:
-            project = registry_row.project
-            if project is None:
-                continue
-            registry_name = registry_row.registry_name
-            url = registry_row.url
-            if project not in result:
-                result[project] = {}
-            result[project][registry_name] = yarl.URL(url)
-        return result
-
-    @classmethod
     def scope_id_expr(cls) -> SQLColumnExpression[ContainerRegistryID]:
         return cls.id
 
     @classmethod
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.registry_name
-
-    @classmethod
-    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
-        instance = cls(
-            id=data.id,
-            url=data.url,
-            registry_name=data.registry_name,
-            type=data.type,
-            project=data.project,
-            username=data.username,
-            password=data.password,
-            ssl_verify=data.ssl_verify,
-            is_global=data.is_global,
-            extra=data.extra,
-        )
-        instance.id = data.id
-        return instance

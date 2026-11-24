@@ -10,7 +10,8 @@ import pytest
 
 from ai.backend.agent.kubernetes.agent import KubernetesKernelCreationContext
 from ai.backend.agent.types import KernelOwnershipData
-from ai.backend.common.types import AgentId, KernelCreationConfig, KernelId, SessionId
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
+from ai.backend.common.types import AgentId, KernelId, SessionId
 
 
 @pytest.fixture

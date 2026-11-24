@@ -60,6 +60,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -99,10 +100,10 @@ class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")
     created_at: datetime = gql_field(description="Creation timestamp.")
 
-    @gql_field(
+    @gql_resolver(
         description="Operation granted by the permission.",
         deprecation_reason=_REMOVED_OPERATION_REASON,
-    )  # type: ignore[misc]
+    )
     def operation(self) -> OperationTypeGQL | None:
         return None
 
@@ -261,10 +262,10 @@ class BulkAddRolePermissionPresetFailureInfoGQL(
     )
     message: str = gql_field(description="Error message describing the failure.")
 
-    @gql_field(
+    @gql_resolver(
         description="Operation of the permission entry that failed.",
         deprecation_reason=_REMOVED_OPERATION_REASON,
-    )  # type: ignore[misc]
+    )
     def operation(self) -> OperationTypeGQL | None:
         return None
 

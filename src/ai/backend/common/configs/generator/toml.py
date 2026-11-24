@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 from dataclasses import replace
 from pathlib import Path
@@ -21,6 +22,13 @@ __all__ = (
     "generate_sample_toml",
     "generate_halfstack_toml",
 )
+
+_JINJA_MARKER = re.compile(r"\{[{%#]")
+
+
+def _escape_jinja(text: str) -> str:
+    """Escape text that Jinja would read as syntax, so rendering gives it back unchanged."""
+    return _JINJA_MARKER.sub(lambda m: "{{ '" + m.group(0) + "' }}", text)
 
 
 class TOMLGenerator:
@@ -170,7 +178,7 @@ class TOMLGenerator:
         if self._config.include_version_comments:
             lines.append(f"{indent}# Added in {field.doc.added_version}")
             if field.doc.deprecated_version:
-                hint = field.doc.deprecation_hint or ""
+                hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
         # Get example value
@@ -183,6 +191,7 @@ class TOMLGenerator:
         value_str = formatted.value
         if formatted.comment:
             value_str = f"{value_str}  {formatted.comment}"
+        value_str = _escape_jinja(value_str)
 
         match visibility:
             case FieldVisibility.REQUIRED:
@@ -228,22 +237,24 @@ class TOMLGenerator:
         if self._config.include_version_comments:
             lines.append(f"{indent}# Added in {field.doc.added_version}")
             if field.doc.deprecated_version:
-                hint = field.doc.deprecation_hint or ""
+                hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
-        # For DICT composite type, add a placeholder key
-        if field.type_info.composite_type == CompositeType.DICT:
-            section_path = path + [key, "<name>"]
-            lines.append(
-                f"{indent}# Replace <name> with your actual key (e.g., 'default', 'local')"
-            )
-        else:
-            section_path = path + [key]
+        # A DICT of tables keys each entry by a template argument named after the field, filled
+        # at render time; a DICT of plain values takes `key = value` lines, so it only gets an example.
+        is_dict = field.type_info.composite_type == CompositeType.DICT
+        section_path = path + [key]
+        if is_dict and field.children:
+            template_arg = key.replace("-", "_") + "_name"
+            section_path.append(f"{{{{ {template_arg} }}}}")
+            lines.append(f"{indent}# Set `{template_arg}` when rendering this template")
 
         # Section header - sections are NOT prefixed with ## even if optional
         # Only leaf fields get the ## prefix for optional status
         section_name = ".".join(section_path)
         lines.append(f"{indent}[{section_name}]")
+        if is_dict and not field.children:
+            lines.append(f'{self._get_indent(len(path) + 1)}## key = "value"')
 
         # Child fields
         if field.children:
@@ -289,7 +300,7 @@ class TOMLGenerator:
         if self._config.include_version_comments:
             lines.append(f"{indent}# Added in {field.doc.added_version}")
             if field.doc.deprecated_version:
-                hint = field.doc.deprecation_hint or ""
+                hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
         # Array of tables header
@@ -336,7 +347,7 @@ class TOMLGenerator:
 
         Priority: example value > default value > None (placeholder)
 
-        Example values are preferred for sample.toml generation.
+        Example values are preferred for sample template generation.
         Since example values are strings, they are converted to proper types
         based on the field's type information.
 
@@ -350,7 +361,7 @@ class TOMLGenerator:
         if field.type_info.secret and self._config.mask_secrets:
             return self._config.secret_placeholder
 
-        # Use example value first (preferred for sample.toml)
+        # Use example value first (preferred for the sample template)
         if field.doc.example is not None:
             example_str = self._get_example_value(field.doc.example)
             # Convert string example to proper type
@@ -533,7 +544,7 @@ class TOMLGenerator:
                 for wrapped_line in wrapped:
                     result_lines.append(f"{indent}# {wrapped_line}")
 
-        return "\n".join(result_lines)
+        return _escape_jinja("\n".join(result_lines))
 
     def _categorize_fields(
         self,
@@ -577,7 +588,7 @@ def generate_sample_toml(
     output_path: str | Path | None = None,
     header: str | None = None,
 ) -> str:
-    """Generate sample.toml with LOCAL (dev) environment examples.
+    """Generate the sample template with LOCAL (dev) environment examples.
 
     Convenience function for generating development configuration samples.
 

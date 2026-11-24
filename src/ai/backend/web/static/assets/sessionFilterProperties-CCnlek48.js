@@ -1,0 +1,11 @@
+/* empty css            */import{m as e}from"./helper-DF1Eunoe.js";import{t}from"./sessionTypeLabel-DXsYxso0.js";
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+Every session field the manager's queryfilter accepts
+(`gql_legacy/session.py::_queryfilter_fieldspec`), so a custom panel can
+express any condition the backend supports instead of the three the picker
+used to offer (FR-3654).
+*/
+var n=(e,t=e=>e)=>e.map(e=>({label:t(e),value:e})),r=[`PENDING`,`DEPRIORITIZING`,`RESERVED`,`SCHEDULED`,`PREPARING`,`PULLING`,`PREPARED`,`CREATING`,`RUNNING`,`RESTARTING`,`RUNNING_DEGRADED`,`PREEMPTED`,`RESCHEDULING`,`TERMINATING`,`TERMINATED`,`ERROR`,`CANCELLED`],i=[`interactive`,`batch`,`inference`,`system`],a=[`undefined`,`success`,`failure`],o=[`single-node`,`multi-node`],s=(t,n,r)=>({key:t,propertyLabel:n,type:`uuid`,rule:{message:r(`general.InvalidUUID`),validate:t=>e(t.toLowerCase())}}),c=(e,t,r,i)=>({key:e,propertyLabel:t,type:`string`,defaultOperator:`==`,strictSelection:!0,options:n(r,i)}),l=e=>[{key:`name`,propertyLabel:e(`session.SessionName`),type:`string`},c(`status`,e(`session.Status`),r),c(`type`,e(`session.SessionType`),i,n=>t(e,n)),{key:`scaling_group`,propertyLabel:e(`session.ResourceGroup`),type:`string`},{key:`agent_ids`,propertyLabel:e(`session.Agent`),type:`string`},{key:`image`,propertyLabel:e(`general.Image`),type:`string`},{key:`user_email`,propertyLabel:e(`session.launcher.OwnerEmail`),type:`string`},s(`user_id`,e(`credential.UserID`),e),{key:`full_name`,propertyLabel:e(`credential.FullName`),type:`string`},{key:`access_key`,propertyLabel:e(`general.AccessKey`),type:`string`},c(`cluster_mode`,e(`session.ClusterMode`),o),{key:`cluster_size`,propertyLabel:e(`session.launcher.ClusterSize`),type:`number`},{key:`priority`,propertyLabel:e(`session.Priority`),type:`number`},c(`result`,e(`session.Result`),a),{key:`status_info`,propertyLabel:e(`session.StatusInfo`),type:`string`},{key:`startup_command`,propertyLabel:e(`session.StartupCommand`),type:`string`},s(`id`,e(`session.SessionId`),e),{key:`created_at`,propertyLabel:e(`session.CreatedAt`),type:`datetime`},{key:`starts_at`,propertyLabel:e(`session.StartsAt`),type:`datetime`},{key:`terminated_at`,propertyLabel:e(`session.TerminatedAt`),type:`datetime`}];export{l as t};

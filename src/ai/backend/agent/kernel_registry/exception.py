@@ -1,5 +1,7 @@
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,7 +11,7 @@ from ai.backend.common.exception import (
 )
 
 
-class KernelRegistryLoadError(BackendAIError):
+class KernelRegistryLoadError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-registry-load-error"
     error_title = "Failed to load kernel registry"
 
@@ -22,7 +24,7 @@ class KernelRegistryLoadError(BackendAIError):
         )
 
 
-class KernelRegistryNotFound(BackendAIError):
+class KernelRegistryNotFound(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-registry-not-found"
     error_title = "Kernel registry not found"
 
@@ -35,7 +37,7 @@ class KernelRegistryNotFound(BackendAIError):
         )
 
 
-class KernelRecoveryDataParseError(BackendAIError):
+class KernelRecoveryDataParseError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-recovery-data-parse-error"
     error_title = "Failed to parse kernel recovery data"
 

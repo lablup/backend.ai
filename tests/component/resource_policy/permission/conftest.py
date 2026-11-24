@@ -33,7 +33,7 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
@@ -55,7 +55,7 @@ from ai.backend.manager.actions.v2.scope.validator.rbac import (
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
-from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.actions.validators.rbac.virtual_entity import VirtualEntityRBACValidators
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -372,8 +372,6 @@ async def seeded_caller(
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(access_key),
                     secret_key=SecretValue(secret_key),
-                    ssh_public_key="ssh-rsa test",
-                    ssh_private_key="test-private-key",
                 ),
                 keypair_resource_policy=resource_policy_fixture,
             )

@@ -19,15 +19,9 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.models.agent.row import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.image.row import ImageRow  # noqa: F401
-from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
@@ -59,7 +53,7 @@ class TestVFolderPurgersIntegration:
     @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -67,9 +61,7 @@ class TestVFolderPurgersIntegration:
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ResourceGroupRow,
                 UserRow,
-                KeyPairRow,
                 VFolderRow,
                 VFolderUserMountPolicyRow,
                 # An entity batch purge tears the graph down with each row.
@@ -79,8 +71,6 @@ class TestVFolderPurgersIntegration:
                 EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
-                RoleRow,
-                PermissionRow,
                 EntityShareRow,
             ],
         ):

@@ -147,23 +147,22 @@ def format_error(exc: Exception) -> Iterator[str]:
             if per_field_errors:
                 yield "\n"
                 yield json.dumps(per_field_errors, indent=2)
+        elif exc.data["type"].endswith("/graphql-error"):
+            yield "\n\u279c Message:\n"
+            for err_item in exc.data.get("data", []):
+                yield f"{err_item['message']}"
+                if err_path := err_item.get("path"):
+                    yield f" (path: {_format_gql_path(err_path)})"
+                yield "\n"
         else:
-            if exc.data["type"].endswith("/graphql-error"):
-                yield "\n\u279c Message:\n"
-                for err_item in exc.data.get("data", []):
-                    yield f"{err_item['message']}"
-                    if err_path := err_item.get("path"):
-                        yield f" (path: {_format_gql_path(err_path)})"
-                    yield "\n"
-            else:
-                other_details = exc.data.get("msg", None)
-                if other_details:
-                    yield "\n\u279c Message: "
-                    yield str(other_details)
-                other_data = exc.data.get("data", None)
-                if other_data:
-                    yield "\n\u279c Data: "
-                    yield repr(other_data)
+            other_details = exc.data.get("msg", None)
+            if other_details:
+                yield "\n\u279c Message: "
+                yield str(other_details)
+            other_data = exc.data.get("data", None)
+            if other_data:
+                yield "\n\u279c Data: "
+                yield repr(other_data)
         agent_details = exc.data.get("agent-details", None)
         if agent_details is not None:
             yield "\n\u279c This is an agent-side error. "

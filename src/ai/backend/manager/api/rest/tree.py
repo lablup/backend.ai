@@ -156,7 +156,7 @@ def build_api_routes(
 
     # 2. Build all handlers
     acl_handler = AclHandler()
-    auth_handler = AuthHandler(auth=processors.auth)
+    auth_handler = AuthHandler(auth=processors.auth, adapter=adapters.auth)
     agent_handler = AgentHandler(agent=processors.agent)
     resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)
     artifact_handler = ArtifactHandler(
@@ -176,7 +176,9 @@ def build_api_routes(
         deployment=processors.deployment,
         runtime_variant_adapter=adapters.runtime_variant,
     )
-    domainconfig_handler = DomainConfigHandler(domain=processors.domain)
+    domainconfig_handler = DomainConfigHandler(
+        domain=processors.domain, auto_generated_file=adapters.auto_generated_file
+    )
     error_log_handler = ErrorLogHandler(error_log=processors.user.error_log)
     etcd_handler = EtcdHandler(
         container_registry=processors.container_registry,
@@ -193,7 +195,9 @@ def build_api_routes(
         resource_group=processors.resource_group,
     )
     group_handler = GroupHandler(container_registry=processors.container_registry)
-    groupconfig_handler = GroupConfigHandler(project=processors.project)
+    groupconfig_handler = GroupConfigHandler(
+        project=processors.project, auto_generated_file=adapters.auto_generated_file
+    )
     manager_handler = ManagerHandler(manager_admin=processors.manager_admin)
     notification_handler = NotificationHandler(notification=processors.notification)
     object_storage_handler = ObjectStorageHandler(
@@ -235,7 +239,7 @@ def build_api_routes(
     userconfig_handler = UserConfigHandler(
         auth=processors.auth,
         user=processors.user,
-        user_config=adapters.user_config,
+        auto_generated_file=adapters.auto_generated_file,
     )
     vfolder_handler = VFolderHandler(
         auth=processors.auth,

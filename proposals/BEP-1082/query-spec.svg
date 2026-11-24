@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 290" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="860" height="290" fill="#ffffff"/>
+  <text x="20" y="20" fill="#64748b" font-size="11" font-weight="bold">DECLARATION</text>
+  <text x="380" y="20" fill="#64748b" font-size="11" font-weight="bold">REQUEST</text>
+  <text x="640" y="20" fill="#64748b" font-size="11" font-weight="bold">RESULT TYPE</text>
+
+  <rect x="20" y="36" width="320" height="236" rx="4" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="32" y="58" fill="#1e1b4b" font-weight="bold">{Entity}QuerySpec</text>
+  <text x="32" y="82" fill="#1e1b4b">own: QueryColumn</text>
+  <text x="44" y="100" fill="#475569" font-size="11">column, name, filter, order (+ read for to_data)</text>
+  <text x="32" y="124" fill="#1e1b4b">nested: NestedQueryColumn</text>
+  <text x="44" y="142" fill="#475569" font-size="11">columns, correlation</text>
+  <text x="32" y="166" fill="#1e1b4b">linked: membership, usage</text>
+  <text x="44" y="184" fill="#475569" font-size="11">id conditions, other entity's READ check</text>
+  <text x="32" y="208" fill="#1e1b4b">aggregate: group, value</text>
+  <text x="44" y="226" fill="#475569" font-size="11">wraps own's QueryColumn (BEP-1080)</text>
+  <text x="32" y="254" fill="#64748b" font-size="11">replaces SearchableFields, AggregateFields</text>
+
+  <rect x="380" y="36" width="220" height="236" rx="4" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="392" y="58" fill="#0f172a" font-weight="bold">fields</text>
+  <text x="392" y="82" fill="#475569">{own.name, own.shared_memory}</text>
+  <text x="392" y="106" fill="#475569">SELECT: id + column</text>
+  <text x="392" y="130" fill="#475569">value stored by name</text>
+  <text x="392" y="214" fill="#64748b" font-size="11">applied by searcher, querier</text>
+
+  <rect x="640" y="36" width="200" height="236" rx="4" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="652" y="58" fill="#1e1b4b" font-weight="bold">{Entity}PartialData</text>
+  <text x="652" y="80" fill="#1e1b4b">(PartialRecord)</text>
+  <text x="652" y="104" fill="#1e1b4b">id: always read</text>
+  <text x="652" y="128" fill="#1e1b4b">others: selectable()</text>
+
+  <line x1="340" y1="82" x2="378" y2="82" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="600" y1="130" x2="638" y2="130" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+</svg>

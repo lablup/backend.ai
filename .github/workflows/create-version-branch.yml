@@ -48,7 +48,7 @@ jobs:
           # The pull request's checks only run when its branch is pushed by
           # something other than the workflow's own token.
           token: ${{ secrets.OCTODOG }}
-      # The script installs the pinned ruff into a venv of its own.
+      # The script installs the ruff of the `lint` group into a venv of its own.
       - name: Set up Python
         uses: actions/setup-python@v6
         with:

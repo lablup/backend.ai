@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 import async_timeout
+from callosum.rpc import RPCUserError
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -17,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -25,7 +27,6 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
     ImageConfig,
-    KernelCreationConfig,
     KernelId,
     SessionId,
 )
@@ -63,6 +64,9 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+# The agent rejects a kernel it is already creating with this error; the agent is not at fault.
+_KERNEL_CREATION_IN_PROGRESS_ERROR = "KernelCreationInProgress"
 
 
 @dataclass
@@ -439,9 +443,16 @@ class SessionLauncher:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
                 failed_agent_ids: list[AgentId] = []
                 for aid, result in zip(agent_ids_ordered, results, strict=True):
-                    if isinstance(result, BaseException):
-                        log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
-                        failed_agent_ids.append(aid)
+                    if not isinstance(result, BaseException):
+                        continue
+                    if (
+                        isinstance(result, RPCUserError)
+                        and result.name == _KERNEL_CREATION_IN_PROGRESS_ERROR
+                    ):
+                        log.debug("kernel creation already in progress on agent", agent_id=aid)
+                        continue
+                    log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
+                    failed_agent_ids.append(aid)
                 if failed_agent_ids:
                     try:
                         await self._valkey_schedule.record_session_failed_agents(

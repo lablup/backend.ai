@@ -82,7 +82,7 @@ _ROW_COUNT = 5
 @pytest.fixture
 async def fragment_db(
     ops_db: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(
         ops_db, [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow]
     ):

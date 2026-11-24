@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import override
+from typing import Any, override
 
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -24,6 +25,8 @@ from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleTarget
@@ -39,7 +42,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.domain import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf, TheCallIsRefused
 from bai_scenario.components.rbac import (
     Granted,
     RoleLook,
@@ -49,9 +52,14 @@ from bai_scenario.components.rbac import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 
 type RolePage = SearchResult[RoleNode]
 type RoleStep = Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, RolePage]
+type ProjectRoleStep = Scenario[TestSeedingSession, ProjectRolesAndACaller, RBACAdapter, RolePage]
 
 
 def _by_name(roles: list[RoleData]) -> list[RoleData]:
@@ -410,6 +418,206 @@ class AUserGrantedNothingMayNotSearchADomain(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class ProjectRolesAndACaller:
+    """한 프로젝트에 둔 역할 여럿과, 그것을 부를 사람."""
+
+    project: ProjectData
+    roles: tuple[RoleData, ...]
+    excluded_role: RoleData
+    caller: UserData
+    grant_role: RoleData | None
+
+
+@dataclass(frozen=True)
+class ProjectRolesAndSomeone(Given[Any, ProjectRolesAndACaller]):
+    """한 프로젝트에 둔 역할 여럿, 그 프로젝트 밖 도메인에 둔 역할 하나, 다른 도메인에 사는 사람 한 명.
+
+    ``grant`` 는 호출자에게 그 프로젝트에서 준 역할의 권한이다.
+    """
+
+    count: int = 2
+    grant: tuple[Permission, ...] = ()
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            f"한 프로젝트에 둔 커스텀 역할 {self.count}개와, 다른 도메인에 사는 user 한 명",
+            english=f"{self.count} custom roles in one project and one user in another domain",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ProjectRolesAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        target = await seeding.creating(TestSeedDomain(name_hint="target", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), target, policy)
+        roles = [
+            await seeding.creating_from(
+                TestSeedRole(lambda p: ProjectID(p.id), name_hint="role"), project
+            )
+            for _ in range(self.count)
+        ]
+        excluded = await seeding.creating_from(
+            TestSeedRole(lambda p: ProjectID(p.id), name_hint="excluded"), project
+        )
+        await seeding.creating_from(TestSeedRole(lambda d: d.id, name_hint="beyond"), target)
+        caller = await seeding.within(SomeoneOf(home))
+        grant_role = None
+        if self.grant:
+            grant_role = await seeding.creating_from(
+                TestSeedRole(lambda p: ProjectID(p.id), name_hint="grant"), project
+            )
+            for permission in self.grant:
+                await seeding.adding(TestSeedPermission(RoleEntityType(), permission), grant_role)
+            await seeding.granting(
+                grant_role,
+                caller,
+                role_id=lambda one: one.id,
+                user_id=lambda one: UserID(one.id),
+            )
+        return ProjectRolesAndACaller(
+            project=seeding.made(project),
+            roles=tuple(seeding.made(one) for one in roles),
+            excluded_role=seeding.made(excluded),
+            caller=seeding.made(caller),
+            grant_role=seeding.made(grant_role) if grant_role is not None else None,
+        )
+
+
+@dataclass(frozen=True)
+class SearchingTheProject(When[ProjectRolesAndACaller, RBACAdapter, RolePage]):
+    """대상 프로젝트의 역할을 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "project_search_roles"
+
+    @override
+    def describe(self, laid: ProjectRolesAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 프로젝트 {laid.project.name} 의 역할을 검색합니다",
+            english=f"{laid.caller.username} searches the roles of project {laid.project.name}",
+        )
+
+    @override
+    async def call(self, adapter: RBACAdapter, laid: ProjectRolesAndACaller) -> RolePage:
+        expected = len(laid.roles) + (1 if laid.grant_role is not None else 0)
+        with ActingAs(laid.caller):
+            return await adapter.project_search_roles(
+                laid.project.id,
+                SearchRolesInput(
+                    filter=RoleFilter(name=StringFilter(not_equals=laid.excluded_role.name)),
+                    order=[RoleOrderBy(field="name", direction=OrderDirection.ASC)],
+                    limit=expected,
+                ),
+            )
+
+
+@dataclass(frozen=True)
+class EveryProjectRoleInNameOrder(Then[ProjectRolesAndACaller, RolePage]):
+    """프로젝트에 둔 역할이 이름 순으로 모두 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "필터가 고른 프로젝트의 역할이 이름 순으로 옵니다",
+            english="the project roles the filter keeps come back in name order",
+        )
+
+    @override
+    def look(self, laid: ProjectRolesAndACaller, answered: Answered[RolePage]) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        roles = list(laid.roles)
+        if laid.grant_role is not None:
+            roles.append(laid.grant_role)
+        expected = _by_name(roles)
+        verdicts: list[Verdict] = [
+            Same("items count", len(page.items), len(expected)),
+            Same("total_count", page.total_count, len(expected)),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]
+        look = RoleLook(self.started, scope_type=ProjectEntityType())
+        for i, (node, role) in enumerate(zip(page.items, expected, strict=False)):
+            verdicts += look.verdicts(
+                f"items[{i}].",
+                node,
+                role,
+                laid.project.id,
+                Says("역할을 둔 프로젝트의 id", english="the id of the project the role sits in"),
+            )
+        return verdicts
+
+
+@dataclass(frozen=True)
+class AUserGrantedRoleReadSearchesAProject(
+    Scenario[TestSeedingSession, ProjectRolesAndACaller, RBACAdapter, RolePage]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-role-read-searches-a-project"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대상 프로젝트에서 역할 읽기 권한을 받은 사용자가 한 역할의 이름을 빼는 조건으로 그 "
+            "프로젝트의 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 오고 프로젝트 밖에 둔 "
+            "역할은 빠집니다",
+            english=(
+                "when a user granted role read permission in a project searches the roles of that "
+                "project leaving one role's name out, the roles the filter keeps come back in name "
+                "order and the role outside the project is not listed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ProjectRolesAndACaller]:
+        return ProjectRolesAndSomeone(grant=(Permission.READ,))
+
+    @override
+    def when(self) -> When[ProjectRolesAndACaller, RBACAdapter, RolePage]:
+        return SearchingTheProject()
+
+    @override
+    def then(self) -> Then[ProjectRolesAndACaller, RolePage]:
+        return EveryProjectRoleInNameOrder(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotSearchAProject(
+    Scenario[TestSeedingSession, ProjectRolesAndACaller, RBACAdapter, RolePage]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-search-a-project"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자는 프로젝트의 역할을 검색할 수 없습니다",
+            english="a user granted nothing cannot search the roles of a project",
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ProjectRolesAndACaller]:
+        return ProjectRolesAndSomeone()
+
+    @override
+    def when(self) -> When[ProjectRolesAndACaller, RBACAdapter, RolePage]:
+        return SearchingTheProject()
+
+    @override
+    def then(self) -> Then[ProjectRolesAndACaller, RolePage]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[RoleStep] = [
     TheSuperadminSearchesEveryRole(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotSearchEveryRole(),
@@ -423,5 +631,18 @@ SCENARIOS: list[RoleStep] = [
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_searching(
     scenario: RoleStep, adapter: RBACAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)
+
+
+PROJECT_SCENARIOS: list[ProjectRoleStep] = [
+    AUserGrantedRoleReadSearchesAProject(started=datetime.now(UTC)),
+    AUserGrantedNothingMayNotSearchAProject(),
+]
+
+
+@pytest.mark.parametrize("scenario", PROJECT_SCENARIOS, ids=lambda s: s.summary())
+async def test_searching_a_project(
+    scenario: ProjectRoleStep, adapter: RBACAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

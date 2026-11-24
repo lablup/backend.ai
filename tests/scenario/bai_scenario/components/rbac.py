@@ -541,7 +541,4 @@ class TheScopeEntities(Condition[list[ScopeEntityCombinationInfo]]):
         if [one.scope_type for one in got] != list(CATALOG_SCOPES):
             return False
         expected = sorted(CATALOG_OPERATIONS)
-        for one in got:
-            if list(one.valid_entity_types) != expected:
-                return False
-        return True
+        return all(list(one.valid_entity_types) == expected for one in got)

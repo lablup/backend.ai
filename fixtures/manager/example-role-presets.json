@@ -112,6 +112,41 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "01993d56-bb39-7a36-9518-e7e4d6d11ac6",
+            "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+            "entity_type": "auto_generated_file",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-72fb-85a9-f1c6a88deb67",
+            "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+            "entity_type": "auto_generated_file",
+            "permission": 2,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7aad-b644-c78d88bc0d6b",
+            "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+            "entity_type": "auto_generated_file",
+            "permission": 4,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-74ed-9782-8a32c9c535b7",
+            "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+            "entity_type": "auto_generated_file",
+            "permission": 8,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7e1f-ab42-52341732b0dd",
+            "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+            "entity_type": "auto_generated_file",
+            "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "01993d56-bb39-7627-96c7-39210e0a24b8",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "container_registry",
@@ -910,6 +945,41 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "01993d56-bb39-7ca5-90a8-73e90d2b9aa8",
+            "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
+            "entity_type": "auto_generated_file",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-72fb-8fe9-20544596c78d",
+            "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
+            "entity_type": "auto_generated_file",
+            "permission": 2,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7acd-b429-4096dc8af3e6",
+            "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
+            "entity_type": "auto_generated_file",
+            "permission": 4,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7c35-849b-9e6761800ead",
+            "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
+            "entity_type": "auto_generated_file",
+            "permission": 8,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7384-bd0c-887a11680ecd",
+            "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
+            "entity_type": "auto_generated_file",
+            "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "01993d56-bb39-791e-a83c-71ecda95404d",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "container_registry",
@@ -1512,6 +1582,13 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "01993d56-bb39-7c8b-8e67-b286b2672d74",
+            "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
+            "entity_type": "auto_generated_file",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "01993d56-bb39-7415-99a0-682ebbfb9343",
             "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
             "entity_type": "container_registry",
@@ -1760,6 +1837,41 @@
             "id": "01993d56-bb39-716b-a8f1-c7054504ac22",
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "app_config_fragment",
+            "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7aaa-8b4f-238b973412df",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "auto_generated_file",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7559-8e35-3e585c8ded22",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "auto_generated_file",
+            "permission": 2,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7a70-ab0f-f12089bc8ab6",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "auto_generated_file",
+            "permission": 4,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-784f-8f95-f1d0b5b0abee",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "auto_generated_file",
+            "permission": 8,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7224-b0eb-83b4e764f5f1",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "auto_generated_file",
             "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },

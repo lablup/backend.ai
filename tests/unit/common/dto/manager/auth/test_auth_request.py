@@ -168,12 +168,8 @@ def test_update_password_no_auth_request() -> None:
 
 
 def test_upload_ssh_keypair_request() -> None:
-    req = UploadSSHKeypairRequest(
-        pubkey="ssh-rsa AAAA...",
-        privkey="-----BEGIN RSA PRIVATE KEY-----...",
-    )
+    req = UploadSSHKeypairRequest(pubkey="ssh-rsa AAAA...")
     assert req.pubkey == "ssh-rsa AAAA..."
-    assert req.privkey == "-----BEGIN RSA PRIVATE KEY-----..."
 
 
 def test_verify_auth_request() -> None:

@@ -71,6 +71,7 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
+from ai.backend.manager.data.vfolder.types import VFolderMountAvailability, VFolderOperationStatus
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent.row import AgentRow
@@ -192,7 +193,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -810,7 +811,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_group_id: uuid.UUID,
     ) -> None:
         """Test fetching service discovery info for a single route with inference port."""
-        kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
+        _kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
 
         result = await deployment_repository.fetch_route_service_discovery_info({
             ReplicaID(test_route_id)
@@ -1090,7 +1091,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -1432,7 +1433,7 @@ class TestDeploymentRevisionOperations:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -2204,6 +2205,74 @@ class TestDeploymentRevisionOperations:
             ).scalar_one()
             assert endpoint.sub_step is None
 
+    async def _create_vfolder_with_status(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        domain_name: str,
+        user_uuid: uuid.UUID,
+        status: VFolderOperationStatus,
+    ) -> VFolderUUID:
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    host="local:volume1",
+                    domain_name=domain_name,
+                    quota_scope_id=QuotaScopeID.parse(f"user:{user_uuid}"),
+                    name=f"vfolder-{uuid.uuid4().hex[:8]}",
+                    creator="test@example.com",
+                    status=status,
+                )
+            )
+            await db_sess.commit()
+        return vfolder_id
+
+    async def test_vfolder_mount_availability_sorts_unmountable_vfolders_by_reason(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        deployment_repository: DeploymentRepository,
+        test_domain: DomainFixtureData,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        by_status = {
+            status: await self._create_vfolder_with_status(
+                db_with_cleanup,
+                domain_name=test_domain.domain_name,
+                user_uuid=test_user_uuid,
+                status=status,
+            )
+            for status in (
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.DELETE_PENDING,
+                VFolderOperationStatus.DELETE_COMPLETE,
+                VFolderOperationStatus.ERROR,
+            )
+        }
+        purged_id = VFolderUUID(uuid.uuid4())
+
+        availability = await deployment_repository.vfolder_mount_availability([
+            *by_status.values(),
+            purged_id,
+        ])
+
+        assert availability == VFolderMountAvailability(
+            missing=frozenset({purged_id}),
+            trashed=frozenset({by_status[VFolderOperationStatus.DELETE_PENDING]}),
+            deleted=frozenset({by_status[VFolderOperationStatus.DELETE_COMPLETE]}),
+            not_ready=frozenset({by_status[VFolderOperationStatus.ERROR]}),
+        )
+
+    async def test_vfolder_mount_availability_of_mountable_vfolders(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_vfolder_id: VFolderUUID,
+    ) -> None:
+        availability = await deployment_repository.vfolder_mount_availability([test_vfolder_id])
+
+        assert availability.all_mountable
+
 
 class TestDeploymentPolicyOperations:
     """Test cases for deployment policy repository operations."""
@@ -2212,7 +2281,7 @@ class TestDeploymentPolicyOperations:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -2552,7 +2621,7 @@ class TestSearchDeploymentPolicies:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created."""
         async with with_tables(
             database_connection,
@@ -2810,7 +2879,7 @@ class TestRouteOperations:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
@@ -3185,7 +3254,7 @@ class TestDeploymentRepositoryDuplicateName:
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         """Database connection with required tables for EndpointRow and RBAC."""
         async with with_tables(
             database_connection,

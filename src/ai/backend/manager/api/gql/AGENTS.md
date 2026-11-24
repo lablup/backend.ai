@@ -19,7 +19,8 @@
   - `@gql_pydantic_input` - input type (inherits `PydanticInputMixin[DTO]`)
   - `@gql_pydantic_interface(model=DTO)` - DTO-based interface
   - `@gql_connection_type` - `Connection[T]`/`Edge[T]` subclass
-  - `gql_field` / `gql_added_field`: a field introduced together with its parent type / a field added later (with its own version)
+  - `gql_field` / `gql_added_field`: a field default introduced together with its parent type / added later (with its own version)
+  - `@gql_resolver` / `@gql_added_resolver`: the same split for a resolver method. Do not decorate a resolver with `gql_field` or `gql_added_field`
   - `@gql_root_field` - a root query field on the Query type (always version-tagged)
   - `gql_enum` / `@gql_enum`, `@gql_mutation`, `@gql_subscription`, `@gql_federation_type`
 - Do not add new decorators to bypass the Pydantic DTO requirement.
@@ -145,7 +146,7 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 
 ## Admin and scope
 
-- superadmin-only resolvers: call `check_admin_only()` on the first line.
+- superadmin-only resolvers: call `check_admin_only()` on the first line (`BAI402`).
 
 **search: three variants:**
 - `adminFoosV2`: superadmin only, no scope: the entire system.
@@ -202,4 +203,4 @@ and the migration is judged separately.
 
 ## Legacy
 
-- Do not copy `gql_legacy/` (Graphene) patterns: migrating to Strawberry.
+- Do not import `gql_legacy/` or copy its (Graphene) patterns: migrating to Strawberry.

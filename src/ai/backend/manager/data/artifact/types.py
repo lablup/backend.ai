@@ -34,6 +34,10 @@ class ArtifactStatus(enum.StrEnum):
     FAILED = "FAILED"
     REJECTED = "REJECTED"
 
+    @classmethod
+    def import_in_progress(cls) -> "frozenset[ArtifactStatus]":
+        return frozenset({cls.PULLING, cls.VERIFYING})
+
 
 class ArtifactRemoteStatus(enum.StrEnum):
     """
@@ -93,37 +97,6 @@ class ArtifactRevisionData(FieldData):
 
 
 @dataclass
-class ArtifactRevisionResponseData:
-    """ArtifactRevisionData without readme field for API responses."""
-
-    id: ArtifactRevisionID
-    artifact_id: ArtifactID
-    version: str
-    size: int | None
-    status: ArtifactStatus
-    remote_status: ArtifactRemoteStatus | None
-    created_at: datetime | None
-    updated_at: datetime | None
-    digest: str | None
-    verification_result: VerificationStepResult | None
-
-    @classmethod
-    def from_revision_data(cls, data: ArtifactRevisionData) -> Self:
-        return cls(
-            id=data.id,
-            artifact_id=data.artifact_id,
-            version=data.version,
-            size=data.size,
-            status=data.status,
-            remote_status=data.remote_status,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            digest=data.digest,
-            verification_result=data.verification_result,
-        )
-
-
-@dataclass
 class ArtifactRevisionReadme:
     readme: str | None
 
@@ -151,58 +124,6 @@ class ArtifactDataWithRevisions(ArtifactData):
             availability=artifact_data.availability,
             extra=artifact_data.extra,
             revisions=revisions,
-        )
-
-
-@dataclass
-class ArtifactDataWithRevisionsResponse(ArtifactData):
-    """ArtifactDataWithRevisions without readme in revisions for API responses."""
-
-    revisions: list[ArtifactRevisionResponseData]
-
-    @classmethod
-    def from_dataclasses(
-        cls, artifact_data: ArtifactData, revisions: list[ArtifactRevisionData]
-    ) -> Self:
-        return cls(
-            id=artifact_data.id,
-            name=artifact_data.name,
-            type=artifact_data.type,
-            description=artifact_data.description,
-            registry_id=artifact_data.registry_id,
-            source_registry_id=artifact_data.source_registry_id,
-            registry_type=artifact_data.registry_type,
-            source_registry_type=artifact_data.source_registry_type,
-            scanned_at=artifact_data.scanned_at,
-            updated_at=artifact_data.updated_at,
-            readonly=artifact_data.readonly,
-            availability=artifact_data.availability,
-            extra=artifact_data.extra,
-            revisions=[ArtifactRevisionResponseData.from_revision_data(rev) for rev in revisions],
-        )
-
-    @classmethod
-    def from_artifact_with_revisions(
-        cls, artifact_with_revisions: ArtifactDataWithRevisions
-    ) -> Self:
-        return cls(
-            id=artifact_with_revisions.id,
-            name=artifact_with_revisions.name,
-            type=artifact_with_revisions.type,
-            description=artifact_with_revisions.description,
-            registry_id=artifact_with_revisions.registry_id,
-            source_registry_id=artifact_with_revisions.source_registry_id,
-            registry_type=artifact_with_revisions.registry_type,
-            source_registry_type=artifact_with_revisions.source_registry_type,
-            scanned_at=artifact_with_revisions.scanned_at,
-            updated_at=artifact_with_revisions.updated_at,
-            readonly=artifact_with_revisions.readonly,
-            availability=artifact_with_revisions.availability,
-            extra=artifact_with_revisions.extra,
-            revisions=[
-                ArtifactRevisionResponseData.from_revision_data(rev)
-                for rev in artifact_with_revisions.revisions
-            ],
         )
 
 

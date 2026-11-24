@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     CreateContainerRegistryInput,
     DeleteContainerRegistryInput,
     PartialBulkPurgeContainerRegistriesInput,
+    ScopedSearchContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
@@ -39,6 +40,14 @@ class V2ContainerRegistryHandler:
     ) -> APIResponse:
         """Search container registries with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchContainerRegistriesInput],
+    ) -> APIResponse:
+        """Search the container registries the named domains are related to, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_create(

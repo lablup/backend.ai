@@ -13,8 +13,15 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
     CombinedDownloadProgress,
     VerificationStepResult,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactAvailability,
+    ArtifactRemoteStatus,
+    ArtifactStatus,
+    ArtifactType,
 )
 from ai.backend.common.types import BackendAISchema
 
@@ -43,8 +50,8 @@ class ArtifactRevisionDTO(BackendAISchema):
     artifact_id: UUID = Field(description="Parent artifact ID")
     version: str = Field(description="Revision version string")
     size: int | None = Field(default=None, description="Revision size in bytes")
-    status: str = Field(description="Revision status")
-    remote_status: str | None = Field(default=None, description="Remote status")
+    status: ArtifactStatus = Field(description="Revision status")
+    remote_status: ArtifactRemoteStatus | None = Field(default=None, description="Remote status")
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp")
     digest: str | None = Field(default=None, description="Content digest")
@@ -58,13 +65,13 @@ class ArtifactDTO(BackendAISchema):
 
     id: UUID = Field(description="Artifact ID")
     name: str = Field(description="Artifact name")
-    type: str = Field(description="Artifact type")
+    type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")
     registry_id: UUID = Field(description="Registry ID")
     source_registry_id: UUID = Field(description="Source registry ID")
-    registry_type: str = Field(description="Registry type")
-    source_registry_type: str = Field(description="Source registry type")
-    availability: str = Field(description="Artifact availability")
+    registry_type: ArtifactRegistryType = Field(description="Registry type")
+    source_registry_type: ArtifactRegistryType = Field(description="Source registry type")
+    availability: ArtifactAvailability = Field(description="Artifact availability")
     scanned_at: datetime = Field(description="Last scanned timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     readonly: bool = Field(description="Whether the artifact is readonly")

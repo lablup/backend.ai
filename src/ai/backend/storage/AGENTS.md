@@ -4,14 +4,14 @@
 
 ## API handlers
 
-- Every handler must be a method of a typed handler class: no module-level async functions.
+- Every handler must be a method of a typed handler class: no module-level async functions (`BAI403`).
 - Use the `@api_handler` or `@stream_api_handler` decorator.
 - Parse requests with `PathParam[T]`, `BodyParam[T]`: do not access the raw request object directly.
 
 ## Exceptions
 
-- All exceptions must inherit from `StorageProxyError` (which inherits from `BackendAIError`).
-- `storage/exception.py` is legacy: do not add new exceptions here.
+- Every exception inherits `BackendAIError` and the aiohttp HTTP exception of its status (`web.HTTPNotFound`, ...).
+  `StorageProxyError` is the generic internal error, not a base class.
 - Put new exceptions only in `storage/errors/`, organized by feature: `object.py`, `quota.py`, `vfolder.py`,
   `volume.py`, `process.py`.
 

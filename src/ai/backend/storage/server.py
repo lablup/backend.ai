@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pformat
 from typing import Any
 
 import aiohttp_cors
@@ -35,7 +35,8 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.plugin.wheelhouse import load_configured_wheelhouse
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -165,7 +166,7 @@ async def api_ctx(
     @asynccontextmanager
     async def _init_storage_webapp_plugin(
         plugin_ctx: BasePluginContext[AbstractPlugin], root_app: web.Application
-    ) -> AsyncGenerator[BasePluginContext[AbstractPlugin], None]:
+    ) -> AsyncGenerator[BasePluginContext[AbstractPlugin]]:
         pid = os.getpid()
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
@@ -497,9 +498,6 @@ def main(
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")
-                if local_config.debug.enabled:
-                    print("== Storage proxy configuration ==")
-                    pprint(local_config.model_dump())
                 runner: Callable[..., Any]
                 match local_config.storage_proxy.event_loop:
                     case EventLoopType.UVLOOP:

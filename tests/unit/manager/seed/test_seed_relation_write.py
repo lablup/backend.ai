@@ -190,7 +190,7 @@ async def _allowed_rows(db: ExtendedAsyncSAEngine) -> list[uuid.UUID]:
 
 
 @pytest.fixture
-async def relation_db(db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+async def relation_db(db: ExtendedAsyncSAEngine) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(db, [ResourceGroupForProjectRow]):
         yield db
 

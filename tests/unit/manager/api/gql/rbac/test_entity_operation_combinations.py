@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -77,7 +78,9 @@ class TestRbacEntityOperationCombinationsResolver:
                 ],
             )
         ])
-        resolver_fn = permission_resolver.rbac_entity_operation_combinations.base_resolver
+        resolver_fn = cast(
+            Any, permission_resolver.rbac_entity_operation_combinations
+        ).base_resolver
 
         result = await resolver_fn(info)
 
@@ -86,6 +89,8 @@ class TestRbacEntityOperationCombinationsResolver:
         assert [op.operation for op in result[0].operations] == ["create_session"]
 
     async def test_answers_an_empty_catalog(self) -> None:
-        resolver_fn = permission_resolver.rbac_entity_operation_combinations.base_resolver
+        resolver_fn = cast(
+            Any, permission_resolver.rbac_entity_operation_combinations
+        ).base_resolver
 
         assert await resolver_fn(_info_answering([])) == []

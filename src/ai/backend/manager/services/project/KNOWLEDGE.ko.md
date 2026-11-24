@@ -8,6 +8,9 @@
 `backend.ai mgr ops list --concern organization --entity project` 는 연결된 목록을
 출력한다. 그 출력이 엔티티 타입, 모양, 연산, gate, backing 을 나타낸다.
 
+프로젝트의 dotfile 은 프로젝트가 own 하는 auto-generated file 이다. 이 service 가 아니라
+auto-generated file action 이 처리하며, `services/user/KNOWLEDGE.md` 가 설명한다.
+
 ## 개인 프로젝트
 
 `ProjectType.PERSONAL` 은 동작을 두 곳에서 변경한다. 나머지는 일반 프로젝트와 같다.

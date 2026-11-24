@@ -1,1 +1,0 @@
-@layer reset,theme,base,astryx-base,astryx-theme,ui-common,components,utilities;@layer ui-common{.uic-divided-row{align-items:stretch;display:flex}.uic-divided-row__item{align-items:stretch;display:flex;position:relative}.uic-divided-row__divider{right:calc(-.5 * var(--divided-row-column-gap,0px));background:var(--color-border);pointer-events:none;position:absolute}}

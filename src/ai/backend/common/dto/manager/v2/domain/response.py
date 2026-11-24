@@ -17,6 +17,8 @@ from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchDomainsPayload",
+    "DomainContainerRegistryRelation",
+    "CreateDomainContainerRegistryRelationsPayload",
     "DeleteDomainPayload",
     "RestoreDomainPayload",
     "DomainBasicInfo",
@@ -24,6 +26,7 @@ __all__ = (
     "DomainNode",
     "DomainPayload",
     "DomainRegistryInfo",
+    "PurgeDomainContainerRegistryRelationsPayload",
     "PurgeDomainPayload",
     "SearchDomainsPayload",
 )
@@ -150,4 +153,27 @@ class PurgeDomainPayload(BaseResponseModel):
 
     purged: bool = Field(
         description="Whether the purge was successful.",
+    )
+
+
+class DomainContainerRegistryRelation(BaseResponseModel):
+    """A relation between one domain and one container registry."""
+
+    domain_id: UUID = Field(description="ID of the domain.")
+    container_registry_id: UUID = Field(description="ID of the container registry.")
+
+
+class CreateDomainContainerRegistryRelationsPayload(BaseResponseModel):
+    """Payload for creating relations between domains and container registries."""
+
+    items: list[DomainContainerRegistryRelation] = Field(
+        description="The relations this request created. A relation that already exists is left out."
+    )
+
+
+class PurgeDomainContainerRegistryRelationsPayload(BaseResponseModel):
+    """Payload for purging relations between domains and container registries."""
+
+    items: list[DomainContainerRegistryRelation] = Field(
+        description="The relations this request purged. A relation that does not exist is left out."
     )

@@ -6,7 +6,7 @@ import graphene
 import graphql
 
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     ScopeType,
     deserialize_scope,
 )

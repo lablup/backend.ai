@@ -262,7 +262,7 @@ class Dispatchers:
         self._storage_status_event_handler = StorageStatusEventHandler(
             args.repositories.storage_status.repository
         )
-        self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
+        self.stream_cleanup_handler = StreamCleanupEventHandler(args.scheduler_repository)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """

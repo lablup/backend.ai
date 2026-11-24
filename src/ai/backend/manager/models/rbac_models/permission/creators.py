@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.errors.permission import PermissionAlreadyGranted
+from ai.backend.manager.errors.permission_field import PermissionAlreadyGranted
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.searchable_fields import (

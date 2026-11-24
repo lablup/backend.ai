@@ -52,6 +52,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
@@ -106,18 +107,18 @@ VFSStorageEdge = Edge[VFSStorage]
     ),
 )
 class VFSStorageConnection(Connection[VFSStorage]):
-    @gql_field(description="The count of this entity.")  # type: ignore[misc]
+    @gql_resolver(description="The count of this entity.")
     def count(self) -> int:
         return len(self.edges)
 
 
-@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
     node = await info.context.adapters.vfs_storage.get(parse_uuid(id))
     return VFSStorage.from_pydantic(node)
 
 
-@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="List all VFS storages"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="List all VFS storages"))
 async def vfs_storages(
     info: Info[StrawberryGQLContext],
     before: str | None = None,

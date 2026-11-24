@@ -6,7 +6,7 @@ from tabulate import tabulate
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.pretty import print_done, print_error, print_warn
 
-from . import admin
+from ._group import admin
 
 
 @admin.group()

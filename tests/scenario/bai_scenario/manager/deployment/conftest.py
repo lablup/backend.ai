@@ -18,13 +18,14 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
@@ -128,6 +129,7 @@ async def adapter(
     service = DeploymentService(
         controller,
         repository,
+        unwired(AgentRepository, "no deployment here designates an agent"),
         unwired(AppProxyClientPool, "only a served deployment reaches the proxy"),
     )
     return DeploymentAdapter(

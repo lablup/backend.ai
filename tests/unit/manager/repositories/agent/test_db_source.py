@@ -15,7 +15,6 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -37,7 +36,7 @@ class TestImageIdLookups:
     async def db_with_tables(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(
             database_connection,
             [
@@ -46,7 +45,6 @@ class TestImageIdLookups:
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,

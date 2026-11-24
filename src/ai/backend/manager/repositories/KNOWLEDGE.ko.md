@@ -31,7 +31,7 @@
 
 - create, purge, upsert 메서드는 write 가 무엇을 등록하는지에 따라 나뉜다. 그래서 scoped spec 이 등록이 없는 경로로 흐를 수 없다.
 - `delete` 는 없다. 어느 column 이 row 를 삭제로 표시하는지는 도메인 지식이므로, delete action 은 `DataUpdater` 를 가지고 update 경로를 실행한다.
-- `OpsRepository` 는 row 가 없으면 `None` 대신 `EntityNotFoundError` / `FieldNotFoundError` 를 반환한다. ops 위에 추가하는 것은 이 접점 하나뿐이다. 에러의 domain 은 spec 이 가진 식별자에서 읽고, key 로 지정한 row 라면 lookup 에서 읽는다.
+- `OpsRepository` 가 ops 위에 추가하는 것은 두 가지다. row 가 없으면 `None` 대신 `EntityNotFoundError` / `FieldNotFoundError` 를 반환한다. 에러의 domain 은 spec 이 가진 식별자에서 읽고, key 로 지정한 row 라면 lookup 에서 읽는다. 그리고 `BackendAIError` 가 아닌 에러(연결을 열지 못한 경우 등)로 실패한 호출을 재시도한다.
 
 ## ops provider 로의 점진 이관
 

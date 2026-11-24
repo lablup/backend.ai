@@ -21,7 +21,10 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    ResourceSlotInfo,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.schema.deployment import IntOrPercent

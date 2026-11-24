@@ -156,7 +156,7 @@ class TestWatcher:
     @pytest.fixture
     def watcher_service_ok(
         self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock: Any
-    ) -> Generator[AgentService, None, None]:
+    ) -> Generator[AgentService]:
         mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.OK, {"result": "ok"})
 
         with patch(
@@ -171,7 +171,7 @@ class TestWatcher:
         agent_service: AgentService,
         agent_id: AgentId,
         _setup_http_mock: Any,
-    ) -> Generator[AgentService, None, None]:
+    ) -> Generator[AgentService]:
         mock_session, _ = _setup_http_mock(
             agent_id,
             HTTPStatus.OK,
@@ -190,7 +190,7 @@ class TestWatcher:
         agent_service: AgentService,
         agent_id: AgentId,
         _setup_http_mock: Any,
-    ) -> Generator[AgentService, None, None]:
+    ) -> Generator[AgentService]:
         mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.FORBIDDEN, "Invalid token")
 
         with patch(
@@ -205,7 +205,7 @@ class TestWatcher:
         agent_service: AgentService,
         agent_id: AgentId,
         _setup_http_mock: Any,
-    ) -> Generator[AgentService, None, None]:
+    ) -> Generator[AgentService]:
         mock_session, _ = _setup_http_mock(
             agent_id, HTTPStatus.INTERNAL_SERVER_ERROR, "Systemctl command failed"
         )

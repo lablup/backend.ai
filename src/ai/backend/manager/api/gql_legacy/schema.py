@@ -41,6 +41,7 @@ from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project.actions.search_projects import GetProjectAction
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
 )
@@ -81,7 +82,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.rbac import ContainerRegistryScope
+from ai.backend.manager.models.rbac.base import ContainerRegistryScope
 from ai.backend.manager.models.session.row import SessionRow
 
 from .container_registry import (
@@ -135,14 +136,16 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
 )
-from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac.base import ProjectScope, ScopeType, SystemScope
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
@@ -1456,6 +1459,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
 
+    @staticmethod
     async def resolve_agent_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -1578,11 +1582,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             # for backward compatibility.
             # TODO: remove this part after `project_id` argument is fully deprecated
             _scope_id = ProjectScope(project_id)
+        elif scope_id is None:
+            _scope_id = SystemScope()
         else:
-            if scope_id is None:
-                _scope_id = SystemScope()
-            else:
-                _scope_id = scope_id
+            _scope_id = scope_id
         return await VirtualFolderNode.get_accessible_connection(
             info,
             _scope_id,
@@ -1703,6 +1706,13 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Group]:
         if type is None:
             type = [ProjectType.GENERAL.name]
+        try:
+            project_types = [ProjectType(t) for t in type]
+        except ValueError as e:
+            allowed_types = ", ".join(t.name for t in ProjectType)
+            raise InvalidAPIParameters(
+                f"{e}. All elements of `type` should be one of ({allowed_types})"
+            ) from e
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1714,19 +1724,20 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 raise InsufficientPrivilege
             domain_name = client_domain
         elif client_role == UserRole.USER:
-            loader = ctx.dataloader_manager.get_loader(
+            (user_projects,) = await Group.batch_load_by_user(
                 ctx,
-                "Group.by_user",
+                [client_user_id],
+                type=project_types,
                 is_active=is_active,
             )
-            return cast(Sequence[Group], await loader.load(client_user_id))
+            return cast(Sequence[Group], user_projects)
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Group.load_all(
             info.context,
             domain_name=domain_name,
             is_active=is_active,
-            type=[ProjectType(t) for t in type],
+            type=project_types,
         )
 
     @staticmethod
@@ -2323,6 +2334,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         owner = await ctx.processors.user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
         )
+        # `scoped_query()` pins the domain and the access key but not the project, so the
+        # read permission on the project answers for it.
+        await ctx.processors.project.get_project.run(
+            GetProjectAction(project_id=ProjectID(project_id))
+        )
         domain_id = await ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         allowed = await ctx.scheduler_repository.query_allowed_resource_groups(
             domain_id=domain_id,
@@ -2619,11 +2635,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             # for backward compatibility.
             # TODO: remove this part after `project_id` argument is fully deprecated
             final_scope_id = ProjectScope(project_id)
+        elif scope_id is None:
+            final_scope_id = SystemScope()
         else:
-            if scope_id is None:
-                final_scope_id = SystemScope()
-            else:
-                final_scope_id = scope_id
+            final_scope_id = scope_id
         return await ComputeSessionNode.get_accessible_connection(
             info,
             final_scope_id,
@@ -3274,6 +3289,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             last,
         )
 
+    @staticmethod
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3407,7 +3423,9 @@ class GQLMutationPrivilegeCheckMiddleware:
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
                 if _is_legacy_mutation(mutation_cls):
-                    return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                    return cast(Any, mutation_cls)(
+                        False, f"no permission to execute {info.path.key}"
+                    )
                 raise PermissionDeniedError()
         return next(root, info, **args)
 
@@ -3420,10 +3438,12 @@ class GQLExceptionMiddleware:
             res = next(root, info, **args)
         except GraphQLError:
             raise
+        except RepositoryIntegrityError as e:
+            raise self._wrap_integrity_error(e) from e
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except Exception as e:
-            raise self._wrap_unexpected_error(e) from e
+            raise self._wrap_backend_error(InternalServerError()) from e
         if asyncio.iscoroutine(res):
             # Async resolvers raise while being awaited by graphql-core,
             # outside this try block; wrap the coroutine to catch them.
@@ -3435,31 +3455,24 @@ class GQLExceptionMiddleware:
             return await coro
         except GraphQLError:
             raise
+        except RepositoryIntegrityError as e:
+            raise self._wrap_integrity_error(e) from e
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except BaseException as e:
-            raise self._wrap_unexpected_error(e) from e
+            raise self._wrap_backend_error(InternalServerError()) from e
+
+    def _wrap_integrity_error(self, e: RepositoryIntegrityError) -> GraphQLError:
+        # Its message carries the PostgreSQL diagnostic; answer with the title only.
+        log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
+        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
-        if e.status_code // 100 == 4:
+        if e.is_client_error():
             log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
-        elif e.status_code // 100 == 5:
-            log.exception("graphql server error", error_code=str(e.error_code()))
-        return GraphQLError(
-            message=str(e),
-            extensions={
-                "code": str(e.error_code()),
-            },
-        )
-
-    def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
-        log.exception("graphql unexpected error")
-        return GraphQLError(
-            message=str(e),
-            extensions={
-                "code": str(ErrorCode.default()),
-            },
-        )
+            return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
+        log.exception("graphql server error", error_code=str(e.error_code()))
+        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
 
 class GQLMetricMiddleware:

@@ -15,6 +15,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `install-dev.sh` | Installs a full source setup: Pants, halfstack, configs, git hooks | person; `integration.yml` |
+| `setup-venv.py` | Builds the python-default virtualenv from `python.lock` without Pants, at the path `pants export` writes (`--venv <dir>` overrides) and fails when a package differs from the lock | person; `.github/actions/python-venv` |
 | `check-docker.py` | Verifies the Docker and Compose setup and reports the preferred Pants exec root | auto: `install-dev.sh` |
 | `configure-minio.sh` | Configures the MinIO bucket used by the `storage` halfstack profile | auto: sourced by `install-dev.sh` |
 | `delete-dev.sh` | Tears down what `install-dev.sh` created | person |
@@ -39,7 +40,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python files, with the ruff version from `pants.toml` | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format`, `ruff check` and `flake8` over the staged Python and BUILD files with the `lint` group of `pyproject.toml` installed into `dist/lint-venv` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 
@@ -50,18 +51,20 @@ current, see `AGENTS.md` in this directory.
 | `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | auto: `ci.yml` (`check-build-and-lint`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto: `ci.yml`, `.github/scripts/merge-alembic-heads.sh` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
-| `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto: `ci.yml` (`check-build-and-lint`) |
 | `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto: `knowledge-check.yml`; person |
 | `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | auto: `knowledge-check.yml`; person |
 | `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`, `pre-push.sh`; person |
+| `knowledge/check_bep_length.py` | Checks the length limits of BEP-1080 and later BEPs: lines, list items, design subsections | auto: `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto: `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto: `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto: `backport-migration-check.yml` |
-| `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames; `allow:migration-edit` records an intended one | auto: `migration-edit-check.yml` |
+| `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames, and the new manager migrations without a `# Part of:` comment; `allow:migration-edit` records an intended edit, not a missing comment | auto: `migration-edit-check.yml` |
 | `.github/scripts/merge-alembic-heads.sh` | Opens a `skip:changelog` pull request adding an empty merge migration when the manager's alembic graph on `main` has more than one head | auto: `alembic-merge-heads.yml` |
-| `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files, and prints the `--shard` values that hold a target | auto: `ci.yml` |
-| `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto: `ci-lint.yml`, `ci-typecheck.yml`, `ci-test.yml`, `ci-test-scenario.yml` |
-| `.github/scripts/prune-ref-caches.sh` | Deletes the cache entries under a ref that a newer save of the same key prefix superseded | auto: `.github/actions/pants-caches` |
+| `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files from the changed files and the `ruff analyze graph` import graph, and prints the `--shard` values that hold a target | auto: `ci.yml` |
+| `.github/scripts/list-typecheck-files.sh` | Prints the existing `.py` and `.pyi` files of `typecheck.txt`, without the duplicates | auto: `ci-typecheck.yml` |
+| `.github/scripts/run-pytest-shard.py` | Runs the files of one shard of `unit.txt` or `component.txt` with pytest in parallel processes, one per file or per batch, and writes the failed tests to a summary and `::error` annotations | auto: `ci-pytest.yml`; person |
+| `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto: `ci-lint.yml`, `ci-test.yml`, `ci-test-scenario.yml` |
+| `.github/scripts/prune-ref-caches.sh` | Deletes the cache entries under a ref that a newer save of the same key prefix superseded | auto: `.github/actions/pants-caches`, `mypy-cache.yml` |
 | `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto: `cleanup-pr-caches.yml` |
 | `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto: `update-seccomp-profile.yml` (monthly); person |
 | `check-docs-label.sh` | Skips a Read the Docs PR preview build unless the PR carries `area:docs`. **Currently unreferenced**: `.readthedocs.yaml` does the same check inline | none |
@@ -99,9 +102,9 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
-| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh`, `pre-commit.sh`, `release.sh` |
+| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh` |
 | `python.sh` | Runs a plain Python command through the uv-managed interpreter | person; `install-dev.sh` |
-| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `pre-commit.sh`, `release.sh` |
+| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `install-dev.sh` |
 | `add_future_annotations.py` | Adds the missing `from __future__ import annotations` imports | person |
 | `validate_ann_compliance.py` | Reports the ANN (flake8-annotations) violations of a path | person |
 | `run_mypy_subset.sh` | Runs `pants check` over a subset of paths | person |
@@ -118,4 +121,4 @@ current, see `AGENTS.md` in this directory.
 | `agent/` | Cross-build recipes for the static binaries bundled into the kernel runner (dropbear, ttyd, tmux, sftp-server, socket-relay, suexec) and agent-side deployment helpers |
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
-| `knowledge/` | `KNOWLEDGE.md` tooling: shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py`, `check_words.py` |
+| `knowledge/` | `KNOWLEDGE.md` tooling: shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py`, `check_words.py`, `check_bep_length.py` |

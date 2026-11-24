@@ -8,4 +8,5 @@ __all__ = ("BraceStyleAdapter",)
 warnings.warn(
     "Please import BraceStyleAdapter from ai.backend.logging instead of ai.backend.common.logging",
     DeprecationWarning,
+    stacklevel=2,
 )

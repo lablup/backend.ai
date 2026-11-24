@@ -18,7 +18,9 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 
 Applies to every generated artifact — docs, code comments, BEPs, PR descriptions.
 
-- Before writing, read `GLOSSARY.md` and the `glossary/<topic>.md` for the topic, and use the words they set.
+- Before writing, read the glossary of the document's language (`GLOSSARY.md` and `glossary/<topic>.md`, or their `.ko.md` pairs), and use the words they set.
+- Review a document people review (`KNOWLEDGE.md`, BEP, `AGENTS.md`, skill, `README.md`, PR description) with `/glossary-review` before requesting the review.
+- Do not write a fact the body does not refer to. Measurement conditions and the investigation go in the report or the PR.
 - Lead with the conclusion; keep background short.
 - Implementation details live in the code and the PR — docs describe interfaces and contracts, not line-by-line steps.
 - Prefer tables and lists over prose.
@@ -63,6 +65,7 @@ When to use:
 - Submitting PR (backport targeting) → `/submit`
 - Preparing release → `/release`
 - Searching or writing background knowledge (`KNOWLEDGE.md`) → `/knowledge`
+- Reviewing a document people review against the glossary → `/glossary-review`
 
 Skills source: `.claude/skills/{name}/SKILL.md`
 

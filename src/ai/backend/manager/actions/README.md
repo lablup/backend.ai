@@ -297,7 +297,7 @@ class SessionAccessValidator(ActionValidator):
 ### 3. Monitor Implementation
 
 ```python
-from ai.backend.manager.actions.monitors import ActionMonitor
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitor
 
 class AuditLogMonitor(ActionMonitor):
     """Audit log recording"""
@@ -368,7 +368,7 @@ result = await processor._run(action, meta)
 ### RBAC
 
 ```python
-from ai.backend.manager.actions.validators.rbac import RBACValidator
+from ai.backend.manager.actions.validators.rbac.virtual_entity import RBACValidator
 
 class RBACValidator(ActionValidator):
     """RBAC-based authorization"""

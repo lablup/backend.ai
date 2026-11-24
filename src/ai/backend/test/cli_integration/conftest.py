@@ -145,7 +145,7 @@ def keypair_resource_policy() -> str:
 
 
 @pytest.fixture
-def txt_file() -> Generator[TextIOWrapper, None, None]:
+def txt_file() -> Generator[TextIOWrapper]:
     filepath = Path("test.txt")
     with filepath.open("w") as f:
         f.write("This file is for testing.")

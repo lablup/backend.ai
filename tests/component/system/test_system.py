@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+from ai.backend.client.v2.exceptions import AuthenticationError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.system import SystemVersionResponse
 
@@ -27,3 +30,10 @@ class TestGetVersions:
         assert isinstance(result, SystemVersionResponse)
         assert result.version.startswith("v")
         assert len(result.manager) > 0
+
+    async def test_anonymous_caller_is_rejected(
+        self,
+        anonymous_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(AuthenticationError):
+            await anonymous_registry.system.get_versions()

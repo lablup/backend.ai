@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.auth.response import (
     GetSSHKeypairPayload,
     SignoutPayload,
     SignupPayload,
-    SSHKeypairPayload,
     UpdateFullNamePayload,
     UpdatePasswordNoAuthPayload,
     UpdatePasswordPayload,
@@ -20,7 +19,6 @@ from ai.backend.common.dto.manager.v2.auth.types import (
     AuthCredentialInfo,
     PasswordChangeInfo,
     RoleInfo,
-    SSHKeypairInfo,
 )
 
 
@@ -294,48 +292,3 @@ class TestGetSSHKeypairPayload:
         data = json.loads(payload.model_dump_json())
         assert "ssh_public_key" in data
         assert data["ssh_public_key"] == "ssh-rsa AAAA..."
-
-
-class TestSSHKeypairPayload:
-    """Tests for SSHKeypairPayload with nested SSHKeypairInfo."""
-
-    def test_creation_with_keypair_info(self) -> None:
-        keypair = SSHKeypairInfo(
-            ssh_public_key="ssh-rsa AAAAB3NzaC1yc2E...",
-            ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...",
-        )
-        payload = SSHKeypairPayload(keypair=keypair)
-        assert payload.keypair.ssh_public_key == "ssh-rsa AAAAB3NzaC1yc2E..."
-        assert payload.keypair.ssh_private_key == "-----BEGIN RSA PRIVATE KEY-----\nMIIEow..."
-
-    def test_both_keys_accessible_via_payload(self) -> None:
-        keypair = SSHKeypairInfo(
-            ssh_public_key="ssh-rsa PUBKEY",
-            ssh_private_key="-----BEGIN PRIVKEY-----",
-        )
-        payload = SSHKeypairPayload(keypair=keypair)
-        assert payload.keypair.ssh_public_key == "ssh-rsa PUBKEY"
-        assert payload.keypair.ssh_private_key == "-----BEGIN PRIVKEY-----"
-
-    def test_round_trip(self) -> None:
-        keypair = SSHKeypairInfo(
-            ssh_public_key="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ",
-            ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA",
-        )
-        payload = SSHKeypairPayload(keypair=keypair)
-        json_str = payload.model_dump_json()
-        restored = SSHKeypairPayload.model_validate_json(json_str)
-        assert restored.keypair.ssh_public_key == keypair.ssh_public_key
-        assert restored.keypair.ssh_private_key == keypair.ssh_private_key
-
-    def test_nested_keypair_structure_in_json(self) -> None:
-        keypair = SSHKeypairInfo(
-            ssh_public_key="ssh-rsa PUB",
-            ssh_private_key="PRIV",
-        )
-        payload = SSHKeypairPayload(keypair=keypair)
-        data = json.loads(payload.model_dump_json())
-        assert "keypair" in data
-        assert isinstance(data["keypair"], dict)
-        assert data["keypair"]["ssh_public_key"] == "ssh-rsa PUB"
-        assert data["keypair"]["ssh_private_key"] == "PRIV"

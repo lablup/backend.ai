@@ -19,7 +19,6 @@ __all__ = (
     "AuthTokenType",
     "PasswordChangeInfo",
     "RoleInfo",
-    "SSHKeypairInfo",
     "TwoFactorInfo",
     "TwoFactorType",
 )
@@ -50,13 +49,6 @@ class RoleInfo(BaseResponseModel):
         default=None,
         description="Group-level role if group ID was requested; None if not a member",
     )
-
-
-class SSHKeypairInfo(BaseResponseModel):
-    """SSH keypair data."""
-
-    ssh_public_key: str = Field(description="SSH public key in standard format")
-    ssh_private_key: str = Field(description="SSH private key in PEM format")
 
 
 class PasswordChangeInfo(BaseResponseModel):

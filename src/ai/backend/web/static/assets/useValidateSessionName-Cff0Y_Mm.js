@@ -1,0 +1,6 @@
+import{t as e}from"./compiler-runtime-CZQb2eIb.js";import{ot as t}from"./lodash-ClfL87UH.js";import{r as n}from"./Skeleton-D35z7Ria.js";
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+*/
+var r=e(),i=e=>/^\w/.test(e)?/\w$/.test(e)?/^[\w.-]*$/.test(e)?null:`characters`:`end`:`start`,a=e=>{"use memo";let a=(0,r.c)(17),{t:o}=n(),s;a[0]===o?s=a[1]:(s=o(`session.validation.SessionNameTooShort`),a[0]=o,a[1]=s);let c;a[2]===s?c=a[3]:(c={min:4,message:s},a[2]=s,a[3]=c);let l;a[4]===o?l=a[5]:(l=o(`session.validation.SessionNameTooLong64`),a[4]=o,a[5]=l);let u;a[6]===l?u=a[7]:(u={max:64,message:l},a[6]=l,a[7]=u);let d;a[8]===o?d=a[9]:(d={validator(e,n){if(t(n))return Promise.resolve();let r=i(n);return r===`start`?Promise.reject(o(`session.validation.SessionNameShouldStartWith`)):r===`end`?Promise.reject(o(`session.validation.SessionNameShouldEndWith`)):r===`characters`?Promise.reject(o(`session.validation.SessionNameInvalidCharacter`)):Promise.resolve()}},a[8]=o,a[9]=d);let f;a[10]===e?f=a[11]:(f=e?{required:!0}:{},a[10]=e,a[11]=f);let p;return a[12]!==c||a[13]!==u||a[14]!==d||a[15]!==f?(p=[c,u,d,f],a[12]=c,a[13]=u,a[14]=d,a[15]=f,a[16]=p):p=a[16],p};export{a as n,i as t};

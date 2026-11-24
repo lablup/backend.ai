@@ -9,10 +9,11 @@ implementation these slots hand the columns to.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -29,11 +30,16 @@ from ai.backend.manager.models.specs.conditions.number import DecimalConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
+from ai.backend.manager.models.specs.querier import PartialDataQuerier
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation, ToOneCorrelation
-from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
+from ai.backend.manager.models.specs.search.field import (
+    NestedSearchableField,
+    QueryColumn,
+    SearchableField,
+)
 from ai.backend.manager.models.specs.search.usage import UsedByConditions
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.searcher import PartialSearcher, Searcher
 from ai.backend.manager.models.virtual_entity.permission_reach import user_permission_reaches
 
 from .shelf_rows import (
@@ -46,9 +52,11 @@ from .shelf_rows import (
     CategoryRow,
     ShelfData,
     ShelfEntityType,
+    ShelfID,
     ShelfItemData,
     ShelfItemRow,
     ShelfKind,
+    ShelfPartialData,
     ShelfRow,
     SpecData,
     SpecRow,
@@ -179,47 +187,41 @@ class BoxSearchableFields:
 
 
 class _ShelfOwnFields(RowDataConverter[ShelfRow, ShelfData]):
-    """The shelf's own columns."""
+    """The shelf's own columns, named for the requested fields of a partial read."""
 
-    id = SearchableField(ShelfRow.id, UUIDConditions(ShelfRow.id), ColumnOrder(ShelfRow.id))
-    name = SearchableField(
-        ShelfRow.name, StringConditions(ShelfRow.name), ColumnOrder(ShelfRow.name)
-    )
-    note = SearchableField(
-        ShelfRow.note, StringConditions(ShelfRow.note), ColumnOrder(ShelfRow.note)
-    )
-    count = SearchableField(
-        ShelfRow.count, IntConditions(ShelfRow.count), ColumnOrder(ShelfRow.count)
-    )
-    price = SearchableField(
+    id = QueryColumn(ShelfRow.id, UUIDConditions(ShelfRow.id), ColumnOrder(ShelfRow.id))
+    name = QueryColumn(ShelfRow.name, StringConditions(ShelfRow.name), ColumnOrder(ShelfRow.name))
+    note = QueryColumn(ShelfRow.note, StringConditions(ShelfRow.note), ColumnOrder(ShelfRow.note))
+    count = QueryColumn(ShelfRow.count, IntConditions(ShelfRow.count), ColumnOrder(ShelfRow.count))
+    price = QueryColumn(
         ShelfRow.price, DecimalConditions(ShelfRow.price), ColumnOrder(ShelfRow.price)
     )
-    kind = SearchableField(
+    kind = QueryColumn(
         ShelfRow.kind, EnumConditions(ShelfRow.kind, ShelfKind), ColumnOrder(ShelfRow.kind)
     )
-    active = SearchableField(
+    active = QueryColumn(
         ShelfRow.active, BoolConditions(ShelfRow.active), ColumnOrder(ShelfRow.active)
     )
-    tags = SearchableField(ShelfRow.tags, ArrayConditions(ShelfRow.tags, sa.String()), None)
-    opened_at = SearchableField(
+    tags = QueryColumn(ShelfRow.tags, ArrayConditions(ShelfRow.tags, sa.String()), None)
+    opened_at = QueryColumn(
         ShelfRow.opened_at,
         DateTimeConditions(ShelfRow.opened_at),
         ColumnOrder(ShelfRow.opened_at),
     )
-    closed_at = SearchableField(
+    closed_at = QueryColumn(
         ShelfRow.closed_at,
         DateTimeConditions(ShelfRow.closed_at),
         ColumnOrder(ShelfRow.closed_at),
     )
-    stocked_on = SearchableField(
+    stocked_on = QueryColumn(
         ShelfRow.stocked_on,
         DateConditions(ShelfRow.stocked_on),
         ColumnOrder(ShelfRow.stocked_on),
     )
-    zone_id = SearchableField(
+    zone_id = QueryColumn(
         ShelfRow.zone_id, UUIDConditions(ShelfRow.zone_id), ColumnOrder(ShelfRow.zone_id)
     )
-    category_id = SearchableField(
+    category_id = QueryColumn(
         ShelfRow.category_id,
         UUIDConditions(ShelfRow.category_id),
         ColumnOrder(ShelfRow.category_id),
@@ -242,6 +244,10 @@ class _ShelfOwnFields(RowDataConverter[ShelfRow, ShelfData]):
             zone_id=self.zone_id.read(row),
             category_id=self.category_id.read(row),
         )
+
+    def to_partial_data(self, row: ShelfRow) -> ShelfPartialData:
+        data = self.to_data(row)
+        return ShelfPartialData(**{field.name: getattr(data, field.name) for field in fields(data)})
 
 
 class _ShelfNestedFields:
@@ -294,6 +300,54 @@ class ShelfSearcher(Searcher[ShelfRow, ShelfData]):
     @override
     def to_data(self, row: ShelfRow) -> ShelfData:
         return ShelfSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ShelfPartialSearcher(PartialSearcher[ShelfRow, ShelfPartialData]):
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(ShelfRow)
+
+    @override
+    def to_data(self, row: ShelfRow) -> ShelfPartialData:
+        return ShelfSearchableFields.own.to_partial_data(row)
+
+    @override
+    def id_column(self) -> QueryColumn[Any, Any, Any]:
+        return ShelfSearchableFields.own.id
+
+    @override
+    def partial_class(self) -> type[ShelfPartialData]:
+        return ShelfPartialData
+
+
+@dataclass
+class ShelfPartialQuerier(PartialDataQuerier[ShelfRow, ShelfPartialData]):
+    shelf_id: ShelfID
+
+    @override
+    def row_class(self) -> type[ShelfRow]:
+        return ShelfRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return ShelfRow.id
+
+    @override
+    def entity_id_value(self) -> ShelfID:
+        return self.shelf_id
+
+    @override
+    def to_data(self, row: ShelfRow) -> ShelfPartialData:
+        return ShelfSearchableFields.own.to_partial_data(row)
+
+    @override
+    def id_column(self) -> QueryColumn[Any, Any, Any]:
+        return ShelfSearchableFields.own.id
+
+    @override
+    def partial_class(self) -> type[ShelfPartialData]:
+        return ShelfPartialData
 
 
 class ZoneShelfTarget(ScopeTarget):

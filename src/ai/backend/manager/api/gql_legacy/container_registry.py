@@ -27,10 +27,10 @@ from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.field_spec import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.rbac import (
+from ai.backend.manager.models.rbac.base import (
     ContainerRegistryScope,
     ProjectScope,
     ScopeType,
@@ -529,10 +529,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-    )
+    allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scope_id = ScopeField(required=True)
@@ -567,10 +564,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
 class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-    )
+    allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scope_id = ScopeField(required=True)
@@ -605,10 +599,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
 class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-    )
+    allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scope_id = ScopeField(required=True)

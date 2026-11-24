@@ -111,6 +111,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
@@ -260,7 +261,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The role this permission belongs to.")  # type: ignore[misc]
+    @gql_resolver(description="The role this permission belongs to.")
     async def role(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -273,22 +274,22 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
-    @gql_field(description="Scope type.", deprecation_reason=_REMOVED_SCOPE_REASON)  # type: ignore[misc]
+    @gql_resolver(description="Scope type.", deprecation_reason=_REMOVED_SCOPE_REASON)
     def scope_type(self) -> RBACElementTypeGQL | None:
         return None
 
-    @gql_field(description="Scope ID.", deprecation_reason=_REMOVED_SCOPE_REASON)  # type: ignore[misc]
+    @gql_resolver(description="Scope ID.", deprecation_reason=_REMOVED_SCOPE_REASON)
     def scope_id(self) -> str | None:
         return None
 
-    @gql_field(description="Operation type.", deprecation_reason=_REMOVED_OPERATION_REASON)  # type: ignore[misc]
+    @gql_resolver(description="Operation type.", deprecation_reason=_REMOVED_OPERATION_REASON)
     def operation(self) -> OperationTypeGQL | None:
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="The scope this permission applies to.",
         deprecation_reason=_REMOVED_SCOPE_REASON,
-    )  # type: ignore[misc]
+    )
     def scope(
         self,
     ) -> (
@@ -532,24 +533,24 @@ class BulkAddRolePermissionFailureInfoGQL(
     permission: PermissionBitGQL = gql_field(description="Operation bit of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
-    @gql_field(
+    @gql_resolver(
         description="Scope element type of the failed entry.",
         deprecation_reason=_REMOVED_SCOPE_REASON,
-    )  # type: ignore[misc]
+    )
     def scope_type(self) -> str | None:
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="Scope element ID of the failed entry.",
         deprecation_reason=_REMOVED_SCOPE_REASON,
-    )  # type: ignore[misc]
+    )
     def scope_id(self) -> str | None:
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="Operation type of the failed entry.",
         deprecation_reason=_REMOVED_OPERATION_REASON,
-    )  # type: ignore[misc]
+    )
     def operation(self) -> str | None:
         return None
 
@@ -585,24 +586,24 @@ class ReplaceRolePermissionFailureInfoGQL(
     permission: PermissionBitGQL = gql_field(description="Operation bit of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
-    @gql_field(
+    @gql_resolver(
         description="Scope element type of the failed entry.",
         deprecation_reason=_REMOVED_SCOPE_REASON,
-    )  # type: ignore[misc]
+    )
     def scope_type(self) -> str | None:
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="Scope element ID of the failed entry.",
         deprecation_reason=_REMOVED_SCOPE_REASON,
-    )  # type: ignore[misc]
+    )
     def scope_id(self) -> str | None:
         return None
 
-    @gql_field(
+    @gql_resolver(
         description="Operation type of the failed entry.",
         deprecation_reason=_REMOVED_OPERATION_REASON,
-    )  # type: ignore[misc]
+    )
     def operation(self) -> str | None:
         return None
 

@@ -4,18 +4,26 @@ import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any, cast, override
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import zmq
 
 from ai.backend.agent import kernel as kernel_mod
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
+from ai.backend.agent.errors.agent import InvalidSocket, UnsupportedBaseDistroError
 from ai.backend.agent.errors.kernel import (
     KernelRunnerInvalidReplyError,
     KernelRunnerReplyTimeoutError,
 )
-from ai.backend.agent.kernel import AbstractCodeRunner, match_distro_data
+from ai.backend.agent.kernel import (
+    AbstractCodeRunner,
+    RobustSocket,
+    SocketPair,
+    match_distro_data,
+)
 from ai.backend.common import msgpack
+from ai.backend.common.types import ServicePort, ServicePortProtocols
 
 
 def test_match_distro_data() -> None:
@@ -341,3 +349,87 @@ class TestLateStatusRepliesNeverBlockOutput:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         assert [runner.status_queue.get_nowait() for _ in range(2)] == [b"stale-2", b"fresh"]
+
+
+def _unanswered_socket_pair() -> SocketPair:
+    return SocketPair(
+        RobustSocket(zmq.PUSH, "tcp://127.0.0.1:1"),
+        RobustSocket(zmq.PULL, "tcp://127.0.0.1:2"),
+    )
+
+
+class TestAClosedRunnerStaysClosed:
+    """A destroy closes the runner while its create may still be polling it; a socket made after
+    that is closed by no one and reconnects to the next kernel on the container's address."""
+
+    async def test_a_send_after_close_fails_without_reconnecting(self) -> None:
+        sockets = _unanswered_socket_pair()
+        sockets.close()
+        with pytest.raises(InvalidSocket):
+            await sockets.send_multipart([b"status", b""])
+        assert sockets.input_sock.socket.closed
+        assert sockets.output_sock.socket.closed
+
+    async def test_a_socket_lost_while_open_is_still_recreated(self) -> None:
+        sockets = _unanswered_socket_pair()
+        sockets.input_sock.socket.close()
+        try:
+            await sockets.send_multipart([b"status", b""])
+            assert not sockets.input_sock.socket.closed
+        finally:
+            sockets.close()
+
+
+_SESSION_INTERPOLATION = {"delimiters": [{"start": "<<", "end": ">>"}]}
+
+
+def _kernel_with_service(
+    service_interpolation: dict[str, Any] | None,
+) -> tuple[DockerKernel, MagicMock]:
+    kernel = DockerKernel.__new__(DockerKernel)
+    kernel.data = {"service_interpolation": service_interpolation}
+    kernel.service_ports = [
+        ServicePort(
+            name="jupyter",
+            protocol=ServicePortProtocols.HTTP,
+            container_ports=[8080],
+            host_ports=[None],
+            is_inference=False,
+        )
+    ]
+    runner = MagicMock()
+    runner.feed_start_service = AsyncMock(return_value={"status": "started"})
+    runner.feed_start_model_service = AsyncMock(return_value={"status": "started"})
+    kernel.runner = runner
+    return kernel, runner
+
+
+class TestServiceStartUsesTheSessionInterpolation:
+    """The interpolation fixed on the session fills a start that does not name its own."""
+
+    async def test_start_service_takes_the_session_interpolation(self) -> None:
+        kernel, runner = _kernel_with_service(_SESSION_INTERPOLATION)
+        await kernel.start_service("jupyter", {})
+        sent = runner.feed_start_service.await_args.args[0]
+        assert sent["options"]["interpolation"] == _SESSION_INTERPOLATION
+
+    async def test_start_service_keeps_its_own_interpolation(self) -> None:
+        own = {"delimiters": [{"start": "{{", "end": "}}"}]}
+        kernel, runner = _kernel_with_service(_SESSION_INTERPOLATION)
+        await kernel.start_service("jupyter", {"interpolation": own})
+        sent = runner.feed_start_service.await_args.args[0]
+        assert sent["options"]["interpolation"] == own
+
+    async def test_start_service_without_session_interpolation_sends_options_as_given(
+        self,
+    ) -> None:
+        kernel, runner = _kernel_with_service(None)
+        await kernel.start_service("jupyter", {"arguments": {}})
+        sent = runner.feed_start_service.await_args.args[0]
+        assert sent["options"] == {"arguments": {}}
+
+    async def test_start_model_service_takes_the_session_interpolation(self) -> None:
+        kernel, runner = _kernel_with_service(_SESSION_INTERPOLATION)
+        await kernel.start_model_service({"name": "model", "service": {"port": 8000}})
+        sent = runner.feed_start_model_service.await_args.args[0]
+        assert sent["service"] == {"port": 8000, "interpolation": _SESSION_INTERPOLATION}

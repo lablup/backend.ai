@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum, auto
-from typing import NamedTuple
+from typing import Any, NamedTuple, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -60,7 +60,7 @@ class TestAgentsV2AdminOnly:
             domain_name="default",
             domain_id=DomainID(uuid.uuid4()),
         )
-        resolver_fn = agents_v2.base_resolver
+        resolver_fn = cast(Any, agents_v2).base_resolver
         if case.expected == ExpectedResult.FORBIDDEN:
             with with_user_context(user), pytest.raises(web.HTTPForbidden):
                 await resolver_fn(mock_info)

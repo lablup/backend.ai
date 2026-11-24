@@ -82,7 +82,7 @@ manager_local_config_iv = (
             t.Key("pool-size", default=8): t.ToInt[1:],
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("pool-pre-ping", default=False): t.ToBool,
-            t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
+            t.Key("max-overflow", default=64): t.ToInt(gte=-1),  # -1 is infinite
             t.Key("lock-conn-timeout", default=0): t.ToFloat[0:],  # 0 is infinite
         }),
         t.Key("manager"): t.Dict({
@@ -99,7 +99,7 @@ manager_local_config_iv = (
             t.Key(
                 "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
             ): tx.Path(type="file"),
-            t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
+            t.Key("heartbeat-timeout", default=40.0): t.Float(gte=1.0),
             t.Key("secret", default=None): t.Null | t.String,
             t.Key("ssl-enabled", default=False): t.ToBool,
             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),

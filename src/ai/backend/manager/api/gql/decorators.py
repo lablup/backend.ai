@@ -13,6 +13,8 @@ Decorator roles:
     gql_pydantic_interface — Interface types backed by a v2 Pydantic DTO.
     gql_field              — Fields introduced with the parent type (no separate version).
     gql_added_field        — Fields added after the parent type (own version via meta).
+    gql_resolver           — Resolver form of gql_field.
+    gql_added_resolver     — Resolver form of gql_added_field.
     gql_root_field         — Root query fields (always have their own version via meta).
     gql_enum               — Enum types with version metadata.
     gql_mutation           — Mutation resolvers with version metadata.
@@ -40,6 +42,7 @@ from strawberry.types.field import field as strawberry_field
 
 from ai.backend.common.meta import BackendAIGQLMeta
 from ai.backend.manager.api.gql.pydantic_compat import (
+    MissingKeepingFromPydantic,
     PydanticInputMixin,
     PydanticNodeMixin,
 )
@@ -64,6 +67,7 @@ __all__ = (
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
 T_conn = TypeVar("T_conn", bound="Connection[Any] | Edge[Any]")
 T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
+_ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])
 
 
 def _build_description(meta: BackendAIGQLMeta) -> str:
@@ -266,6 +270,7 @@ def gql_pydantic_type[PydanticModel: BaseModel](
             declared = declared_descriptions.get(field.python_name)
             if declared is not None:
                 field.description = declared
+        MissingKeepingFromPydantic.wrap(model, wrapped)
         return wrapped
 
     return wrap
@@ -319,23 +324,60 @@ def gql_added_field(
     )
 
 
+def gql_resolver(
+    *,
+    description: str,
+    name: str | None = None,
+    deprecation_reason: str | None = None,
+) -> Callable[[_ResolverFn], _ResolverFn]:
+    """Resolver form of ``gql_field``."""
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.field(
+            description=description,
+            name=name,
+            deprecation_reason=deprecation_reason,
+        ),
+    )
+
+
+def gql_added_resolver(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    deprecation_reason: str | None = None,
+) -> Callable[[_ResolverFn], _ResolverFn]:
+    """Resolver form of ``gql_added_field``."""
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.field(
+            description=_build_description(meta),
+            name=name,
+            deprecation_reason=deprecation_reason,
+        ),
+    )
+
+
 def gql_root_field(
     meta: BackendAIGQLMeta,
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
     directives: Sequence[object] = (),
-) -> Any:
+) -> Callable[[_ResolverFn], _ResolverFn]:
     """Root query/subscription field on the Query type (always has its own version).
 
     Use for top-level fields on the Query type that are independently versioned.
     ``directives`` forwards schema directives (e.g. federation ``@override``) onto the field.
     """
-    return strawberry.field(
-        description=_build_description(meta),
-        name=name,
-        deprecation_reason=deprecation_reason,
-        directives=directives,
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.field(
+            description=_build_description(meta),
+            name=name,
+            deprecation_reason=deprecation_reason,
+            directives=directives,
+        ),
     )
 
 
@@ -416,9 +458,6 @@ def gql_enum(
     if enum_cls is not None:
         return process(enum_cls)
     return process
-
-
-_ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])
 
 
 def gql_mutation(

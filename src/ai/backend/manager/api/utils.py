@@ -121,9 +121,7 @@ class LegacyBaseResponseModel(BaseResponseModel):
     status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
-TParamModel = TypeVar("TParamModel", bound=LegacyBaseRequestModel, contravariant=True)
 TQueryModel = TypeVar("TQueryModel", bound=LegacyBaseRequestModel)
-TResponseModel = TypeVar("TResponseModel", bound=LegacyBaseResponseModel, covariant=True)
 
 type TPydanticResponse[TResponseModel: LegacyBaseResponseModel] = (
     TResponseModel | list[TResponseModel]
@@ -194,6 +192,7 @@ def pydantic_response_api_handler[**P, TResponseModel: LegacyBaseResponseModel](
 def pydantic_params_api_handler[
     TParamModel: LegacyBaseRequestModel,
     TQueryModel: LegacyBaseRequestModel,
+    TResponseModel: LegacyBaseResponseModel,
 ](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
@@ -374,7 +373,7 @@ def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamRes
     return deprecated_stub_impl
 
 
-def chunked(iterable: Iterable[Any], n: int) -> Generator[tuple[Any, ...], None, None]:
+def chunked(iterable: Iterable[Any], n: int) -> Generator[tuple[Any, ...]]:
     it = iter(iterable)
     while True:
         chunk = tuple(itertools.islice(it, n))
@@ -399,7 +398,7 @@ async def call_non_bursty(
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.
     """
-    global _burst_last_call, _burst_times, _burst_counts
+    global _burst_last_call
     if inspect.iscoroutine(coro):
         # Coroutine objects may not be called before garbage-collected
         # as this function throttles the frequency of invocation.

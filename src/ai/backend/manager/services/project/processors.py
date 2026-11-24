@@ -25,15 +25,7 @@ from ai.backend.manager.services.project.actions.clear_default_registry import (
     ClearProjectDefaultRegistryActionResult,
 )
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
-from ai.backend.manager.services.project.actions.create_project_dotfile import (
-    CreateProjectDotfileAction,
-    CreateProjectDotfileActionResult,
-)
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
-from ai.backend.manager.services.project.actions.delete_project_dotfile import (
-    DeleteProjectDotfileAction,
-    DeleteProjectDotfileActionResult,
-)
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.project.actions.partial_bulk_delete_projects import (
     PartialBulkDeleteProjectsAction,
@@ -63,10 +55,6 @@ from ai.backend.manager.services.project.actions.switch_default_registry import 
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
     UpdateProjectActionResult,
-)
-from ai.backend.manager.services.project.actions.update_project_dotfile import (
-    UpdateProjectDotfileAction,
-    UpdateProjectDotfileActionResult,
 )
 from ai.backend.manager.services.project.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -106,15 +94,6 @@ class ProjectProcessors:
     partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreProjectsAction, ProjectData]
     usage_per_month: GlobalActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
     usage_per_period: GlobalActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
-    create_dotfile: SingleEntityActionProcessor[
-        CreateProjectDotfileAction, CreateProjectDotfileActionResult
-    ]
-    update_dotfile: SingleEntityActionProcessor[
-        UpdateProjectDotfileAction, UpdateProjectDotfileActionResult
-    ]
-    delete_dotfile: SingleEntityActionProcessor[
-        DeleteProjectDotfileAction, DeleteProjectDotfileActionResult
-    ]
 
     def __init__(
         self,
@@ -151,13 +130,4 @@ class ProjectProcessors:
         )
         self.usage_per_period = group.global_scope(
             UsagePerPeriodAction, group_service.usage_per_period
-        )
-        self.create_dotfile = group.single_entity(
-            CreateProjectDotfileAction, group_service.create_dotfile
-        )
-        self.update_dotfile = group.single_entity(
-            UpdateProjectDotfileAction, group_service.update_dotfile
-        )
-        self.delete_dotfile = group.single_entity(
-            DeleteProjectDotfileAction, group_service.delete_dotfile
         )

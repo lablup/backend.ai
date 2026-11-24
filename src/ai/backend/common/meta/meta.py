@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.types import BackendAISchema
 
@@ -224,7 +224,7 @@ def get_field_type(model: type[BackendAISchema], field_name: str) -> type | None
         return None
 
     # In Pydantic v2, annotation is already unwrapped from Annotated
-    return field_info.annotation
+    return cast(type[Any] | None, field_info.annotation)
 
 
 def generate_example(
@@ -313,10 +313,9 @@ def generate_composite_example(
                 and issubclass(child_type, BackendAISchema)
             ):
                 result[name] = generate_composite_example(child_type, env)
-        else:
-            # Use direct example
-            if meta.example is not None:
-                result[name] = meta.example.get(env)
+        # Use direct example
+        elif meta.example is not None:
+            result[name] = meta.example.get(env)
 
     return result
 

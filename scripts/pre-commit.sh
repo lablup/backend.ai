@@ -19,10 +19,10 @@ cd "$(git rev-parse --show-toplevel)"
 PY_FILES=()
 while IFS= read -r -d '' f; do
   PY_FILES+=("$f")
-done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py' '*.pyi')
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py' '*.pyi' 'BUILD' '*/BUILD')
 
 if [ ${#PY_FILES[@]} -eq 0 ]; then
-  echo "No staged Python files; skipping ruff."
+  echo "No staged Python or BUILD files; skipping ruff."
   exit 0
 fi
 
@@ -31,12 +31,18 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
-RUFF=(uvx "ruff@${RUFF_VERSION}")
+# ruff and flake8 from the `lint` group of pyproject.toml, in a gitignored venv
+install_lint_venv() {
+  uv venv --quiet --allow-existing dist/lint-venv
+  uv pip install --quiet --python dist/lint-venv --group pyproject.toml:lint
+}
+install_lint_venv
+RUFF=(dist/lint-venv/bin/ruff)
+FLAKE8=(dist/lint-venv/bin/flake8)
 
 EXIT_CODE=0
 
-echo "Running pre-commit checks (ruff ${RUFF_VERSION})..."
+echo "Running pre-commit checks ($("${RUFF[@]}" --version))..."
 
 # 1. Auto-format
 echo "✓ Formatting..."
@@ -50,6 +56,13 @@ fi
 echo "✓ Linting..."
 if ! "${RUFF[@]}" check --force-exclude "${PY_FILES[@]}"; then
   echo "❌ Linting failed"
+  EXIT_CODE=1
+fi
+
+# 3. Repository rules (tools/flake8-plugins)
+echo "✓ Checking repository rules..."
+if ! "${FLAKE8[@]}" "${PY_FILES[@]}"; then
+  echo "❌ Repository rules failed"
   EXIT_CODE=1
 fi
 

@@ -1,6 +1,7 @@
 import dataclasses
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -65,9 +66,9 @@ IMAGE_FIXTURE_DATA = ImageSearchableFields.own.to_data(IMAGE_ROW_FIXTURE)
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(
         IMAGE_FIXTURE_DATA,
-        type=ImageType.COMPUTE._name_,  # type: ignore
-        labels={},  # type: ignore
-        resources=RESOURCE_LIMITS,  # type: ignore
+        type=cast(Any, ImageType.COMPUTE._name_),
+        labels=cast(Any, {}),
+        resources=cast(Any, RESOURCE_LIMITS),
     )
 )
 

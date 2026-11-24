@@ -27,7 +27,8 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogOrderField,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope
-from ai.backend.manager.actions.types import ActionKind, ActionOperationType, OperationStatus
+from ai.backend.manager.actions.spec import ActionKind
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData

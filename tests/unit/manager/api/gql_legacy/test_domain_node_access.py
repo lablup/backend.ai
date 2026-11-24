@@ -41,7 +41,7 @@ class TestDomainNodeGetNodeByName:
     async def db_holding_caller_and_other_domains(
         self,
         database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
         async with with_tables(database_connection, [DomainRow]):
             async with database_connection.begin_session() as db_session:
                 db_session.add_all([

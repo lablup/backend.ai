@@ -3,7 +3,8 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from ai.backend.manager.data.deployment.types import RouteData
+from ai.backend.common.types import AgentId
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteData
 
 
 class RouteLifecycleType(StrEnum):
@@ -40,3 +41,11 @@ class RouteExecutionResult:
     successes: list[RouteData] = field(default_factory=list)
     errors: list[RouteExecutionError] = field(default_factory=list)
     stale: list[RouteData] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RouteProvisionTarget:
+    """A deployment and the agents it designates, read together to provision its routes."""
+
+    deployment: DeploymentInfo
+    designated_agents: list[AgentId]

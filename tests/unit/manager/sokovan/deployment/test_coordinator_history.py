@@ -271,7 +271,7 @@ def coordinator_with_pending_deployments(
     mock_valkey_stat: AsyncMock,
     mock_route_controller: MagicMock,
     sample_deployment_with_history: DeploymentWithHistory,
-) -> Generator[DeploymentCoordinator, None, None]:
+) -> Generator[DeploymentCoordinator]:
     """Coordinator with PENDING deployments available."""
     mock_deployment_repository.search_deployments_with_last_history = AsyncMock(
         return_value=[sample_deployment_with_history]
@@ -308,7 +308,7 @@ def coordinator_without_deployments(
     mock_client_pool: MagicMock,
     mock_valkey_stat: AsyncMock,
     mock_route_controller: MagicMock,
-) -> Generator[DeploymentCoordinator, None, None]:
+) -> Generator[DeploymentCoordinator]:
     """Coordinator with no deployments available."""
     mock_deployment_repository.search_deployments_with_last_history = AsyncMock(return_value=[])
 

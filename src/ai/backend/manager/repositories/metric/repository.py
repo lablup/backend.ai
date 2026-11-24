@@ -8,11 +8,13 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
     InvalidMetricPresetTemplate,
-    PrometheusConnectionError,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy

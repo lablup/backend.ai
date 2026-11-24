@@ -75,13 +75,13 @@ async def test_proxy_web(
     api_app_fixture: tuple[web.Application, list[Any], int],
     proxy_app_fixture: tuple[web.Application, int],
 ) -> None:
-    api_app, recv_queue, api_port = api_app_fixture
+    _api_app, _recv_queue, api_port = api_app_fixture
     api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
     monkeypatch.setenv("BACKEND_ENDPOINT", api_url)
     monkeypatch.setattr(config, "_config", config.APIConfig())
-    proxy_app, proxy_port = proxy_app_fixture
+    _proxy_app, proxy_port = proxy_app_fixture
     proxy_timeout = aiohttp.ClientTimeout(connect=1.0)
     async with aiohttp.ClientSession(timeout=proxy_timeout) as proxy_client:
         proxy_url = f"http://127.0.0.1:{proxy_port}"
@@ -111,7 +111,7 @@ async def test_proxy_web_502(
     # Skip creation of api_app; let the proxy use a non-existent server.
     proxy_timeout = aiohttp.ClientTimeout(connect=1.0)
     async with aiohttp.ClientSession(timeout=proxy_timeout) as proxy_client:
-        proxy_app, proxy_port = proxy_app_fixture
+        _proxy_app, proxy_port = proxy_app_fixture
         proxy_url = f"http://127.0.0.1:{proxy_port}"
         data = {"test": 1234}
         async with proxy_client.request("POST", proxy_url + "/echo", json=data) as resp:
@@ -128,7 +128,7 @@ async def test_proxy_websocket(
     api_app_fixture: tuple[web.Application, list[Any], int],
     proxy_app_fixture: tuple[web.Application, int],
 ) -> None:
-    api_app, recv_queue, api_port = api_app_fixture
+    _api_app, recv_queue, api_port = api_app_fixture
     api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
@@ -136,7 +136,7 @@ async def test_proxy_websocket(
     monkeypatch.setattr(config, "_config", config.APIConfig())
     proxy_timeout = aiohttp.ClientTimeout(connect=1.0)
     async with aiohttp.ClientSession(timeout=proxy_timeout) as proxy_client:
-        proxy_app, proxy_port = proxy_app_fixture
+        _proxy_app, proxy_port = proxy_app_fixture
         proxy_url = f"http://127.0.0.1:{proxy_port}"
         ws = await proxy_client.ws_connect(proxy_url + "/stream/echo")
         await ws.send_str("test")

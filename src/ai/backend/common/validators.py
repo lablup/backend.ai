@@ -76,8 +76,8 @@ class StringLengthMeta(TrafaretMeta):
     A metaclass that makes string-like trafarets to have sliced min/max length indicator.
     """
 
-    def __getitem__(cls, slice_: slice) -> t.Trafaret:
-        return cast(t.Trafaret, cls(min_length=slice_.start, max_length=slice_.stop))
+    def __getitem__(self, slice_: slice) -> t.Trafaret:
+        return cast(t.Trafaret, self(min_length=slice_.start, max_length=slice_.stop))
 
 
 class AliasedKey(t.Key):
@@ -93,7 +93,7 @@ class AliasedKey(t.Key):
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:
+    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...]]:
         key: str | None = None
         for name in self.names:
             if name in data:

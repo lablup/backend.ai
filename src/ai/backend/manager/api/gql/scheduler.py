@@ -33,6 +33,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_resolver,
     gql_root_field,
     gql_subscription,
 )
@@ -86,9 +87,9 @@ class SchedulingBroadcastEventPayloadGQL:
     status_transition: SchedulingStatus
     reason: str
 
-    @gql_field(
+    @gql_resolver(
         description="The session ID associated with the replica. This can be null right after replica creation."
-    )  # type: ignore[misc]
+    )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
         # The federated ComputeSessionNode stub is a relay.Node; pass the inner id so
         # Strawberry re-encodes the same global ID the graphene subgraph expects.
@@ -108,7 +109,7 @@ class SchedulingBroadcastEventPayloadGQL:
 async def scheduling_events_by_session(
     session_id: strawberry.ID,
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[SchedulingBroadcastEventPayloadGQL, None]:
+) -> AsyncGenerator[SchedulingBroadcastEventPayloadGQL]:
     """Subscribe to scheduling events for a specific session.
 
     Streams status transition events for a session during its lifecycle,
@@ -261,7 +262,7 @@ class ComputeSchedulePayloadGQL:
             "outcomes, with hints on what to reduce for kernels that do not fit."
         ),
     )
-)  # type: ignore[misc]
+)
 async def compute_schedule(
     input: ComputeScheduleInputGQL,
     info: Info[StrawberryGQLContext],

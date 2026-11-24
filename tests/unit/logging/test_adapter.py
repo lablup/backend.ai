@@ -72,7 +72,7 @@ def test_brace_style_adapter_exceptions(caplog: pytest.LogCaptureFixture) -> Non
 def test_brace_style_adapter_context_fields_via_extra(caplog: pytest.LogCaptureFixture) -> None:
     logger = _adapter(logging.getLogger())
     with (
-        pytest.warns(DeprecationWarning),
+        pytest.warns(DeprecationWarning, match="with_log_context_fields is deprecated"),
         with_log_context_fields({"user": "Alice"}),
         caplog.at_level(logging.INFO),
     ):
@@ -112,7 +112,7 @@ def test_structured_logger_ignores_legacy_context_fields(
 ) -> None:
     logger = StructuredLogger(logging.getLogger())
     with (
-        pytest.warns(DeprecationWarning),
+        pytest.warns(DeprecationWarning, match="with_log_context_fields is deprecated"),
         with_log_context_fields({"user_id": "user-1"}),
         caplog.at_level(logging.INFO),
     ):

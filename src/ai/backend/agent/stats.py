@@ -334,7 +334,7 @@ class Metric:
 
     def to_serializable_dict(self) -> MetricValue:
         q_pct = Decimal("0.00")
-        return {
+        result: dict[str, Any] = {
             "current": _to_serializable_value(self.current),
             "capacity": (
                 _to_serializable_value(self.capacity) if self.capacity is not None else None
@@ -348,11 +348,12 @@ class Metric:
             ),
             "unit_hint": self.unit_hint,
             **{
-                f"stats.{k}": v  # type: ignore
+                f"stats.{k}": v
                 for k, v in self.stats.to_serializable_dict().items()
                 if k in self.stats_filter
             },
         }
+        return cast(MetricValue, result)
 
 
 class StatContext:
@@ -875,9 +876,10 @@ class StatContext:
 
     async def _get_processes(
         self, container_id: ContainerId, docker: aiodocker.Docker
-    ) -> list[PID]:
+    ) -> list[PID] | None:
         """
-        Get the list of PIDs for the given container ID.
+        Get the list of PIDs for the given container ID, or None when Docker answers
+        `"Processes": null`: the list is unknown then, not empty.
         """
         return_val: list[PID] = []
         try:
@@ -886,6 +888,11 @@ class StatContext:
         except (KeyError, aiodocker.exceptions.DockerError):
             log.debug("container process list not found", container_id=container_id)
             return return_val
+        if procs is None:
+            # Docker answers `"Processes": null` for a running container it cannot list,
+            # such as one whose only process is stuck in uninterruptible I/O.
+            log.debug("container process list is null", container_id=container_id)
+            return None
 
         for proc in procs:
             try:
@@ -925,12 +932,16 @@ class StatContext:
                 kernel_id_map[ContainerId(cid)] = kid
 
         pid_map: dict[PID, ContainerId] = {}
+        unlisted_cids: set[ContainerId] = set()
         with self._stage_observer.measure_stage(
             stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
         ):
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
                     active_pids = await self._get_processes(cid, docker)
+                    if active_pids is None:
+                        unlisted_cids.add(cid)
+                        continue
                     for pid_ in active_pids:
                         pid_map[pid_] = cid
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
@@ -996,6 +1007,9 @@ class StatContext:
             active_pids_by_cid[live_cid].add(live_pid)
         agent_id = self.agent.id
         for tracked_cid, metrics_per_pid in self.process_metrics.items():
+            if tracked_cid in unlisted_cids:
+                # Its process list is unknown this cycle; keep its metrics.
+                continue
             active_pids_set = active_pids_by_cid[tracked_cid]
             tracked_kid = kernel_id_map.get(tracked_cid)
             if tracked_kid is None:

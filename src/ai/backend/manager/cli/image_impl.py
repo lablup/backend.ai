@@ -131,7 +131,7 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
                 raise UnknownImageReference(canonical_or_alias)
             pprint(dataclasses.asdict(details[0]))
         except UnknownImageReference:
-            log.error("image not found", image_ref=canonical_or_alias)
+            log.exception("image not found", image_ref=canonical_or_alias)
         except Exception:
             log.exception("image command failed")
 
@@ -144,7 +144,7 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
             )
             await ImageDBSource(db, V2DBOpsProvider(db)).mark_image_deleted_by_id(image.id)
         except (UnknownImageReference, ImageNotFound):
-            log.error("image not found", image_ref=canonical_or_alias)
+            log.exception("image not found", image_ref=canonical_or_alias)
         except Exception:
             log.exception("image command failed")
 
@@ -160,9 +160,6 @@ async def purge_image(
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
             )
-            async with V2DBOpsProvider(db).write_ops() as w:
-                await w.purge_entity(ImagePurger(image_id=image.id))
-
             if remove_from_registry:
                 registry_info = await session.get(ContainerRegistryRow, image.registry_id)
                 if registry_info is None:
@@ -174,8 +171,11 @@ async def purge_image(
                 scanner = HarborRegistry_v2(db, image.image_ref.registry, registry_info)
                 await scanner.untag(image.image_ref)
 
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.purge_entity(ImagePurger(image_id=image.id))
+
         except UnknownImageReference:
-            log.error("image not found", image_ref=canonical_or_alias)
+            log.exception("image not found", image_ref=canonical_or_alias)
         except Exception:
             log.exception("image command failed")
 
@@ -196,7 +196,7 @@ async def set_image_resource_limit(
                 image_row = await session.get_one(ImageRow, image.id)
                 image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
-            log.error("image not found", image_ref=canonical_or_alias)
+            log.exception("image not found", image_ref=canonical_or_alias)
         except Exception:
             log.exception("image command failed")
 
@@ -227,9 +227,9 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
                 image.id, ImageAliasCreator(alias=alias)
             )
         except UnknownImageReference:
-            log.error("image not found", image_ref=target)
+            log.exception("image not found", image_ref=target)
         except UniqueConstraintViolationError:
-            log.error("image alias already exists", image_alias=alias)
+            log.exception("image alias already exists", image_alias=alias)
         except Exception:
             log.exception("image command failed")
 
@@ -260,7 +260,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
                 print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
-            log.error("no images found with the alias", image_alias=alias)
+            log.exception("no images found with the alias", image_alias=alias)
         except Exception:
             log.exception("image command failed")
 
@@ -308,6 +308,6 @@ async def validate_image_canonical(
                         print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
-            log.error("image not found", image_ref=canonical)
+            log.exception("image not found", image_ref=canonical)
         except Exception:
             log.exception("image command failed")

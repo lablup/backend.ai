@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
@@ -22,6 +23,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNetworkConfigInfo,
     ResourceGroupNode,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
+    ResourceGroupSchedulerOptionsInfo,
     ResourceGroupStatusInfo,
     UpdateResourceGroupPayload,
 )
@@ -39,7 +42,7 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import AgentSelectionStrategy, PreemptionOrder, SessionTypes
 
 
 def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
@@ -80,6 +83,14 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
                 order=PreemptionOrder.OLDEST,
                 mode=PreemptionModeDTO.TERMINATE,
                 preemption_min_runtime=0.0,
+            ),
+            options=ResourceGroupSchedulerOptionsInfo(
+                allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+                pending_timeout=0.0,
+                config=ResourceGroupSchedulerOptionsConfigInfo(num_retries_to_skip=None),
+                agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
+                allow_fractional_resource_fragmentation=True,
+                route_cleanup_target_statuses=[RouteHealthStatus.UNHEALTHY],
             ),
         ),
         default_deployment_options=DeploymentOptionsInfo(

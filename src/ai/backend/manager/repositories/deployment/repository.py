@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -34,6 +35,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
+    AgentId,
     AutoScalingMetricSource,
     KernelId,
     MountPermission,
@@ -76,6 +78,7 @@ from ai.backend.manager.data.deployment.types import (
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
     ModelRevisionData,
     ResourceGroupCleanupConfig,
     RevisionSearchResult,
@@ -91,7 +94,13 @@ from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountAvailability,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+    VFolderStatusSet,
+    vfolder_status_map,
+)
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
@@ -99,6 +108,7 @@ from ai.backend.manager.models.deployment_policy.upserters import DeploymentPoli
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.searchers import (
     DeploymentAccessTokenSearcher,
     DeploymentIDSearcher,
@@ -114,7 +124,11 @@ from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
 from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
     DeploymentStorageSource,
@@ -371,7 +385,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (modern, light: revision *ids* only).
+        """Get endpoint information with its revisions and policy.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -383,8 +397,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (legacy, full: includes the current/deploying
-        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        """Get endpoint information with its revisions and policy, for the REST v1 surface.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -423,25 +436,25 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def replace_designated_agents(
+    async def set_designated_agents(
         self,
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``.
+        """Make ``agent_uuids`` the agents the deployment designates.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
+        await self._db_source.set_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
-    async def fetch_designated_agents_by_deployment_ids(
+    async def fetch_designated_agent_ids_by_deployment_ids(
         self,
         deployment_ids: set[DeploymentID],
-    ) -> Mapping[DeploymentID, list[AgentUUID]]:
-        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
-        return await self._db_source.fetch_designated_agents_by_deployment_ids(deployment_ids)
+    ) -> Mapping[DeploymentID, list[AgentId]]:
+        """Fetch the agent ids each deployment designates; one with none maps to ``[]``."""
+        return await self._db_source.fetch_designated_agent_ids_by_deployment_ids(deployment_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_endpoint(
@@ -1361,6 +1374,43 @@ class DeploymentRepository:
         return await self._db_source.get_revision(revision_id)
 
     @deployment_repository_resilience.apply()
+    async def vfolder_mount_availability(
+        self,
+        vfolder_ids: Collection[VFolderUUID],
+    ) -> VFolderMountAvailability:
+        """Sort the vfolders among ``vfolder_ids`` that cannot be mounted by the reason."""
+        found: dict[VFolderUUID, VFolderOperationStatus] = {}
+        if vfolder_ids:
+            searcher = VFolderSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    VFolderSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=list(vfolder_ids), negated=False)
+                    ),
+                ],
+            )
+            async with self._reconcile_ops.read_ops() as r:
+                result = await r.search_in_global(searcher)
+            found = {vfolder.id: vfolder.status for vfolder in result.items}
+        mountable = vfolder_status_map[VFolderStatusSet.MOUNTABLE]
+        recoverable = vfolder_status_map[VFolderStatusSet.RECOVERABLE]
+        deleted = {
+            VFolderOperationStatus.DELETE_ONGOING,
+            VFolderOperationStatus.DELETE_COMPLETE,
+            VFolderOperationStatus.DELETE_ERROR,
+        }
+        return VFolderMountAvailability(
+            missing=frozenset(set(vfolder_ids) - found.keys()),
+            trashed=frozenset(vfid for vfid, status in found.items() if status in recoverable),
+            deleted=frozenset(vfid for vfid, status in found.items() if status in deleted),
+            not_ready=frozenset(
+                vfid
+                for vfid, status in found.items()
+                if status not in mountable | recoverable | deleted
+            ),
+        )
+
+    @deployment_repository_resilience.apply()
     async def get_revision_by_route_id(
         self,
         route_id: uuid.UUID,
@@ -1585,6 +1635,20 @@ class DeploymentRepository:
         ``DeploymentSearcher``.
         """
         return await self._db_source.search_legacy_endpoints(searcher)
+
+    @deployment_repository_resilience.apply()
+    async def scoped_search_deployments(
+        self, scoped: ScopedSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of the deployments the scopes reach, each with its policy."""
+        return await self._db_source.scoped_search_deployments(scoped)
+
+    @deployment_repository_resilience.apply()
+    async def global_search_deployments(
+        self, global_searcher: GlobalSearcher[EndpointRow, ModelDeploymentData]
+    ) -> SearcherResult[ModelDeploymentData]:
+        """A page of every deployment, each with its policy."""
+        return await self._db_source.global_search_deployments(global_searcher)
 
     # ========== Access Token Operations ==========
 

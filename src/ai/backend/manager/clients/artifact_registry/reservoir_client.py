@@ -8,21 +8,25 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.dto.request import (
-    DelegateImportArtifactsReq,
-    DelegateScanArtifactsReq,
-    SearchArtifactsReq,
+from ai.backend.common.dto.manager.artifact.response import (
+    GetRevisionDownloadProgressResponse,
+    GetRevisionReadmeResponse,
 )
-from ai.backend.manager.dto.response import (
+from ai.backend.common.dto.manager.artifact_registry.request import (
+    DelegateImportArtifactsRequest,
+    DelegateScanArtifactsRequest,
+    SearchArtifactsRequest,
+)
+from ai.backend.common.dto.manager.artifact_registry.response import (
     DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
-    GetArtifactRevisionReadmeResponse,
-    GetDownloadProgressResponse,
-    GetVFSStorageResponse,
-    ListVFSStorageResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.common.dto.manager.storage.response import (
+    GetVFSStorageResponse,
+    ListVFSStorageResponse,
+)
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 
 _HASH_TYPE = "sha256"
 
@@ -79,7 +83,7 @@ class ReservoirRegistryClient:
                 return await response.json()
 
     async def delegate_scan_artifacts(
-        self, req: DelegateScanArtifactsReq
+        self, req: DelegateScanArtifactsRequest
     ) -> DelegateScanArtifactsResponse:
         resp = await self._request(
             "POST", "/artifact-registries/delegation/scan", json=req.model_dump(mode="json")
@@ -87,24 +91,22 @@ class ReservoirRegistryClient:
         return DelegateScanArtifactsResponse.model_validate(resp)
 
     async def delegate_import_artifacts(
-        self, req: DelegateImportArtifactsReq
+        self, req: DelegateImportArtifactsRequest
     ) -> DelegateImportArtifactsResponse:
         resp = await self._request(
             "POST", "/artifact-registries/delegation/import", json=req.model_dump(mode="json")
         )
         return DelegateImportArtifactsResponse.model_validate(resp)
 
-    async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
+    async def search_artifacts(self, req: SearchArtifactsRequest) -> SearchArtifactsResponse:
         resp = await self._request(
             "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
         )
         return SearchArtifactsResponse.model_validate(resp)
 
-    async def get_readme(
-        self, artifact_revision_id: uuid.UUID
-    ) -> GetArtifactRevisionReadmeResponse:
+    async def get_readme(self, artifact_revision_id: uuid.UUID) -> GetRevisionReadmeResponse:
         resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
-        return GetArtifactRevisionReadmeResponse.model_validate(resp)
+        return GetRevisionReadmeResponse.model_validate(resp)
 
     async def get_vfs_storage(self, storage_name: str) -> GetVFSStorageResponse:
         resp = await self._request("GET", f"/vfs-storages/{storage_name}")
@@ -116,9 +118,9 @@ class ReservoirRegistryClient:
 
     async def get_download_progress(
         self, artifact_revision_id: uuid.UUID
-    ) -> GetDownloadProgressResponse:
+    ) -> GetRevisionDownloadProgressResponse:
         resp = await self._request(
             "GET",
             f"/artifacts/revisions/{artifact_revision_id}/download-progress",
         )
-        return GetDownloadProgressResponse.model_validate(resp)
+        return GetRevisionDownloadProgressResponse.model_validate(resp)

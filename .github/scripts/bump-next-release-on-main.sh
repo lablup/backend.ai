@@ -16,7 +16,7 @@
 # ship in `X.Y.0`, so they are frozen to it the way `release.sh` freezes the
 # branch at its final release; the two freezes agree. The rewrite runs on an
 # exported copy of `main`, then `ruff check --fix` and `ruff format` at the
-# version `pants.toml` pins, installed into a scratch venv. The commit subject names the
+# version the `lint` group of `pyproject.toml` pins, installed into a scratch venv. The commit subject names the
 # release, and the branch is built with plumbing, so neither HEAD nor the
 # worktree is touched.
 #
@@ -142,11 +142,11 @@ if [ "$dry_run" = 1 ]; then
   exit 0
 fi
 
-ruff_version=$(sed -n '/^\[ruff\]/,/^\[/s/^version = "\(.*\)"$/\1/p' pants.toml)
 venv=$(mktemp -d)
 trap 'rm -rf "$scratch" "$venv"' EXIT
 python3 -m venv "$venv"
-"$venv/bin/pip" install --quiet --disable-pip-version-check "ruff==$ruff_version"
+"$venv/bin/pip" install --quiet --disable-pip-version-check uv
+"$venv/bin/uv" pip install --quiet --python "$venv" --group pyproject.toml:lint
 (
   cd "$scratch"
   python3 "$freeze_script" "$line"

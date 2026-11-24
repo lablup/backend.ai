@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -77,7 +78,7 @@ class _Fixture:
 @pytest.fixture
 async def db(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine]:
     async with with_tables(database_connection, _TABLES):
         async with database_connection.begin() as conn:
             await conn.execute(
@@ -89,9 +90,7 @@ async def db(
         yield database_connection
 
 
-async def _node(
-    session: sa.ext.asyncio.AsyncSession, entity_type: str, entity_id: uuid.UUID
-) -> None:
+async def _node(session: AsyncSession, entity_type: str, entity_id: uuid.UUID) -> None:
     await session.execute(
         sa.insert(VirtualEntityRow.__table__).values(entity_type=entity_type, entity_id=entity_id)
     )

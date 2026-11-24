@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
@@ -24,6 +24,7 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
@@ -132,6 +133,7 @@ async def adapter(
             DeploymentService(
                 controller,
                 deployments,
+                unwired(AgentRepository, "no deployment here designates an agent"),
                 unwired(AppProxyClientPool, "only a served deployment reaches the proxy"),
             ),
         ),

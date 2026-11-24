@@ -14,7 +14,7 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
     WiredProcessor,
 )
-from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.spec import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.relation.monitor.base import RelationActionMonitor
 from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor

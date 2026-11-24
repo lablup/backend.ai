@@ -1,0 +1,63 @@
+name: mypy-cache
+
+# Type-check the whole tree on each push to main and save `.mypy_cache` for the
+# pull requests' `ci-typecheck.yml` to restore.
+
+on:
+  push:
+    branches: [main]
+
+# A running job finishes; of the waiting ones only the latest runs.
+concurrency:
+  group: mypy-cache
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Deleting the cache entries a save superseded.
+  actions: write
+
+jobs:
+
+  mypy-cache:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+        lfs: false
+    - name: Set up the venv
+      id: venv
+      uses: ./.github/actions/python-venv
+    - name: Restore the mypy cache
+      uses: actions/cache/restore@v5
+      with:
+        path: .mypy_cache
+        key: mypy-main-${{ github.sha }}
+        restore-keys: mypy-main-
+    - name: Typecheck
+      id: mypy
+      continue-on-error: true
+      env:
+        MYPY: ${{ steps.venv.outputs.venv }}/bin/mypy
+      run: |
+        echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        "$MYPY" src tests
+    - name: Save the mypy cache
+      id: save
+      uses: actions/cache/save@v5
+      with:
+        path: .mypy_cache
+        key: mypy-main-${{ github.sha }}
+    - name: Delete the mypy caches the save superseded
+      if: steps.save.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        KEY: mypy-main-${{ github.sha }}
+      run: .github/scripts/prune-ref-caches.sh "$REPO" refs/heads/main mypy-main- "$KEY"
+    - name: Fail on type errors
+      if: steps.mypy.outcome == 'failure'
+      run: exit 1
