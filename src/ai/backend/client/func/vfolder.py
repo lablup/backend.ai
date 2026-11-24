@@ -24,7 +24,7 @@ from yarl import URL
 
 from ai.backend.client.compat import current_loop
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
-from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.exceptions import BackendClientError, BackendConnectError
 from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
@@ -431,6 +431,11 @@ class VFolderByName(BaseFunction):
                                     await writer_fut
                                     q.close()
                                     await q.wait_closed()
+                    except aiohttp.ClientConnectorCertificateError as e:
+                        raise BackendConnectError(
+                            "Failed to verify the TLS certificate of the storage proxy "
+                            f"at {e.host}:{e.port}.\n\u279c {e.certificate_error}"
+                        ) from e
                     except (
                         ResponseFailed,
                         aiohttp.ClientPayloadError,
