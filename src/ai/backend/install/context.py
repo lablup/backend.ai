@@ -1867,6 +1867,16 @@ class Context(metaclass=ABCMeta):
         fixture_path.write_text(json.dumps(fixture, indent=2))
         self.log_header("Registering local Harbor as a Backend.AI container registry...")
         await self.run_manager_cli(["mgr", "fixture", "populate", str(fixture_path)])
+        async with aiotools.closing_async(await self.get_db_connection()) as conn:
+            await conn.execute(
+                """
+                UPDATE domains
+                SET allowed_docker_registries =
+                    array_append(allowed_docker_registries, $1::varchar)
+                WHERE name = 'default' AND NOT ($1::varchar = ANY(allowed_docker_registries));
+                """,
+                registry_name,
+            )
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
