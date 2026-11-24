@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import web
@@ -179,11 +179,13 @@ async def test_429_carries_the_rate_limit_headers(
 @pytest.fixture
 def anonymous_request(mock_valkey_rate_limit_client: AsyncMock) -> web.Request:
     """A proxied request with no login session, arriving from _CLIENT_IP."""
+    transport = MagicMock()
+    transport.get_extra_info.return_value = (_CLIENT_IP, 54321)
     return make_mocked_request(
         "GET",
         "/func/session",
-        headers={"X-Forwarded-For": _CLIENT_IP},
         app={"valkey_rate_limit": mock_valkey_rate_limit_client},
+        transport=transport,
     )
 
 
