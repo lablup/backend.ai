@@ -95,23 +95,17 @@ class WebhookChannel(AbstractNotificationChannel):
                     return SendResult(
                         message=f"Webhook sent successfully (status: {response.status})",
                     )
-<<<<<<< HEAD
-                response_text = await response.text()
-                log.warning(
-                    "Webhook request failed with status {}: {}",
-                    response.status,
-                    response_text[:200],
-                )
-                raise NotificationProcessingFailure(
-                    f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
-=======
                 # Bounded, and decoded leniently: a body in another charset must not escape
                 # as a decoding error.
                 body = await response.content.read(_FAILURE_BODY_LIMIT)
+                response_text = body.decode("utf-8", errors="replace")
+                log.warning(
+                    "Webhook request failed with status {}: {}",
+                    response.status,
+                    response_text,
+                )
                 raise NotificationDeliveryFailure(
-                    f"Webhook delivery failed with status {response.status}: "
-                    f"{body.decode('utf-8', errors='replace')}"
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
+                    f"Webhook delivery failed with status {response.status}: {response_text}"
                 )
         except (aiohttp.ClientError, TimeoutError) as e:
             raise WebhookConnectionFailure(

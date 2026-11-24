@@ -5,24 +5,10 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-<<<<<<< HEAD
 from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.logging import BraceStyleAdapter
-=======
-from typing import TYPE_CHECKING
-
-from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
-from ai.backend.common.data.notification.types import NotificationChannelType
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
-from ai.backend.manager.errors.notification import (
-    NotificationDeliveryFailure,
-    NotificationTemplateRenderingFailure,
-    WebhookConnectionFailure,
-)
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
 from ai.backend.manager.notification.types import ProcessRuleParams
 from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
@@ -355,18 +341,6 @@ class NotificationService:
             errors=result.errors,
         )
 
-<<<<<<< HEAD
-=======
-    def _is_user_side_failure(
-        self, channel_type: NotificationChannelType, error: BaseException
-    ) -> bool:
-        if isinstance(error, NotificationTemplateRenderingFailure):
-            return True
-        if channel_type == NotificationChannelType.WEBHOOK:
-            return isinstance(error, (NotificationDeliveryFailure, WebhookConnectionFailure))
-        return False
-
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
     async def _process_rules(
         self,
         rules: Sequence[NotificationRuleData],

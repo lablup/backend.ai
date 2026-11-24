@@ -113,9 +113,6 @@ class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-<<<<<<< HEAD
-class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
-=======
 class NotificationDeliveryFailure(BackendAIError, web.HTTPBadRequest):
     """Raised when the channel's destination rejects the message: a webhook failure status or an SMTP error."""
 
@@ -131,8 +128,7 @@ class NotificationDeliveryFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidNotificationChannelType(EntityError, web.HTTPBadRequest):
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
+class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-notification-channel-type"
     error_title = "Invalid notification channel type."
 

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
 import asyncio
-=======
 import errno
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
 import logging
 import smtplib
 import socket
@@ -15,16 +12,11 @@ from email.mime.text import MIMEText
 from functools import partial
 
 from ai.backend.common.data.notification.types import EmailSpec
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.notification import NotificationProcessingFailure
-=======
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.notification import (
     NotificationDeliveryFailure,
     NotificationProcessingFailure,
 )
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
@@ -123,33 +115,31 @@ class EmailChannel(AbstractNotificationChannel):
                     to_addrs=msg.to_emails,
                 )
         except smtplib.SMTPConnectError as e:
-<<<<<<< HEAD
             log.exception(
                 "Failed to connect to SMTP server {}:{}",
                 smtp.host,
                 smtp.port,
             )
-            raise NotificationProcessingFailure(f"SMTP connection failed: {e!s}") from e
+            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
         except smtplib.SMTPAuthenticationError as e:
             log.exception(
                 "SMTP authentication failed for user {}",
                 auth.username if auth else "unknown",
             )
-            raise NotificationProcessingFailure(f"SMTP authentication failed: {e!s}") from e
-        except smtplib.SMTPException as e:
-            log.exception("SMTP error while sending email")
-            raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
-=======
-            raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
-        except smtplib.SMTPAuthenticationError as e:
             raise NotificationDeliveryFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
+            log.exception("SMTP error while sending email")
             raise NotificationDeliveryFailure(f"Email delivery failed: {e!s}") from e
         except OSError as e:
             if not _is_smtp_destination_failure(e):
+                log.exception("Unexpected error sending email")
                 raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
+            log.exception(
+                "Failed to connect to SMTP server {}:{}",
+                smtp.host,
+                smtp.port,
+            )
             raise NotificationDeliveryFailure(f"SMTP connection failed: {e!s}") from e
->>>>>>> 123382797 (fix(BAI-913): answer 400 with the reason when a notification channel rejects a message (#17288))
         except Exception as e:
             log.exception("Unexpected error sending email")
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

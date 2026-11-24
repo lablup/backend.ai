@@ -108,7 +108,7 @@ class TestWebhookChannelSend:
         with pytest.raises(NotificationDeliveryFailure, match="status 500: boom") as exc_info:
             await channel.send(message)
 
-        assert exc_info.value.is_client_error()
+        assert exc_info.value.status_code == 400
 
     @pytest.mark.parametrize(
         "outcome",
