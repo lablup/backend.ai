@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import ResourceSlotEntry
 from ai.backend.manager.data.dotfile.types import DotfileBundle
@@ -40,6 +41,7 @@ def rule() -> DropZeroResourceSlotsRule:
 def context() -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=DefaultSessionOptions(),
             network=None,
             allow_fractional=False,

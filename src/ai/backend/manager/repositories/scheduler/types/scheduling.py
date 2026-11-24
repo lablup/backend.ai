@@ -30,6 +30,8 @@ class SchedulingFetch:
     policy: ResourceGroupSchedulingPolicy
     workloads: list[SessionWorkload]
     agents: list[AgentMeta]
+    # Agents of the other resource groups the pending kernels name
+    agents_of_other_groups: list[AgentMeta]
     occupancy: ResourceOccupancySnapshot
     resource_policy: ResourcePolicySnapshot
     session_dependencies: SessionDependencySnapshot

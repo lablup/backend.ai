@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     SessionId,
@@ -146,6 +147,8 @@ class SessionProvisioner:
         Once a session fails because the group ran out of resources, the
         sessions behind it are left unattempted and reported as skips, so
         lower-priority sessions cannot take the resources it is waiting for.
+        A session short only in another group its kernels name leaves the
+        sessions behind it attempted.
 
         Args:
             scheduling_data: Pre-fetched scheduling data from Handler.
@@ -200,16 +203,17 @@ class SessionProvisioner:
                     else:
                         session_allocations.append(session_allocation)
                 except (BatchAgentSelectionFailedError, NoAvailableAgentError) as e:
-                    # The group ran out of resources. This is the one failure the
-                    # sessions behind share: they would take exactly what this one
-                    # is waiting for, so they are left unattempted.
                     self._record_failure(scheduling_failures, session_workload, e)
-                    scheduling_skips.extend(
-                        self._skips_behind(
-                            sequenced_workloads[index + 1 :], session_workload.meta.session_id
+                    if self._is_short_in_resource_group(e, resource_group_id):
+                        # The group ran out of resources. This is the one failure the
+                        # sessions behind share: they would take exactly what this one
+                        # is waiting for, so they are left unattempted.
+                        scheduling_skips.extend(
+                            self._skips_behind(
+                                sequenced_workloads[index + 1 :], session_workload.meta.session_id
+                            )
                         )
-                    )
-                    break
+                        break
                 except Exception as e:
                     # Specific to the session that hit it (an architecture mismatch,
                     # an unsatisfied dependency, an exceeded quota, a group with no
@@ -266,6 +270,21 @@ class SessionProvisioner:
                 msg=str(error),
             )
         )
+
+    def _is_short_in_resource_group(
+        self,
+        error: BatchAgentSelectionFailedError | NoAvailableAgentError,
+        resource_group_id: ResourceGroupID,
+    ) -> bool:
+        """Whether the scheduled group itself ran out, not only another group a kernel names."""
+        match error:
+            case BatchAgentSelectionFailedError():
+                return any(
+                    failure.resource_requirement.resource_group_id == resource_group_id
+                    for failure in error.failures
+                )
+            case NoAvailableAgentError():
+                return True
 
     def _is_rejection(self, error: Exception) -> bool:
         if isinstance(error, SchedulingError):

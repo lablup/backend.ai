@@ -66,6 +66,8 @@ class SessionSpecFetch:
     """
 
     resource_group: ResourceGroupEnqueueInfo
+    # Keyed by ``KernelGroup.role``; only the roles whose group names one
+    named_resource_group_by_role: Mapping[str, ResourceGroupEnqueueInfo]
     global_info: GlobalEnqueueInfo
     user: UserEnqueueFetch
 

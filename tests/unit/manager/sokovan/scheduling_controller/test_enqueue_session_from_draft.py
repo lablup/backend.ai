@@ -223,6 +223,7 @@ def _spec_context(
 ) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=rg_defaults if rg_defaults is not None else DefaultSessionOptions(),
             network=ResourceGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
             allow_fractional=False,
@@ -592,6 +593,23 @@ class TestZeroResourceSlots:
 
 
 class TestResourceGroupAccessibility:
+    @pytest.fixture
+    def draft_naming_another_resource_group(self, draft: SessionSpecDraft) -> SessionSpecDraft:
+        """The draft with its kernel group naming a resource group of its own."""
+        resource = draft.resource_spec.resource
+        kernel_groups = tuple(
+            group.model_copy(update={"resource_group_id": ResourceGroupID(uuid.uuid4())})
+            for group in resource.options.kernel_groups or ()
+        )
+        options = resource.options.model_copy(update={"kernel_groups": kernel_groups})
+        return draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={"resource": resource.model_copy(update={"options": options})}
+                )
+            }
+        )
+
     async def test_inaccessible_resource_group_rejected_before_fetch(
         self,
         draft: SessionSpecDraft,
@@ -609,6 +627,22 @@ class TestResourceGroupAccessibility:
 
         repository.fetch_session_spec_context.assert_not_called()
         repository.enqueue_session_from_spec.assert_not_called()
+
+    async def test_inaccessible_resource_group_of_a_kernel_group_rejected_before_fetch(
+        self,
+        draft_naming_another_resource_group: SessionSpecDraft,
+    ) -> None:
+        repository = AsyncMock()
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft_naming_another_resource_group.scope.resource_group_id
+        })
+
+        controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
+
+        with with_user_context(_make_user()), pytest.raises(InvalidAPIParameters):
+            await controller.enqueue_session_from_draft(draft_naming_another_resource_group)
+
+        repository.fetch_session_spec_context.assert_not_called()
 
     async def test_access_check_uses_spec_identity_user(
         self,

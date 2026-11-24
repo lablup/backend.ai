@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -138,7 +138,13 @@ from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.network.row import NetworkRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
+from ai.backend.manager.models.resource_group.searchers import (
+    AllowedResourceGroupsSearch,
+    ResourceGroupSearcher,
+)
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_kernel_allocations,
@@ -349,7 +355,10 @@ class ScheduleDBSource:
                 return None
 
             # 3. Fetch the remaining observations bounded by the pending owners
-            agents = await self._fetch_agents(db_sess, resource_group.meta.id)
+            agents = await self._fetch_agents(db_sess, {resource_group.meta.id})
+            agents_of_other_groups = await self._fetch_agents(
+                db_sess, pending_sessions.kernel_resource_group_ids - {resource_group.meta.id}
+            )
             occupancy = await self._fetch_global_occupancy(db_sess, pending_sessions)
             known_slot_types = await self._fetch_known_slot_types(db_sess)
             resource_policy = await self._fetch_resource_limits(
@@ -372,6 +381,7 @@ class ScheduleDBSource:
                 policy=resource_group.policy,
                 workloads=pending_sessions.sessions,
                 agents=agents,
+                agents_of_other_groups=agents_of_other_groups,
                 occupancy=occupancy,
                 resource_policy=resource_policy,
                 session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
@@ -517,6 +527,7 @@ class ScheduleDBSource:
                 load_only(
                     KernelRow.id,
                     KernelRow.session_id,
+                    KernelRow.resource_group_id,
                     KernelRow.architecture,
                 )
             )
@@ -567,6 +578,7 @@ class ScheduleDBSource:
             kernels = [
                 KernelWorkload(
                     kernel_id=KernelId(kernel_row.id),
+                    resource_group_id=kernel_row.resource_group_id,
                     # Nullable at the column level only for legacy rows;
                     # enqueue always populates it.
                     architecture=ArchName(kernel_row.architecture or ""),
@@ -694,22 +706,24 @@ class ScheduleDBSource:
         return dict(members_by_agent)
 
     async def _fetch_agents(
-        self, db_sess: SASession, resource_group_id: ResourceGroupID
+        self, db_sess: SASession, resource_group_ids: Collection[ResourceGroupID]
     ) -> list[AgentMeta]:
         """Fetch schedulable agent metadata with per-slot capacity/reserved/used
         from the normalized ``agent_resources`` table."""
+        if not resource_group_ids:
+            return []
         agent_rows = (
             await db_sess.scalars(
                 sa.select(AgentRow).where(
                     sa.and_(
                         AgentRow.status == AgentStatus.ALIVE,
-                        AgentRow.resource_group_id == resource_group_id,
+                        AgentRow.resource_group_id.in_(resource_group_ids),
                         AgentRow.schedulable == sa.true(),
                     )
                 )
             )
         ).all()
-        container_counts = await self._fetch_agent_container_counts(db_sess, resource_group_id)
+        container_counts = await self._fetch_agent_container_counts(db_sess, resource_group_ids)
         resources_by_agent = await self._fetch_agent_resources(
             db_sess, [AgentId(row.id) for row in agent_rows]
         )
@@ -729,6 +743,7 @@ class ScheduleDBSource:
             agents.append(
                 AgentMeta(
                     id=agent_id,
+                    resource_group_id=agent_row.resource_group_id,
                     addr=agent_row.addr,
                     architecture=ArchName(agent_row.architecture),
                     resources=AgentResource(slots=slots),
@@ -759,9 +774,9 @@ class ScheduleDBSource:
         }
 
     async def _fetch_agent_container_counts(
-        self, db_sess: SASession, resource_group_id: ResourceGroupID
+        self, db_sess: SASession, resource_group_ids: Collection[ResourceGroupID]
     ) -> dict[AgentId, int]:
-        """Count live kernels (containers) per agent in the resource group."""
+        """Count live kernels (containers) per agent in the resource groups."""
         k = KernelRow.__table__
         all_resource_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
@@ -772,7 +787,7 @@ class ScheduleDBSource:
                 sa.func.count().label("container_count"),
             )
             .where(
-                k.c.resource_group_id == resource_group_id,
+                k.c.resource_group_id.in_(resource_group_ids),
                 k.c.status.in_(all_resource_statuses),
                 k.c.agent.is_not(None),
             )
@@ -1086,9 +1101,9 @@ class ScheduleDBSource:
         """Load this resource group's preemption victim candidates per scope key.
 
         A candidate is one whole session (the preemption unit): a
-        preemptible, non-private session that holds unfreed agent
-        allocations (SCHEDULED onward, terminatable — same hold definition
-        as the occupancy scan), within a pending owner's victim scope, with
+        preemptible, non-private session with kernels in this group that
+        hold unfreed agent allocations (SCHEDULED onward, terminatable —
+        same hold definition as the occupancy scan), within a pending owner's victim scope, with
         ``job_priority`` strictly below that scope's max pending
         ``job_priority`` — a superset of every per-pending comparison, so
         no valid victim is dropped. The group's ``victim_scope`` decides
@@ -1138,7 +1153,7 @@ class ScheduleDBSource:
             )
             .select_from(ra.join(k, ra.c.kernel_id == k.c.id).join(s, k.c.session_id == s.c.id))
             .where(
-                s.c.resource_group_id == resource_group.meta.id,
+                k.c.resource_group_id == resource_group.meta.id,
                 s.c.status.in_(SessionStatus.preemption_victim_statuses()),
                 s.c.is_preemptible == sa.true(),
                 # Private (SFTP/system) sessions are never preemption victims
@@ -2037,7 +2052,45 @@ class ScheduleDBSource:
                     )
                 designated_agent_uuids = [agent.uuid for agent in registered.items]
 
-        kernel_groups = spec.resource_spec.options.kernel_groups
+            kernel_groups = spec.resource_spec.options.kernel_groups
+            resource_group_name_by_id = {
+                spec.scope.resource_group_id: spec.scope.resource_group_name
+            }
+            named_resource_group_ids = {
+                group.resource_group_id
+                for group in kernel_groups
+                if group.resource_group_id is not None
+            } - resource_group_name_by_id.keys()
+            if named_resource_group_ids:
+                named_resource_groups = await r.search_in_global(
+                    ResourceGroupSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            ResourceGroupSearchableFields.own.id.filter.in_(
+                                UUIDInMatchSpec(
+                                    values=list(named_resource_group_ids), negated=False
+                                )
+                            )
+                        ],
+                    )
+                )
+                for resource_group in named_resource_groups.items:
+                    resource_group_name_by_id[resource_group.id] = ResourceGroupName(
+                        resource_group.name
+                    )
+                if unknown_ids := named_resource_group_ids - resource_group_name_by_id.keys():
+                    raise ResourceGroupNotFound(
+                        f"Resource groups {sorted(map(str, unknown_ids))} not found"
+                    )
+            resource_group_id_by_role = {
+                group.role: (
+                    group.resource_group_id
+                    if group.resource_group_id is not None
+                    else spec.scope.resource_group_id
+                )
+                for group in kernel_groups
+            }
+
         group_roles = {group.role for group in kernel_groups}
         for kernel in spec.resource_spec.kernel_specs:
             if kernel.cluster_role not in group_roles:
@@ -2118,6 +2171,10 @@ class ScheduleDBSource:
                     ),
                     enqueue_time=enqueue_time,
                     kernel_group_id=group_ids[KernelGroupRole(kernel.cluster_role)],
+                    resource_group_id=resource_group_id_by_role[kernel.cluster_role],
+                    resource_group_name=resource_group_name_by_id[
+                        resource_group_id_by_role[kernel.cluster_role]
+                    ],
                 )
                 for kernel in spec.resource_spec.kernel_specs
             ]
@@ -2199,6 +2256,7 @@ class ScheduleDBSource:
             if rg_row is None:
                 raise ResourceGroupNotFound(f"Resource group {resource_group_id} not found")
             resource_group = ResourceGroupEnqueueInfo(
+                name=ResourceGroupName(rg_row.name),
                 defaults=rg_row.default_session_options,
                 network=ResourceGroupNetworkInfo(
                     use_host_network=rg_row.use_host_network,
@@ -2213,7 +2271,7 @@ class ScheduleDBSource:
                 image_infos=await self._fetch_image_infos(db_sess, image_ids),
                 slot_type_info=await self._fetch_slot_type_info(db_sess),
             )
-            agents = await self._fetch_agents(db_sess, resource_group_id)
+            agents = await self._fetch_agents(db_sess, {resource_group_id})
             return ComputeScheduleFetch(
                 resource_group=resource_group,
                 global_info=global_info,
@@ -2233,9 +2291,33 @@ class ScheduleDBSource:
             resource_group=await self._fetch_resource_group_enqueue_info(
                 db_sess, draft.scope.resource_group_id
             ),
+            named_resource_group_by_role=await self._fetch_named_resource_group_by_role(
+                db_sess, kernel_specs
+            ),
             global_info=await self._fetch_global_enqueue_info(db_sess, kernel_specs),
             user=await self._fetch_user_enqueue_fetch(db_sess, draft),
         )
+
+    async def _fetch_named_resource_group_by_role(
+        self,
+        db_sess: SASession,
+        kernel_groups: Sequence[KernelGroupDraft],
+    ) -> dict[str, ResourceGroupEnqueueInfo]:
+        """Enqueue-time information of the resource groups the kernel groups
+        name themselves, keyed by role."""
+        info_by_id: dict[ResourceGroupID, ResourceGroupEnqueueInfo] = {}
+        info_by_role: dict[str, ResourceGroupEnqueueInfo] = {}
+        for group in kernel_groups:
+            if group.resource_group_id is None:
+                continue
+            info = info_by_id.get(group.resource_group_id)
+            if info is None:
+                info = await self._fetch_resource_group_enqueue_info(
+                    db_sess, group.resource_group_id
+                )
+                info_by_id[group.resource_group_id] = info
+            info_by_role[group.role] = info
+        return info_by_role
 
     async def _fetch_resource_group_enqueue_info(
         self,
@@ -2244,6 +2326,7 @@ class ScheduleDBSource:
     ) -> ResourceGroupEnqueueInfo:
         """Enqueue-time information of the target resource group; defaults
         when the draft has no resource group yet."""
+        name: ResourceGroupName | None = None
         network_info: ResourceGroupNetworkInfo | None = None
         rg_defaults = None
         resource_group_allow_fractional = False
@@ -2253,6 +2336,7 @@ class ScheduleDBSource:
                 db_sess, resource_group_id
             )
             rg_row = rg_bundle.rg_row
+            name = ResourceGroupName(rg_row.name)
             served_slot_names = rg_bundle.served_slot_names
             network_info = ResourceGroupNetworkInfo(
                 use_host_network=rg_row.use_host_network,
@@ -2268,6 +2352,7 @@ class ScheduleDBSource:
             rg_defaults = DefaultSessionOptions()
 
         return ResourceGroupEnqueueInfo(
+            name=name,
             defaults=rg_defaults,
             network=network_info,
             allow_fractional=resource_group_allow_fractional,

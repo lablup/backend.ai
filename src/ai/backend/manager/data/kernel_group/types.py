@@ -9,6 +9,7 @@ from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGrou
 from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
 from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
 from ai.backend.common.data.entity.kernel_group_vfolder_mount import KernelGroupVFolderMountID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import FieldData
@@ -28,6 +29,7 @@ class KernelGroupData(FieldData):
     id: KernelGroupID
     session_id: SessionID
     role: KernelGroupRole
+    resource_group_id: ResourceGroupID | None
     image_id: ImageID | None
     shmem: int | None
     startup_command: str | None

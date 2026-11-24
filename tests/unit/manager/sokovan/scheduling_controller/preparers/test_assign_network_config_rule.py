@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import (
@@ -45,6 +46,7 @@ def rule() -> AssignNetworkConfigRule:
 def _context(*, use_host_network: bool = False, resource_group: bool = True) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=DefaultSessionOptions(),
             network=(
                 ResourceGroupNetworkInfo(use_host_network=use_host_network)

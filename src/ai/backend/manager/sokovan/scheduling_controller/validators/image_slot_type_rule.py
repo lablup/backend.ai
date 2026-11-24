@@ -29,7 +29,7 @@ from ai.backend.manager.views.sokovan.session_creation import (
 
 
 class ImageSlotTypeRule(SessionSpecValidatorRule):
-    """Image-declared slot keys must be served by an agent in the target RG."""
+    """Image-declared slot keys must be served by an agent in the RG of the kernel's group."""
 
     @override
     def name(self) -> str:
@@ -41,17 +41,18 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        served_slot_names = context.resource_group.served_slot_names
         enabled_types = context.global_info.slot_type_info.types
-        if not served_slot_names:
-            raise InvalidAPIParameters(
-                extra_msg=(
-                    f"resource group '{spec.scope.resource_group_name}' has no "
-                    f"agents serving any resource slot."
-                ),
-            )
         errors: list[str] = []
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
+            resource_group = context.resource_group_of_role(kernel.cluster_role)
+            served_slot_names = resource_group.served_slot_names
+            if not served_slot_names:
+                raise InvalidAPIParameters(
+                    extra_msg=(
+                        f"resource group '{resource_group.name}' has no "
+                        f"agents serving any resource slot."
+                    ),
+                )
             image_info = context.global_info.image_infos.get(
                 kernel.execution_spec.resource_input.image_id
             )
@@ -69,7 +70,7 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
                 errors.append(
                     f"kernel_specs[{idx}]: image '{image_info.canonical}' "
                     f"requires resource slot(s) {unknown} that resource "
-                    f"group '{spec.scope.resource_group_name}' does not "
+                    f"group '{resource_group.name}' does not "
                     f"serve. Pick an image whose required slots are "
                     f"available here, or switch to a resource group that "
                     f"supports these slots."

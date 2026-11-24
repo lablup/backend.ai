@@ -135,5 +135,5 @@ def build_agent_trackers(resources: ResourceGroupResource) -> list[AgentStateTra
             ),
             group_member_counts=resources.group_members_by_agent.get(agent.id, {}),
         )
-        for agent in resources.agents
+        for agent in [*resources.agents, *resources.agents_of_other_groups]
     ]

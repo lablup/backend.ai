@@ -76,9 +76,12 @@ def _make_workload(
     architecture: str = "x86_64",
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     requested_starts_at: datetime | None = None,
+    kernel_resource_group_ids: list[ResourceGroupID] | None = None,
 ) -> SessionWorkload:
     if kernel_slots is None:
         kernel_slots = [{"cpu": "1", "mem": "1024"}]
+    if kernel_resource_group_ids is None:
+        kernel_resource_group_ids = [RESOURCE_GROUP_ID] * len(kernel_slots)
     return SessionWorkload(
         meta=WorkloadMeta(
             session_id=SessionId(uuid.uuid4()),
@@ -94,6 +97,7 @@ def _make_workload(
             cluster_mode=cluster_mode,
             kernels=[
                 KernelWorkload(
+                    resource_group_id=resource_group_id,
                     kernel_id=KernelId(uuid.uuid4()),
                     architecture=ArchName(architecture),
                     requested_slots=ResourceRequest(
@@ -103,7 +107,9 @@ def _make_workload(
                         }
                     ),
                 )
-                for slots in kernel_slots
+                for slots, resource_group_id in zip(
+                    kernel_slots, kernel_resource_group_ids, strict=True
+                )
             ],
             agent_selection_policy=AgentSelectionPolicy.STRICT,
             designated_agent_ids=None,
@@ -120,10 +126,12 @@ def _make_workload(
 def _make_agent_meta(
     agent_id: str = "agent-1",
     capacities: Mapping[str, str] | None = None,
+    resource_group_id: ResourceGroupID = RESOURCE_GROUP_ID,
 ) -> AgentMeta:
     if capacities is None:
         capacities = {"cpu": "16", "mem": "32768"}
     return AgentMeta(
+        resource_group_id=resource_group_id,
         id=AgentId(agent_id),
         addr=f"{agent_id}:6001",
         architecture=ArchName("x86_64"),
@@ -143,6 +151,7 @@ def _make_scheduling_data(
     *,
     workloads: list[SessionWorkload],
     agents: list[AgentMeta] | None = None,
+    agents_of_other_groups: list[AgentMeta] | None = None,
     scheduler: str = "fifo",
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.CONCENTRATED,
     session_dependencies: Mapping[SessionId, list[SessionDependencyInfo]] | None = None,
@@ -158,7 +167,9 @@ def _make_scheduling_data(
         workloads=workloads,
         system_snapshot=SystemSnapshot(
             resource_group=ResourceGroupScopeSnapshot(
-                resources=ResourceGroupResource(agents=agents),
+                resources=ResourceGroupResource(
+                    agents=agents, agents_of_other_groups=agents_of_other_groups or []
+                ),
                 session_dependencies=SessionDependencySnapshot(
                     by_session=session_dependencies or {}
                 ),

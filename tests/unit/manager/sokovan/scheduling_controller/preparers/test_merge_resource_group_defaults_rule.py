@@ -16,6 +16,7 @@ Verifies the one-shot RG-default merge that replaces the prior split
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 
 import pytest
 
@@ -25,6 +26,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlotEntry
 from ai.backend.manager.data.dotfile.types import DotfileBundle
@@ -102,6 +104,7 @@ def _context(
 ) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=rg,
             network=None,
             allow_fractional=False,
@@ -199,6 +202,41 @@ class TestMergeResourceGroupDefaultsRule:
         assert merged.resource_input.resource_opts == ResourceOpts(
             shmem=BinarySize(128 * 1024 * 1024)
         )
+
+    async def test_fills_group_execution_spec_from_the_rg_the_group_names(
+        self,
+        rule: MergeResourceGroupDefaultsRule,
+        rg_defaults: DefaultSessionOptions,
+        rg_image_id: ImageID,
+    ) -> None:
+        """Only the group naming an RG takes the baseline of that RG."""
+        context = _context(DefaultSessionOptions())
+        context = replace(
+            context,
+            named_resource_group_by_role={
+                "gpu": replace(context.resource_group, defaults=rg_defaults)
+            },
+        )
+        draft = ResourceSpecDraft(
+            options=SessionOptionsDraft(
+                kernel_groups=(
+                    KernelGroupDraft(role="main", replica_count=1),
+                    KernelGroupDraft(
+                        role="gpu",
+                        replica_count=1,
+                        resource_group_id=ResourceGroupID(uuid.uuid4()),
+                    ),
+                ),
+            ),
+        )
+
+        result = await rule.prepare(draft, context)
+
+        assert result.options.kernel_groups is not None
+        assert {
+            group.role: group.execution_spec.resource_input.image_id
+            for group in result.options.kernel_groups
+        } == {"main": None, "gpu": rg_image_id}
 
     async def test_preserves_caller_execution_spec_over_rg(
         self,

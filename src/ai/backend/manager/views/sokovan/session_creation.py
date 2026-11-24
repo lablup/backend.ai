@@ -1,11 +1,12 @@
 """Session creation context types shared with the scheduling controller."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     VFolderMount,
@@ -22,8 +23,10 @@ from ai.backend.manager.data.session.options import DefaultSessionOptions
 
 @dataclass(frozen=True)
 class ResourceGroupEnqueueInfo:
-    """Enqueue-time information read from the target resource group."""
+    """Enqueue-time information read from one resource group."""
 
+    # None when the draft has no resource group yet
+    name: ResourceGroupName | None
     defaults: DefaultSessionOptions
     network: ResourceGroupNetworkInfo | None
     allow_fractional: bool
@@ -64,12 +67,21 @@ class GlobalEnqueueInfo:
 class SessionSpecContext:
     """Shared read-only context the preparer and validator chains consume.
 
-    Grouped by data source: the target resource group, the session
+    Grouped by data source: the target resource groups, the session
     owner, and cluster-global registries. Assembled entirely inside the
     repository (DB reads plus the storage-manager mount resolution) so
     it only ever exists in a complete state.
     """
 
+    # The session's resource group
     resource_group: ResourceGroupEnqueueInfo
     user: UserEnqueueInfo
     global_info: GlobalEnqueueInfo
+    # Resource groups the kernel groups name themselves, keyed by
+    # ``KernelGroup.role``; a role absent here uses the session's
+    named_resource_group_by_role: Mapping[str, ResourceGroupEnqueueInfo] = field(
+        default_factory=dict
+    )
+
+    def resource_group_of_role(self, role: str) -> ResourceGroupEnqueueInfo:
+        return self.named_resource_group_by_role.get(role, self.resource_group)

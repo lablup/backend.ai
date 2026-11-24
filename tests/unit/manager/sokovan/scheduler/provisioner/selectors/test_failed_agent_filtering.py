@@ -45,6 +45,9 @@ from ai.backend.manager.views.sokovan.agent import (
 )
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
+_RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID(int=0))
+
+
 AGENT_A = AgentId("agent-a")
 AGENT_B = AgentId("agent-b")
 SESSION_ID = SessionId(uuid.uuid4())
@@ -53,6 +56,7 @@ NO_LIMIT = AgentLimit(max_container_count=None)
 
 def _agent_meta(agent_id: str) -> AgentMeta:
     return AgentMeta(
+        resource_group_id=_RESOURCE_GROUP_ID,
         id=AgentId(agent_id),
         addr=f"{agent_id}:6001",
         architecture=ArchName("x86_64"),
@@ -88,9 +92,10 @@ def _criteria(
 ) -> AgentSelectionCriteria:
     return AgentSelectionCriteria(
         session_id=SESSION_ID,
-        resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
+        resource_group_id=_RESOURCE_GROUP_ID,
         requirements=[
             ResourceRequirements(
+                resource_group_id=_RESOURCE_GROUP_ID,
                 requested_slots=ResourceRequest(
                     slots={
                         ResourceSlotName("cpu"): Decimal("1"),

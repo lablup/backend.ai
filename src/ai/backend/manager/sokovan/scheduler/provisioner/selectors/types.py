@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import ArchName
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
@@ -17,13 +18,15 @@ from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 @dataclass
 class ResourceRequirements:
-    """One placement requirement: the slots, architecture, and container
-    count a single agent must be able to host.
+    """One placement requirement: the resource group an agent must belong to
+    and the slots, architecture, and container count it must be able to host.
 
     For single-node sessions this is the whole session aggregated; for
     multi-node sessions there is one requirement per container.
     """
 
+    # Resource group whose agents may host the requirement
+    resource_group_id: ResourceGroupID
     # Resource slots required
     requested_slots: ResourceRequest
     # Architecture required

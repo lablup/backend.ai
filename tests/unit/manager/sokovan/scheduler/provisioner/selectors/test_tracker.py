@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Mapping
 from decimal import Decimal
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AgentId, ArchName, SessionId
@@ -22,6 +23,9 @@ from ai.backend.manager.views.sokovan.agent import (
 )
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
+_RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID(int=0))
+
+
 CPU = ResourceSlotName("cpu")
 MEM = ResourceSlotName("mem")
 GROUP_ID = SessionGroupID(uuid.uuid4())
@@ -37,6 +41,7 @@ def _agent_info(
     reserved = reserved or {}
     used = used or {}
     return AgentInfo(
+        resource_group_id=_RESOURCE_GROUP_ID,
         agent_id=AgentId("agent-x"),
         agent_addr="agent-x:6001",
         architecture=ArchName("x86_64"),
@@ -211,6 +216,7 @@ class TestBuildAgentTrackers:
         resources = ResourceGroupResource(
             agents=[
                 AgentMeta(
+                    resource_group_id=_RESOURCE_GROUP_ID,
                     id=AgentId("agent-a"),
                     addr="agent-a:6001",
                     architecture=ArchName("x86_64"),
@@ -226,6 +232,7 @@ class TestBuildAgentTrackers:
                     container_count=1,
                 ),
                 AgentMeta(
+                    resource_group_id=_RESOURCE_GROUP_ID,
                     id=AgentId("agent-b"),
                     addr="agent-b:6001",
                     architecture=ArchName("aarch64"),

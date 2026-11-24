@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import AgentId, ArchName
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
@@ -15,6 +17,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import Res
 from ai.backend.manager.views.sokovan.agent import AgentInfo
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
+_RESOURCE_GROUP_ID = ResourceGroupID(UUID(int=0))
+
 
 def _req(
     slots: Mapping[str, str],
@@ -22,6 +26,7 @@ def _req(
     containers: int = 1,
 ) -> ResourceRequirements:
     return ResourceRequirements(
+        resource_group_id=_RESOURCE_GROUP_ID,
         requested_slots=ResourceRequest(
             slots={ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
         ),

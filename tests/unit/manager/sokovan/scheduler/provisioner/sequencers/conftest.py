@@ -90,6 +90,7 @@ def _make_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,
             kernels=[
                 KernelWorkload(
+                    resource_group_id=RESOURCE_GROUP_ID,
                     kernel_id=KernelId(uuid.uuid4()),
                     architecture=ArchName("x86_64"),
                     requested_slots=ResourceRequest(
@@ -140,6 +141,7 @@ def _make_snapshot(
             resources=ResourceGroupResource(
                 agents=[
                     AgentMeta(
+                        resource_group_id=RESOURCE_GROUP_ID,
                         id=AgentId("agent-1"),
                         addr="agent-1:6001",
                         architecture=ArchName("x86_64"),

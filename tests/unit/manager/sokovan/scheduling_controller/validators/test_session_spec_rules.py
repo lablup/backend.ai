@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import Any
@@ -209,6 +210,7 @@ def _ctx(
     )
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=DefaultSessionOptions(),
             network=None,
             allow_fractional=False,
@@ -784,6 +786,21 @@ class TestRequestedSlotTypeRule:
         ctx = _ctx(slot_types={**_RG_BASE, ResourceSlotName("cuda.shares"): SlotTypes.COUNT})
         with pytest.raises(InvalidAPIParameters):
             RequestedSlotTypeRule().validate(spec, ctx)
+
+    def test_passes_when_the_rg_the_kernel_group_names_serves_the_slot(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel_with_resources(img, resources=(("cuda.device", "1"),)),))
+        session_group_ctx = _ctx(slot_types=dict(_RG_BASE))
+        ctx = replace(
+            session_group_ctx,
+            named_resource_group_by_role={
+                "main": replace(
+                    session_group_ctx.resource_group,
+                    served_slot_names=frozenset({ResourceSlotName("cuda.device")}),
+                )
+            },
+        )
+        RequestedSlotTypeRule().validate(spec, ctx)
 
     def test_rejects_when_rg_has_no_active_agents(self) -> None:
         img = ImageID(uuid.uuid4())

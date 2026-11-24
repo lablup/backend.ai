@@ -14,6 +14,7 @@ from .concentrated import ConcentratedAgentSelector
 from .dispersed import DispersedAgentSelector
 from .filters.exclusion.architecture import ArchitectureTrackerFilter
 from .filters.exclusion.designated_strict import DesignatedStrictTrackerFilter
+from .filters.exclusion.resource_group import ResourceGroupTrackerFilter
 from .filters.exclusion.session_group_strict import SessionGroupStrictTrackerFilter
 from .filters.stateful.container_limit import ContainerLimitTrackerFilter
 from .filters.stateful.resource import ResourceTrackerFilter
@@ -48,6 +49,7 @@ def create_agent_selector(agent_selection_resource_priority: list[str]) -> Agent
     return AgentSelector(
         strategy_pool,
         exclusion_filters=[
+            ResourceGroupTrackerFilter(),
             ArchitectureTrackerFilter(),
             DesignatedStrictTrackerFilter(),
             SessionGroupStrictTrackerFilter(),

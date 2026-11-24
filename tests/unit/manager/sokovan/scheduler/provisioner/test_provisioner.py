@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -10,8 +11,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, SessionId, SessionResult, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
@@ -43,6 +51,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
 from ai.backend.manager.views.sokovan.workload import SessionDependencyInfo, SessionWorkload
 
 from .conftest import (
+    RESOURCE_GROUP_ID,
     RESOURCE_GROUP_NAME,
     AgentMetaFactory,
     SchedulingDataFactory,
@@ -386,6 +395,33 @@ class TestQueueBlockingOnResourceExhaustion:
 
         assert result.scheduled_session_ids == [fitting.meta.session_id]
         assert [f.session_id for f in result.scheduling_failures] == [foreign.meta.session_id]
+        assert result.scheduling_skips == []
+
+    async def test_another_group_running_out_does_not_block_later_sessions(
+        self,
+        provisioner: SessionProvisioner,
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+    ) -> None:
+        """The sessions behind take nothing from the group the first one waits for."""
+        other_group_id = ResourceGroupID(uuid.UUID(int=1))
+        spanning = workload_factory(
+            kernel_slots=[{"cpu": "1"}, {"cpu": "1"}],
+            kernel_resource_group_ids=[RESOURCE_GROUP_ID, other_group_id],
+            cluster_mode=ClusterMode.MULTI_NODE,
+            priority=10,
+        )
+        behind = workload_factory(priority=1)
+        data = scheduling_data_factory(
+            workloads=[spanning, behind],
+            agents_of_other_groups=[agent_meta_factory("full-agent", {"cpu": "0"}, other_group_id)],
+        )
+
+        result = await _schedule(provisioner, data, [spanning, behind])
+
+        assert result.scheduled_session_ids == [behind.meta.session_id]
+        assert [f.session_id for f in result.scheduling_failures] == [spanning.meta.session_id]
         assert result.scheduling_skips == []
 
     async def test_empty_resource_group_does_not_block_later_sessions(

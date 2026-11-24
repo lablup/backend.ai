@@ -38,6 +38,7 @@ class KernelGroupCreator(FieldCreator[SessionID, KernelGroupRow, KernelGroupData
         return KernelGroupRow(
             session_id=owner_id,
             role=KernelGroupRole(self.group.role),
+            resource_group_id=self.group.resource_group_id,
             image_id=execution.resource_input.image_id,
             shmem=(int(shmem) if shmem is not None else None),
             startup_command=execution.startup_command,

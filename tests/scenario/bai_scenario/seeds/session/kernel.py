@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import ResourceSlotEntry
@@ -138,6 +139,8 @@ class TestSeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo
             ),
             enqueue_time=datetime.now(UTC),
             kernel_group_id=self.group.id,
+            resource_group_id=self.session.resource_group_id,
+            resource_group_name=ResourceGroupName(self.session.resource_group_name),
         )
 
     @override

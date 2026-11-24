@@ -149,10 +149,13 @@ class KernelGroupDraft(_DraftBaseModel):
     :class:`ExpandKernelGroupsRule` copies onto each expanded
     :attr:`KernelSpecDraft.preopen_ports`. Per-replica overrides land
     alongside task #33.
+
+    ``resource_group_id`` left ``None`` means the session's resource group.
     """
 
     role: str
     replica_count: int
+    resource_group_id: ResourceGroupID | None = None
     execution_spec: KernelExecutionSpecDraft = Field(default_factory=KernelExecutionSpecDraft)
     failure_policy: FailurePolicy | None = None
     depends_on_roles: tuple[str, ...] = ()

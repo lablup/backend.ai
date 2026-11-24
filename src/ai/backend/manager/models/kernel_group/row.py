@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGroupRole
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.models.base import GUID, Base
@@ -44,6 +45,14 @@ class KernelGroupRow(CreatedAtMixin, Base):
         nullable=False,
     )
     role: Mapped[KernelGroupRole] = mapped_column("role", sa.String(length=16), nullable=False)
+    # NULL means the session's resource group.
+    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        sa.ForeignKey("scaling_groups.id"),
+        nullable=True,
+        index=True,
+    )
     image_id: Mapped[ImageID | None] = mapped_column(
         "image_id",
         GUID(ImageID),
@@ -74,6 +83,7 @@ class KernelGroupRow(CreatedAtMixin, Base):
             id=KernelGroupID(self.id),
             session_id=self.session_id,
             role=KernelGroupRole(self.role),
+            resource_group_id=self.resource_group_id,
             image_id=self.image_id,
             shmem=self.shmem,
             startup_command=self.startup_command,

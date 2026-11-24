@@ -86,7 +86,7 @@ class AgentSelectionCriteria:
 
     # Session the placement is for (failed-agent retry filter)
     session_id: SessionId
-    # Resource group the candidates were drawn from (error context)
+    # Resource group the session is scheduled in (error context)
     resource_group_id: ResourceGroupID
     # Placement requirements, already grouped by cluster mode
     requirements: Sequence[ResourceRequirements]
@@ -159,11 +159,12 @@ class PlacementPlan:
         """Group per-item requirements into placement groups by cluster mode.
 
         Single-node sessions merge every item into one requirement (one
-        agent hosts all containers, slots summed, architectures must
-        agree); multi-node sessions keep one group per item.
+        agent hosts all containers, slots summed, architectures and resource
+        groups must agree); multi-node sessions keep one group per item.
 
         Raises:
-            ValueError: If a single-node session mixes architectures.
+            ValueError: If a single-node session mixes architectures or
+                resource groups.
         """
         if not items:
             return cls(groups=[])
@@ -174,6 +175,12 @@ class PlacementPlan:
                 raise ValueError(
                     f"Single-node session has kernels with different architectures: {architectures}"
                 )
+            resource_group_ids = {item.resource_group_id for item in items}
+            if len(resource_group_ids) > 1:
+                raise ValueError(
+                    "Single-node session has kernels in different resource groups: "
+                    f"{sorted(map(str, resource_group_ids))}"
+                )
 
             total_slots: dict[ResourceSlotName, Decimal] = {}
             for item in items:
@@ -182,6 +189,7 @@ class PlacementPlan:
 
             group = PlacementGroup(
                 requirement=ResourceRequirements(
+                    resource_group_id=resource_group_ids.pop(),
                     requested_slots=ResourceRequest(slots=total_slots),
                     required_architecture=architectures.pop(),
                     container_count=sum(item.container_count for item in items),
@@ -204,6 +212,7 @@ class PlacementPlan:
         return cls.from_items(
             [
                 ResourceRequirements(
+                    resource_group_id=kernel.resource_group_id,
                     requested_slots=kernel.requested_slots,
                     required_architecture=kernel.architecture,
                     container_count=1,

@@ -10,12 +10,17 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable, Mapping
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import AgentId, ArchName
 from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentResource, SlotResource
+
+_RESOURCE_GROUP_ID = ResourceGroupID(UUID(int=0))
+
 
 AgentInfoFactory = Callable[..., AgentInfo]
 
@@ -48,6 +53,7 @@ def _create_agent_info(
         for slot_name, capacity in available_slots.items()
     }
     return AgentInfo(
+        resource_group_id=_RESOURCE_GROUP_ID,
         agent_id=AgentId(agent_id),
         agent_addr=agent_addr,
         architecture=ArchName(architecture),

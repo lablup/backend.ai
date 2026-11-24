@@ -25,6 +25,7 @@ from ai.backend.common.config import (
     ServiceArgumentInterpolationDelimiter,
 )
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     BackendAISchema,
@@ -379,6 +380,13 @@ class KernelGroup(_OptionsBaseModel):
         description=(
             "Number of kernels to create for this role. Each replica "
             "receives its own `cluster_idx` within the group."
+        ),
+    )
+    resource_group_id: ResourceGroupID | None = Field(
+        default=None,
+        description=(
+            "Resource group whose agents run this group's kernels. "
+            "`None` means the session's resource group."
         ),
     )
     execution_spec: KernelExecutionSpec = Field(

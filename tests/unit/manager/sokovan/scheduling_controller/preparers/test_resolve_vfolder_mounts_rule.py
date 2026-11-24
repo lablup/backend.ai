@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from pathlib import PurePosixPath
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountInfoEntry,
@@ -52,6 +53,7 @@ def _context(
 ) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=DefaultSessionOptions(),
             network=None,
             allow_fractional=False,

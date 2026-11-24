@@ -8,6 +8,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import SlotTypeInfo
@@ -37,6 +38,7 @@ def rule() -> AssignUserIdentityRule:
 def context() -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=DefaultSessionOptions(),
             network=None,
             allow_fractional=False,

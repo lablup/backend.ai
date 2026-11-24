@@ -12,7 +12,8 @@ Scope:
   * option-level fields: ``priority``, ``job_priority``, ``is_preemptible``,
     ``cluster_mode``, ``timeouts``, ``interpolation``,
     ``scheduling_target.agent_selection_policy``
-  * per-group ``execution_spec`` fields: ``image_id``, ``resources``,
+  * per-group ``execution_spec`` fields, from the resource group of the
+    kernel group: ``image_id``, ``resources``,
     ``resource_opts``, ``environ``, ``mounts``, ``startup_command``,
     ``bootstrap_script``, ``starts_at``, ``batch_timeout_sec``
 
@@ -33,6 +34,7 @@ from typing import override
 
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
+    KernelGroupDraft,
     ResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import KernelExecutionSpec
@@ -118,23 +120,31 @@ class MergeResourceGroupDefaultsRule(ResourceSpecDraftRule):
                 }
             )
 
-        # Per-group execution-spec fill — only when RG carries a baseline.
-        if (
-            rg_defaults.default_kernel_execution_spec is not None
-            and new_options.kernel_groups is not None
-        ):
-            rg_exec = rg_defaults.default_kernel_execution_spec
+        # Per-group execution-spec fill — only when the group's RG carries a baseline.
+        if new_options.kernel_groups is not None:
             merged_groups = tuple(
-                group.model_copy(
-                    update={
-                        "execution_spec": self._merge_execution_spec(group.execution_spec, rg_exec),
-                    }
+                self._fill_execution_spec(
+                    group,
+                    context.resource_group_of_role(
+                        group.role
+                    ).defaults.default_kernel_execution_spec,
                 )
                 for group in new_options.kernel_groups
             )
             new_options = new_options.model_copy(update={"kernel_groups": merged_groups})
 
         return draft.model_copy(update={"options": new_options})
+
+    def _fill_execution_spec(
+        self,
+        group: KernelGroupDraft,
+        rg_exec: KernelExecutionSpec | None,
+    ) -> KernelGroupDraft:
+        if rg_exec is None:
+            return group
+        return group.model_copy(
+            update={"execution_spec": self._merge_execution_spec(group.execution_spec, rg_exec)}
+        )
 
     @staticmethod
     def _merge_execution_spec(

@@ -9,6 +9,7 @@ from typing import override
 
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import ResourceSlot, ResourceSlotEntry
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -25,6 +26,8 @@ __all__ = ("KernelCreator",)
 class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
     """Build one kernel of the session being enqueued.
 
+    ``resource_group_id`` is the kernel's own, which differs from the session's when the
+    kernel group names another one.
     ``image_info`` carries the canonical/architecture/registry strings still persisted
     on the row beside ``image_id``. The row's id is left to the database.
     """
@@ -34,6 +37,8 @@ class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
     image_info: ImageInfo | None
     enqueue_time: datetime
     kernel_group_id: KernelGroupID
+    resource_group_id: ResourceGroupID
+    resource_group_name: ResourceGroupName
 
     def requested_slots(self) -> ResourceSlot:
         return ResourceSlotEntry.inputs_to_resource_slot(
@@ -68,8 +73,8 @@ class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
             cluster_idx=self.kernel_spec.cluster_idx,
             local_rank=self.kernel_spec.local_rank,
             cluster_hostname=self.kernel_spec.cluster_hostname,
-            scaling_group=str(self.spec.scope.resource_group_name),
-            resource_group_id=self.spec.scope.resource_group_id,
+            scaling_group=str(self.resource_group_name),
+            resource_group_id=self.resource_group_id,
             domain_name=str(self.spec.scope.domain_name),
             group_id=self.spec.scope.project_id,
             user_uuid=self.spec.resource_spec.identity.user_uuid,

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import ArchName, ClusterMode, KernelId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
@@ -19,13 +20,20 @@ from ai.backend.manager.views.sokovan.workload import (
     SessionPlacement,
 )
 
+_RESOURCE_GROUP_ID = ResourceGroupID(UUID(int=0))
+
 
 def _slots(slots: Mapping[str, str]) -> dict[ResourceSlotName, Decimal]:
     return {ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
 
 
-def _item(slots: Mapping[str, str], arch: str = "x86_64") -> ResourceRequirements:
+def _item(
+    slots: Mapping[str, str],
+    arch: str = "x86_64",
+    resource_group_id: ResourceGroupID = _RESOURCE_GROUP_ID,
+) -> ResourceRequirements:
     return ResourceRequirements(
+        resource_group_id=resource_group_id,
         requested_slots=ResourceRequest(slots=_slots(slots)),
         required_architecture=ArchName(arch),
         container_count=1,
@@ -62,6 +70,17 @@ class TestPlacementPlanFromItems:
                 [
                     _item({"cpu": "1"}, arch="x86_64"),
                     _item({"cpu": "1"}, arch="aarch64"),
+                ],
+                ClusterMode.SINGLE_NODE,
+            )
+
+    def test_single_node_mixed_resource_group_error(self) -> None:
+        """A single-node session mixing resource groups is rejected."""
+        with pytest.raises(ValueError, match="different resource groups"):
+            PlacementPlan.from_items(
+                [
+                    _item({"cpu": "1"}),
+                    _item({"cpu": "1"}, resource_group_id=ResourceGroupID(UUID(int=1))),
                 ],
                 ClusterMode.SINGLE_NODE,
             )
@@ -115,11 +134,13 @@ class TestPlacementPlanFromPlacement:
     def test_indices_refer_to_kernel_positions(self) -> None:
         kernels = [
             KernelWorkload(
+                resource_group_id=_RESOURCE_GROUP_ID,
                 kernel_id=KernelId(uuid4()),
                 architecture=ArchName("x86_64"),
                 requested_slots=ResourceRequest(slots=_slots({"cpu": "1"})),
             ),
             KernelWorkload(
+                resource_group_id=_RESOURCE_GROUP_ID,
                 kernel_id=KernelId(uuid4()),
                 architecture=ArchName("x86_64"),
                 requested_slots=ResourceRequest(slots=_slots({"cpu": "2"})),

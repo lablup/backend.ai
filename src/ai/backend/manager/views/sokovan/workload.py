@@ -71,6 +71,8 @@ class KernelWorkload:
 
     # Unique identifier of the kernel
     kernel_id: KernelId
+    # Resource group whose agents may host the kernel
+    resource_group_id: ResourceGroupID
     # Architecture required for the kernel
     architecture: ArchName
     # Resource requirements for this kernel

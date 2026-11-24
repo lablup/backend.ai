@@ -112,6 +112,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.image_slot_type
 from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
     InferenceModelFolderRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.kernel_group_resource_group_rule import (
+    KernelGroupResourceGroupRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
     MountNameValidationRule,
 )
@@ -235,6 +238,7 @@ class SchedulingController:
             ContainerLimitRule(),
             ImageSlotTypeRule(),
             RequestedSlotTypeRule(),
+            KernelGroupResourceGroupRule(),
             RequiredResourceSlotRule(),
             ResourceLimitRule(),
             ServicePortRule(),
@@ -246,14 +250,19 @@ class SchedulingController:
         self._agent_selector = args.agent_selector
 
     async def _verify_resource_group_accessible(self, draft: SessionSpecDraft) -> None:
-        """Reject the draft when its target resource group is outside the
-        requester's single-project allowlist.
+        """Reject the draft when a resource group it names, for the session or for
+        a kernel group, is outside the requester's single-project allowlist.
 
         The scope decision and rejection live in the caller; the repository only
         performs DB reads.
         """
-        resource_group_id = draft.scope.resource_group_id
-        if resource_group_id is None:
+        resource_group_ids: list[ResourceGroupID] = []
+        if draft.scope.resource_group_id is not None:
+            resource_group_ids.append(draft.scope.resource_group_id)
+        for group in draft.resource_spec.resource.options.kernel_groups or ():
+            if group.resource_group_id is not None:
+                resource_group_ids.append(group.resource_group_id)
+        if not resource_group_ids:
             return
         domain_id = draft.scope.domain_id
         project_id = draft.scope.project_id
@@ -267,8 +276,13 @@ class SchedulingController:
             project_id=project_id,
             user_id=UserID(user_uuid),
         )
-        if resource_group_id not in accessible_rg_ids:
-            rg_label = draft.scope.resource_group_name or resource_group_id
+        for resource_group_id in resource_group_ids:
+            if resource_group_id in accessible_rg_ids:
+                continue
+            if resource_group_id == draft.scope.resource_group_id:
+                rg_label = draft.scope.resource_group_name or resource_group_id
+            else:
+                rg_label = resource_group_id
             raise InvalidAPIParameters(f"Resource group '{rg_label}' is not accessible")
 
     async def enqueue_session_from_draft(
@@ -371,6 +385,7 @@ class SchedulingController:
     @staticmethod
     def _build_requirement_items(
         prepared: ResourceSpecDraft,
+        resource_group_id: ResourceGroupID,
         context: SessionSpecContext,
     ) -> list[ResourceRequirements]:
         """Parse the prepared resource draft into per-item placement
@@ -394,6 +409,7 @@ class SchedulingController:
                 raise ImageNotFound(f"Image '{resource_input.image_id}' not found")
             items.append(
                 ResourceRequirements(
+                    resource_group_id=resource_group_id,
                     requested_slots=ResourceRequest(
                         slots={
                             ResourceSlotName(k): v
@@ -414,7 +430,7 @@ class SchedulingController:
         resource_group_id: ResourceGroupID,
         data: ComputeScheduleData,
     ) -> ComputeScheduleResult:
-        items = self._build_requirement_items(prepared, data.spec_context)
+        items = self._build_requirement_items(prepared, resource_group_id, data.spec_context)
         failure_hints: dict[int, UnschedulableReasonHint] = {}
 
         if items:

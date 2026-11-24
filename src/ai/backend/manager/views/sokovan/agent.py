@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import cached_property
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AgentId, ArchName, SessionId
@@ -34,6 +35,8 @@ class AgentInfo:
 
     # Unique identifier of the agent
     agent_id: AgentId
+    # Resource group the agent belongs to
+    resource_group_id: ResourceGroupID
     # Network address of the agent
     agent_addr: str
     # Architecture of the agent (e.g., "x86_64", "aarch64")
@@ -49,6 +52,7 @@ class AgentMeta:
     """Agent metadata plus normalized per-slot resources."""
 
     id: AgentId
+    resource_group_id: ResourceGroupID
     addr: str
     architecture: ArchName
     resources: AgentResource
@@ -57,6 +61,7 @@ class AgentMeta:
     def to_agent_info(self) -> AgentInfo:
         return AgentInfo(
             agent_id=self.id,
+            resource_group_id=self.resource_group_id,
             agent_addr=self.addr,
             architecture=self.architecture,
             resources=self.resources,
@@ -81,6 +86,9 @@ class ResourceGroupResource:
     """
 
     agents: list[AgentMeta]
+    # Agents of the other resource groups this pass's pending kernels name.
+    # They take placements but are no part of the group's own ``slots``
+    agents_of_other_groups: list[AgentMeta] = field(default_factory=list)
     # Sessions that previously failed per agent (retry deprioritization
     # hints from Valkey; empty for the fitting check)
     failed_sessions_by_agent: Mapping[AgentId, frozenset[SessionId]] = field(default_factory=dict)

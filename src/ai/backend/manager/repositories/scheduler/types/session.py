@@ -5,6 +5,7 @@ from functools import cached_property
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
@@ -41,6 +42,15 @@ class PendingSessions:
     def domain_ids(self) -> set[DomainID]:
         """Extract unique domain IDs from pending sessions."""
         return {s.meta.owner.domain_id for s in self.sessions}
+
+    @cached_property
+    def kernel_resource_group_ids(self) -> set[ResourceGroupID]:
+        """Resource groups the pending kernels are placed in."""
+        return {
+            kernel.resource_group_id
+            for session in self.sessions
+            for kernel in session.placement.kernels
+        }
 
     @cached_property
     def placement_group_ids(self) -> set[SessionGroupID]:

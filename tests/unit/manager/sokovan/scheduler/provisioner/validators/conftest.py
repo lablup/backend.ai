@@ -104,6 +104,7 @@ def _make_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,
             kernels=[
                 KernelWorkload(
+                    resource_group_id=RESOURCE_GROUP_ID,
                     kernel_id=KernelId(uuid.uuid4()),
                     architecture=ArchName("x86_64"),
                     requested_slots=ResourceRequest(slots=slot_map(slots)),

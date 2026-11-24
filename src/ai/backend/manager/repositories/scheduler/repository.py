@@ -167,6 +167,7 @@ class SchedulerRepository:
             resource_group=ResourceGroupScopeSnapshot(
                 resources=ResourceGroupResource(
                     agents=fetch.agents,
+                    agents_of_other_groups=fetch.agents_of_other_groups,
                     failed_sessions_by_agent=failed_sessions_by_agent,
                     group_members_by_agent=fetch.session_group_members,
                 ),
@@ -382,6 +383,7 @@ class SchedulerRepository:
             resource_group=fetch.resource_group,
             user=fetch.user.to_info(vfolder_mounts_by_role),
             global_info=fetch.global_info,
+            named_resource_group_by_role=fetch.named_resource_group_by_role,
         )
 
     async def _resolve_vfolder_mounts_by_role(

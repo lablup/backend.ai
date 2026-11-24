@@ -16,6 +16,7 @@ from pathlib import PurePosixPath
 import pytest
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     MountPermission,
@@ -68,6 +69,7 @@ def _context_with_mounts(
 ) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
+            name=ResourceGroupName("default"),
             defaults=DefaultSessionOptions(),
             network=None,
             allow_fractional=False,

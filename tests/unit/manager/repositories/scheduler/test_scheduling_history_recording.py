@@ -77,6 +77,7 @@ from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import InvalidKernelConfig
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -453,10 +454,12 @@ class TestEnqueueSessionSchedulingHistory:
         cpu: str = "2",
         mem: str = "1024",
         environ: dict[str, str] | None = None,
+        resource_group_id: ResourceGroupID | None = None,
     ) -> KernelGroup:
         return KernelGroup(
             role=role,
             replica_count=replica_count,
+            resource_group_id=resource_group_id,
             execution_spec=KernelExecutionSpec(
                 resource_input=KernelResourceConfig(
                     image_id=image_id,
@@ -1147,6 +1150,107 @@ class TestEnqueueSessionSchedulingHistory:
             ("worker", groups["worker"].id),
             ("worker", groups["worker"].id),
         ]
+
+    @pytest.fixture
+    async def other_resource_group_id(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> ResourceGroupID:
+        """A resource group other than the one the specs enqueue into."""
+        resource_group_id = ResourceGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ResourceGroupRow(
+                    id=resource_group_id,
+                    name="other-sgroup",
+                    driver="static",
+                    scheduler="fifo",
+                    scheduler_opts=ResourceGroupOpts(),
+                    driver_opts={},
+                    is_active=True,
+                )
+            )
+        return resource_group_id
+
+    async def test_enqueue_writes_each_kernel_in_the_resource_group_its_group_names(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+        other_resource_group_id: ResourceGroupID,
+    ) -> None:
+        """A group naming none keeps the session's, and the session keeps its own."""
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            image_id=test_image_id,
+            groups=[
+                self._group(role="main", replica_count=1, image_id=test_image_id),
+                self._group(
+                    role="gpu",
+                    replica_count=1,
+                    image_id=test_image_id,
+                    resource_group_id=other_resource_group_id,
+                ),
+            ],
+            **enqueue_spec_args,
+        )
+
+        await db_source.enqueue_session_from_spec(spec)
+
+        session_resource_group_id = enqueue_spec_args["resource_group_id"]
+        groups = await self._groups_by_role(db_with_cleanup, session_id)
+        assert {role: group.resource_group_id for role, group in groups.items()} == {
+            "main": None,
+            "gpu": other_resource_group_id,
+        }
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kernels = (
+                await db_sess.scalars(
+                    sa.select(KernelRow).where(KernelRow.session_id == session_id)
+                )
+            ).all()
+            session = await db_sess.get_one(SessionRow, session_id)
+        assert {
+            kernel.cluster_role: (kernel.resource_group_id, kernel.scaling_group)
+            for kernel in kernels
+        } == {
+            "main": (session_resource_group_id, enqueue_spec_args["resource_group_name"]),
+            "gpu": (other_resource_group_id, "other-sgroup"),
+        }
+        assert session.resource_group_id == session_resource_group_id
+
+    async def test_enqueue_refuses_an_unknown_resource_group_of_a_kernel_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+    ) -> None:
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        spec = self._spec(
+            session_id=SessionID(uuid.uuid4()),
+            image_id=test_image_id,
+            groups=[
+                self._group(
+                    role="main",
+                    replica_count=1,
+                    image_id=test_image_id,
+                    resource_group_id=ResourceGroupID(uuid.uuid4()),
+                ),
+            ],
+            **enqueue_spec_args,
+        )
+
+        with pytest.raises(ResourceGroupNotFound):
+            await db_source.enqueue_session_from_spec(spec)
 
     async def test_enqueue_writes_environ_under_its_group_only(
         self,

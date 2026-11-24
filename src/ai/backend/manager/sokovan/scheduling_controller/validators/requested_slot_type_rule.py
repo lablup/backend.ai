@@ -30,7 +30,7 @@ from ai.backend.manager.views.sokovan.session_creation import (
 
 
 class RequestedSlotTypeRule(SessionSpecValidatorRule):
-    """Requested slot keys must be served by an agent in the target RG."""
+    """Requested slot keys must be served by an agent in the RG of the kernel's group."""
 
     @override
     def name(self) -> str:
@@ -42,16 +42,17 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        rg_slot_types = context.resource_group.served_slot_names
-        if not rg_slot_types:
-            raise InvalidAPIParameters(
-                extra_msg=(
-                    f"resource group '{spec.scope.resource_group_name}' has no "
-                    f"agents serving any resource slot."
-                ),
-            )
         errors: list[str] = []
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
+            resource_group = context.resource_group_of_role(kernel.cluster_role)
+            rg_slot_types = resource_group.served_slot_names
+            if not rg_slot_types:
+                raise InvalidAPIParameters(
+                    extra_msg=(
+                        f"resource group '{resource_group.name}' has no "
+                        f"agents serving any resource slot."
+                    ),
+                )
             unknown = sorted({
                 entry.resource_type
                 for entry in kernel.execution_spec.resource_input.resources
@@ -62,7 +63,7 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
                 errors.append(
                     f"kernel_specs[{idx}]: the request asks for resource "
                     f"slot(s) {unknown} that resource group "
-                    f"'{spec.scope.resource_group_name}' does not serve. "
+                    f"'{resource_group.name}' does not serve. "
                     f"Drop these slots from the request or switch to a "
                     f"resource group that supports them."
                 )
