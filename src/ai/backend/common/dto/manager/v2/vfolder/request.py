@@ -448,9 +448,8 @@ class VFolderFilter(BaseRequestModel):
     mount_permission: VFolderMountPermissionFilter | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Filter by the mount policy of the scope user on "
-            "the vfolder. A search whose scope does not name exactly one user rejects it. "
-            "wd matches rw."
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the mount policy of one user on the "
+            "vfolder. wd matches rw."
         ),
     )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")

@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
@@ -80,6 +81,8 @@ class VFolderUsageModeFilter(EnumFilter[VFolderUsageMode]):
 
 class VFolderMountPermissionFilter(EnumFilter[VFolderPermissionField]):
     """Filter for the mount policy of one user on a vfolder."""
+
+    user_id: UserID = Field(description="The user whose mount policy is compared.")
 
 
 class VFolderMetadataInfo(BaseResponseModel):

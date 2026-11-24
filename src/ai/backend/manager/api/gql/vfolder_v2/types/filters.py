@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Self
+from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.vfolder.request import VFolderFilter, VFolderOrder
 from ai.backend.common.dto.manager.v2.vfolder.types import (
@@ -79,14 +80,14 @@ class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=(
-            "Filter for the mount policy of the scope user on a vfolder. "
-            "RW_DELETE matches READ_WRITE."
+            "Filter for the mount policy of one user on a vfolder. RW_DELETE matches READ_WRITE."
         ),
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="VFolderMountPermissionFilter",
 )
 class VFolderMountPermissionFilterGQL(PydanticInputMixin[VFolderMountPermissionFilter]):
+    user_id: UUID = gql_field(description="The user whose mount policy is compared.")
     equals: VFolderMountPermissionGQL | None = gql_field(description="Exact match.", default=None)
     in_: list[VFolderMountPermissionGQL] | None = gql_field(
         description="Match any of the given levels.", name="in", default=None
@@ -136,11 +137,7 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     mount_permission: VFolderMountPermissionFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Filter by the mount policy of the scope user on the vfolder. Only a search whose "
-                "scope names exactly one user takes it: `scopedVFoldersV2` with one `scope.user`, "
-                "and `myVfolders`. Other searches reject it."
-            ),
+            description="Filter by the mount policy of one user on the vfolder.",
         ),
         default=None,
     )

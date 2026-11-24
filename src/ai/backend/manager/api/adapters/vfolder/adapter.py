@@ -116,7 +116,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPolicyData,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -406,9 +405,7 @@ class VFolderAdapter(BaseAdapter):
         """
         action_result = await self._vfolder.scoped_search.run(
             self._scoped_search_action(
-                [ProjectVFolderTarget(project_id=ProjectID(project_id))],
-                input.usage,
-                self._build_vfolder_searcher(input),
+                [ProjectVFolderTarget(project_id=ProjectID(project_id))], input
             )
         )
         return SearchVFoldersPayload(
@@ -448,16 +445,13 @@ class VFolderAdapter(BaseAdapter):
         ]
 
     def _scoped_search_action(
-        self,
-        scopes: Sequence[ScopeTarget],
-        usage: VFolderUsage | None,
-        searcher: VFolderSearcher,
+        self, scopes: Sequence[ScopeTarget], input: SearchVFoldersInput
     ) -> ScopedSearchVFoldersAction:
         return ScopedSearchVFoldersAction(
             searcher=ScopedSearcher(
                 scopes=scopes,
-                used_by=self._usage(usage),
-                searcher=searcher,
+                used_by=self._usage(input.usage),
+                searcher=self._build_vfolder_searcher(input),
             )
         )
 
@@ -466,13 +460,8 @@ class VFolderAdapter(BaseAdapter):
         input: ScopedSearchVFoldersInput,
     ) -> SearchVFoldersPayload:
         """Search the vfolders the named scopes reach, combined with OR."""
-        scope_user_ids = [UserID(entry.value) for entry in input.scope.user or []]
         action_result = await self._vfolder.scoped_search.run(
-            self._scoped_search_action(
-                self._scope_targets(input.scope),
-                input.usage,
-                self._build_vfolder_searcher(input, scope_user_ids),
-            )
+            self._scoped_search_action(self._scope_targets(input.scope), input)
         )
         return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.items],
@@ -481,16 +470,10 @@ class VFolderAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_vfolder_searcher(
-        self,
-        input: SearchVFoldersInput,
-        scope_user_ids: Sequence[UserID] = (),
-    ) -> VFolderSearcher:
+    def _build_vfolder_searcher(self, input: SearchVFoldersInput) -> VFolderSearcher:
         return self._build_searcher(
             VFolderSearcher,
-            conditions=(
-                self._convert_vfolder_filter(input.filter, scope_user_ids) if input.filter else []
-            ),
+            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
             orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
@@ -991,9 +974,7 @@ class VFolderAdapter(BaseAdapter):
     # Filter / Order conversion
     # -------------------------------------------------------------------------
 
-    def _convert_vfolder_filter(
-        self, f: VFolderFilter, scope_user_ids: Sequence[UserID] = ()
-    ) -> list[QueryCondition]:
+    def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
         fields = VFolderSearchableFields.own
         conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
@@ -1015,30 +996,28 @@ class VFolderAdapter(BaseAdapter):
             ),
         ]
         if f.mount_permission is not None:
-            if len(scope_user_ids) != 1:
-                raise InvalidAPIParameters(
-                    "mount_permission requires a scope naming exactly one user"
-                )
             conditions.extend(
                 self.apply_enum_filter(
                     f.mount_permission,
-                    VFolderSearchableFields.linked.mount_permission.of_user(scope_user_ids[0]),
+                    VFolderSearchableFields.linked.mount_permission.of_user(
+                        f.mount_permission.user_id
+                    ),
                 )
             )
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_vfolder_filter(sub, scope_user_ids))
+                conditions.extend(self._convert_vfolder_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                sub_conditions = self._convert_vfolder_filter(sub, scope_user_ids)
+                sub_conditions = self._convert_vfolder_filter(sub)
                 if sub_conditions:
                     or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             for sub in f.NOT:
-                sub_conditions = self._convert_vfolder_filter(sub, scope_user_ids)
+                sub_conditions = self._convert_vfolder_filter(sub)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions

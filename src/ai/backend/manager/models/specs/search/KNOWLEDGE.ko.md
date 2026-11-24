@@ -100,11 +100,11 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 - 진입점이 하나이므로 sweep test 와 권한 검사가 한 곳에서 시작한다. 뒤의 class 는 이름으로 참조하지
   않으므로 private 이다.
 
-## 사용자 한 명 기준으로 계산한 값은 스코프의 사용자를 사용한다
+## 사용자 한 명 기준으로 계산한 값은 filter 가 사용자를 지정한다
 
 - 사용자의 vfolder 마운트 정책에는 column 이 없다. SQL 이 그 사용자의 역할과 정책 row 로 계산한다. 계산에 사용하는 값이 모두 query 가 읽을 수 있는 row 이므로 filter 로 둘 수 있다.
-- validator 가 읽기 전에 스코프에 대한 호출자의 권한을 검사한다. 요청의 다른 항목에 둔 사용자 id 에는 이런 검사가 없고, `current_user()` 를 사용하면 결과가 호출자에 따라 달라진다.
-- global search 와 scoped search 는 filter DTO 하나를 함께 사용한다. global search 는 사용자를 지정하지 않으므로 이 filter 를 거부한다.
+- filter 가 사용자를 지정하므로 결과는 요청만으로 정해지고, global search 를 포함해 filter DTO 를 받는 모든 search 가 같은 방식으로 동작한다.
+- row 는 호출자의 권한을 검사한 스코프 안에 있다. vfolder 의 사용자별 정책은 그 vfolder 의 READ 권한으로 모두 읽을 수 있으므로, 이 filter 로 더 알 수 있는 것은 지정한 사용자가 그 vfolder 를 읽을 수 있는지뿐이다.
 
 ## 다른 테이블의 field 는 펼치지 않고 nested 로 둔다
 

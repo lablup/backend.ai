@@ -10,6 +10,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -157,7 +158,8 @@ class SearchingByFragmentInOrder(
                     filter=VFolderFilter(
                         name=StringFilter(contains=self.fragment),
                         mount_permission=VFolderMountPermissionFilter(
-                            equals=VFolderPermissionField.READ_WRITE
+                            user_id=UserID(laid.caller.id),
+                            equals=VFolderPermissionField.READ_WRITE,
                         ),
                     ),
                     order=[

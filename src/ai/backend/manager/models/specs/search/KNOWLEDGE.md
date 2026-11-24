@@ -1,7 +1,7 @@
 ---
 name: search-field-declarations
 type: design-rationale
-description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, why a value computed for one user takes the user from the scope, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why a condition naming an entity the caller cannot read refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters, which scopes a search accepts, why usage is one bundle with used_by and uses as its two directions, why public is a scope rather than a login-only processor, the two kinds of membership in public, why global reads keep the action shape
+description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, why a value computed for one user names the user in its filter, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why a condition naming an entity the caller cannot read refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters, which scopes a search accepts, why usage is one bundle with used_by and uses as its two directions, why public is a scope rather than a login-only processor, the two kinds of membership in public, why global reads keep the action shape
 scope: src/ai/backend/manager/models/specs/search
 keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, secret_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, uses, usage direction, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by, PublicImageTarget, CreatedInPublic, is_global, public scope, global scope, search scope table]
 sources:
@@ -116,11 +116,11 @@ This package replaces the condition functions and order methods written by hand 
 - A foreign key on the searched row is an own filter, one on an owned row a nested filter. Only one on the other entity's side is linked.
 - One entry point means the sweep test and the permission check start from one place. The classes behind it are never referenced by name, so they are private.
 
-## A value computed for one user takes the user from the scope
+## A value computed for one user names the user in its filter
 
 - The mount policy of a user on a vfolder has no column: SQL computes it from the roles and the policy row of the user. It is a filter all the same, because every input is a row the query can read.
-- The validator checks the permission of the caller on the scope before the read. A user id elsewhere in the request would have no such check, and `current_user()` would make the result depend on the caller.
-- The global search and the scoped search take one filter DTO. The global search names no user, so it rejects the filter.
+- The filter names the user, so the result depends on the request alone and every search that takes the filter DTO answers it the same way, the global search included.
+- The rows stay within the scope the caller is checked against. The policies of every user on a vfolder are readable under the READ permission of the vfolder, so the filter adds only whether the named user can read it.
 
 ## Fields of other tables are nested, not flattened
 
