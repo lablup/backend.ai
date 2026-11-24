@@ -17008,6 +17008,27 @@ type Query {
     limit: Int = null
     offset: Int = null
   ): VFolderConnection
+
+  """
+  Added in 26.10.0. Page through the virtual folders the named scopes reach, selected by the level the current user mounts them at (`VFolder.mountPermission`).
+  """
+  myVfoldersByMountPermission(
+    scope: VFolderScope!
+    mountPermission: VFolderMountPermissionFilter!
+
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usage: VFolderUsage = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 }
 
 """
@@ -25184,11 +25205,6 @@ input VFolderFilter {
 
   """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
   autoMounts: VFolderAutoMountNestedFilter = null
-
-  """
-  Added in 26.10.0. Filter by the level the current user mounts the vfolder at (`VFolder.mountPermission`).
-  """
-  mountPermission: VFolderMountPermissionFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
