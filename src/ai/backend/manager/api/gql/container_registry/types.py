@@ -27,6 +27,13 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.filters import (
+        DomainV2Filter,
+        DomainV2OrderBy,
+    )
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2Connection
+
 
 @gql_enum(
     BackendAIGQLMeta(added_version="26.4.0", description="Container registry type."),
@@ -182,11 +189,3 @@ class ContainerRegistryV2Connection(Connection[ContainerRegistryGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
-
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.domain_v2.types.filters import (
-        DomainV2Filter,
-        DomainV2OrderBy,
-    )
-    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2Connection
