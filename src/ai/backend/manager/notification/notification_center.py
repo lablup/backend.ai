@@ -145,7 +145,8 @@ class NotificationCenter:
 
         Raises:
             WebhookConnectionFailure: If the webhook URL cannot be reached or times out
-            NotificationProcessingFailure: If validation fails
+            NotificationDeliveryFailure: If the channel's destination rejects the message
+            NotificationProcessingFailure: If validation fails for any other reason
         """
         # Create notification message from provided test message
         message = NotificationMessage(

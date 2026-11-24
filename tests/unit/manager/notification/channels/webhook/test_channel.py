@@ -9,23 +9,30 @@ import pytest
 from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.data.notification.types import WebhookSpec
 from ai.backend.manager.errors.notification import (
-    NotificationProcessingFailure,
+    NotificationDeliveryFailure,
     WebhookConnectionFailure,
 )
 from ai.backend.manager.notification.channels.webhook.channel import WebhookChannel
 from ai.backend.manager.notification.types import NotificationMessage
 
 
+class _FakeContent:
+    _body: bytes
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    async def read(self, n: int = -1) -> bytes:
+        return self._body if n < 0 else self._body[:n]
+
+
 class _FakeResponse:
     status: int
-    _text: str
+    content: _FakeContent
 
-    def __init__(self, status: int, text: str = "") -> None:
+    def __init__(self, status: int, text: str | bytes = "") -> None:
         self.status = status
-        self._text = text
-
-    async def text(self) -> str:
-        return self._text
+        self.content = _FakeContent(text.encode() if isinstance(text, str) else text)
 
 
 class _FakePostContext:
@@ -93,13 +100,31 @@ class TestWebhookChannelSend:
         assert exc_info.value.__cause__ is outcome
 
     @pytest.mark.parametrize("outcome", [_FakeResponse(500, "boom")], ids=["status-500"])
-    async def test_a_failed_response_status_stays_a_processing_failure(
+    async def test_a_failed_response_status_is_a_client_visible_delivery_failure(
         self,
         channel: WebhookChannel,
         message: NotificationMessage,
     ) -> None:
-        with pytest.raises(NotificationProcessingFailure, match="status 500"):
+        with pytest.raises(NotificationDeliveryFailure, match="status 500: boom") as exc_info:
             await channel.send(message)
+
+        assert exc_info.value.is_client_error()
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [_FakeResponse(502, b"\xff\xfe not utf-8" + b"x" * 500)],
+        ids=["undecodable-long-body"],
+    )
+    async def test_an_undecodable_body_is_quoted_leniently_and_bounded(
+        self,
+        channel: WebhookChannel,
+        message: NotificationMessage,
+    ) -> None:
+        with pytest.raises(NotificationDeliveryFailure, match="status 502") as exc_info:
+            await channel.send(message)
+
+        assert "\ufffd" in str(exc_info.value)
+        assert "x" * 200 not in str(exc_info.value)
 
     async def test_a_success_status_returns_a_result(
         self,
