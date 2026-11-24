@@ -53194,6 +53194,35 @@
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/agents/{agent_id}/gpu-devices": {
+      "get": {
+        "operationId": "v2/agents.admin_get_gpu_devices",
+        "tags": [
+          "v2/agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Retrieve the scanned GPU devices of an agent (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/app-config/my/get": {
       "post": {
         "operationId": "v2/app-config.my_get_app_configs",

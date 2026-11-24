@@ -325,6 +325,39 @@ input AgentFilter {
   NOT: [AgentFilter!] = null
 }
 
+"""
+Added in 26.10.0. A GPU device of an agent and the kernels it is allocated to.
+"""
+type AgentGPUDevice {
+  """Device ID the compute plugin reports, such as the GPU UUID."""
+  deviceId: String!
+
+  """
+  Index of the device on the node. Null if the compute plugin does not report it.
+  """
+  deviceIndex: Int
+
+  """
+  Ratio of the device capacity allocated to all kernels (0 to 1). 0 if the device is not allocated.
+  """
+  allocatedRatio: Decimal!
+
+  """Kernels holding the device. Empty if the device is not allocated."""
+  kernelAllocations: [AgentGPUKernelAllocation!]!
+}
+
+"""Added in 26.10.0. The share of one GPU device that one kernel holds."""
+type AgentGPUKernelAllocation {
+  """ID of the kernel holding the device."""
+  kernelId: UUID!
+
+  """ID of the session the kernel belongs to."""
+  sessionId: UUID!
+
+  """Ratio of the device capacity allocated to the kernel (0 to 1)."""
+  allocatedRatio: Decimal!
+}
+
 """Added in 26.1.0. Network-related information for an agent."""
 type AgentNetworkInfo {
   """Logical region where the agent is deployed."""
@@ -609,6 +642,11 @@ type AgentV2 implements Node {
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int
+
+  """
+  Added in 26.10.0. GPU devices of this agent as of the last GPU allocation map rescan, in the order of the device index (superadmin only). Null if the agent has no scan result.
+  """
+  gpuDevices: [AgentGPUDevice!]
 
   """
   Added in 26.2.0. List of kernels running on this agent with pagination support.
