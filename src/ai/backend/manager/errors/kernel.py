@@ -350,6 +350,7 @@ class IdlePolicyNotFound(ObjectNotFound):
         )
 
 
+<<<<<<< HEAD
 class InvalidKernelStatus(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/invalid-kernel-status"
     error_title = "Invalid kernel status for this operation."
@@ -359,4 +360,18 @@ class InvalidKernelStatus(BackendAIError, web.HTTPConflict):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.CONFLICT,
+=======
+class KernelCreationFailedOnAgents(BackendAIError, web.HTTPInternalServerError):
+    """Raised when agents fail to create the kernels of a session."""
+
+    error_type = "https://api.backend.ai/probs/kernel-creation-failed"
+    error_title = "Kernel creation failed on agents."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+>>>>>>> 425e0813b (fix(BA-6229): record agent kernel creation failures in the session status data and history (#17315))
         )
