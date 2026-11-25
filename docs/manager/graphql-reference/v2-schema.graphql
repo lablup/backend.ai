@@ -8591,6 +8591,11 @@ type KernelV2 implements Node {
   """
   resourceAllocation: ResourceAllocation!
 
+  """
+  Added in 26.10.0. The latest values of the kernel's metrics, read from the metric store. Null when the store has no sample of the kernel.
+  """
+  liveStat: KernelV2LiveStat
+
   """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
 
@@ -8671,6 +8676,46 @@ type KernelV2LifecycleInfo {
 
   """Scheduled start time for the kernel, if applicable."""
   startsAt: DateTime
+}
+
+"""
+Added in 26.10.0. The live statistics of a kernel, one entry per metric.
+"""
+type KernelV2LiveStat {
+  """The metrics of the kernel."""
+  metrics: [KernelV2LiveStatMetric!]!
+}
+
+"""
+Added in 26.10.0. The latest value and the window statistics of one metric of a kernel.
+"""
+type KernelV2LiveStatMetric {
+  """The metric name (e.g., 'cpu_util', 'mem')."""
+  metricName: String!
+
+  """The latest value."""
+  current: String!
+
+  """The upper bound of the value."""
+  capacity: String
+
+  """The latest value as a percentage of the capacity."""
+  pct: String!
+
+  """The unit of the value (e.g., 'bytes', 'percent')."""
+  unitHint: String!
+
+  """The maximum over the statistics window."""
+  statsMax: String!
+
+  """The average over the statistics window."""
+  statsAvg: String!
+
+  """The rate per second, for the network metrics."""
+  statsRate: String!
+
+  """The change of the value, for the CPU utilization."""
+  statsDiff: String!
 }
 
 """Added in 26.2.0. Network configuration for a kernel."""
