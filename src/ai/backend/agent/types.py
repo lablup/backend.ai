@@ -146,6 +146,13 @@ class Container:
         return SessionId(uuid.UUID(raw_session_id))
 
 
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
+class ContainerListing:
+    containers: Sequence[tuple[KernelId, Container]]
+    # Listed, but their containers could not be inspected.
+    kernel_ids_failed_to_inspect: frozenset[KernelId] = frozenset()
+
+
 class KernelLifecycleStatus(enum.StrEnum):
     """
     The lifecycle status of `AbstractKernel` object.

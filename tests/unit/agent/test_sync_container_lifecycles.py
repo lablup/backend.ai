@@ -20,6 +20,7 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.types import (
     Container,
     ContainerLifecycleEvent,
+    ContainerListing,
     KernelLifecycleStatus,
     LifecycleEvent,
 )
@@ -61,7 +62,7 @@ def _make_agent(
     """A stub carrying only what ``sync_container_lifecycles()`` touches."""
     agent = MagicMock()
     agent.id = AgentId("test-agent")
-    agent.enumerate_containers = AsyncMock(return_value=containers)
+    agent.enumerate_containers = AsyncMock(return_value=ContainerListing(containers=containers))
     agent.registry_lock = asyncio.Lock()
     agent.restarting_kernels = {}
     agent.kernel_registry = kernel_registry

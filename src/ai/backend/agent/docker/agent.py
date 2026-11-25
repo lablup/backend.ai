@@ -101,6 +101,7 @@ from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
+    ContainerListing,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -1897,14 +1898,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> ContainerListing:
         result = []
+        kernel_ids_failed_to_inspect: set[KernelId] = set()
         fetch_tasks = []
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
 
                 async def _fetch_container_info(container: DockerContainer) -> None:
                     kernel_id_str: str = "(unknown)"
+                    # An inspection replaces the listed fields.
+                    listed_names: Sequence[str] = container._container.get("Names") or []
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
                         if kernel_id is None:
@@ -1922,28 +1926,33 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                         container_from_docker_container(container),
                                     ),
                                 )
-                    except DockerError as e:
-                        if e.status == HTTPStatus.NOT_FOUND:
+                    except asyncio.CancelledError:
+                        pass
+                    except Exception as e:
+                        if isinstance(e, DockerError) and e.status == HTTPStatus.NOT_FOUND:
                             log.debug(
                                 "container vanished during enumeration",
                                 container_id=container._id,
                                 kernel_id=kernel_id_str,
                             )
-                            return
-                        raise
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception:
-                        log.exception(
-                            "container info fetch failed",
-                            container_id=container._id,
-                            kernel_id=kernel_id_str,
-                        )
+                        else:
+                            log.exception(
+                                "container info fetch failed",
+                                container_id=container._id,
+                                kernel_id=kernel_id_str,
+                            )
+                            for name in listed_names:
+                                listed_kernel_id = await get_kernel_id_from_container(name)
+                                if listed_kernel_id is not None:
+                                    kernel_ids_failed_to_inspect.add(listed_kernel_id)
 
                 fetch_tasks.append(_fetch_container_info(container))
 
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        return result
+        return ContainerListing(
+            containers=result,
+            kernel_ids_failed_to_inspect=frozenset(kernel_ids_failed_to_inspect),
+        )
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:

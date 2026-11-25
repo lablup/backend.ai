@@ -290,6 +290,7 @@ from .stats import StatContext, StatModes
 from .types import (
     Container,
     ContainerLifecycleEvent,
+    ContainerListing,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -312,7 +313,6 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
 
 P = ParamSpec("P")
-KernelIdContainerPair = tuple[KernelId, Container]
 
 
 def update_additional_gids(environ: MutableMapping[str, str], gids: Collection[int]) -> None:
@@ -1629,14 +1629,18 @@ class AbstractAgent[
         cleanup_tasks: set[asyncio.Task[None]] = set()
         while True:
             try:
-                alive_containers = await self.enumerate_containers()
-                alive_kernel_ids = {kid for kid, _ in alive_containers}
+                container_listing = await self.enumerate_containers()
+                alive_kernel_ids = {kid for kid, _ in container_listing.containers}
                 registered_kernel_ids = {
                     kid
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING
                 }
-                dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
+                dangling_kernel_ids = (
+                    registered_kernel_ids
+                    - alive_kernel_ids
+                    - container_listing.kernel_ids_failed_to_inspect
+                )
                 if dangling_kernel_ids:
                     log.info(
                         "dangling kernel objects cleanup started",
@@ -1813,7 +1817,7 @@ class AbstractAgent[
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[KernelIdContainerPair]:
+    ) -> ContainerListing:
         """
         Enumerate the containers with the given status filter.
         """
@@ -1823,11 +1827,11 @@ class AbstractAgent[
         Reconstruct the resource alloc maps for each compute plugin from
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
-        containers = await self.enumerate_containers()
+        container_listing = await self.enumerate_containers()
         async with self.resource_lock:
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()
-            for kernel_id, container in containers:
+            for kernel_id, container in container_listing.containers:
                 for computer_ctx in self.computers.values():
                     try:
                         await computer_ctx.instance.restore_from_container(
@@ -1871,13 +1875,13 @@ class AbstractAgent[
 
         log.debug("container lifecycle sync started")
         try:
-            _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
+            container_listing = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
             async with self.registry_lock:
                 try:
                     # Check if: there are dead containers
                     dead_containers = [
                         (kid, container)
-                        for kid, container in _containers
+                        for kid, container in container_listing.containers
                         if container.status in DEAD_STATUS_SET
                     ]
                     log.debug(
@@ -1915,7 +1919,7 @@ class AbstractAgent[
                         )
                     active_containers = [
                         (kid, container)
-                        for kid, container in _containers
+                        for kid, container in container_listing.containers
                         if container.status in ACTIVE_STATUS_SET
                     ]
                     log.debug(
@@ -1946,6 +1950,7 @@ class AbstractAgent[
                         if (
                             kernel_id in self.restarting_kernels
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                            or kernel_id in container_listing.kernel_ids_failed_to_inspect
                         ):
                             continue
                         log.info("kernel without container detected", kernel_id=kernel_id)
@@ -2336,9 +2341,8 @@ class AbstractAgent[
                     ),
                 )
         async with self.registry_lock:
-            for kernel_id, container in await self.enumerate_containers(
-                ACTIVE_STATUS_SET | DEAD_STATUS_SET,
-            ):
+            container_listing = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
+            for kernel_id, container in container_listing.containers:
                 session_id = SessionId(UUID(container.labels[LabelName.SESSION_ID]))
                 if container.status in ACTIVE_STATUS_SET:
                     kernelspec = int(container.labels.get(LabelName.KERNEL_SPEC, "1"))
