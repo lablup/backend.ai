@@ -75,6 +75,8 @@ jobs:
           cache-prefix: build
       - name: Build
         run: go build ./...
+      - name: Check that the integration tests carry the build tag
+        run: .github/scripts/check-build-tag.sh './tests/integration/...'
       - name: Tidy the module
         run: go mod tidy
       - name: Check that tidy changed nothing
