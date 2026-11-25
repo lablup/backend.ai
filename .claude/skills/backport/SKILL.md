@@ -110,7 +110,7 @@ Run every check inside the worktree.
    git commit -m "fix(BA-XXXX): resolve backport conflicts for <ver>"
    ```
    - The body states what was kept from the release branch and what `main`-only code was dropped.
-2. Push. The pre-push hook checks for rejected words:
+2. Push:
    ```bash
    git push origin "backport/<PR>-to-${ver}"
    ```

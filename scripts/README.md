@@ -41,8 +41,6 @@ current, see `AGENTS.md` in this directory.
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-commit.sh` | Runs `ruff format`, `ruff check` and `flake8` over the staged Python and BUILD files with the `lint` group of `pyproject.toml` installed into `dist/lint-venv`, and `golangci-lint fmt` and `run --fast-only --new-from-rev HEAD` when a `.go` file is staged | auto: `pre-commit` |
-| `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 
 ## Pull-request CI
 
@@ -53,7 +51,7 @@ current, see `AGENTS.md` in this directory.
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
 | `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto: `knowledge-check.yml`; person |
 | `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | auto: `knowledge-check.yml`; person |
-| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`, `pre-push.sh`; person |
+| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`; person |
 | `knowledge/check_bep_length.py` | Checks the length limits of BEP-1080 and later BEPs: lines, list items, design subsections | auto: `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto: `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto: `backport.yml` |
