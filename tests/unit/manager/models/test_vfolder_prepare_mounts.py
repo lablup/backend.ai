@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-from collections.abc import AsyncGenerator
-=======
 import enum
-import uuid
-from collections.abc import AsyncGenerator, Mapping, Sequence
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
->>>>>>> 1542d4f19 (fix(BAI-1028): mount the vfolder requested by id, not one of the same name (#17361))
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -26,6 +21,12 @@ from ai.backend.common.types import (
     VFolderMountRequest,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -42,6 +43,9 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -55,6 +59,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import (
+    VFolderOwnershipType,
     VFolderPermissionRow,
     VFolderRow,
     prepare_vfolder_mounts,
@@ -66,8 +71,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-<<<<<<< HEAD
-=======
 class _VFolderOwner(enum.Enum):
     USER = enum.auto()
     SESSION_PROJECT = enum.auto()
@@ -93,14 +96,6 @@ class _SameNamedVFolders:
     vfolder_ids: dict[_VFolderOwner, UUID]
 
 
-async def _held_in_full(
-    vfolder_ids: Sequence[VFolderUUID],
-) -> Mapping[EntityIdentifier, Permission]:
-    """Every bit on every folder: what is resolved is under test, not the permission."""
-    return dict.fromkeys(vfolder_ids, Permission.full())
-
-
->>>>>>> 1542d4f19 (fix(BAI-1028): mount the vfolder requested by id, not one of the same name (#17361))
 def _password_info() -> PasswordInfo:
     return PasswordInfo(
         password="dummy",
@@ -187,6 +182,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 KernelRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -486,18 +482,17 @@ class TestPrepareVFolderMountsSubpathFlow:
                     ownership_type=VFolderOwnershipType.GROUP,
                     user=None,
                     group=session_project_id,
-                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
+                )
+            )
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=PermissionScopeType.PROJECT,
+                    scope_id=str(session_project_id),
+                    entity_type=PermissionEntityType.USER,
+                    entity_id=str(user_uuid),
                 )
             )
             await db_sess.flush()
-            seeder = VirtualEntitySeeder()
-            await seeder.enroll_user_in_project(db_sess, session_project_id, user_uuid)
-            await seeder.create_in(
-                db_sess,
-                VFolderEntityType(),
-                project_vfolder_id,
-                [(ProjectEntityType(), session_project_id)],
-            )
         return _SameNamedVFolders(
             user_scope=UserScope(
                 domain_name=domain_name,
@@ -566,7 +561,6 @@ class TestPrepareVFolderMountsSubpathFlow:
                 resource_policy={
                     "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
                 },
-                held_permissions=_held_in_full,
                 mount_requests=[
                     VFolderMountRequest(
                         ref=same_named_vfolders.vfolder_ids[requested.owner],
