@@ -42747,6 +42747,123 @@
         "title": "VFolderAutoMountOrderField",
         "type": "string"
       },
+      "AdminSearchVFolderAutoMountsInput": {
+        "description": "Input for searching every vfolder auto-mount (superadmin).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchVFolderAutoMountsInput",
+        "type": "object"
+      },
       "VFolderAutoMountScope": {
         "description": "Scope for the scoped vfolder auto-mount query; the items are OR'd.",
         "properties": {
@@ -70138,6 +70255,35 @@
         },
         "parameters": [],
         "description": "Auto-mount a vfolder of a project or a user into every session created in that\nproject or by that user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolder-auto-mounts/search": {
+      "post": {
+        "operationId": "v2/vfolder-auto-mounts.admin_search",
+        "tags": [
+          "v2/vfolder-auto-mounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchVFolderAutoMountsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the auto-mounts of every project and user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/vfolder-auto-mounts/scoped/search": {
