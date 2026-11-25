@@ -256,7 +256,6 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound("There is no accessible vfolders at all.")
         return []
 
-    requested_names = set(requested_vfolder_names.values())
     resolved_vfolder_ids: set[uuid.UUID] = set()
     for row in accessible_vfolders:
         vfid = row["id"]
@@ -272,8 +271,6 @@ async def prepare_vfolder_mounts(
             continue
         if name in _already_resolved:
             continue
-        if name not in requested_names:
-            requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
 
     # A UUID-referenced request that matched no accessible vfolder would
@@ -289,28 +286,19 @@ async def prepare_vfolder_mounts(
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
 
-    # add automount folder list into requested_vfolder_names
-    # and requested_vfolder_subpath
-    for _vfolder in accessible_vfolders:
-        if _vfolder["name"].startswith("."):
-            requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
-            requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
-
     # The session's project comes first, so its folder wins a name shared with another.
     accessible_vfolders_map: dict[str, dict[str, Any]] = {}
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
-    # An auto-mount is keyed by its vfolder id; the requests come first so that an auto-mount
-    # gives way to a requested vfolder of the same name at the same path.
-    for requested_key, vfolder_name in sorted(
-        requested_vfolder_names.items(), key=lambda item: isinstance(item[0], uuid.UUID)
-    ):
-        if isinstance(requested_key, uuid.UUID) and any(
-            mount.name == vfolder_name
-            and mount.kernel_path == PurePosixPath("/home/work", vfolder_name)
-            for mount in matched_vfolder_mounts
-        ):
-            continue
+
+    # add automount folder list into requested_vfolder_names
+    # and requested_vfolder_subpath
+    for _vfolder in accessible_vfolders_map.values():
+        if _vfolder["name"].startswith(".") and _vfolder["id"] not in requested_vfolder_ids:
+            requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
+            requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
+
+    for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
