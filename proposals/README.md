@@ -152,6 +152,7 @@ BEP numbers start from 1000.
 | [1079](BEP-1079-vxlan-overlay-cluster-network.md) | VXLAN Overlay Cluster Network | Daemyung Jang | Draft |
 | [1080](BEP-1080-aggregate-ops.md) | Aggregate Ops | HyeokJin Kim | Draft |
 | [1082](BEP-1082-requested-field-read.md) | Requested Field Read | HyeokJin Kim | Draft |
+| [1083](BEP-1083-v2-development.md) | v2 Development | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
