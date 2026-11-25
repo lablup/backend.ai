@@ -150,7 +150,7 @@ class Container:
 class EnumerateContainersResult:
     containers: Sequence[tuple[KernelId, Container]]
     # Listed, but their containers could not be inspected.
-    kernel_ids_failed_to_inspect: frozenset[KernelId] = frozenset()
+    failed_kernel_ids: frozenset[KernelId] = frozenset()
 
 
 class KernelLifecycleStatus(enum.StrEnum):

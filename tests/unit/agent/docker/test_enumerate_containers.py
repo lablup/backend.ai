@@ -25,7 +25,7 @@ _KERNEL_ID = KernelId(UUID("9f8aa407-fbe4-46b3-b62e-f8641b255c9a"))
 class _InspectFailureCase:
     description: str
     inspect_error: Exception
-    expected_kernel_ids_failed_to_inspect: frozenset[KernelId] = field(default_factory=frozenset)
+    expected_failed_kernel_ids: frozenset[KernelId] = field(default_factory=frozenset)
 
 
 class TestListingAContainerThatFailsToBeInspected:
@@ -55,12 +55,12 @@ class TestListingAContainerThatFailsToBeInspected:
                 inspect_error=DockerError(
                     HTTPStatus.INTERNAL_SERVER_ERROR, "context deadline exceeded"
                 ),
-                expected_kernel_ids_failed_to_inspect=frozenset({_KERNEL_ID}),
+                expected_failed_kernel_ids=frozenset({_KERNEL_ID}),
             ),
             _InspectFailureCase(
                 description="Docker does not answer",
                 inspect_error=ClientConnectionError("server disconnected"),
-                expected_kernel_ids_failed_to_inspect=frozenset({_KERNEL_ID}),
+                expected_failed_kernel_ids=frozenset({_KERNEL_ID}),
             ),
         ],
         ids=lambda case: case.description,
@@ -71,7 +71,4 @@ class TestListingAContainerThatFailsToBeInspected:
         enumeration_result = await DockerAgent.enumerate_containers(cast(Any, docker_agent))
 
         assert enumeration_result.containers == []
-        assert (
-            enumeration_result.kernel_ids_failed_to_inspect
-            == case.expected_kernel_ids_failed_to_inspect
-        )
+        assert enumeration_result.failed_kernel_ids == case.expected_failed_kernel_ids

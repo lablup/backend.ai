@@ -1645,7 +1645,7 @@ class AbstractAgent[
                 dangling_kernel_ids = (
                     (registered_kernel_ids & kernel_ids_running_before_listing)
                     - alive_kernel_ids
-                    - enumeration_result.kernel_ids_failed_to_inspect
+                    - enumeration_result.failed_kernel_ids
                 )
                 if dangling_kernel_ids:
                     log.info(
@@ -1965,7 +1965,7 @@ class AbstractAgent[
                             kernel_id in self.restarting_kernels
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
                             or kernel_id not in kernel_ids_running_before_listing
-                            or kernel_id in enumeration_result.kernel_ids_failed_to_inspect
+                            or kernel_id in enumeration_result.failed_kernel_ids
                         ):
                             continue
                         log.info("kernel without container detected", kernel_id=kernel_id)

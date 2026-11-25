@@ -38,7 +38,7 @@ class TestRunningKernelFailedToInspect:
             id=AgentId("test-agent"),
             enumerate_containers=AsyncMock(
                 return_value=EnumerateContainersResult(
-                    containers=[], kernel_ids_failed_to_inspect=frozenset({kernel_id})
+                    containers=[], failed_kernel_ids=frozenset({kernel_id})
                 )
             ),
             registry_lock=asyncio.Lock(),

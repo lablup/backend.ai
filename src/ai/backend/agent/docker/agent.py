@@ -1900,7 +1900,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> EnumerateContainersResult:
         result = []
-        kernel_ids_failed_to_inspect: set[KernelId] = set()
+        failed_kernel_ids: set[KernelId] = set()
         fetch_tasks = []
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
@@ -1944,14 +1944,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             for name in listed_names:
                                 listed_kernel_id = await get_kernel_id_from_container(name)
                                 if listed_kernel_id is not None:
-                                    kernel_ids_failed_to_inspect.add(listed_kernel_id)
+                                    failed_kernel_ids.add(listed_kernel_id)
 
                 fetch_tasks.append(_fetch_container_info(container))
 
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return EnumerateContainersResult(
             containers=result,
-            kernel_ids_failed_to_inspect=frozenset(kernel_ids_failed_to_inspect),
+            failed_kernel_ids=frozenset(failed_kernel_ids),
         )
 
     @override
