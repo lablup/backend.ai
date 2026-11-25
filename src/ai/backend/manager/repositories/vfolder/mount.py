@@ -269,6 +269,7 @@ async def prepare_vfolder_mounts(
 
     requested_names = set(requested_vfolder_names.values())
     resolved_vfolder_ids: set[uuid.UUID] = set()
+    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {}
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
@@ -281,6 +282,7 @@ async def prepare_vfolder_mounts(
             # overlap for these is enforced later by ``is_mount_duplicate``.
             for index in uuid_request_indices.get(vfid, ()):
                 requested_vfolder_names[index] = name
+                vfolders_by_uuid_request[index] = row
             continue
         if name in _already_resolved:
             continue
@@ -312,8 +314,21 @@ async def prepare_vfolder_mounts(
     accessible_vfolders_map: dict[str, dict[str, Any]] = {}
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
-    for requested_key, vfolder_name in requested_vfolder_names.items():
-        if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
+    # An auto-mount is keyed by its vfolder id; the requests come first so that an auto-mount
+    # gives way to a requested vfolder of the same name at the same path.
+    for requested_key, vfolder_name in sorted(
+        requested_vfolder_names.items(), key=lambda item: isinstance(item[0], uuid.UUID)
+    ):
+        if isinstance(requested_key, uuid.UUID) and any(
+            mount.name == vfolder_name
+            and mount.kernel_path == PurePosixPath("/home/work", vfolder_name)
+            for mount in matched_vfolder_mounts
+        ):
+            continue
+        vfolder = vfolders_by_uuid_request.get(requested_key) or accessible_vfolders_map.get(
+            vfolder_name
+        )
+        if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             if vfolder["name"].startswith("."):
