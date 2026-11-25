@@ -46,31 +46,6 @@ def check_if_requester_is_eligible_to_act_as_target_user(
     return True
 
 
-async def check_if_requester_is_eligible_to_act_as_target_access_key(
-    conn: SAConnection,
-    requester_role: UserRole,
-    requester_domain: str,
-    target_access_key: AccessKey,
-) -> bool:
-    query = (
-        sa.select(users.c.domain_name, users.c.role)
-        .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
-        .where(keypairs.c.access_key == target_access_key)
-    )
-    result = await conn.execute(query)
-    row = result.first()
-    if row is None:
-        raise AccessKeyNotFound("Unknown owner access key")
-    owner_domain = row.domain_name
-    owner_role = row.role
-    return check_if_requester_is_eligible_to_act_as_target_user(
-        requester_role,
-        requester_domain,
-        owner_role,
-        owner_domain,
-    )
-
-
 async def check_if_requester_is_eligible_to_act_as_target_user_uuid(
     conn: SAConnection,
     requester_role: UserRole,
