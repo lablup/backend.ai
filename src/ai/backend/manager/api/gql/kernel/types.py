@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.v2.kernel.request import KernelFilter, Kernel
 from ai.backend.common.dto.manager.v2.kernel.response import (
     KernelClusterInfoGQLDTO,
     KernelLifecycleInfoGQLDTO,
+    KernelLiveStatInfo,
+    KernelLiveStatMetricInfo,
     KernelNetworkInfoGQLDTO,
     KernelNode,
     KernelResourceInfoGQLDTO,
@@ -323,6 +325,38 @@ class KernelV2LifecycleInfoGQL:
     )
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The latest value and the window statistics of one metric of a kernel.",
+    ),
+    model=KernelLiveStatMetricInfo,
+    name="KernelV2LiveStatMetric",
+)
+class KernelV2LiveStatMetricGQL:
+    metric_name: str = gql_field(description="The metric name (e.g., 'cpu_util', 'mem').")
+    current: str = gql_field(description="The latest value.")
+    capacity: str | None = gql_field(description="The upper bound of the value.")
+    pct: str = gql_field(description="The latest value as a percentage of the capacity.")
+    unit_hint: str = gql_field(description="The unit of the value (e.g., 'bytes', 'percent').")
+    stats_max: str = gql_field(description="The maximum over the statistics window.")
+    stats_avg: str = gql_field(description="The average over the statistics window.")
+    stats_rate: str = gql_field(description="The rate per second, for the network metrics.")
+    stats_diff: str = gql_field(description="The change of the value, for the CPU utilization.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The live statistics of a kernel, one entry per metric.",
+    ),
+    model=KernelLiveStatInfo,
+    name="KernelV2LiveStat",
+)
+class KernelV2LiveStatGQL(PydanticOutputMixin[KernelLiveStatInfo]):
+    metrics: list[KernelV2LiveStatMetricGQL] = gql_field(description="The metrics of the kernel.")
+
+
 # ========== Main Kernel Type ==========
 
 
@@ -484,6 +518,20 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     )
     async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
         return await info.context.data_loaders.kernel_resource_allocation_loader.load(
+            KernelID(UUID(str(self.id)))
+        )
+
+    @gql_added_resolver(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The latest values of the kernel's metrics, read from the metric store. "
+                "Null when the store has no sample of the kernel."
+            ),
+        )
+    )
+    async def live_stat(self, info: Info[StrawberryGQLContext]) -> KernelV2LiveStatGQL | None:
+        return await info.context.data_loaders.kernel_live_stat_loader.load(
             KernelID(UUID(str(self.id)))
         )
 
