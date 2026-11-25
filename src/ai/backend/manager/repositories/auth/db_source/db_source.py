@@ -302,7 +302,7 @@ class AuthDBSource:
             return await r.lookup_entity_id(lookup)
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_info_by_access_key(self, access_key: str) -> DelegationTarget:
+    async def fetch_delegation_target_by_access_key(self, access_key: str) -> DelegationTarget:
         """Join keypairs→users to get the owner of *access_key*.
 
         Raises ``ValueError`` if the access key is unknown.
