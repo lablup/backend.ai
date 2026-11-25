@@ -480,6 +480,8 @@ class SchedulerRepository:
             VFolderAutoMountSearcher(
                 pagination=NoPagination(),
                 conditions=[fields.deleted_at.filter.is_null()],
+                # Of auto-mounts whose destinations overlap, the first is mounted: the project's
+                # before the user's, then the one set earlier. Migrated rows share created_at.
                 orders=[
                     ConditionOrder(
                         fields.scope_type.filter.equals(VFolderAutoMountScopeType.PROJECT)
