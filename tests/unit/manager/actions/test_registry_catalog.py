@@ -52,6 +52,7 @@ from ai.backend.common.data.entity.system_session_environ import SystemSessionEn
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors.action_monitors import ActionMonitors
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
@@ -432,6 +433,10 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.manager.services.vfolder_auto_mount.actions.global_search import (
+    GlobalSearchVFolderAutoMountsAction,
+)
+from ai.backend.manager.services.vfolder_auto_mount.processors import VFolderAutoMountProcessors
 from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
@@ -1117,6 +1122,22 @@ def test_vfolder_allowed_types_read_is_public() -> None:
         VFolderEntityType(),
         ActionKind.GLOBAL,
         ActionGate.PUBLIC,
+    )
+
+
+def test_vfolder_auto_mount_admin_search_is_a_global_permission_read() -> None:
+    """The search naming no scope reads every auto-mount under the global gate."""
+    registry = _ops_registry()
+    VFolderAutoMountProcessors(registry.group(GroupMeta(VFolderAutoMountEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[GlobalSearchVFolderAutoMountsAction] == (
+        VFolderAutoMountEntityType(),
+        ActionKind.GLOBAL,
+        ActionGate.PERMISSION,
     )
 
 

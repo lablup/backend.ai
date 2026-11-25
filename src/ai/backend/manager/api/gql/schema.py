@@ -714,6 +714,7 @@ from ai.backend.manager.api.gql.user.resolver.query import (
     scoped_users_v2,
 )
 from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    admin_vfolder_auto_mounts,
     create_vfolder_auto_mount,
     delete_vfolder_auto_mount,
     scoped_vfolder_auto_mounts,
@@ -943,6 +944,7 @@ class Query:
     session_group = session_group
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
+    admin_vfolder_auto_mounts = admin_vfolder_auto_mounts
     scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
     auto_generated_file = auto_generated_file
     scoped_auto_generated_files = scoped_auto_generated_files

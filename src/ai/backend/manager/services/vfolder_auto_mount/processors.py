@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
     EntityOpsResult,
     ScopedBatchOpsResult,
 )
@@ -18,6 +20,9 @@ from ai.backend.manager.services.vfolder_auto_mount.actions.create import (
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.delete import (
     DeleteVFolderAutoMountAction,
+)
+from ai.backend.manager.services.vfolder_auto_mount.actions.global_search import (
+    GlobalSearchVFolderAutoMountsAction,
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.purge import (
     PurgeVFolderAutoMountAction,
@@ -42,6 +47,9 @@ class VFolderAutoMountProcessors:
 
     bulk_get_ids: PartialBulkActionProcessor[BulkGetVFolderAutoMountsAction, VFolderAutoMountData]
     create: ScopeActionProcessor[CreateVFolderAutoMountAction, CreateVFolderAutoMountActionResult]
+    global_search: GlobalActionProcessor[
+        GlobalSearchVFolderAutoMountsAction, BatchOpsResult[VFolderAutoMountData]
+    ]
     search: ScopeActionProcessor[
         SearchVFolderAutoMountsAction, ScopedBatchOpsResult[VFolderAutoMountData]
     ]
@@ -63,6 +71,7 @@ class VFolderAutoMountProcessors:
     ) -> None:
         self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetVFolderAutoMountsAction)
         self.create = group.scope(CreateVFolderAutoMountAction, service.create)
+        self.global_search = group.global_searcher_ops(GlobalSearchVFolderAutoMountsAction)
         self.search = group.scoped_search_ops(SearchVFolderAutoMountsAction)
         self.update = group.single_update_ops(UpdateVFolderAutoMountAction)
         self.delete = group.single_delete_ops(DeleteVFolderAutoMountAction)

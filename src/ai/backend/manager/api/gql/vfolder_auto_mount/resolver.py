@@ -6,6 +6,7 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    AdminSearchVFolderAutoMountsInput,
     ScopedSearchVFolderAutoMountsInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.response import (
@@ -19,6 +20,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
     CreateVFolderAutoMountInputGQL,
     CreateVFolderAutoMountPayloadGQL,
@@ -33,6 +35,42 @@ from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
     VFolderAutoMountOrderByGQL,
     VFolderAutoMountScopeGQL,
 )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the vfolder auto-mounts of every project and user (superadmin only). "
+            "Auto-mounts marked deleted are left out unless the filter names `deletedAt`."
+        ),
+    )
+)
+async def admin_vfolder_auto_mounts(
+    info: Info[StrawberryGQLContext],
+    filter: VFolderAutoMountFilterGQL | None = None,
+    order_by: list[VFolderAutoMountOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> VFolderAutoMountConnectionGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.vfolder_auto_mount.global_search(
+        AdminSearchVFolderAutoMountsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    return build_vfolder_auto_mount_connection(payload)
 
 
 @gql_root_field(

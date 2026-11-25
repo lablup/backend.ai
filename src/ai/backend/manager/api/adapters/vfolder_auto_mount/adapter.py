@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    AdminSearchVFolderAutoMountsInput,
     CreateVFolderAutoMountInput,
     DeleteVFolderAutoMountInput,
     ScopedSearchVFolderAutoMountsInput,
@@ -42,7 +43,7 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.scopes import ScopeTarget
-from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 from ai.backend.manager.models.vfolder_auto_mount.creators import VFolderAutoMountCreator
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
@@ -64,6 +65,9 @@ from ai.backend.manager.services.vfolder_auto_mount.actions.create import (
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.delete import (
     DeleteVFolderAutoMountAction,
+)
+from ai.backend.manager.services.vfolder_auto_mount.actions.global_search import (
+    GlobalSearchVFolderAutoMountsAction,
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.search import (
     SearchVFolderAutoMountsAction,
@@ -106,6 +110,29 @@ class VFolderAutoMountAdapter(BaseAdapter):
             else self.batch_load_failure(item.error)
             for item in result.items
         ]
+
+    async def global_search(
+        self, input: AdminSearchVFolderAutoMountsInput
+    ) -> SearchVFolderAutoMountsPayload:
+        """Search the auto-mounts of every project and user."""
+        searcher = self._build_searcher(
+            VFolderAutoMountSearcher,
+            conditions=self._search_conditions(input.filter),
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_VFOLDER_AUTO_MOUNT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._vfolder_auto_mount.global_search.run(
+            GlobalSearchVFolderAutoMountsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
+        )
+        return self._to_payload(result)
 
     async def scoped_search(
         self, input: ScopedSearchVFolderAutoMountsInput
