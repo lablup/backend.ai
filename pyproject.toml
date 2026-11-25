@@ -393,6 +393,11 @@ module = [
 ]
 ignore_errors = true
 
+# glide ships py.typed but leaves Script.__init__ unannotated
+[[tool.mypy.overrides]]
+module = "ai.backend.common.clients.valkey_client.*"
+disable_error_code = ["no-untyped-call"]
+
 [tool.pyright]
 pythonVersion = "3.13"
 extraPaths = ["src"]
