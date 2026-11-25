@@ -54,7 +54,7 @@ Go 로 대체하는 manager, agent, storage proxy 를 장기 개발 브랜치 `v
 | 1 | `main` 을 잠시 동결 |
 | 2 | 전환 브랜치에서 `main` 머지. 수정/삭제 충돌은 삭제로 정리하고, `main` 이 새로 추가한 파일로 다시 생긴 삭제한 디렉터리를 다시 삭제. `.github/workflows/ci.yml` 은 `main`(Python)과 `v2`(Go)가 같은 경로라 내용 충돌이 생기며 `v2` 쪽으로 정리 |
 | 3 | 충돌 목록으로 버그 수정의 Go 반영(`require:v2-port`)을 대조 |
-| 4 | `v2` → `main` PR 을 만들고 머지 커밋으로 머지. 전환 머지 커밋은 지금 `main` ruleset(linear history, squash 만 허용)에 막히므로 전환 때 ruleset 을 바꾸거나 우회 권한으로 머지 |
+| 4 | `v2` → `main` PR 을 만들고 머지 커밋으로 머지. 전환 머지 커밋은 지금 `main` ruleset(linear history, squash 만 허용)에서 차단되므로 전환 때 ruleset 을 바꾸거나 우회 권한으로 머지 |
 
 ### CI, 릴리스, 검증
 
@@ -63,7 +63,7 @@ base 가 `v2` 인 PR 은 PR 의 merge commit 의 워크플로를 쓰므로 `v2` 
 | 시점 | 검사 | 효과 |
 |---|---|---|
 | pre-commit | `golangci-lint fmt`, `run --fast-only`. `v2` 에는 pre-push hook 이 없음 | 커밋 전 검사 |
-| PR | 포맷, lint(golangci-lint), build(`go mod tidy` 차이 포함) | 머지를 막음 |
+| PR | 포맷, lint(golangci-lint), build(`go mod tidy` 차이 포함) | 머지 차단 |
 | PR | `go test -short`, 생성물 차이(`go generate` 후 diff) | 결과만 표시 |
 | `v2` push | 커밋마다 전체 테스트(DB, `-race`)와 생성물 차이 검사. 차이가 있으면 다시 생성한 PR 을 엶 | 사후 검사 |
 | 태그 릴리스 | 전체 테스트를 통과해야 빌드 | 빌드 조건 |
@@ -91,7 +91,7 @@ base 가 `v2` 인 PR 은 PR 의 merge commit 의 워크플로를 쓰므로 `v2` 
 - `main` 기여자: 새 alembic migration 파일은 CI 가 거부합니다.
 - `main` 기여자: Python 기능 개발은 AGENTS.md 규칙으로 금지합니다.
 - `main` 기여자: manager, agent, storage proxy 를 수정한 버그 수정은 `require:v2-port` 를 붙입니다.
-- CI: `v2` 에는 Go CI 만 있고, PR 은 포맷, lint, build 만 머지를 막습니다.
+- CI: `v2` 에는 Go CI 만 있고, PR 은 포맷, lint, build 만 머지를 차단합니다.
 - CI: `main` 대상 PR 은 새 alembic migration 파일을 거부합니다.
 - DB schema: 전환 후 schema 변경은 `v2` 의 migration 만 사용합니다.
 - 릴리스: 머지 후 프리뷰를 거쳐 정식 버전을 릴리스합니다. LTS 는 Python 릴리스 브랜치가 맡습니다.
