@@ -1629,6 +1629,12 @@ class AbstractAgent[
         cleanup_tasks: set[asyncio.Task[None]] = set()
         while True:
             try:
+                # A kernel that starts during the listing is absent from it.
+                kernel_ids_running_before_listing = {
+                    kid
+                    for kid, kernel in self.kernel_registry.items()
+                    if kernel.state == KernelLifecycleStatus.RUNNING
+                }
                 alive_containers = await self.enumerate_containers()
                 alive_kernel_ids = {kid for kid, _ in alive_containers}
                 registered_kernel_ids = {
@@ -1636,7 +1642,9 @@ class AbstractAgent[
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING
                 }
-                dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
+                dangling_kernel_ids = (
+                    registered_kernel_ids & kernel_ids_running_before_listing
+                ) - alive_kernel_ids
                 if dangling_kernel_ids:
                     log.info(
                         "dangling kernel objects cleanup started",
@@ -1871,6 +1879,12 @@ class AbstractAgent[
 
         log.debug("container lifecycle sync started")
         try:
+            # A kernel that starts during the listing is absent from it.
+            kernel_ids_running_before_listing = {
+                kernel_id
+                for kernel_id, kernel_obj in self.kernel_registry.items()
+                if kernel_obj.state == KernelLifecycleStatus.RUNNING
+            }
             _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
             async with self.registry_lock:
                 try:
@@ -1946,6 +1960,7 @@ class AbstractAgent[
                         if (
                             kernel_id in self.restarting_kernels
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                            or kernel_id not in kernel_ids_running_before_listing
                         ):
                             continue
                         log.info("kernel without container detected", kernel_id=kernel_id)
