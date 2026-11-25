@@ -10,6 +10,7 @@ and how it affects users and other developers.
 
 - [ ] Backport targets: a `fix:` PR goes to every version in `.github/maintained-versions.yml` automatically.
       A `Backport:` line here names the targets instead: some of them, other ones, or `none`.
+- [ ] A bug fix to `src/ai/backend/manager`, `agent` or `storage` carries the label `require:v2-port`
 - [ ] Mention the original issue
 - [ ] Installer updates including:
   - Fixtures for db schema changes

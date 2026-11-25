@@ -4,6 +4,9 @@
 
 ## Rules
 
+- **No new migration on `main`**: `main` takes no alembic migration. A schema change is a goose migration on `v2`.
+  A bug fix that needs a schema change requires user approval and the PR label `allow:alembic-migration`
+  (`alembic-freeze-check.yml`), and the same change is also added as a goose migration on `v2`.
 - **Backport = fixes only**: do not backport feature-level schema changes.
 - **Idempotency**: every backport migration (both `d` and `d'`) must be safe to re-apply by using existence checks
   (`IF NOT EXISTS`, `IF EXISTS`, `inspector`).
