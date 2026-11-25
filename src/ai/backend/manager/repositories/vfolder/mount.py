@@ -392,6 +392,9 @@ async def prepare_vfolder_mounts(
         if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         is_auto_mount = requested_key in auto_mount_keys
+        # Overlapping destinations are equal, or one is a parent directory of the other.
+        # A session with overlapping mounts is rejected, so the auto-mount gives way to the
+        # requested mounts and the auto-mounts before it.
         if is_auto_mount and _overlaps_any_mount(
             PurePosixPath(requested_vfolder_dstpaths[requested_key]), matched_vfolder_mounts
         ):
