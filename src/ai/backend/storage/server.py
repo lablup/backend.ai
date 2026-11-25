@@ -63,6 +63,7 @@ from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
@@ -139,6 +140,8 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
+    child_status: ChildStatus = _args[2][pidx]
+    child_status.publish_pid()
     local_config: StorageProxyUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
@@ -154,6 +157,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -620,6 +624,7 @@ async def server_main(
     loop.set_debug(local_config.debug.asyncio)
 
     storage_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await storage_init_stack.__aenter__()
     try:
         metric_registry = CommonMetricRegistry()
@@ -783,14 +788,17 @@ async def server_main(
             log.info("Changed process uid:gid to {}:{}", uid, gid)
 
         log.info("Started the storage-proxy service.")
-    except Exception:
+    except Exception as e:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
     try:
         yield
     finally:
         log.info("Shutting down...")
         await storage_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @click.group(invoke_without_command=True)
@@ -907,14 +915,18 @@ def main(
                 else:
                     extra_procs = tuple()
 
+                child_statuses = tuple(ChildStatus() for _ in range(num_workers))
+                child_exit_monitor = ChildExitMonitor(child_statuses)
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=num_workers,
                         extra_procs=extra_procs,
-                        args=(local_config, log_endpoint),
+                        main_ctxmgr=child_exit_monitor.main_context(),
+                        args=(local_config, log_endpoint, child_statuses),
                         runner=runner,
                     )
+                    child_exit_monitor.raise_system_exit()
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")

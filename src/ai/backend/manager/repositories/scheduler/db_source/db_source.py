@@ -3521,7 +3521,7 @@ class ScheduleDBSource:
                     status_data=sql_json_merge(
                         SessionRow.__table__.c.status_data,
                         ("error",),
-                        obj=error_info,
+                        obj=error_info["error"],
                     ),
                 )
             )
@@ -3535,7 +3535,7 @@ class ScheduleDBSource:
                     status_data=sql_json_merge(
                         KernelRow.__table__.c.status_data,
                         ("error",),
-                        obj=error_info,
+                        obj=error_info["error"],
                     ),
                 )
             )

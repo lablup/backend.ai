@@ -135,10 +135,10 @@ async def purge_image(
                 ],
                 filter_by_statuses=None,
             )
-            await session.delete(image_row)
-
             if remove_from_registry:
                 await image_row.untag_image_from_registry(db=db, session=session)
+
+            await session.delete(image_row)
 
         except UnknownImageReference:
             log.exception("Image not found.")

@@ -109,6 +109,7 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
@@ -1117,6 +1118,7 @@ async def server_main(
             await runner.cleanup()
 
     proxy_init_stack = AsyncExitStack()
+    init_error: Exception | None = None
     await proxy_init_stack.__aenter__()
     try:
         root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
@@ -1134,14 +1136,17 @@ async def server_main(
             log.info("changed process uid and gid to {}:{}", uid, gid)
 
         log.info("Started the app-proxy coordinator service.")
-    except Exception:
+    except Exception as e:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+        init_error = e
     try:
         yield
     finally:
         log.info("shutting down...")
         await proxy_init_stack.__aexit__(None, None, None)
+    if init_error is not None:
+        raise init_error
 
 
 @aiotools.server_context
@@ -1151,6 +1156,8 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: proxy-coordinator worker-{pidx}")
+    child_status: ChildStatus = _args[2][pidx]
+    child_status.publish_pid()
     local_config: ServerConfig = _args[0]
     log_endpoint: str = _args[1]
     logger = Logger(
@@ -1166,6 +1173,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -1249,14 +1257,18 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                child_statuses = (ChildStatus(),)
+                child_exit_monitor = ChildExitMonitor(child_statuses)
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=1,
-                        args=(server_config, log_endpoint),
+                        main_ctxmgr=child_exit_monitor.main_context(),
+                        args=(server_config, log_endpoint, child_statuses),
                         wait_timeout=5.0,
                         runner=runner,
                     )
+                    child_exit_monitor.raise_system_exit()
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")

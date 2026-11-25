@@ -17,6 +17,7 @@ __all__ = (
     "InvalidNotificationSpec",
     "NotificationChannelConflict",
     "NotificationChannelNotFound",
+    "NotificationDeliveryFailure",
     "NotificationProcessingFailure",
     "NotificationRuleConflict",
     "NotificationRuleNotFound",
@@ -102,6 +103,21 @@ class WebhookConnectionFailure(BackendAIError, web.HTTPBadRequest):
 
     error_type = "https://api.backend.ai/probs/webhook-connection-failure"
     error_title = "Failed to connect to the webhook URL."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class NotificationDeliveryFailure(BackendAIError, web.HTTPBadRequest):
+    """Raised when the channel's destination rejects the message: a webhook failure status or an SMTP error."""
+
+    error_type = "https://api.backend.ai/probs/notification-delivery-failure"
+    error_title = "The notification channel did not accept the message."
 
     @override
     def error_code(self) -> ErrorCode:
