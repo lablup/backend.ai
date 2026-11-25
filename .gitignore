@@ -1,85 +1,9 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Runtime data
-/run/
-
 # Distribution / packaging
-.Python
-/build/
 /dist/
-downloads/
-develop-eggs/
-eggs/
-.eggs/
-/lib/
-/lib64/
-/parts/
-/sdist/
-/var/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-/htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*,cover
-.hypothesis/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Sphinx documentation
-docs/_build/
-
-# IPython Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-.python-runtime
-
-# celery beat schedule file
-celerybeat-schedule
 
 # dotenv
 .env
 .envrc
-
-# virtualenv
-venv/
-.venv
-ENV/
 
 # IDE/vim
 /.idea
@@ -95,53 +19,16 @@ ENV/
 /.ripgreprc
 /.neoconf.json
 /.zed
-/.ropeproject
-/pyrightconfig.json
-
-# Pants
-/.pants.d/
-/.pids
-/.pants.workdir.file_lock*
-/.pants.rc
-/pants-local
-/tools/pants-src
 
 # Local configurations
-/account-manager*.toml
-/app-proxy*.toml
-/manager*.toml
-/agent*.toml
-/storage-proxy*.toml
-/webserver*.conf
-/cuda-mock*.toml
-/mock-accelerator*.toml
-/.pants.env
-/.pants.bootstrap
-/.pants.rc
 /docker-compose.halfstack.current.yml
-/alembic.ini
-/alembic-*.ini
-/dev.etcd.volumes.json
-/dev.etcd.installed.json
 /env-*.sh
-/*dummy*.toml
-/wsproxy.toml
 /grafana-dashboards
 /grafana-provisioning
 /prometheus.yaml
-/supergraph.graphql
-/gateway.config.ts
 /otel-collector-config.yaml
 /loki-config.yaml
 /tempo-config.yaml
-
-# backend.ai-install (single-host TUI installer) writes these into the repo in
-# DEVELOP mode; harbor/* only appears when installing with --with-harbor.
-/etcd.config.json
-/etcd.installed.json
-/vfolder/
-/harbor/
-/harbor-offline-installer-*.tgz
 
 # Local temp and installer-generated directories
 /.tmp/
@@ -156,22 +43,13 @@ logs/
 /*.pid
 /.postgres-volume-backup
 
-# Additional clones for editable components
-/src/ai/backend/webui/
-
-# Release artifacts
-/CHANGELOG_RELEASE.md
-/.towncrier.generated.toml
-
 # macOS specific
 .DS_Store
 ._.DS_Store
 
 # Generated files
-docs/manager/rest-reference/openapi.json
 backup.*.json
 /DIST-INFO
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
-/fixtures/agent/

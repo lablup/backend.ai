@@ -8,18 +8,8 @@ and how it affects users and other developers.
 
 **Checklist:** (if applicable)
 
-- [ ] Backport targets: a `fix:` PR goes to every version in `.github/maintained-versions.yml` automatically.
-      A `Backport:` line here names the targets instead: some of them, other ones, or `none`.
-- [ ] A bug fix to `src/ai/backend/manager`, `agent` or `storage` carries the label `require:v2-port`
 - [ ] Mention the original issue
-- [ ] Installer updates including:
-  - Fixtures for db schema changes
-  - New mandatory config options
-- [ ] Update of end-to-end CLI integration tests in `ai.backend.test`
 - [ ] API server-client counterparts (for example, manager API → client SDK)
 - [ ] Test case(s) to:
   - Demonstrate the difference of before and after
   - Demonstrate the flow of abstract and conceptual models with a concrete implementation
-- [ ] Documentation
-  - Contents in the `docs` directory
-  - docstrings in public interfaces and type annotations

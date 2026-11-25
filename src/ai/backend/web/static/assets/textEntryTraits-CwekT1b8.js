@@ -1,1 +1,0 @@
-function e({enterKeyHint:e,inputMode:t,autoCapitalize:n,hasAutoCorrect:r}){let i={};return e!=null&&(i.enterKeyHint=e),t!=null&&(i.inputMode=t),n!=null&&(i.autoCapitalize=n),r!=null&&(i.autoCorrect=r?`on`:`off`),i}export{e as t};

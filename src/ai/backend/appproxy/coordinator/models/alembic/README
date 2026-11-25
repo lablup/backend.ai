@@ -1,3 +1,0 @@
-Generic single-database configuration.
-
-For the migration backport strategy, see `src/ai/backend/manager/models/alembic/README.md`.

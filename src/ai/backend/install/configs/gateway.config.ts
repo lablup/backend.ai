@@ -1,1 +1,0 @@
-../../../../../configs/graphql/gateway.config.ts
