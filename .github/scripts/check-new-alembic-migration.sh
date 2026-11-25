@@ -20,7 +20,7 @@
 #   .github/scripts/check-new-alembic-migration.sh \
 #     --base-sha origin/main --head-sha HEAD
 
-set -e
+set -euo pipefail
 
 usage() {
   echo "Usage: $0 --base-sha <sha> --head-sha <sha> [options]"
@@ -62,8 +62,12 @@ if [ -z "$override_label" ]; then
   exit 2
 fi
 
-added=$(git diff --name-only --diff-filter=A "$base_sha...$head_sha" \
-  -- 'src/ai/backend/manager/models/alembic/versions/*.py' | grep -v '/__init__\.py$' || true)
+diff_out=$(git diff --name-only --diff-filter=A "$base_sha...$head_sha" \
+  -- 'src/ai/backend/manager/models/alembic/versions/*.py') || {
+  echo "Error: git diff failed for $base_sha...$head_sha" >&2
+  exit 2
+}
+added=$(printf '%s\n' "$diff_out" | grep -v '/__init__\.py$' | grep -v '^$' || true)
 
 if [ -z "$added" ]; then
   echo "The pull request adds no manager alembic migration." >&2
