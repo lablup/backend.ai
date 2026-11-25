@@ -369,7 +369,7 @@ Packages are placed in the `dist/` directory.
 
 ### Code Quality Hooks
 
-The git hooks (pre-commit, pre-push) run the low-cost checks, and CI runs the pants-based checks (lint, typecheck, test).
+The git hook (pre-commit) runs the low-cost checks, and CI runs the pants-based checks (lint, typecheck, test).
 See [BUILDING.md](BUILDING.md#automated-quality-checks) for what each hook runs.
 
 ### Development Guide

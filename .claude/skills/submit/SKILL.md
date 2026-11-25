@@ -178,7 +178,7 @@ With `--draft`, print `CI: not watched (draft)` instead.
 
 ### Hook or CI failure
 ```
-Failed at: {pre-commit | pre-push | CI job name}
+Failed at: {pre-commit | CI job name}
 
 Cause:
 {cause found from the hook output or the job log}

@@ -1,2 +1,0 @@
-# backend.ai monorepo standard pre-push hook
-"$(git rev-parse --show-toplevel)/scripts/pre-push.sh" "$@"

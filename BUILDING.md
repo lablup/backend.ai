@@ -54,11 +54,6 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 - CI handles type checking and tests (`ci.yml` lint-and-typecheck and test jobs)
 - Bypass with `git commit --no-verify` for work-in-progress commits, but not on main or release branches
 
-### Git Pre-push Hook (`scripts/pre-push.sh`)
-- Runs on every `git push`
-- Runs `scripts/knowledge/check_words.py` against the PR's base branch (`HEAD~1` without `gh`)
-- Does not run pants; CI runs lint, type checking and tests
-
 ### Ruff
 - Runs outside Pants. `pyproject.toml` holds the version (`[dependency-groups] lint`), the rules and the paths (`[tool.ruff]`)
 - CI, the pre-commit hook and `scripts/release.sh` install it with `uv pip install --group pyproject.toml:lint`; the hook and `release.sh` into `dist/lint-venv`

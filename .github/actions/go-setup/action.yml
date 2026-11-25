@@ -1,0 +1,42 @@
+name: go-setup
+description: Install the Go version of go.mod and restore the Go build and module caches. Saving is left to the caller.
+
+inputs:
+  cache-prefix:
+    description: Prefix of the cache key, one per job
+    required: true
+
+outputs:
+  cache-paths:
+    description: GOCACHE and GOMODCACHE, one per line
+    value: ${{ steps.paths.outputs.paths }}
+  cache-key-prefix:
+    description: The cache key without the commit
+    value: ${{ steps.paths.outputs.prefix }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: false
+    - name: Find the cache directories
+      id: paths
+      shell: bash
+      env:
+        PREFIX: ${{ inputs.cache-prefix }}
+        RUNNER_OS_NAME: ${{ runner.os }}
+      run: |
+        {
+          echo "paths<<EOF"
+          go env GOCACHE GOMODCACHE
+          echo "EOF"
+          echo "prefix=$PREFIX-$RUNNER_OS_NAME-"
+        } >> "$GITHUB_OUTPUT"
+    - name: Restore the Go caches
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.paths.outputs.paths }}
+        key: ${{ steps.paths.outputs.prefix }}${{ github.sha }}
+        restore-keys: ${{ steps.paths.outputs.prefix }}

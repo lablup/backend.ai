@@ -688,19 +688,6 @@ install_git_hooks() {
     cp scripts/pre-commit .git/hooks/pre-commit
     chmod +x .git/hooks/pre-commit
   fi
-  local magic_str="monorepo standard pre-push hook"
-  if [ -f .git/hooks/pre-push ]; then
-    grep -Fq "$magic_str" .git/hooks/pre-push
-    if [ $? -eq 0 ]; then
-      :
-    else
-      echo "" >> .git/hooks/pre-push
-      cat scripts/pre-push >> .git/hooks/pre-push
-    fi
-  else
-    cp scripts/pre-push .git/hooks/pre-push
-    chmod +x .git/hooks/pre-push
-  fi
 }
 
 check_python() {

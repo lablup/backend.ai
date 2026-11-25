@@ -64,7 +64,6 @@ async def install_git_hooks(ctx: Context) -> None:
         ctx.log.write(f"✓ The {hook_name} hook is already installed.")
 
     upsert_hook("pre-commit", "monorepo standard pre-commit hook")
-    upsert_hook("pre-push", "monorepo standard pre-push hook")
 
 
 async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:

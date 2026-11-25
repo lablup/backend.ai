@@ -1,0 +1,20 @@
+version: "2"
+
+linters:
+  exclusions:
+    paths:
+      - ^src/
+      - ^third-party-plugins/
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/lablup/backend.ai
+  exclusions:
+    paths:
+      - ^src/
+      - ^third-party-plugins/
