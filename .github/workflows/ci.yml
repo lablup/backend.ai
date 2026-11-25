@@ -69,7 +69,7 @@ jobs:
         with:
           lfs: false
           # The documents check compares with the base branch.
-          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
       - name: Set up Go
         id: go
         uses: ./.github/actions/go-setup
