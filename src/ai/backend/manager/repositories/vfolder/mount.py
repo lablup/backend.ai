@@ -269,7 +269,17 @@ async def prepare_vfolder_mounts(
 
     requested_names = set(requested_vfolder_names.values())
     resolved_vfolder_ids: set[uuid.UUID] = set()
-    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {}
+    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {
+        index: row
+        for row in accessible_vfolders
+        for index in uuid_request_indices.get(row["id"], ())
+    }
+    # A vfolder requested at /home/work/<its name> replaces the auto-mount of that name.
+    for request_key, requested_vfolder in vfolders_by_uuid_request.items():
+        name = requested_vfolder["name"]
+        dst_path = requested_vfolder_dstpaths.get(request_key, name)
+        if PurePosixPath("/home/work", dst_path) == PurePosixPath("/home/work", name):
+            _already_resolved.add(name)
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
@@ -282,7 +292,6 @@ async def prepare_vfolder_mounts(
             # overlap for these is enforced later by ``is_mount_duplicate``.
             for index in uuid_request_indices.get(vfid, ()):
                 requested_vfolder_names[index] = name
-                vfolders_by_uuid_request[index] = row
             continue
         if name in _already_resolved:
             continue
@@ -306,7 +315,7 @@ async def prepare_vfolder_mounts(
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
-        if _vfolder["name"].startswith("."):
+        if _vfolder["name"].startswith(".") and _vfolder["name"] not in _already_resolved:
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
@@ -314,17 +323,7 @@ async def prepare_vfolder_mounts(
     accessible_vfolders_map: dict[str, dict[str, Any]] = {}
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
-    # An auto-mount is keyed by its vfolder id; the requests come first so that an auto-mount
-    # gives way to a requested vfolder of the same name at the same path.
-    for requested_key, vfolder_name in sorted(
-        requested_vfolder_names.items(), key=lambda item: isinstance(item[0], uuid.UUID)
-    ):
-        if isinstance(requested_key, uuid.UUID) and any(
-            mount.name == vfolder_name
-            and mount.kernel_path == PurePosixPath("/home/work", vfolder_name)
-            for mount in matched_vfolder_mounts
-        ):
-            continue
+    for requested_key, vfolder_name in requested_vfolder_names.items():
         vfolder = vfolders_by_uuid_request.get(requested_key) or accessible_vfolders_map.get(
             vfolder_name
         )
