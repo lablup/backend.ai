@@ -15,12 +15,13 @@ import sqlalchemy as sa
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.types import UserData
+from ai.backend.manager.data.auth.types import DelegationTarget, UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
+from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -611,3 +612,22 @@ class TestAuthRepository:
         )
 
         assert result is None
+
+    async def test_delegation_target_is_the_owner_of_the_access_key(
+        self, auth_repository: AuthRepository, sample_user_data: UserTestData
+    ) -> None:
+        result = await auth_repository.get_delegation_target_by_access_key(
+            sample_user_data.access_key
+        )
+
+        assert result == DelegationTarget(
+            user_id=UserID(sample_user_data.uuid),
+            domain_name=sample_user_data.domain_name,
+            role=UserRole.USER,
+        )
+
+    async def test_delegation_target_of_an_unknown_access_key_is_not_found(
+        self, auth_repository: AuthRepository
+    ) -> None:
+        with pytest.raises(AccessKeyNotFound):
+            await auth_repository.get_delegation_target_by_access_key("AKIAUNKNOWN0000000000")
