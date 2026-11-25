@@ -14,6 +14,8 @@ from ai.backend.common.metrics.types import CAPACITY_SENTINEL, CAPACITY_SENTINEL
 from ai.backend.common.types import KernelId
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.clients.prometheus.metric_types import (
+    DIFF_METRICS,
+    RATE_METRICS,
     KernelLiveStatValues,
     resolve_container_metric_unit_hint,
 )
@@ -52,8 +54,8 @@ class MetricAdapter(BaseAdapter):
             unit_hint=resolve_container_metric_unit_hint(name),
             stats_max=values.rate_max.get(name) or values.max.get(name) or "0",
             stats_avg=values.rate_avg.get(name) or values.avg.get(name) or "0",
-            stats_rate=(current or "0") if name in ("net_rx", "net_tx") else "0",
-            stats_diff=(current or "0") if name == "cpu_util" else "0",
+            stats_rate=(current or "0") if name in RATE_METRICS else "0",
+            stats_diff=(current or "0") if name in DIFF_METRICS else "0",
         )
 
     async def batch_get_kernel_live_stats(
