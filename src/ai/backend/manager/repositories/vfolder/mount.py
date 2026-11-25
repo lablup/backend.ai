@@ -98,17 +98,6 @@ def check_overlapping_mounts(mounts: Iterable[str | PurePosixPath]) -> None:
                 )
 
 
-def is_mount_duplicate(
-    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
-) -> bool:
-    for mount in mounts:
-        if mount.vfid != folder_id:
-            continue
-        if subpath.is_relative_to(mount.vfsubpath) or mount.vfsubpath.is_relative_to(subpath):
-            return True
-    return False
-
-
 async def query_reachable_vfolders(
     conn: SAConnection,
     user_scope: UserScope,
@@ -269,6 +258,7 @@ async def prepare_vfolder_mounts(
 
     requested_names = set(requested_vfolder_names.values())
     resolved_vfolder_ids: set[uuid.UUID] = set()
+    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {}
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
@@ -276,11 +266,11 @@ async def prepare_vfolder_mounts(
             resolved_vfolder_ids.add(vfid)
             # Bind every UUID-referenced request for this vfolder to its
             # resolved name. Each request keeps its own subpath/destination/
-            # options (captured above), so multiple subpaths of one vfolder
-            # all survive into the mount loop (lablup/backend.ai#11936). Source
-            # overlap for these is enforced later by ``is_mount_duplicate``.
+            # options (captured above), so one vfolder mounted at several
+            # destinations survives into the mount loop (lablup/backend.ai#11936).
             for index in uuid_request_indices.get(vfid, ()):
                 requested_vfolder_names[index] = name
+                vfolders_by_uuid_request[index] = row
             continue
         if name in _already_resolved:
             continue
@@ -304,7 +294,7 @@ async def prepare_vfolder_mounts(
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
-        if _vfolder["name"].startswith("."):
+        if _vfolder["name"].startswith(".") and _vfolder["id"] not in requested_vfolder_ids:
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
@@ -313,7 +303,10 @@ async def prepare_vfolder_mounts(
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
     for requested_key, vfolder_name in requested_vfolder_names.items():
-        if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
+        vfolder = vfolders_by_uuid_request.get(requested_key) or accessible_vfolders_map.get(
+            vfolder_name
+        )
+        if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             if vfolder["name"].startswith("."):
@@ -348,8 +341,6 @@ async def prepare_vfolder_mounts(
         if unmanaged_path := cast(str | None, vfolder["unmanaged_path"]):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(".")
-            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
-                continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
@@ -393,8 +384,6 @@ async def prepare_vfolder_mounts(
         if vfolder["name"] == ".local" and is_project_vfolder:
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
-            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
-                continue
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
             manager_client = storage_manager.get_manager_facing_client(proxy_name)
@@ -420,8 +409,6 @@ async def prepare_vfolder_mounts(
             # Normal vfolders
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(requested_vfolder_subpaths[requested_key])
-            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
-                continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -72,6 +73,18 @@ from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+
+@dataclass(frozen=True)
+class _RequestedMount:
+    mount_destination: str
+    subpath: str
+
+
+@dataclass(frozen=True)
+class _SameVFolderMountsCase:
+    name: str
+    requested_mounts: list[_RequestedMount]
 
 
 async def _held_in_full(
@@ -429,15 +442,33 @@ class TestPrepareVFolderMountsSubpathFlow:
         assert by_dst["/home/work/in1"].host_path == PurePosixPath("/data/mount-base/shards/a")
         assert by_dst["/home/work/in2"].host_path == PurePosixPath("/data/mount-base/shards/b")
 
-    async def test_same_vfolder_duplicate_subpath_is_deduplicated(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _SameVFolderMountsCase(
+                name="whole-vfolder-twice",
+                requested_mounts=[
+                    _RequestedMount("/home/work/in1", "."),
+                    _RequestedMount("/home/work/in2", "."),
+                ],
+            ),
+            _SameVFolderMountsCase(
+                name="directory-and-one-inside-it",
+                requested_mounts=[
+                    _RequestedMount("/home/work/in1", "shards"),
+                    _RequestedMount("/home/work/in2", "shards/a"),
+                ],
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_same_vfolder_is_mounted_at_each_destination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         fixture_vfolder: tuple[UUID, str, UUID, UUID],
         mock_storage_manager: MagicMock,
+        case: _SameVFolderMountsCase,
     ) -> None:
-        """Two requests for the identical ``(vfolder, subpath)`` collapse to a
-        single mount — ``is_mount_duplicate`` still guards overlapping sources
-        even though the per-request keys are distinct."""
         user_uuid, domain_name, group_id, vfolder_id = fixture_vfolder
         async with db_with_cleanup.connect() as conn:
             mounts = await prepare_vfolder_mounts(
@@ -457,19 +488,83 @@ class TestPrepareVFolderMountsSubpathFlow:
                 mount_requests=[
                     VFolderMountRequest(
                         ref=vfolder_id,
-                        dst_path="/home/work/in1",
-                        options=VFolderMountOptions(subpath="shards/a"),
-                    ),
+                        dst_path=requested.mount_destination,
+                        options=VFolderMountOptions(subpath=requested.subpath),
+                    )
+                    for requested in case.requested_mounts
+                ],
+            )
+
+        assert [
+            _RequestedMount(str(mount.kernel_path), str(mount.vfsubpath)) for mount in mounts
+        ] == case.requested_mounts
+
+    @pytest.fixture
+    async def project_vfolder_of_the_same_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+    ) -> UUID:
+        """A folder of the session's project named like the user's own folder."""
+        user_uuid, domain_name, group_id, personal_vfolder_id = fixture_vfolder
+        vfolder_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    host="proxy:noop",
+                    domain_name=domain_name,
+                    quota_scope_id=QuotaScopeID.parse(f"project:{group_id}"),
+                    name=f"vf-{personal_vfolder_id.hex[:6]}",
+                    ownership_type=VFolderOwnershipType.GROUP,
+                    user=None,
+                    group=group_id,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
+                )
+            )
+            await db_sess.flush()
+            seeder = VirtualEntitySeeder()
+            await seeder.enroll_user_in_project(db_sess, group_id, user_uuid)
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), vfolder_id, [(ProjectEntityType(), group_id)]
+            )
+        return vfolder_id
+
+    async def test_vfolders_sharing_a_name_are_mounted_by_their_own_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        project_vfolder_of_the_same_name: UUID,
+        mock_storage_manager: MagicMock,
+    ) -> None:
+        user_uuid, domain_name, group_id, personal_vfolder_id = fixture_vfolder
+        async with db_with_cleanup.connect() as conn:
+            mounts = await prepare_vfolder_mounts(
+                conn=conn,
+                storage_manager=mock_storage_manager,
+                allowed_vfolder_types=["user", "group"],
+                user_scope=UserScope(
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    user_role=UserRole.USER,
+                ),
+                resource_policy={
+                    "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
+                },
+                held_permissions=_held_in_full,
+                mount_requests=[
+                    VFolderMountRequest(ref=personal_vfolder_id, dst_path="/home/work/personal"),
                     VFolderMountRequest(
-                        ref=vfolder_id,
-                        dst_path="/home/work/in2",
-                        options=VFolderMountOptions(subpath="shards/a"),
+                        ref=project_vfolder_of_the_same_name, dst_path="/home/work/project"
                     ),
                 ],
             )
 
-        assert len(mounts) == 1
-        assert mounts[0].vfsubpath == PurePosixPath("shards/a")
+        assert {str(mount.kernel_path): mount.vfid.folder_id for mount in mounts} == {
+            "/home/work/personal": personal_vfolder_id,
+            "/home/work/project": project_vfolder_of_the_same_name,
+        }
 
     async def test_inaccessible_uuid_request_raises_not_found(
         self,
