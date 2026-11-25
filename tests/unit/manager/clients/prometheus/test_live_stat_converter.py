@@ -7,7 +7,7 @@ import pytest
 from ai.backend.common.metrics.types import CAPACITY_SENTINEL
 from ai.backend.common.types import KernelId
 from ai.backend.common.types import MetricValue as LegacyMetricValue
-from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConverter
+from ai.backend.manager.clients.prometheus.live_stat_converter import LegacyLiveStatConverter
 from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     KernelLiveStatValues,
