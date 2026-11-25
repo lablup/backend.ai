@@ -82,6 +82,7 @@ from ai.backend.manager.views.sokovan.search import (
 )
 from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
+    SessionStatusTransition,
     SweptSessionInfo,
     TerminatingSessionData,
 )
@@ -287,13 +288,13 @@ class SchedulerRepository:
         session_ids: list[SessionId],
         to_status: SessionStatus,
         reason: KernelLifecycleEventReason,
-    ) -> list[SessionId]:
+    ) -> list[SessionStatusTransition]:
         """
         Move sessions to ``to_status``, skipping the sessions whose current
         status cannot enter it. A move to PENDING re-enqueues the sessions'
         kernels in the same transaction.
 
-        Returns the IDs of the sessions actually transitioned.
+        Returns the status changes of the sessions actually transitioned.
         """
         return await self._db_source.mark_sessions_status(session_ids, to_status, reason)
 
@@ -579,7 +580,7 @@ class SchedulerRepository:
         error_msg: str,
         image_ref: str | None = None,
         image_id: UUID | None = None,
-    ) -> set[SessionId]:
+    ) -> list[SessionStatusTransition]:
         """
         Cancel kernels for an image that failed to be available on an agent.
         Also checks and cancels sessions if all their kernels are cancelled.
@@ -589,25 +590,30 @@ class SchedulerRepository:
         :param error_msg: The error message to include in status
         :param image_ref: Optional image reference
         :param image_id: Optional image UUID; when provided, matches by image_id instead of name
-        :return: Set of affected session IDs
+        :return: Status changes of the sessions transitioned to CANCELLED
         """
         affected_session_ids = await self._db_source.cancel_kernels_for_failed_image(
             agent_id, image, error_msg, image_ref, image_id
         )
 
         # Check if any sessions need to be cancelled
+        cancelled: list[SessionStatusTransition] = []
         for session_id in affected_session_ids:
-            await self._db_source.check_and_cancel_session_if_needed(session_id)
+            transition = await self._db_source.check_and_cancel_session_if_needed(session_id)
+            if transition is not None:
+                cancelled.append(transition)
 
-        return affected_session_ids
+        return cancelled
 
     @scheduler_repository_resilience.apply()
-    async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
+    async def check_and_cancel_session_if_needed(
+        self, session_id: SessionId
+    ) -> SessionStatusTransition | None:
         """
         Check if a session should be cancelled when all its kernels are cancelled.
 
         :param session_id: The session ID to check
-        :return: True if session was cancelled, False otherwise
+        :return: The status change if the session was cancelled, None otherwise
         """
         return await self._db_source.check_and_cancel_session_if_needed(session_id)
 
@@ -854,11 +860,11 @@ class SchedulerRepository:
         self,
         updater: SessionStatusBatchUpdater,
         histories: Sequence[SessionHistoryToCreate],
-    ) -> int:
+    ) -> list[SessionStatusTransition]:
         """Move the sessions the updater selects and record each transition, in one
         transaction.
 
-        Returns the number of sessions updated.
+        Returns the status change of each session updated, with the status it held before.
         """
         return await self._db_source.update_with_history(updater, histories)
 

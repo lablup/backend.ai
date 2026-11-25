@@ -147,6 +147,7 @@ The scheduler is the engine that runs the scheduling algorithms. It queries pend
 - **SchedulerRepository**: database access
 - **AgentRPCPool**: RPC communication with agents
 - **HookRegistry**: runs the status-based transition hooks
+- **PostTransitionHookRegistry**: runs the hooks registered for committed session status transitions
 
 **Core Methods:**
 
@@ -631,6 +632,28 @@ TerminatedTransitionHook runs when a session transitions to TERMINATED. It handl
 **HookRegistry:**
 
 HookRegistry provides a hook by SessionStatus. The coordinator calls `get_hook(status)` for a transition and runs the hook when it exists. Every hook blocks: a failure prevents the status transition.
+
+#### PostTransitionHook
+
+A `PostTransitionHook` (`hooks/post_transition.py`) runs after a session status transition is committed. It cannot affect the transition.
+
+```python
+class PostTransitionHook(ABC):
+    @abstractmethod
+    async def on_transitioned(self, transitions: Sequence[SessionStatusTransition]) -> None: ...
+```
+
+- `SessionStatusTransition` (`views/sokovan/session.py`) holds `session_id`, `from_status` and `to_status`. The repository reads `from_status` from the row it locks before the update.
+- `PostTransitionHookRegistry.register(hook, statuses)` registers a hook for the given target statuses. `register_for_all_transitions(hook)` registers a hook for every target status.
+- `notify(transitions)` drops the transitions whose `from_status` equals `to_status`, groups the rest by `to_status`, and runs the matching hooks of each group concurrently. A hook gets one group, never empty. A hook failure is logged and does not affect the other hooks or the transition.
+- One registry is created in the dependency composer and shared by every component that commits a session status transition. Each commit calls `notify` with the transitions it wrote:
+
+| Component | Commit |
+|---|---|
+| `ScheduleCoordinator._apply_transition` | `SchedulerRepository.update_with_history` (handler results, promotions) |
+| `SchedulingController.mark_sessions_status` | `SchedulerRepository.mark_sessions_status` |
+| `SchedulingController.mark_sessions_for_termination` | `SchedulerRepository.mark_sessions_terminating` (CANCELLED, TERMINATING, TERMINATED) |
+| `KernelStateEngine` | `SchedulerRepository.check_and_cancel_session_if_needed`, `cancel_kernels_for_failed_image` (CANCELLED) |
 
 ## State-Specific Handlers
 

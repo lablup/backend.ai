@@ -93,6 +93,16 @@ class V2BatchWriteOps(V2GraphWriteOpsBase):
         scope_condition: sa.ColumnElement[bool] | None,
         updater: DataBatchUpdater[TRow, TData],
     ) -> list[TData]:
+        return [
+            updater.to_data(row)
+            for row in await self._batch_update_returning_rows(scope_condition, updater)
+        ]
+
+    async def _batch_update_returning_rows[TRow: Base, TData](
+        self,
+        scope_condition: sa.ColumnElement[bool] | None,
+        updater: DataBatchUpdater[TRow, TData],
+    ) -> list[TRow]:
         row_class = updater.row_class
         table = row_class.__table__
         stmt = sa.update(table).values(updater.build_values())
@@ -107,4 +117,4 @@ class V2BatchWriteOps(V2GraphWriteOpsBase):
             self._match_integrity_error(
                 self._parse_integrity_error(e), updater.integrity_error_checks
             )
-        return [updater.to_data(row_class(**dict(r._mapping))) for r in result.fetchall()]
+        return [row_class(**dict(r._mapping)) for r in result.fetchall()]

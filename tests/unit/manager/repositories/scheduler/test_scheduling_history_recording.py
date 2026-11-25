@@ -122,6 +122,7 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.views.sokovan.session import SessionStatusTransition
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -1813,6 +1814,13 @@ class TestMarkTerminatingSchedulingHistory:
 
         result = await db_source.mark_sessions_terminating([running_session_id])
         assert running_session_id in result.terminating_sessions
+        assert result.transitions == [
+            SessionStatusTransition(
+                session_id=running_session_id,
+                from_status=SessionStatus.RUNNING,
+                to_status=SessionStatus.TERMINATING,
+            )
+        ]
 
         # Verify scheduling history record was created
         async with db_with_cleanup.begin_readonly_session() as db_sess:

@@ -26,6 +26,9 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -67,6 +70,7 @@ class AgentsInput:
     deployment_revision_preset_repository: DeploymentPresetRepository | None
     runtime_variant_repository: RuntimeVariantRepository
     agent_selector: AgentSelector
+    post_transition_hooks: PostTransitionHookRegistry
     ops_provider: V2DBOpsProvider
 
 
@@ -115,6 +119,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
                 agent_selector=setup_input.agent_selector,
+                post_transition_hooks=setup_input.post_transition_hooks,
             ),
         )
 

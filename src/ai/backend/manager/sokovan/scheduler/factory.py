@@ -19,6 +19,9 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.system_session_environ.repository import (
     SystemSessionEnvironRepository,
 )
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
@@ -110,6 +113,7 @@ def create_default_scheduler_components(
     network_plugin_ctx: NetworkPluginContext,
     valkey_schedule: ValkeyScheduleClient,
     agent_selector: AgentSelector,
+    post_transition_hooks: PostTransitionHookRegistry,
 ) -> SchedulerComponents:
     """
     Create scheduler components with default configuration.
@@ -123,6 +127,7 @@ def create_default_scheduler_components(
         network_plugin_ctx: Network plugin context for network management
         valkey_schedule: Valkey client for scheduling operations
         agent_selector: Agent selector shared with the scheduling controller
+        post_transition_hooks: Post-transition hooks shared with the scheduling controller
 
     Returns:
         A configured SchedulerComponents instance
@@ -177,6 +182,7 @@ def create_default_scheduler_components(
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
         network_plugin_ctx=network_plugin_ctx,
+        post_transition_hooks=post_transition_hooks,
     )
 
 

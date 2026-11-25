@@ -71,6 +71,15 @@ class SweptSessionInfo:
     access_key: AccessKey
 
 
+@dataclass(frozen=True)
+class SessionStatusTransition:
+    """A session status change a commit wrote, with the status the row held before it."""
+
+    session_id: SessionId
+    from_status: SessionStatus
+    to_status: SessionStatus
+
+
 @dataclass
 class MarkTerminatingResult:
     """Result of marking sessions for termination."""
@@ -81,6 +90,7 @@ class MarkTerminatingResult:
     skipped_sessions: list[
         SessionId
     ]  # Sessions not processed (already terminated, not found, etc.)
+    transitions: list[SessionStatusTransition]  # Status changes of the processed sessions
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""

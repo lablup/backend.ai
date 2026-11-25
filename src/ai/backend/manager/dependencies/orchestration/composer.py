@@ -41,6 +41,9 @@ from ai.backend.manager.repositories.system_session_environ.repository import (
 )
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -87,6 +90,7 @@ class OrchestrationInput:
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
     agent_selector: AgentSelector
+    post_transition_hooks: PostTransitionHookRegistry
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
     route_controller: RouteController
@@ -175,6 +179,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             valkey_live=setup_input.valkey_live,
             valkey_stat=setup_input.valkey_stat,
             agent_selector=setup_input.agent_selector,
+            post_transition_hooks=setup_input.post_transition_hooks,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             route_controller=setup_input.route_controller,

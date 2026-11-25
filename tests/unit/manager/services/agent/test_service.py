@@ -328,6 +328,7 @@ class TestUpdateResourceGroup:
             terminating_sessions=terminating,
             force_terminated_sessions=[],
             skipped_sessions=[],
+            transitions=[],
         )
 
     @staticmethod

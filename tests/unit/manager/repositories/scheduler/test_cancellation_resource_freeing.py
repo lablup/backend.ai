@@ -65,6 +65,7 @@ from ai.backend.manager.repositories.ops.v2.reconciler.provider import Reconcile
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.views.sokovan.session import SessionStatusTransition
 from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -548,6 +549,31 @@ class TestCancelFreesResourceAllocations:
 
         assert session_id in affected
         await self._assert_all_freed(db_with_cleanup, kernel_id)
+
+    async def test_check_and_cancel_session_returns_transition_once(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        pulling_session_on_agent: tuple[SessionId, KernelId, str],
+    ) -> None:
+        session_id, _kernel_id, agent_id = pulling_session_on_agent
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
+        await db_source.cancel_kernels_for_failed_image(
+            AgentId(agent_id), "python:3.8", "image pull failed for test"
+        )
+
+        first = await db_source.check_and_cancel_session_if_needed(session_id)
+        second = await db_source.check_and_cancel_session_if_needed(session_id)
+
+        assert first == SessionStatusTransition(
+            session_id=session_id,
+            from_status=SessionStatus.PREPARING,
+            to_status=SessionStatus.CANCELLED,
+        )
+        assert second is None
 
     async def _seed_agent_reserved(
         self, db: ExtendedAsyncSAEngine, agent_id: str, *, cpu: Decimal, mem: Decimal

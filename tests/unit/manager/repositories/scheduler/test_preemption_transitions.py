@@ -35,6 +35,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.views.sokovan.session import SessionStatusTransition
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
@@ -132,7 +133,13 @@ class TestMarkSessionsPreempted:
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).mark_sessions_status([session_id], SessionStatus.PREEMPTED, _REASON)
 
-        assert preempted == [session_id]
+        assert preempted == [
+            SessionStatusTransition(
+                session_id=session_id,
+                from_status=SessionStatus.RUNNING,
+                to_status=SessionStatus.PREEMPTED,
+            )
+        ]
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.PREEMPTED
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kernel_status = await db_sess.scalar(
@@ -217,7 +224,13 @@ class TestMarkSessionsRescheduling:
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).mark_sessions_status([session_id], SessionStatus.RESCHEDULING, _REASON)
 
-        assert marked == [session_id]
+        assert marked == [
+            SessionStatusTransition(
+                session_id=session_id,
+                from_status=SessionStatus.PREEMPTED,
+                to_status=SessionStatus.RESCHEDULING,
+            )
+        ]
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.RESCHEDULING
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kernel_status = await db_sess.scalar(
@@ -330,7 +343,13 @@ class TestRequeueSessionsToPending:
         )
 
         assert reset == 1
-        assert requeued == [session_id]
+        assert requeued == [
+            SessionStatusTransition(
+                session_id=session_id,
+                from_status=SessionStatus.RESCHEDULING,
+                to_status=SessionStatus.PENDING,
+            )
+        ]
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             session_row = (
                 await db_sess.execute(

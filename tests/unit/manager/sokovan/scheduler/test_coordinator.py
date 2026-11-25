@@ -40,6 +40,7 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
     HookExecutionResult,
     ScheduleCoordinator,
 )
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHookRegistry
 from ai.backend.manager.sokovan.scheduler.post_processors.base import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -50,6 +51,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import LastPhase
+from ai.backend.manager.views.sokovan.session import SessionStatusTransition
 
 # =============================================================================
 # Test Fixtures
@@ -742,6 +744,7 @@ class TestScheduleCoordinatorStatusTransition:
         coordinator._repository = AsyncMock()
         coordinator._kernel_state_engine = AsyncMock()
         coordinator._event_producer = AsyncMock()
+        coordinator._post_transition_hooks = PostTransitionHookRegistry()
         return coordinator
 
     async def test_success_transition_applied(
@@ -1000,7 +1003,7 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.PENDING,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.update_with_history = AsyncMock(return_value=[])
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1034,7 +1037,7 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.SCHEDULED,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.update_with_history = AsyncMock(return_value=[])
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1070,10 +1073,12 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater: Any, histories: Any) -> int:
+        async def capture_update_with_history(
+            updater: Any, histories: Any
+        ) -> list[SessionStatusTransition]:
             nonlocal captured_updater
             captured_updater = updater
-            return 1
+            return []
 
         mock_coordinator._repository.update_with_history = capture_update_with_history
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
@@ -1095,6 +1100,99 @@ class TestScheduleCoordinatorStatusTransition:
         built = captured_updater.build_values()
         assert "status_info" in built
         assert built["status_info"] is None
+
+    async def test_post_transition_hooks_receive_changed_transitions(
+        self,
+        mock_coordinator: MagicMock,
+        recording_post_transition_hook: AsyncMock,
+    ) -> None:
+        """Post-transition hooks get only the transitions whose status actually changed.
+
+        Given: The repository updated two sessions, one of which was already RUNNING
+        When: Apply transition is called
+        Then: An all-transition hook is called once with the changed transition only
+        """
+        # Arrange
+        changed_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        unchanged_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        changed = SessionStatusTransition(
+            session_id=changed_info.session_id,
+            from_status=SessionStatus.CREATING,
+            to_status=SessionStatus.RUNNING,
+        )
+        unchanged = SessionStatusTransition(
+            session_id=unchanged_info.session_id,
+            from_status=SessionStatus.RUNNING,
+            to_status=SessionStatus.RUNNING,
+        )
+        transition = TransitionStatus(session=SessionStatus.RUNNING, kernel=None)
+        mock_coordinator._post_transition_hooks.register_for_all_transitions(
+            recording_post_transition_hook
+        )
+        mock_coordinator._repository.update_with_history = AsyncMock(
+            return_value=[changed, unchanged]
+        )
+
+        # Act
+        await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name="test_handler",
+            session_infos=[changed_info, unchanged_info],
+            transition=transition,
+            scheduling_result=SchedulingResult.SUCCESS,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert
+        recording_post_transition_hook.on_transitioned.assert_awaited_once_with([changed])
+
+    async def test_failing_post_transition_hook_does_not_affect_transition(
+        self,
+        mock_coordinator: MagicMock,
+        failing_post_transition_hook: AsyncMock,
+        recording_post_transition_hook: AsyncMock,
+    ) -> None:
+        """A failing post-transition hook leaves the transition and other hooks unaffected.
+
+        Given: A failing hook and a recording hook, a PENDING transition with kernel reset
+        When: Apply transition is called
+        Then: It returns normally, kernels are reset and the other hook is called
+        """
+        # Arrange
+        session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        committed = SessionStatusTransition(
+            session_id=session_info.session_id,
+            from_status=SessionStatus.PREPARING,
+            to_status=SessionStatus.PENDING,
+        )
+        transition = TransitionStatus(
+            session=SessionStatus.PENDING,
+            kernel=KernelStatus.PENDING,
+        )
+        mock_coordinator._post_transition_hooks.register_for_all_transitions(
+            failing_post_transition_hook
+        )
+        mock_coordinator._post_transition_hooks.register_for_all_transitions(
+            recording_post_transition_hook
+        )
+        mock_coordinator._repository.update_with_history = AsyncMock(return_value=[committed])
+        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
+
+        # Act
+        await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name="test_handler",
+            session_infos=[session_info],
+            transition=transition,
+            scheduling_result=SchedulingResult.NEED_RETRY,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert
+        mock_coordinator._apply_kernel_pending_resets.assert_awaited_once()
+        recording_post_transition_hook.on_transitioned.assert_awaited_once_with([committed])
 
 
 # =============================================================================

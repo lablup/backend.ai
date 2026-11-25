@@ -31,6 +31,7 @@ class TestSchedulingControllerDependency:
             network_plugin_ctx=MagicMock(),
             hook_plugin_ctx=MagicMock(),
             agent_selector=MagicMock(),
+            post_transition_hooks=MagicMock(),
         )
 
         dependency = SchedulingControllerDependency()

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -10,6 +12,7 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import PostTransitionHook
 
 # =============================================================================
 # Coordinator test fixtures
@@ -36,3 +39,22 @@ def status_transitions_success_only() -> StatusTransitions:
         expired=None,
         give_up=None,
     )
+
+
+# =============================================================================
+# Post-transition hook fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def recording_post_transition_hook() -> AsyncMock:
+    """A post-transition hook that records its calls."""
+    return AsyncMock(spec=PostTransitionHook)
+
+
+@pytest.fixture
+def failing_post_transition_hook() -> AsyncMock:
+    """A post-transition hook that always raises."""
+    hook = AsyncMock(spec=PostTransitionHook)
+    hook.on_transitioned.side_effect = RuntimeError("post-transition hook failure")
+    return hook

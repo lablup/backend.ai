@@ -53,6 +53,9 @@ from ai.backend.manager.metrics.scheduler import (
 from ai.backend.manager.plugin.hook_args import PostEnqueueSessionHookArgs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.hooks.post_transition import (
+    PostTransitionHookRegistry,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
@@ -164,6 +167,7 @@ class SchedulingControllerArgs:
     network_plugin_ctx: NetworkPluginContext
     hook_plugin_ctx: HookPluginContext
     agent_selector: AgentSelector
+    post_transition_hooks: PostTransitionHookRegistry
 
 
 class SchedulingController:
@@ -183,6 +187,7 @@ class SchedulingController:
     _metric_observer: SchedulerPhaseMetricObserver
     _operation_metrics: SchedulerOperationMetricObserver
     _hook_plugin_ctx: HookPluginContext
+    _post_transition_hooks: PostTransitionHookRegistry
 
     def __init__(self, args: SchedulingControllerArgs) -> None:
         """Initialize the scheduling controller with required services."""
@@ -193,6 +198,7 @@ class SchedulingController:
         self._valkey_schedule = args.valkey_schedule
         self._network_plugin_ctx = args.network_plugin_ctx
         self._hook_plugin_ctx = args.hook_plugin_ctx
+        self._post_transition_hooks = args.post_transition_hooks
 
         # Initialize metric observers (singletons)
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
@@ -562,6 +568,7 @@ class SchedulingController:
             forced=forced,
             message=message,
         )
+        await self._post_transition_hooks.notify(result.transitions)
         if result.has_processed():
             log.trace(
                 "sessions marked for termination",
@@ -641,11 +648,11 @@ class SchedulingController:
         Returns:
             IDs of the sessions actually transitioned.
         """
-        marked_sessions = await self._repository.mark_sessions_status(
-            session_ids, to_status, reason
-        )
-        if not marked_sessions:
-            return marked_sessions
+        transitions = await self._repository.mark_sessions_status(session_ids, to_status, reason)
+        if not transitions:
+            return []
+        await self._post_transition_hooks.notify(transitions)
+        marked_sessions = [transition.session_id for transition in transitions]
 
         log.trace(
             "sessions marked with status", session_count=len(marked_sessions), to_status=to_status
