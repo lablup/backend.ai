@@ -1908,7 +1908,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 async def _fetch_container_info(container: DockerContainer) -> None:
                     kernel_id_str: str = "(unknown)"
                     # An inspection replaces the listed fields.
-                    listed_names: Sequence[str] = container._container.get("Names") or []
+                    listed_kernel_ids: set[KernelId] = set()
+                    for name in container._container.get("Names") or []:
+                        listed_kernel_id = await get_kernel_id_from_container(name)
+                        if listed_kernel_id is not None:
+                            listed_kernel_ids.add(listed_kernel_id)
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
                         if kernel_id is None:
@@ -1926,25 +1930,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                         container_from_docker_container(container),
                                     ),
                                 )
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception as e:
-                        if isinstance(e, DockerError) and e.status == HTTPStatus.NOT_FOUND:
+                    except DockerError as e:
+                        if e.status == HTTPStatus.NOT_FOUND:
                             log.debug(
                                 "container vanished during enumeration",
                                 container_id=container._id,
                                 kernel_id=kernel_id_str,
                             )
-                        else:
-                            log.exception(
-                                "container info fetch failed",
-                                container_id=container._id,
-                                kernel_id=kernel_id_str,
-                            )
-                            for name in listed_names:
-                                listed_kernel_id = await get_kernel_id_from_container(name)
-                                if listed_kernel_id is not None:
-                                    failed_kernel_ids.add(listed_kernel_id)
+                            return
+                        failed_kernel_ids.update(listed_kernel_ids)
+                        raise
+                    except asyncio.CancelledError:
+                        pass
+                    except Exception:
+                        failed_kernel_ids.update(listed_kernel_ids)
+                        log.exception(
+                            "container info fetch failed",
+                            container_id=container._id,
+                            kernel_id=kernel_id_str,
+                        )
 
                 fetch_tasks.append(_fetch_container_info(container))
 
