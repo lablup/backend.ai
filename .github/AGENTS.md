@@ -28,7 +28,11 @@ A script whose decision cannot be reproduced by running it by hand is in the wro
 ## CI (`v2`)
 
 - `ci.yml` runs on pull requests into and pushes to `v2`. The Python workflows are deleted on `v2`; a `pull_request` event runs the workflow files of the merge commit, so `main` keeps its own.
-- `ci-gate` collects `fmt`, `lint` and `build` on a pull request. `test-short` and `generate-diff` report without being in the gate. `test` (with `-race` and Postgres) runs on a push only.
+- Put the jobs of one trigger and purpose in one workflow file: the checks of a pull request and a push to `v2` in `ci.yml`, a tag release in `release.yml` (not yet there).
+- The required check is one status-collecting job, `ci-gate` (`if: always()`). Do not put a `paths` filter on a workflow that holds a required check.
+- When two workflows need the same job, move it to a reusable workflow (`workflow_call`).
+- The Go setup is the composite action `go-setup`. The decision on the event and the branch stays in the workflow YAML.
+- The pull request gate is `fmt`, `lint` and `build`. `test-short` and `generate-diff` report on a pull request without being in the gate. The full test (`test`, with `-race` and Postgres) runs on a push to `v2` and on a release.
 - The Go caches (`GOCACHE`, `GOMODCACHE`) are restored by `actions/go-setup` and saved by each job on a push only: key `<job>-<os>-<sha>`, restored by the prefix.
 - A push to `v2` where `go generate ./...` changes files opens the pull request `go-generate/v2` with `.github/scripts/open-go-generate-pr.sh`.
 - The other workflows: `pr-prefix.yml`, `auto-author-assign.yml`, `cancel-superseded.yml` (cancels superseded `ci.yml` runs), `cleanup-pr-caches.yml`, `stale-pr.yml`, `devskim.yml`, `osv-scanner.yml`, `nvd-cve-watch.yml`.
