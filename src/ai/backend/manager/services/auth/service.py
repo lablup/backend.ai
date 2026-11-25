@@ -857,12 +857,9 @@ class AuthService:
                 owner_access_key=requester_ak,
             )
         owner_ak = AccessKey(action.owner_access_key)
-        try:
-            owner = await self._auth_repository.get_delegation_target_by_access_key(
-                action.owner_access_key,
-            )
-        except ValueError as e:
-            raise InvalidAPIParameters(str(e)) from e
+        owner = await self._auth_repository.get_delegation_target_by_access_key(
+            action.owner_access_key,
+        )
         if owner.user_id == acting.user_id:
             # Another keypair of the acting user is not a delegation.
             return PublicResolveAccessKeyScopeResult(

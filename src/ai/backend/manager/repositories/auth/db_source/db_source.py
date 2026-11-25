@@ -37,6 +37,7 @@ from ai.backend.manager.data.auth.types import (
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
+    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -305,7 +306,7 @@ class AuthDBSource:
     async def fetch_delegation_target_by_access_key(self, access_key: str) -> DelegationTarget:
         """Join keypairs→users to get the owner of *access_key*.
 
-        Raises ``ValueError`` if the access key is unknown.
+        Raises ``AccessKeyNotFound`` if the access key is unknown.
         """
         async with self._db.begin_readonly() as conn:
             query = (
@@ -316,7 +317,7 @@ class AuthDBSource:
             result = await conn.execute(query)
             row = result.first()
             if row is None:
-                raise ValueError("Unknown owner access key")
+                raise AccessKeyNotFound("Unknown owner access key")
             return DelegationTarget(
                 user_id=UserID(row.uuid),
                 domain_name=row.domain_name,

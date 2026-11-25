@@ -8,10 +8,10 @@ from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.types import DelegationTarget
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.errors.auth import AccessKeyNotFound
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -134,18 +134,18 @@ class TestResolveAccessKeyScope:
             with pytest.raises(GenericForbidden):
                 await auth_service.resolve_access_key_scope(action)
 
-    async def test_nonexistent_owner_access_key_raises_invalid_params(
+    async def test_nonexistent_owner_access_key_raises_not_found(
         self,
         auth_service: AuthService,
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.side_effect = ValueError(
+        mock_auth_repository.get_delegation_target_by_access_key.side_effect = AccessKeyNotFound(
             "Unknown owner access key"
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key="NONEXISTENT_KEY")
         with with_user_context(acting_user(UserRole.SUPERADMIN)):
-            with pytest.raises(InvalidAPIParameters):
+            with pytest.raises(AccessKeyNotFound):
                 await auth_service.resolve_access_key_scope(action)
 
     async def test_cross_domain_admin_raises_forbidden(
