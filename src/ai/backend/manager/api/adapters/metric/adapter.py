@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal, InvalidOperation
 
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.dto.manager.v2.kernel.response import (
     KernelLiveStatInfo,
     KernelLiveStatMetricInfo,
 )
-from ai.backend.common.types import KernelId, MetricValue
+from ai.backend.common.metrics.types import CAPACITY_SENTINEL, CAPACITY_SENTINEL_METRICS
+from ai.backend.common.types import KernelId
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.clients.prometheus.live_stat_converter import LegacyLiveStatConverter
+from ai.backend.manager.clients.prometheus.metric_types import (
+    KernelLiveStatValues,
+    resolve_container_metric_unit_hint,
+)
 from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
     BatchGetKernelLiveStatsAction,
 )
@@ -27,17 +32,28 @@ class MetricAdapter(BaseAdapter):
         self._metric = metric
 
     @staticmethod
-    def _metric_value_to_info(name: str, value: MetricValue) -> KernelLiveStatMetricInfo:
+    def _metric_to_info(values: KernelLiveStatValues, name: str) -> KernelLiveStatMetricInfo:
+        # The rate queries answer only the counter metrics, whose rate is the meaningful value.
+        current = values.rate_current.get(name) or values.instant_current.get(name)
+        capacity = values.instant_capacity.get(name)
+        if current is not None and name in CAPACITY_SENTINEL_METRICS:
+            capacity = CAPACITY_SENTINEL
+        pct = "0"
+        try:
+            if current is not None and capacity is not None and Decimal(capacity) > 0:
+                pct = f"{Decimal(current) / Decimal(capacity) * 100:.2f}"
+        except InvalidOperation:
+            pass
         return KernelLiveStatMetricInfo(
             metric_name=name,
-            current=value["current"],
-            capacity=value["capacity"],
-            pct=value["pct"],
-            unit_hint=value["unit_hint"],
-            stats_max=value["stats.max"],
-            stats_avg=value["stats.avg"],
-            stats_rate=value["stats.rate"],
-            stats_diff=value["stats.diff"],
+            current=current or "0",
+            capacity=capacity or "0",
+            pct=pct,
+            unit_hint=resolve_container_metric_unit_hint(name),
+            stats_max=values.rate_max.get(name) or values.max.get(name) or "0",
+            stats_avg=values.rate_avg.get(name) or values.avg.get(name) or "0",
+            stats_rate=(current or "0") if name in ("net_rx", "net_tx") else "0",
+            stats_diff=(current or "0") if name == "cpu_util" else "0",
         )
 
     async def batch_get_kernel_live_stats(
@@ -52,19 +68,26 @@ class MetricAdapter(BaseAdapter):
         action_result = await self._metric.batch_get_kernel_live_stats.run(
             BatchGetKernelLiveStatsAction(kernel_ids=list(kernel_ids))
         )
-        ids = [KernelId(kernel_id) for kernel_id in kernel_ids]
-        converted = LegacyLiveStatConverter.convert(ids, action_result.stats)
         live_stats: list[KernelLiveStatInfo | None] = []
-        for kernel_id in ids:
-            metrics = converted.get(kernel_id)
-            if metrics is None:
+        for kernel_id in kernel_ids:
+            values = action_result.stats.by_kernel.get(KernelId(kernel_id))
+            metric_names = (
+                values.instant_current.keys()
+                | values.instant_capacity.keys()
+                | values.rate_current.keys()
+                | values.max.keys()
+                | values.rate_max.keys()
+                | values.avg.keys()
+                | values.rate_avg.keys()
+                if values is not None
+                else set()
+            )
+            if values is None or not metric_names:
                 live_stats.append(None)
                 continue
             live_stats.append(
                 KernelLiveStatInfo(
-                    metrics=[
-                        self._metric_value_to_info(name, value) for name, value in metrics.items()
-                    ]
+                    metrics=[self._metric_to_info(values, name) for name in sorted(metric_names)]
                 )
             )
         return live_stats
