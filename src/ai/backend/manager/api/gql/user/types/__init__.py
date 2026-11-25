@@ -1,1 +1,0 @@
-"""User GraphQL types package."""

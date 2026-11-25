@@ -1,3 +1,0 @@
-"""
-Scheduler operation handlers.
-"""

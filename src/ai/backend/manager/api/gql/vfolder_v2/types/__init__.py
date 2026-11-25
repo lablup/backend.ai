@@ -1,1 +1,0 @@
-"""VFolder GraphQL types package."""

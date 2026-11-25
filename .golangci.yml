@@ -3,7 +3,6 @@ version: "2"
 linters:
   exclusions:
     paths:
-      - ^src/
       - ^third-party-plugins/
 
 formatters:
@@ -16,5 +15,4 @@ formatters:
         - github.com/lablup/backend.ai
   exclusions:
     paths:
-      - ^src/
       - ^third-party-plugins/

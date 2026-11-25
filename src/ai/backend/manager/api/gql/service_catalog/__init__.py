@@ -1,1 +1,0 @@
-"""GraphQL service catalog module."""

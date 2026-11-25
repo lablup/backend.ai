@@ -1,1 +1,0 @@
-"""Label GQL types."""

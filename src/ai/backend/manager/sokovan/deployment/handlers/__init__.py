@@ -1,3 +1,0 @@
-"""
-Deployment lifecycle operation handlers.
-"""

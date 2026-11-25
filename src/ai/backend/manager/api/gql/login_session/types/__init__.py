@@ -1,1 +1,0 @@
-"""LoginSession GraphQL types package."""

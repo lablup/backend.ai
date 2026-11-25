@@ -1,1 +1,0 @@
-"""Fair Share repository package."""

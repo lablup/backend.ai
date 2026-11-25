@@ -1,1 +1,0 @@
-"""Resource Slot repository package."""
