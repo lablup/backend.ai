@@ -1,0 +1,39 @@
+name: release
+
+# Release of `v2`: the full test, then the binaries of `cmd/` as artifacts.
+# The tag pattern is a placeholder; it is decided at the transition.
+
+on:
+  push:
+    tags:
+      - 'v2-*'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: release
+      - name: Build the binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: .github/scripts/build-release.sh dist
+      - name: Upload the binaries
+        if: hashFiles('dist/*') != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: binaries
+          path: dist/
