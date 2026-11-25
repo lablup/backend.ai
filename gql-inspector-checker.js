@@ -57,6 +57,8 @@ const ACCEPTED_TYPE_CHANGES = {
   "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
   "Mutation.purgeSessionGroup": NULLABLE_MUTATION_PAYLOAD,
+  "Query.myAppConfigs":
+    "The list became nullable so a failed read, such as a 401 before login, leaves the other fields of the response. The field is null only where the whole response was null before.",
 };
 
 const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];
