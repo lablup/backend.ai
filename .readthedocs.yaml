@@ -1,0 +1,8 @@
+# v2 does not build docs. BAI-1162 restores the build.
+version: 2
+build:
+  os: "ubuntu-24.04"
+  tools:
+    python: "3.13"
+  commands:
+    - exit 183
