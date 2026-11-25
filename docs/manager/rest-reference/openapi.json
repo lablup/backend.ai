@@ -42679,7 +42679,7 @@
         "type": "object"
       },
       "CreateVFolderAutoMountInput": {
-        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or be owned by that user.",
+        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or to that user's personal project.",
         "properties": {
           "scope": {
             "$ref": "#/components/schemas/VFolderAutoMountScopeRef",
