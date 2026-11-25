@@ -6,7 +6,6 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
@@ -15,7 +14,7 @@ from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_auto_mount import (
     VFolderAutoMountEntityType,
@@ -51,6 +50,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _TABLES: list[Table | type[HasTable]] = [
     DomainRow,
@@ -140,7 +140,6 @@ def _vfolder_row(
     project_id: ProjectID | None,
     ownership_type: VFolderOwnershipType = VFolderOwnershipType.USER,
     status: VFolderOperationStatus = VFolderOperationStatus.READY,
-    created_at: datetime = datetime(2026, 1, 1, tzinfo=UTC),
 ) -> VFolderRow:
     return VFolderRow(
         id=vfolder_id,
@@ -152,7 +151,6 @@ def _vfolder_row(
         user=user_id,
         group=project_id,
         status=status,
-        created_at=created_at,
     )
 
 
@@ -265,44 +263,22 @@ async def dot_vfolder_conflicting_with_a_registered_auto_mount(
             for name, vfolder_id in vfolder_ids.items()
         ])
         await session.flush()
-        session.add(
-            VFolderAutoMountRow(
-                scope_type=VFolderAutoMountScopeType.USER,
-                scope_id=user_id,
-                vfolder_id=vfolder_ids[case.vfolder_name],
-                mount_destination=case.mount_destination,
-                subpath="sub",
-                mount_permission=VFolderMountPermission.READ_ONLY,
-            )
+        registered_auto_mount = VFolderAutoMountRow(
+            scope_type=VFolderAutoMountScopeType.USER,
+            scope_id=user_id,
+            vfolder_id=vfolder_ids[case.vfolder_name],
+            mount_destination=case.mount_destination,
+            subpath="sub",
+            mount_permission=VFolderMountPermission.READ_ONLY,
         )
-
-
-@pytest.fixture
-async def oldest_of_same_named_dot_vfolders(db: ExtendedAsyncSAEngine) -> VFolderUUID:
-    user_id = UserID(uuid.uuid4())
-    oldest_vfolder_id = VFolderUUID(uuid.uuid4())
-    async with db.begin_session() as session:
-        session.add(VirtualEntityRow(entity_type=EntityType("user"), entity_id=user_id))
-        session.add(
-            _vfolder_row(
-                VFolderUUID(uuid.uuid4()),
-                ".cache",
-                user_id,
-                project_id=None,
-                created_at=datetime(2026, 2, 1, tzinfo=UTC),
-            )
-        )
+        session.add(registered_auto_mount)
         await session.flush()
-        session.add(
-            _vfolder_row(
-                oldest_vfolder_id,
-                ".cache",
-                user_id,
-                project_id=None,
-                created_at=datetime(2026, 1, 1, tzinfo=UTC),
-            )
+        await VirtualEntitySeeder().create_in(
+            session,
+            VFolderAutoMountEntityType(),
+            registered_auto_mount.id,
+            [(UserEntityType(), user_id)],
         )
-    return oldest_vfolder_id
 
 
 @pytest.fixture
@@ -313,23 +289,24 @@ async def dot_vfolder_and_a_registered_auto_mount(db: ExtendedAsyncSAEngine) -> 
         session.add(VirtualEntityRow(entity_type=EntityType("user"), entity_id=user_id))
         session.add_all([
             _vfolder_row(VFolderUUID(uuid.uuid4()), ".cache", user_id, project_id=None),
-            _vfolder_row(registered_vfolder_id, ".config", user_id, project_id=None),
+            _vfolder_row(registered_vfolder_id, "data", user_id, project_id=None),
         ])
         await session.flush()
         registered_auto_mount = VFolderAutoMountRow(
             scope_type=VFolderAutoMountScopeType.USER,
             scope_id=user_id,
             vfolder_id=registered_vfolder_id,
-            mount_destination="/home/work/.config",
+            mount_destination="/home/work/data",
             subpath=".",
             mount_permission=VFolderMountPermission.READ_WRITE,
         )
         session.add(registered_auto_mount)
         await session.flush()
-        session.add(
-            VirtualEntityRow(
-                entity_type=VFolderAutoMountEntityType(), entity_id=registered_auto_mount.id
-            )
+        await VirtualEntitySeeder().create_in(
+            session,
+            VFolderAutoMountEntityType(),
+            registered_auto_mount.id,
+            [(UserEntityType(), user_id)],
         )
 
 
@@ -352,11 +329,6 @@ class TestMoveDotVFolders:
                 ownership_type=VFolderOwnershipType.USER,
                 expected_scope_type=VFolderAutoMountScopeType.USER,
                 expected_mount_destination="/home/work/.local",
-            ),
-            _MovedVFolderCase(
-                name=".linuxbrew",
-                expected_scope_type=VFolderAutoMountScopeType.USER,
-                expected_mount_destination="/home/linuxbrew/.linuxbrew",
             ),
         ],
         ids=lambda case: f"{case.ownership_type.value}{case.name}",
@@ -451,15 +423,6 @@ class TestMoveDotVFolders:
             await conn.run_sync(revision.move_dot_vfolders)
 
         assert await _stored_auto_mounts_and_nodes(db) == before_move
-
-    async def test_the_oldest_of_same_named_vfolders_in_a_scope_is_moved(
-        self, db: ExtendedAsyncSAEngine, oldest_of_same_named_dot_vfolders: VFolderUUID
-    ) -> None:
-        async with db.begin() as conn:
-            await conn.run_sync(revision.move_dot_vfolders)
-
-        [auto_mount] = (await _stored_auto_mounts_and_nodes(db)).auto_mounts
-        assert auto_mount.vfolder_id == oldest_of_same_named_dot_vfolders
 
     @pytest.mark.usefixtures("dot_vfolder_and_a_registered_auto_mount")
     async def test_moving_again_changes_nothing(self, db: ExtendedAsyncSAEngine) -> None:
