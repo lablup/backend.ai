@@ -58,3 +58,10 @@ Worked examples: `scripts/sync-changelog-to-main.sh` (arguments, `--dry-run`, pl
 
 - `test-record.yml` runs every `unit` and `component` test on each push to main (`plan-ci-targets.py --full-run`, then `ci-pytest.yml`), sums the testcase `time` of each file from the junit reports with `scripts/compute-test-durations.py`, and saves `test-durations.json` (`{"<suite>": {"<path>": <seconds>}}`) as `test-durations-main-<sha>`. The older `test-durations-main-*` entries are deleted. A failed test fails the run after the save.
 - `plan-targets` of `ci.yml` restores the newest `test-durations-main-*` and passes it to `plan-ci-targets.py --durations`. Only a push to main saves it.
+
+## Go (`v2`)
+
+- `ci-go.yml` runs on pull requests into and pushes to `v2`. The Python workflows (`ci.yml`, `timeline-check.yml`, `check-version-change.yml`, `update-api-schema.yml`, `docs-preview.yml`, `knowledge-check.yml`) list `branches-ignore: [v2]`. A new workflow that assumes Python does the same.
+- `go-ci-gate` collects `go-fmt`, `go-lint` and `go-build` on a pull request. `go-test-short` and `go-generate-diff` report without being in the gate. `go-test` (with `-race` and Postgres) runs on a push only.
+- The Go caches (`GOCACHE`, `GOMODCACHE`) are restored by `actions/go-setup` and saved by each job on a push only: key `go-<job>-<os>-<sha>`, restored by the prefix.
+- A push to `v2` where `go generate ./...` changes files opens the pull request `go-generate/v2` with `.github/scripts/open-go-generate-pr.sh`.

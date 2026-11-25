@@ -2,6 +2,7 @@ name: update-api-schema
 
 on:
   pull_request:
+    branches-ignore: [v2]
     paths:
       - 'src/ai/backend/manager/models/**'
       - 'src/ai/backend/manager/api/**'

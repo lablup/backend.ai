@@ -1,6 +1,7 @@
 name: docs-preview
 on:
   pull_request:
+    branches-ignore: [v2]
     types: [opened, reopened, labeled, unlabeled, synchronize]
 
 permissions:

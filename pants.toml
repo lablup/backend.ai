@@ -23,6 +23,10 @@ pants_ignore = [
     "/plugins/",
     "/docs/",  # TODO: docs build config
     "/proposals/",
+    "/cmd/",
+    "/internal/",
+    "/api/",
+    "/migrations/",
     "*.log",
     "/tools/pants-plugins",
     "/wheelhouse/*/",

@@ -40,7 +40,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `ruff format`, `ruff check` and `flake8` over the staged Python and BUILD files with the `lint` group of `pyproject.toml` installed into `dist/lint-venv` | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format`, `ruff check` and `flake8` over the staged Python and BUILD files with the `lint` group of `pyproject.toml` installed into `dist/lint-venv`, and `golangci-lint fmt` and `run --fast-only --new-from-rev HEAD` when a `.go` file is staged | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 
@@ -61,6 +61,7 @@ current, see `AGENTS.md` in this directory.
 | `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames, and the new manager migrations without a `# Part of:` comment; `allow:migration-edit` records an intended edit, not a missing comment | auto: `migration-edit-check.yml` |
 | `.github/scripts/check-new-alembic-migration.sh` | Fails when a pull request to `main` adds a manager alembic migration; `allow:alembic-migration` lets a bug fix through | auto: `alembic-freeze-check.yml` |
 | `.github/scripts/merge-alembic-heads.sh` | Opens a `skip:changelog` pull request adding an empty merge migration when the manager's alembic graph on `main` has more than one head | auto: `alembic-merge-heads.yml` |
+| `.github/scripts/open-go-generate-pr.sh` | Opens a `skip:changelog` pull request with the files `go generate ./...` changed on a push to `v2` | auto: `ci-go.yml` |
 | `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files from the changed files and the `ruff analyze graph` import graph, assigns the `unit` and `component` files to shards by their run time in `test-durations.json`, and prints the `--shard` values that hold a target | auto: `ci.yml`, `test-record.yml` |
 | `.github/scripts/list-typecheck-files.sh` | Prints the existing `.py` and `.pyi` files of `typecheck.txt`, without the duplicates | auto: `ci-typecheck.yml` |
 | `.github/scripts/run-pytest-shard.py` | Runs the files of one shard list (`unit.<k>.txt` or `component.<k>.txt`) with pytest in parallel processes, one per file or per batch, and writes the failed tests to a summary and `::error` annotations | auto: `ci-pytest.yml`; person |
