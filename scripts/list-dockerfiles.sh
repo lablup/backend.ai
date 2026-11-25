@@ -35,22 +35,12 @@ set -euo pipefail
 
 # Registry of publishable service images (lowercase names):
 # docker/<name>.dockerfile -> Docker Hub lablup/<name>.
-PUBLISHABLE_SERVICES=(
-  backend.ai-manager
-  backend.ai-agent
-  backend.ai-webserver
-  backend.ai-storage-proxy
-  backend.ai-client
-  backend.ai-appproxy-coordinator
-  backend.ai-appproxy-worker
-)
+PUBLISHABLE_SERVICES=()
 
 # Registry of unpublished base images the service images build FROM
 # (lowercase names). Built as bake dependencies of the service targets in
 # docker-bake.hcl — not pushed anywhere, and not part of --service/--infra.
-BASE_IMAGES=(
-  backend.ai-base
-)
+BASE_IMAGES=()
 
 print_usage() {
   echo "usage: $0 [--all|--service|--infra]"
@@ -84,8 +74,8 @@ unset CDPATH
 cd -- "$(dirname "$0")/.." >/dev/null
 
 [ -d docker ] || {
-  echo "$0: docker/ directory not found under the repository root" >&2
-  exit 1
+  echo '{"include":[]}'
+  exit 0
 }
 
 files=$(find docker -type f \( -name '*.dockerfile' -o -name '*.Dockerfile' \) | LC_ALL=C sort)

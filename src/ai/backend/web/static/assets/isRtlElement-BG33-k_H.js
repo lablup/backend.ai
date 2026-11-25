@@ -1,1 +1,0 @@
-function e(e){return!e||typeof window>`u`?!1:window.getComputedStyle(e).direction===`rtl`}export{e as t};
