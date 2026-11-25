@@ -550,31 +550,6 @@ class TestInviteVFolderAction:
         assert result.vfolder_uuid == vfolder_uuid
         assert invitation_id in result.invitation_ids
 
-    async def test_invite_dot_prefix_raises_forbidden(
-        self,
-        invite_service: VFolderInviteService,
-        mock_vfolder_repo: MagicMock,
-        mock_user_repo: MagicMock,
-        user_uuid: uuid.UUID,
-        vfolder_uuid: uuid.UUID,
-    ) -> None:
-        mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id = AsyncMock(
-            return_value=_make_vfolder_data(vfolder_uuid, name=".hidden-folder")
-        )
-
-        action = InviteVFolderAction(
-            keypair_resource_policy={},
-            user_uuid=user_uuid,
-            vfolder_uuid=VFolderUUID(vfolder_uuid),
-            owner_scope=UserID(user_uuid),
-            mount_permission=VFolderMountPolicy.READ_ONLY,
-            invitee_emails=["invitee@test.com"],
-        )
-
-        with pytest.raises(Forbidden, match="dot-prefixed"):
-            await invite_service.invite(action)
-
     async def test_invite_address_without_account_gets_the_offer_alone(
         self,
         invite_service: VFolderInviteService,

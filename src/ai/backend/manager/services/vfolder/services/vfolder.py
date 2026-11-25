@@ -1210,11 +1210,6 @@ class VFolderService:
                 )
         return host
 
-    def _check_name_parameter(self, name: str, is_group: bool) -> None:
-        """Dot-prefixed names (except ``.local``) cannot be used for group-owned vfolders."""
-        if name.startswith(".") and name != ".local" and is_group:
-            raise VFolderInvalidParameter("dot-prefixed vfolders cannot be a group folder.")
-
     async def _resolve_project_info(
         self, project_id: uuid.UUID, domain_name: str
     ) -> ProjectResourceInfo:

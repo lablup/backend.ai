@@ -55,8 +55,12 @@ such as whether to allow or block mounting the vfolders in compute sessions, clo
 Auto-mount vfolders
 ^^^^^^^^^^^^^^^^^^^
 
-If a user-owned vfolder's name starts with a dot, it is automatically mounted at ``/home/work`` for all sessions created by the user.
+A vfolder set as an auto-mount of a user is mounted into all sessions created by the user, and one set as an auto-mount of a project into all sessions created in the project.
+Each auto-mount states the mount path, the path inside the vfolder and the mount permission.
 A good usecase is ``.config`` and ``.local`` directories to keep your local configurations and user-installed packages (e.g., ``pip install --user``) persistent across all your sessions.
+A vfolder requested for a session at the same path, or at a path above or below it, is mounted instead of the auto-mount.
+
+A project's ``.local`` vfolder needs no auto-mount: each user gets their own directory of it at ``/home/work/.local``.
 
 
 Quota scopes

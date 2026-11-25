@@ -68,9 +68,6 @@ class VFolderInviteService:
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
-        if vfolder_data.name.startswith("."):
-            raise Forbidden("Cannot share private dot-prefixed vfolders.")
-
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )

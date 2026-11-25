@@ -66,7 +66,11 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
-from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
+from ai.backend.manager.repositories.vfolder.mount import (
+    drop_overlapping_auto_mounts,
+    prepare_auto_mounts,
+    prepare_vfolder_mounts,
+)
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
@@ -395,7 +399,8 @@ class SchedulerRepository:
         Lives at the repository level because it composes a DB read with
         the storage-manager RPC. Each group's request list resolves to a
         single ``VFolderMount`` tuple that every replica sharing the role
-        copies verbatim.
+        copies verbatim. The session's auto-mounts follow the requested
+        mounts of every group, minus those a requested destination overlaps.
         """
         user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
@@ -422,7 +427,20 @@ class SchedulerRepository:
             user_uuid=user_uuid,
             user_role="user",
         )
+        session_auto_mounts = await self._db_source.query_session_auto_mounts(
+            project_id=project_id, user_id=UserID(user_uuid)
+        )
+        held_permissions = partial(self._permission_check.held_permissions, UserID(user_uuid))
         async with self._db.begin_readonly_read_committed() as conn:
+            auto_mounts = await prepare_auto_mounts(
+                conn,
+                self._storage_manager,
+                allowed_vfolder_types,
+                user_scope_for_mounts,
+                resource_policy_dict,
+                session_auto_mounts,
+                held_permissions,
+            )
             for group in kernel_specs:
                 per_group_requests: list[VFolderMountRequest] = []
                 for entry in group.execution_spec.mounts:
@@ -436,20 +454,18 @@ class SchedulerRepository:
                             ),
                         )
                     )
-                # Always resolve mounts even when the request list is empty:
-                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
-                # vfolders regardless of explicit requests, so skipping here
-                # would silently drop them.
-                vfolder_mounts_by_role[group.role] = tuple(
-                    await prepare_vfolder_mounts(
-                        conn,
-                        self._storage_manager,
-                        allowed_vfolder_types,
-                        user_scope_for_mounts,
-                        resource_policy_dict,
-                        per_group_requests,
-                        partial(self._permission_check.held_permissions, UserID(user_uuid)),
-                    )
+                requested_mounts = await prepare_vfolder_mounts(
+                    conn,
+                    self._storage_manager,
+                    allowed_vfolder_types,
+                    user_scope_for_mounts,
+                    resource_policy_dict,
+                    per_group_requests,
+                    held_permissions,
+                )
+                vfolder_mounts_by_role[group.role] = (
+                    *requested_mounts,
+                    *drop_overlapping_auto_mounts(auto_mounts, requested_mounts),
                 )
         return vfolder_mounts_by_role
 

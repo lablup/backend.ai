@@ -91,6 +91,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
@@ -174,6 +175,7 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.models.vfolder_auto_mount.searchers import SessionVFolderAutoMountsSearch
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.write import BatchReconcileTransition
 from ai.backend.manager.repositories.resource_slot.types import (
@@ -2518,6 +2520,18 @@ class ScheduleDBSource:
         search = AllowedResourceGroupsSearch(
             domain_id=domain_id, project_ids=project_ids, user_id=user_id
         )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return result.items
+
+    async def query_session_auto_mounts(
+        self,
+        *,
+        project_id: ProjectID | None,
+        user_id: UserID,
+    ) -> list[VFolderAutoMountData]:
+        """Return the live auto-mounts of the session's project and owner, the project's first."""
+        search = SessionVFolderAutoMountsSearch(user_id=user_id, project_id=project_id)
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
         return result.items
