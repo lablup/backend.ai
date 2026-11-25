@@ -8,19 +8,20 @@ import (
 )
 
 func TestNormalizeName(t *testing.T) {
-	if got := example.NormalizeName("  Default "); got != "default" {
-		t.Fatalf("got %q", got)
+	const in, want = "  Default ", "default"
+	if got := example.NormalizeName(in); got != want {
+		t.Errorf("NormalizeName(%q) = %q, want %q", in, got, want)
 	}
 }
 
 func TestCountDomains(t *testing.T) {
 	pool := dbtest.New(t)
 
-	n, err := example.CountDomains(t.Context(), pool)
+	got, err := example.CountDomains(t.Context(), pool)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 0 {
-		t.Fatalf("got %d domains in a fresh database", n)
+	if want := 0; got != want {
+		t.Errorf("CountDomains() = %d, want %d", got, want)
 	}
 }
