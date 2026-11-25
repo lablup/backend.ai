@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.types import ContainerListing, KernelLifecycleStatus
+from ai.backend.agent.types import EnumerateContainersResult, KernelLifecycleStatus
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
 
@@ -37,7 +37,7 @@ class TestRunningKernelFailedToInspect:
         agent = SimpleNamespace(
             id=AgentId("test-agent"),
             enumerate_containers=AsyncMock(
-                return_value=ContainerListing(
+                return_value=EnumerateContainersResult(
                     containers=[], kernel_ids_failed_to_inspect=frozenset({kernel_id})
                 )
             ),

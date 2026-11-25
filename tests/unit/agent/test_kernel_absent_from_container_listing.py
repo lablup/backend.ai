@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.types import ContainerListing, KernelLifecycleStatus
+from ai.backend.agent.types import EnumerateContainersResult, KernelLifecycleStatus
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
@@ -49,9 +49,9 @@ class TestKernelAbsentFromContainerListing:
         kernel_obj.close = AsyncMock()
         kernel_obj.get.return_value = None
 
-        async def _list_no_container(*args: Any) -> ContainerListing:
+        async def _list_no_container(*args: Any) -> EnumerateContainersResult:
             kernel_obj.state = KernelLifecycleStatus.RUNNING
-            return ContainerListing(containers=[])
+            return EnumerateContainersResult(containers=[])
 
         agent = SimpleNamespace(
             id=AgentId("test-agent"),

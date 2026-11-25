@@ -101,7 +101,7 @@ from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
-    ContainerListing,
+    EnumerateContainersResult,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -1898,7 +1898,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> ContainerListing:
+    ) -> EnumerateContainersResult:
         result = []
         kernel_ids_failed_to_inspect: set[KernelId] = set()
         fetch_tasks = []
@@ -1949,7 +1949,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 fetch_tasks.append(_fetch_container_info(container))
 
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        return ContainerListing(
+        return EnumerateContainersResult(
             containers=result,
             kernel_ids_failed_to_inspect=frozenset(kernel_ids_failed_to_inspect),
         )

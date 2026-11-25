@@ -147,7 +147,7 @@ class Container:
 
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True)
-class ContainerListing:
+class EnumerateContainersResult:
     containers: Sequence[tuple[KernelId, Container]]
     # Listed, but their containers could not be inspected.
     kernel_ids_failed_to_inspect: frozenset[KernelId] = frozenset()

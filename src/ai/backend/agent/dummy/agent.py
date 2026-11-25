@@ -24,7 +24,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import ContainerListing, KernelOwnershipData, MountInfo
+from ai.backend.agent.types import EnumerateContainersResult, KernelOwnershipData, MountInfo
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
@@ -306,8 +306,8 @@ class DummyAgent(
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> ContainerListing:
-        return ContainerListing(containers=[])
+    ) -> EnumerateContainersResult:
+        return EnumerateContainersResult(containers=[])
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:

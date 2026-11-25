@@ -68,7 +68,10 @@ class TestListingAContainerThatFailsToBeInspected:
     async def test_only_a_kernel_whose_container_is_not_gone_is_reported(
         self, case: _InspectFailureCase, docker_agent: Any
     ) -> None:
-        listing = await DockerAgent.enumerate_containers(cast(Any, docker_agent))
+        enumeration_result = await DockerAgent.enumerate_containers(cast(Any, docker_agent))
 
-        assert listing.containers == []
-        assert listing.kernel_ids_failed_to_inspect == case.expected_kernel_ids_failed_to_inspect
+        assert enumeration_result.containers == []
+        assert (
+            enumeration_result.kernel_ids_failed_to_inspect
+            == case.expected_kernel_ids_failed_to_inspect
+        )
