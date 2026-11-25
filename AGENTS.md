@@ -108,6 +108,11 @@ Skills source: `.claude/skills/{name}/SKILL.md`
 **MUST load the `/bai-cli` skill before running any `./bai` command.** This skill contains the entity-command reference — without it, you will guess commands wrong.
 For service restarts, see `/local-dev`; for docker service changes, see the `/halfstack` skill.
 
+## Python freeze on `main`
+
+The manager, agent and storage proxy are being rewritten in Go on the `v2` branch. `main` takes bug fixes only: no feature development and no new alembic migration (`src/ai/backend/manager/models/alembic/AGENTS.md`).
+A bug-fix PR that changes `src/ai/backend/manager`, `src/ai/backend/agent` or `src/ai/backend/storage` carries the label `require:v2-port`.
+
 ## Alembic migration backport
 
 When backporting migrations to release branches, both the backport and main branch migrations must be idempotent.

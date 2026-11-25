@@ -2,6 +2,9 @@
 
 Generic single-database configuration.
 
+`main` takes no new manager alembic migration. A schema change is a goose migration on the `v2` branch;
+a bug fix that needs one carries the PR label `allow:alembic-migration` and is added on `v2` as well.
+
 ## Migration Backport Strategy
 
 This section describes how to backport Alembic migrations to release branches safely
