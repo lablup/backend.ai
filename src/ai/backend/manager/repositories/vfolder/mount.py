@@ -327,10 +327,9 @@ async def prepare_vfolder_mounts(
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
-        if (
-            _vfolder["name"].startswith(".")
-            and _vfolder["name"] not in names_excluded_from_auto_mount
-        ):
+        if _vfolder["name"] in names_excluded_from_auto_mount:
+            continue
+        if _vfolder["name"].startswith("."):
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
