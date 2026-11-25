@@ -189,7 +189,7 @@ async def prepare_vfolder_mounts(
     requested_vfolder_dstpaths: dict[str | uuid.UUID | int, str] = {}
     requested_mount_options: dict[str | uuid.UUID | int, VFolderMountOptions] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
-    _already_resolved: set[str] = set()
+    names_excluded_from_auto_mount: set[str] = set()
     # A vfolder referenced by UUID may be requested several times, each with a
     # different subpath/destination. Key each such request by its index in
     # ``mount_requests`` instead of the bare UUID so the entries no longer
@@ -217,7 +217,7 @@ async def prepare_vfolder_mounts(
             requested_mount_options[req.ref] = req.options
             requested_vfolder_names[req.ref] = name
             requested_vfolder_subpaths[req.ref] = os.path.normpath(subpath)
-            _already_resolved.add(name)
+            names_excluded_from_auto_mount.add(name)
             if req.dst_path is not None:
                 requested_vfolder_dstpaths[req.ref] = req.dst_path
 
@@ -279,7 +279,7 @@ async def prepare_vfolder_mounts(
         name = requested_vfolder["name"]
         dst_path = requested_vfolder_dstpaths.get(request_key, name)
         if PurePosixPath("/home/work", dst_path) == PurePosixPath("/home/work", name):
-            _already_resolved.add(name)
+            names_excluded_from_auto_mount.add(name)
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
@@ -293,7 +293,7 @@ async def prepare_vfolder_mounts(
             for index in uuid_request_indices.get(vfid, ()):
                 requested_vfolder_names[index] = name
             continue
-        if name in _already_resolved:
+        if name in names_excluded_from_auto_mount:
             continue
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
@@ -315,7 +315,10 @@ async def prepare_vfolder_mounts(
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
-        if _vfolder["name"].startswith(".") and _vfolder["name"] not in _already_resolved:
+        if (
+            _vfolder["name"].startswith(".")
+            and _vfolder["name"] not in names_excluded_from_auto_mount
+        ):
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
