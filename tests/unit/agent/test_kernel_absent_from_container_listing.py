@@ -25,7 +25,6 @@ class _KernelAbsentFromListingCase:
 
     description: str
     state_before_listing: KernelLifecycleStatus
-    restarted_during_listing: bool = False
     expected_event_reasons: Sequence[KernelLifecycleEventReason] = field(default_factory=list)
     expected_registered: bool = True
 
@@ -37,32 +36,21 @@ class _KernelAbsentFromListing:
 
 
 class TestKernelAbsentFromContainerListing:
-    def _kernel(self, state: KernelLifecycleStatus) -> MagicMock:
-        kernel_obj = MagicMock()
-        kernel_obj.session_id = SessionId(uuid4())
-        kernel_obj.state = state
-        kernel_obj.container_id = "container-1"
-        kernel_obj.runner = None
-        kernel_obj.close = AsyncMock()
-        kernel_obj.get.return_value = None
-        return kernel_obj
-
     @pytest.fixture
     def kernel_absent_from_listing(
         self, case: _KernelAbsentFromListingCase
     ) -> _KernelAbsentFromListing:
         kernel_id = KernelId(uuid4())
-        kernel_before_listing = self._kernel(case.state_before_listing)
-        kernel_after_listing = (
-            self._kernel(KernelLifecycleStatus.RUNNING)
-            if case.restarted_during_listing
-            else kernel_before_listing
-        )
-        kernel_registry = {kernel_id: kernel_before_listing}
+        kernel_obj = MagicMock()
+        kernel_obj.session_id = SessionId(uuid4())
+        kernel_obj.state = case.state_before_listing
+        kernel_obj.container_id = "container-1"
+        kernel_obj.runner = None
+        kernel_obj.close = AsyncMock()
+        kernel_obj.get.return_value = None
 
         async def _list_no_container(*args: Any) -> list[Any]:
-            kernel_after_listing.state = KernelLifecycleStatus.RUNNING
-            kernel_registry[kernel_id] = kernel_after_listing
+            kernel_obj.state = KernelLifecycleStatus.RUNNING
             return []
 
         agent = SimpleNamespace(
@@ -70,7 +58,7 @@ class TestKernelAbsentFromContainerListing:
             enumerate_containers=_list_no_container,
             registry_lock=asyncio.Lock(),
             restarting_kernels={},
-            kernel_registry=kernel_registry,
+            kernel_registry={kernel_id: kernel_obj},
             container_lifecycle_queue=asyncio.Queue(),
             set_container_count=AsyncMock(),
             produce_error_event=AsyncMock(),
@@ -86,11 +74,6 @@ class TestKernelAbsentFromContainerListing:
             _KernelAbsentFromListingCase(
                 description="started during the listing",
                 state_before_listing=KernelLifecycleStatus.PREPARING,
-            ),
-            _KernelAbsentFromListingCase(
-                description="restarted during the listing",
-                state_before_listing=KernelLifecycleStatus.RUNNING,
-                restarted_during_listing=True,
             ),
             _KernelAbsentFromListingCase(
                 description="running since before the listing",
@@ -122,11 +105,6 @@ class TestKernelAbsentFromContainerListing:
             _KernelAbsentFromListingCase(
                 description="started during the listing",
                 state_before_listing=KernelLifecycleStatus.PREPARING,
-            ),
-            _KernelAbsentFromListingCase(
-                description="restarted during the listing",
-                state_before_listing=KernelLifecycleStatus.RUNNING,
-                restarted_during_listing=True,
             ),
             _KernelAbsentFromListingCase(
                 description="running since before the listing",

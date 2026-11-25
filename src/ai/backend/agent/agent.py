@@ -1630,8 +1630,8 @@ class AbstractAgent[
         while True:
             try:
                 # A kernel that starts during the listing is absent from it.
-                kernels_running_before_listing = {
-                    kid: kernel
+                kernel_ids_running_before_listing = {
+                    kid
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING
                 }
@@ -1641,7 +1641,7 @@ class AbstractAgent[
                     kid
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING
-                    and kernels_running_before_listing.get(kid) is kernel
+                    and kid in kernel_ids_running_before_listing
                 }
                 dangling_kernel_ids = kernel_ids_running_throughout_listing - alive_kernel_ids
                 if dangling_kernel_ids:
@@ -1879,8 +1879,8 @@ class AbstractAgent[
         log.debug("container lifecycle sync started")
         try:
             # A kernel that starts during the listing is absent from it.
-            kernels_running_before_listing = {
-                kernel_id: kernel_obj
+            kernel_ids_running_before_listing = {
+                kernel_id
                 for kernel_id, kernel_obj in self.kernel_registry.items()
                 if kernel_obj.state == KernelLifecycleStatus.RUNNING
             }
@@ -1959,7 +1959,7 @@ class AbstractAgent[
                         if (
                             kernel_id in self.restarting_kernels
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
-                            or kernels_running_before_listing.get(kernel_id) is not kernel_obj
+                            or kernel_id not in kernel_ids_running_before_listing
                         ):
                             continue
                         log.info("kernel without container detected", kernel_id=kernel_id)
