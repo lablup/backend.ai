@@ -33,14 +33,13 @@ current, see `AGENTS.md` in this directory.
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
 | `new-changelog.py` | Writes a changelog fragment named `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md`, with front matter for `--issue` and `--epic`, and prints its path | person; Claude Code (`/submit`) |
-| `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
 
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `ruff format`, `ruff check` and `flake8` over the staged Python and BUILD files with the `lint` group of `pyproject.toml` installed into `dist/lint-venv`, and `golangci-lint fmt` and `run --fast-only --new-from-rev HEAD` when a `.go` file is staged | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format`, `ruff check` and `flake8` over the staged Python and BUILD files with the `lint` group of `pyproject.toml` installed into `dist/lint-venv`, `golangci-lint fmt` and `run --fast-only --new-from-rev HEAD` when a `.go` file is staged, and `go run ./tools/doclint check` over the staged `.md` files | auto: `pre-commit` |
 
 ## Pull-request CI
 
@@ -49,10 +48,6 @@ current, see `AGENTS.md` in this directory.
 | `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | person |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | person |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | person |
-| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | person |
-| `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | person |
-| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | person |
-| `knowledge/check_bep_length.py` | Checks the length limits of BEP-1080 and later BEPs: lines, list items, design subsections | person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | person |
 | `.github/scripts/open-go-generate-pr.sh` | Opens a `skip:changelog` pull request with the files `go generate ./...` changed on a push to `v2` | auto: `ci.yml` |
 | `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto: `cleanup-pr-caches.yml` |
@@ -108,4 +103,3 @@ current, see `AGENTS.md` in this directory.
 | `agent/` | Cross-build recipes for the static binaries bundled into the kernel runner (dropbear, ttyd, tmux, sftp-server, socket-relay, suexec), the glibc stub libraries, and agent-side deployment helpers |
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
-| `knowledge/` | `KNOWLEDGE.md` tooling: shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py`, `check_words.py`, `check_bep_length.py` |

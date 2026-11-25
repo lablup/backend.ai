@@ -24,7 +24,7 @@ After translating a Korean draft into English, review it again with the English 
 ## Steps
 
 1. Read the style rules and expressions to avoid in the glossary of the document's language, and the term file for the topic.
-2. Run `python3 scripts/knowledge/check_words.py <file>`. Check the `review:` lines too.
+2. Run `go run ./tools/doclint check --only words <file>`. Check the `review:` lines too.
 3. Read the document again for the items below.
 4. Fix, run step 2 again, and report the locations and words changed.
 

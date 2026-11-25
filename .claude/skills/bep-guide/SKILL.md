@@ -80,7 +80,7 @@ Write in the template order: Goals, Non-goals, Design, Impact, Implementation Or
 | Implementation Order | One step per issue, each with the goal or result it resolves |
 | References | Related BEPs and documents |
 
-- The template comments set the length limits. `scripts/knowledge/check_bep_length.py` checks them from BEP-1080.
+- The template comments set the length limits. `go run ./tools/doclint check --only bep-length` checks them from BEP-1080.
 - Settle open questions in the review and write the result into the design. The BEP keeps no decision log.
 - Before requesting the review, run `/glossary-review`.
 
@@ -98,7 +98,7 @@ Each sub-document of a segmented BEP is a pair too, such as `component-a.md` and
 - Frontmatter goes only in the English file.
 - Both files keep the same headings in the same order.
 - Update both files in the same change.
-- `scripts/knowledge/check_bilingual.py` validates the pairs.
+- `go run ./tools/doclint check --only bilingual` validates the pairs.
 
 ## Document Segmentation
 

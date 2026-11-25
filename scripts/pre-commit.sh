@@ -47,4 +47,17 @@ if git diff --cached --name-only | grep -q '^changes/unreleased/'; then
   fi
 fi
 
+MD_FILES=()
+while IFS= read -r -d '' f; do
+  MD_FILES+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.md')
+
+if [ ${#MD_FILES[@]} -gt 0 ]; then
+  echo "✓ Checking documents..."
+  if ! go run ./tools/doclint check "${MD_FILES[@]}"; then
+    echo "❌ Document check failed"
+    GO_EXIT=1
+  fi
+fi
+
 exit "$GO_EXIT"

@@ -68,6 +68,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           lfs: false
+          # The documents check compares with the base branch.
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
       - name: Set up Go
         id: go
         uses: ./.github/actions/go-setup
@@ -77,6 +79,9 @@ jobs:
         run: go build ./...
       - name: Check the changelog fragments
         run: go run ./tools/changelog check
+      - name: Check the documents changed in the pull request
+        if: github.event_name == 'pull_request'
+        run: go run ./tools/doclint check --base origin/${{ github.base_ref }}
       - name: Check that the integration tests carry the build tag
         run: .github/scripts/check-build-tag.sh './tests/integration/...'
       - name: Tidy the module

@@ -16,8 +16,8 @@ tags:
 ## Search
 
 ```bash
-python3 scripts/knowledge/search.py                # list all documents
-python3 scripts/knowledge/search.py lookup rbac    # every term must match
+go run ./tools/knowledge search                # list all documents
+go run ./tools/knowledge search lookup rbac    # every term must match
 ```
 
 Terms match name, type, keywords, description and path (case-insensitive).
@@ -100,17 +100,16 @@ Actor convention: `<producer>/<version>` for agents (for example `claude-code/fa
 ## Check before pushing
 
 ```bash
-python3 scripts/knowledge/check.py
-python3 scripts/knowledge/check_bilingual.py --base origin/main
-python3 scripts/knowledge/check_words.py --base origin/main
+go run ./tools/doclint check --base origin/main
 ```
 
 Validates the schema, scope and sources path existence, body links, name
 uniqueness, and the verified-not-older-than-generated invariant.
-`check_bilingual.py` validates the `.md` and `.ko.md` pairs and rejects Korean
-added to a `.md` file. `check_words.py` finds the words the glossary rejects in
-added lines, and takes paths to check whole files. `knowledge-check.yml` runs all
-three on pull requests.
+`go run ./tools/doclint check` runs five checks: `frontmatter`, `bilingual` (the
+`.md` and `.ko.md` pairs, no Korean added to a `.md` file), `words` (the words the
+glossary rejects, in added lines), `bep-length` and `agents-lines`. `--only <check>`
+picks one, and file arguments check whole files. The `build` job of `ci.yml` runs
+it on pull requests.
 
 ## What goes where
 
