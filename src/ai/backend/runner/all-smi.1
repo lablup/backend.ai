@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "October 20, 2026" "all-smi 0.28.1" "User Commands"
+.TH ALL-SMI 1 "November 24, 2026" "all-smi 0.29.1" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -99,6 +99,8 @@ Format: http://hostname:port or https://hostname:port
 .B \-\-hostfile \fIFILE\fR
 (Required) A CSV file containing a list of host addresses to connect to for remote monitoring.
 The file should contain one URL per line. Either this or --hosts must be specified.
+Hosts from both options are merged, and an endpoint listed twice is scraped once.
+In view mode the file is checked every refresh and re-read when it changes, so added hosts get a tab on the next refresh and removed hosts leave; if the file cannot be read, the previous host list is kept.
 .TP
 .B \-i, \-\-interval \fISECONDS\fR
 The interval in seconds at which to update the hardware information. 
@@ -221,8 +223,8 @@ loginctl enable\-linger "$USER"   # boot persistence for a user service
 .RE
 .PP
 The subcommand default is root rather than a dedicated account, because vendor
-CLIs (\fBhl\-smi\fR, \fBrbln\-stat\fR, \fBfuriosa\-smi\fR,
-\fBtegrastats\fR) differ in the permissions they require and a wrong guess
+CLIs (\fBhl\-smi\fR, \fBrbln\-stat\fR, \fBfuriosa\-smi\fR)
+differ in the permissions they require and a wrong guess
 yields a silently empty metrics page. Pass \fB\-\-service\-user\fR where your
 vendor stack permits a dedicated account.
 .PP
