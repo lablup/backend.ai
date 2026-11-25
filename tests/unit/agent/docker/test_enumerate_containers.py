@@ -48,12 +48,12 @@ class TestListingAContainerThatFailsToBeInspected:
         [
             _InspectFailureCase(
                 description="the container is gone",
-                inspect_error=DockerError(HTTPStatus.NOT_FOUND, {"message": "no such container"}),
+                inspect_error=DockerError(HTTPStatus.NOT_FOUND, "no such container"),
             ),
             _InspectFailureCase(
                 description="Docker answers an error",
                 inspect_error=DockerError(
-                    HTTPStatus.INTERNAL_SERVER_ERROR, {"message": "context deadline exceeded"}
+                    HTTPStatus.INTERNAL_SERVER_ERROR, "context deadline exceeded"
                 ),
                 expected_kernel_ids_failed_to_inspect=frozenset({_KERNEL_ID}),
             ),
