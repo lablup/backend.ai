@@ -4,8 +4,9 @@ import logging
 import os.path
 import uuid
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -57,13 +58,7 @@ from ai.backend.manager.types import UserScope
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
-__all__: Sequence[str] = (
-    "HeldPermissions",
-    "drop_overlapping_auto_mounts",
-    "prepare_auto_mounts",
-    "prepare_vfolder_mounts",
-    "query_reachable_vfolders",
-)
+__all__: Sequence[str] = ("HeldPermissions", "prepare_vfolder_mounts", "query_reachable_vfolders")
 
 _PROJECT_LOCAL_FOLDER_NAME: Final = ".local"
 
@@ -177,201 +172,64 @@ async def query_reachable_vfolders(
     return reachable
 
 
-def _mount_unmanaged_vfolder(
-    vfolder: Mapping[str, Any], kernel_path: PurePosixPath, mount_perm: MountPermission
-) -> VFolderMount:
-    return VFolderMount(
-        name=vfolder["name"],
-        vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-        vfsubpath=PurePosixPath("."),
-        host_path=PurePosixPath(vfolder["unmanaged_path"]),
-        kernel_path=kernel_path,
-        mount_perm=mount_perm,
-        usage_mode=vfolder["usage_mode"],
-    )
+@dataclass(frozen=True)
+class _MountableAutoMount:
+    vfolder: dict[str, Any]
+    destination: PurePosixPath
+    subpath: str
+    permission: MountPermission
 
 
-async def _get_mount_base_path(
-    storage_manager: StorageSessionManager,
-    vfolder: Mapping[str, Any],
-    subpath: PurePosixPath,
-) -> PurePosixPath:
-    """The path the storage proxy mounts the folder's ``subpath`` from."""
-    try:
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
-        manager_client = storage_manager.get_manager_facing_client(proxy_name)
-        mount_path_result = await manager_client.get_mount_path(
-            volume_name,
-            str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
-            str(subpath),
-        )
-    except VFolderOperationFailed as e:
-        raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
-    return PurePosixPath(mount_path_result["path"])
-
-
-async def _mount_user_directory_of_project_local(
-    storage_manager: StorageSessionManager,
-    vfolder: Mapping[str, Any],
-    user_id: uuid.UUID,
-    mount_base_path: PurePosixPath,
-) -> VFolderMount:
-    """Mount the user's own directory of a project's ``.local`` folder, made if missing."""
-    vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
-    proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
-    manager_client = storage_manager.get_manager_facing_client(proxy_name)
-    await manager_client.mkdir(
-        volume=volume_name,
-        vfid=str(vfid),
-        relpath=[user_id.hex],
-        exist_ok=True,
-    )
-    return VFolderMount(
-        name=vfolder["name"],
-        vfid=vfid,
-        vfsubpath=PurePosixPath(user_id.hex),
-        host_path=mount_base_path / user_id.hex,
-        kernel_path=PurePosixPath("/home/work", _PROJECT_LOCAL_FOLDER_NAME),
-        mount_perm=MountPermission(vfolder["permission"].value),
-        usage_mode=vfolder["usage_mode"],
-    )
-
-
-async def _may_auto_mount(
-    conn: SAConnection,
-    allowed_vfolder_types: Sequence[str],
-    user_scope: UserScope,
-    resource_policy: Mapping[str, Any],
-    vfolder: Mapping[str, Any],
-) -> bool:
-    if vfolder["permission"] == VFolderMountPolicy.NONE:
-        log.trace("auto-mount skipped, mount policy is none", vfolder_id=vfolder["id"])
-        return False
-    try:
-        await ensure_host_permission_allowed(
-            conn,
-            vfolder["host"],
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_scope.user_uuid,
-            resource_policy=resource_policy,
-            domain_name=user_scope.domain_name,
-            group_id=user_scope.group_id,
-            permission=VFolderHostPermission.MOUNT_IN_SESSION,
-        )
-    except InsufficientStoragePermission:
-        log.trace("auto-mount skipped, host permission denied", vfolder_id=vfolder["id"])
-        return False
-    return True
-
-
-async def prepare_auto_mounts(
-    conn: SAConnection,
-    storage_manager: StorageSessionManager,
-    allowed_vfolder_types: Sequence[str],
-    user_scope: UserScope,
-    resource_policy: Mapping[str, Any],
+def _mountable_auto_mounts(
+    accessible_vfolders: Sequence[dict[str, Any]],
     auto_mounts: Sequence[VFolderAutoMountData],
-    held_permissions: HeldPermissions,
-) -> Sequence[VFolderMount]:
-    """The mounts of the session project's ``.local`` folder and of ``auto_mounts``, in that order.
-
-    A folder the user cannot reach or may not mount is left out, and a read-only
-    folder is mounted read-only whatever the auto-mount's own permission says.
-    """
-    reachable_vfolders = await query_reachable_vfolders(
-        conn,
-        user_scope,
-        sa.and_(
-            sa.or_(
-                VFolderRow.id.in_([auto_mount.vfolder_id for auto_mount in auto_mounts]),
-                sa.and_(
-                    VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
-                    VFolderRow.ownership_type == VFolderOwnershipType.GROUP,
-                    VFolderRow.group == user_scope.group_id,
-                ),
-            ),
-            VFolderRow.status.not_in(VFolderOperationStatus.dead()),
-        ),
-        held_permissions,
-    )
+    session_project_id: uuid.UUID,
+) -> list[_MountableAutoMount]:
+    """The session project's ``.local`` folder, then ``auto_mounts``, without the folders the
+    user cannot reach or whose mount policy is none. A read-only folder is mounted read-only."""
     mountable_vfolders = {
-        VFolderUUID(vfolder["id"]): vfolder
-        for vfolder in reachable_vfolders
-        if await _may_auto_mount(conn, allowed_vfolder_types, user_scope, resource_policy, vfolder)
+        vfolder["id"]: vfolder
+        for vfolder in accessible_vfolders
+        if vfolder["permission"] != VFolderMountPolicy.NONE
     }
-    mounts: list[VFolderMount] = []
-    for vfolder in mountable_vfolders.values():
-        if (
-            vfolder["name"] != _PROJECT_LOCAL_FOLDER_NAME
-            or vfolder["ownership_type"] != VFolderOwnershipType.GROUP
-            or vfolder["group"] != user_scope.group_id
-        ):
-            continue
-        if vfolder["unmanaged_path"]:
-            mounts.append(
-                _mount_unmanaged_vfolder(
-                    vfolder,
-                    PurePosixPath("/home/work", _PROJECT_LOCAL_FOLDER_NAME),
-                    MountPermission(vfolder["permission"].value),
-                )
-            )
-        else:
-            mounts.append(
-                await _mount_user_directory_of_project_local(
-                    storage_manager,
-                    vfolder,
-                    user_scope.user_uuid,
-                    await _get_mount_base_path(storage_manager, vfolder, PurePosixPath(".")),
-                )
-            )
-    for auto_mount in auto_mounts:
-        mountable_vfolder = mountable_vfolders.get(auto_mount.vfolder_id)
-        if mountable_vfolder is None:
-            continue
-        kernel_path = PurePosixPath("/home/work", auto_mount.mount_destination)
-        mount_perm = (
-            MountPermission.READ_ONLY
-            if mountable_vfolder["permission"] == VFolderMountPolicy.READ_ONLY
-            else MountPermission(auto_mount.mount_permission.value)
+    mountable_auto_mounts = [
+        _MountableAutoMount(
+            vfolder=vfolder,
+            destination=PurePosixPath("/home/work", _PROJECT_LOCAL_FOLDER_NAME),
+            subpath=".",
+            permission=MountPermission(vfolder["permission"].value),
         )
-        if mountable_vfolder["unmanaged_path"]:
-            mounts.append(_mount_unmanaged_vfolder(mountable_vfolder, kernel_path, mount_perm))
+        for vfolder in mountable_vfolders.values()
+        if vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME
+        and vfolder["ownership_type"] == VFolderOwnershipType.GROUP
+        and vfolder["group"] == session_project_id
+    ]
+    for auto_mount in auto_mounts:
+        vfolder = mountable_vfolders.get(auto_mount.vfolder_id)
+        if vfolder is None:
             continue
-        subpath = PurePosixPath(_normalize_mount_subpath(auto_mount.subpath))
-        mount_base_path = await _get_mount_base_path(storage_manager, mountable_vfolder, subpath)
-        mounts.append(
-            VFolderMount(
-                name=mountable_vfolder["name"],
-                vfid=VFolderID(mountable_vfolder["quota_scope_id"], mountable_vfolder["id"]),
-                vfsubpath=subpath,
-                host_path=mount_base_path / subpath,
-                kernel_path=kernel_path,
-                mount_perm=mount_perm,
-                usage_mode=mountable_vfolder["usage_mode"],
+        is_read_only = vfolder["permission"] == VFolderMountPolicy.READ_ONLY
+        mountable_auto_mounts.append(
+            _MountableAutoMount(
+                vfolder=vfolder,
+                destination=PurePosixPath("/home/work", auto_mount.mount_destination),
+                subpath=_normalize_mount_subpath(auto_mount.subpath),
+                permission=(
+                    MountPermission.READ_ONLY
+                    if is_read_only
+                    else MountPermission(auto_mount.mount_permission.value)
+                ),
             )
         )
-    return mounts
+    return mountable_auto_mounts
 
 
-def drop_overlapping_auto_mounts(
-    auto_mounts: Sequence[VFolderMount], requested_mounts: Sequence[VFolderMount]
-) -> Sequence[VFolderMount]:
-    """The auto-mounts whose destination overlaps neither a requested mount nor an earlier one."""
-    kept: list[VFolderMount] = []
-    for auto_mount in auto_mounts:
-        if any(
-            auto_mount.kernel_path.is_relative_to(mount.kernel_path)
-            or mount.kernel_path.is_relative_to(auto_mount.kernel_path)
-            for mount in (*requested_mounts, *kept)
-        ):
-            log.trace(
-                "auto-mount skipped, destination already used",
-                vfolder_id=auto_mount.vfid.folder_id,
-                mount_destination=str(auto_mount.kernel_path),
-            )
-            continue
-        kept.append(auto_mount)
-    return kept
+def _overlaps_any_mount(destination: PurePosixPath, mounts: Iterable[VFolderMount]) -> bool:
+    return any(
+        destination.is_relative_to(mount.kernel_path)
+        or mount.kernel_path.is_relative_to(destination)
+        for mount in mounts
+    )
 
 
 async def prepare_vfolder_mounts(
@@ -382,13 +240,15 @@ async def prepare_vfolder_mounts(
     resource_policy: Mapping[str, Any],
     mount_requests: Sequence[VFolderMountRequest],
     held_permissions: HeldPermissions,
+    auto_mounts: Sequence[VFolderAutoMountData] = (),
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
+
+    ``auto_mounts`` follow the requests. One that may not be mounted, or whose destination
+    overlaps an earlier mount, is left out instead of rejecting the requests.
     """
-    if not mount_requests:
-        return []
     requested_mounts: list[str] = []
     requested_vfolder_names: dict[str | uuid.UUID | int, str] = {}
     requested_vfolder_ids: set[uuid.UUID] = set()
@@ -446,7 +306,14 @@ async def prepare_vfolder_mounts(
     _ms_result = await conn.execute(_ms_query)
     model_store_project_ids: set[uuid.UUID] = {row.id for row in _ms_result.fetchall()}
 
-    extra_vf_conds: sa.ColumnElement[bool] = sa.false()
+    extra_vf_conds: sa.ColumnElement[bool] = sa.or_(
+        VFolderRow.id.in_([auto_mount.vfolder_id for auto_mount in auto_mounts]),
+        sa.and_(
+            VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
+            VFolderRow.ownership_type == VFolderOwnershipType.GROUP,
+            VFolderRow.group == user_scope.group_id,
+        ),
+    )
     if requested_vfolder_names:
         extra_vf_conds = sa.or_(
             extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
@@ -470,7 +337,7 @@ async def prepare_vfolder_mounts(
         return []
 
     resolved_vfolder_ids: set[uuid.UUID] = set()
-    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {
+    vfolders_by_id_key: dict[str | uuid.UUID | int, dict[str, Any]] = {
         index: row
         for row in accessible_vfolders
         for index in uuid_request_indices.get(row["id"], ())
@@ -498,16 +365,32 @@ async def prepare_vfolder_mounts(
             + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
         )
 
+    auto_mount_keys: set[str | uuid.UUID | int] = set()
+    for index, auto_mount in enumerate(
+        _mountable_auto_mounts(accessible_vfolders, auto_mounts, user_scope.group_id),
+        start=len(mount_requests),
+    ):
+        auto_mount_keys.add(index)
+        vfolders_by_id_key[index] = auto_mount.vfolder
+        requested_vfolder_names[index] = auto_mount.vfolder["name"]
+        requested_vfolder_subpaths[index] = auto_mount.subpath
+        requested_vfolder_dstpaths[index] = str(auto_mount.destination)
+        requested_mount_options[index] = VFolderMountOptions(permission=auto_mount.permission)
+
     # The session's project comes first, so its folder wins a name shared with another.
     accessible_vfolders_map: dict[str, dict[str, Any]] = {}
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
     for requested_key, vfolder_name in requested_vfolder_names.items():
-        vfolder = vfolders_by_uuid_request.get(requested_key) or accessible_vfolders_map.get(
-            vfolder_name
-        )
+        vfolder = vfolders_by_id_key.get(requested_key) or accessible_vfolders_map.get(vfolder_name)
         if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        is_auto_mount = requested_key in auto_mount_keys
+        if is_auto_mount and _overlaps_any_mount(
+            PurePosixPath(requested_vfolder_dstpaths[requested_key]), matched_vfolder_mounts
+        ):
+            log.trace("auto-mount skipped, destination already used", vfolder_id=vfolder["id"])
+            continue
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             raise VFolderPermissionError(f"VFolder {vfolder_name} is not permitted to be mounted.")
         try:
@@ -522,11 +405,14 @@ async def prepare_vfolder_mounts(
                 permission=VFolderHostPermission.MOUNT_IN_SESSION,
             )
         except InsufficientStoragePermission as e:
+            if is_auto_mount:
+                log.trace("auto-mount skipped, host permission denied", vfolder_id=vfolder["id"])
+                continue
             raise InsufficientStoragePermission(
                 f"Permission denied to mount VFolder '{vfolder_name}' on host '{vfolder['host']}'. {e.extra_msg}",
                 e.extra_data,
             ) from e
-        if vfolder["unmanaged_path"]:
+        if unmanaged_path := cast(str | None, vfolder["unmanaged_path"]):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(".")
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
@@ -537,32 +423,65 @@ async def prepare_vfolder_mounts(
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
             matched_vfolder_mounts.append(
-                _mount_unmanaged_vfolder(
-                    vfolder, kernel_path, MountPermission(vfolder["permission"].value)
+                VFolderMount(
+                    name=vfolder["name"],
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
+                    host_path=PurePosixPath(unmanaged_path),
+                    kernel_path=kernel_path,
+                    mount_perm=MountPermission(vfolder["permission"].value),
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
             continue
         # A personal folder also carries a project — its owner's personal project — so
         # project ownership is read off the ownership type, never off the column.
         is_project_vfolder = vfolder["ownership_type"] == VFolderOwnershipType.GROUP
-        is_cross_project = is_project_vfolder and vfolder["group"] != user_scope.group_id
+        # An auto-mount's folder belongs to the scope it is set on, whatever the session's project.
+        is_cross_project = (
+            is_project_vfolder and vfolder["group"] != user_scope.group_id and not is_auto_mount
+        )
         is_model_store_vfolder = is_project_vfolder and vfolder["group"] in model_store_project_ids
         if is_cross_project:
             if is_model_store_vfolder and vfolder["usage_mode"] == VFolderUsageMode.MODEL:
                 pass  # Allow cross-project MODEL_STORE model vfolders (read-only)
             else:
                 continue
-        mount_base_path = await _get_mount_base_path(
-            storage_manager, vfolder, PurePosixPath(requested_vfolder_subpaths[requested_key])
-        )
+        try:
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            mount_path_result = await manager_client.get_mount_path(
+                volume_name,
+                str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
+                str(PurePosixPath(requested_vfolder_subpaths[requested_key])),
+            )
+            mount_base_path = PurePosixPath(mount_path_result["path"])
+        except VFolderOperationFailed as e:
+            raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
         if vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME and is_project_vfolder:
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
                 continue
+            # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.mkdir(
+                volume=volume_name,
+                vfid=str(vfid),
+                relpath=[vfsubpath.as_posix()],
+                exist_ok=True,
+            )
+            # Mount the per-user subdirectory as the ".local" vfolder.
             matched_vfolder_mounts.append(
-                await _mount_user_directory_of_project_local(
-                    storage_manager, vfolder, user_scope.user_uuid, mount_base_path
+                VFolderMount(
+                    name=vfolder["name"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
+                    host_path=mount_base_path / user_scope.user_uuid.hex,
+                    kernel_path=PurePosixPath("/home/work/.local"),
+                    mount_perm=MountPermission(vfolder["permission"].value),
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
         else:

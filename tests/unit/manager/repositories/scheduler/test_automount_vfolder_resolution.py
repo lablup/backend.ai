@@ -579,10 +579,7 @@ class TestAutoMountVFolderResolution:
                 folders=[_Folder("data", _Project.PERSONAL, VFolderOwnershipType.USER)],
                 auto_mounts=[_AutoMount("data", VFolderAutoMountScopeType.USER, "/home/work/data")],
                 requested_mounts=[_RequestedMount("data", "/home/work/requested")],
-                expected_mounts=[
-                    _ResolvedMount("data", "/home/work/requested"),
-                    _ResolvedMount("data", "/home/work/data"),
-                ],
+                expected_mounts=[_ResolvedMount("data", "/home/work/requested")],
             ),
             _SessionMountsCase(
                 name="same-destination-in-the-user-and-the-session-project",
