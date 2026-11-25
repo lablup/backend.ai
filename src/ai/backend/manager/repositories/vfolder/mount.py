@@ -169,6 +169,21 @@ async def query_reachable_vfolders(
     return reachable
 
 
+def _names_requested_at_auto_mount_path(
+    vfolders_by_uuid_request: Mapping[str | uuid.UUID | int, Mapping[str, Any]],
+    requested_dstpaths: Mapping[str | uuid.UUID | int, str],
+) -> set[str]:
+    """The names of the vfolders requested where an auto-mount of the same name is mounted."""
+    names: set[str] = set()
+    for request_key, vfolder in vfolders_by_uuid_request.items():
+        name = vfolder["name"]
+        auto_mount_path = PurePosixPath("/home/work", name)
+        requested_path = PurePosixPath("/home/work", requested_dstpaths.get(request_key, name))
+        if requested_path == auto_mount_path:
+            names.add(name)
+    return names
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -274,12 +289,9 @@ async def prepare_vfolder_mounts(
         for row in accessible_vfolders
         for index in uuid_request_indices.get(row["id"], ())
     }
-    # A vfolder requested at /home/work/<its name> replaces the auto-mount of that name.
-    for request_key, requested_vfolder in vfolders_by_uuid_request.items():
-        name = requested_vfolder["name"]
-        dst_path = requested_vfolder_dstpaths.get(request_key, name)
-        if PurePosixPath("/home/work", dst_path) == PurePosixPath("/home/work", name):
-            names_excluded_from_auto_mount.add(name)
+    names_excluded_from_auto_mount |= _names_requested_at_auto_mount_path(
+        vfolders_by_uuid_request, requested_vfolder_dstpaths
+    )
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
