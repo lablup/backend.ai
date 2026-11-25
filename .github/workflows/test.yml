@@ -1,0 +1,45 @@
+name: test
+
+# The full Go test: `go test -race ./...` against a Postgres service container.
+# Called by `ci.yml` (push to `v2`) and `release.yml`.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: test
+      - name: Test
+        run: go test -race ./...
+      - name: Save the Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
