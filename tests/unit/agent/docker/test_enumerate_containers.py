@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from types import SimpleNamespace
-from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -30,7 +28,7 @@ class _InspectFailureCase:
 
 class TestListingAContainerThatFailsToBeInspected:
     @pytest.fixture
-    def docker_agent(self, case: _InspectFailureCase) -> Iterator[Any]:
+    def docker_agent(self, case: _InspectFailureCase) -> Iterator[DockerAgent]:
         docker = MagicMock()
         docker.close = AsyncMock()
         container = DockerContainer(
@@ -41,7 +39,9 @@ class TestListingAContainerThatFailsToBeInspected:
             patch("ai.backend.agent.docker.agent.Docker", return_value=docker),
             patch.object(container, "show", AsyncMock(side_effect=case.inspect_error)),
         ):
-            yield SimpleNamespace(id=AgentId("test-agent"))
+            agent = object.__new__(DockerAgent)
+            agent.id = AgentId("test-agent")
+            yield agent
 
     @pytest.mark.parametrize(
         "case",
@@ -66,9 +66,9 @@ class TestListingAContainerThatFailsToBeInspected:
         ids=lambda case: case.description,
     )
     async def test_only_a_kernel_whose_container_is_not_gone_is_reported(
-        self, case: _InspectFailureCase, docker_agent: Any
+        self, case: _InspectFailureCase, docker_agent: DockerAgent
     ) -> None:
-        enumeration_result = await DockerAgent.enumerate_containers(cast(Any, docker_agent))
+        enumeration_result = await docker_agent.enumerate_containers()
 
         assert enumeration_result.containers == []
         assert enumeration_result.failed_kernel_ids == case.expected_failed_kernel_ids
