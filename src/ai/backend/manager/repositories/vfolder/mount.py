@@ -180,6 +180,14 @@ class _MountableAutoMount:
     permission: MountPermission
 
 
+def _is_local_folder_of_project(vfolder: Mapping[str, Any], project_id: uuid.UUID) -> bool:
+    return bool(
+        vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME
+        and vfolder["ownership_type"] == VFolderOwnershipType.GROUP
+        and vfolder["group"] == project_id
+    )
+
+
 def _mountable_auto_mounts(
     accessible_vfolders: Sequence[dict[str, Any]],
     auto_mounts: Sequence[VFolderAutoMountData],
@@ -200,9 +208,7 @@ def _mountable_auto_mounts(
             permission=MountPermission(vfolder["permission"].value),
         )
         for vfolder in mountable_vfolders.values()
-        if vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME
-        and vfolder["ownership_type"] == VFolderOwnershipType.GROUP
-        and vfolder["group"] == session_project_id
+        if _is_local_folder_of_project(vfolder, session_project_id)
     ]
     for auto_mount in auto_mounts:
         vfolder = mountable_vfolders.get(auto_mount.vfolder_id)
@@ -464,7 +470,7 @@ async def prepare_vfolder_mounts(
             mount_base_path = PurePosixPath(mount_path_result["path"])
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
-        if vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME and is_project_vfolder:
+        if _is_local_folder_of_project(vfolder, user_scope.group_id):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):

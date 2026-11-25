@@ -618,6 +618,34 @@ class TestAutoMountVFolderResolution:
                 expected_mounts=[_ResolvedMount("of-user", "/home/work/.local")],
             ),
             _SessionMountsCase(
+                name="local-of-the-personal-project-set-away-from-the-project-local",
+                folders=[
+                    _Folder(
+                        "of-personal-project",
+                        _Project.PERSONAL,
+                        VFolderOwnershipType.GROUP,
+                        vfolder_name=".local",
+                    ),
+                    _Folder(
+                        "of-project",
+                        _Project.OF_THE_SESSION,
+                        VFolderOwnershipType.GROUP,
+                        vfolder_name=".local",
+                    ),
+                ],
+                auto_mounts=[
+                    _AutoMount(
+                        "of-personal-project",
+                        VFolderAutoMountScopeType.USER,
+                        "/home/work/own-local",
+                    )
+                ],
+                expected_mounts=[
+                    _ResolvedMount("of-project", "/home/work/.local"),
+                    _ResolvedMount("of-personal-project", "/home/work/own-local"),
+                ],
+            ),
+            _SessionMountsCase(
                 name="own-local-requested-away-from-the-project-local",
                 folders=[
                     _Folder(
