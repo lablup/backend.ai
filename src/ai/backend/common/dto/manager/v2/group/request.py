@@ -28,14 +28,17 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 __all__ = (
     "AdminSearchProjectsInput",
     "AssignUsersToProjectInput",
+    "CreateProjectContainerRegistryRelationsInput",
     "CreateProjectInput",
     "DeleteProjectInput",
     "PartialBulkDeleteProjectsInput",
     "PartialBulkRestoreProjectsInput",
     "PartialBulkUpdateProjectItemInput",
     "PartialBulkUpdateProjectsInput",
+    "ProjectContainerRegistryRelationInput",
     "ProjectFilter",
     "ProjectOrder",
+    "PurgeProjectContainerRegistryRelationsInput",
     "PurgeProjectInput",
     "RestoreProjectInput",
     "ScopedSearchProjectsInput",
@@ -270,3 +273,26 @@ class UnassignUsersFromProjectInput(BaseRequestModel):
     """Input for unassigning users from a project."""
 
     user_ids: list[UUID] = Field(description="List of user UUIDs to unassign from the project.")
+
+
+class ProjectContainerRegistryRelationInput(BaseRequestModel):
+    """One project and one container registry, the two ends of a relation."""
+
+    project_id: UUID = Field(description="ID of the project.")
+    container_registry_id: UUID = Field(description="ID of the container registry.")
+
+
+class CreateProjectContainerRegistryRelationsInput(BaseRequestModel):
+    """Input for creating relations between projects and container registries."""
+
+    items: NonEmptyList[ProjectContainerRegistryRelationInput] = Field(
+        description="The project and container registry pairs to relate. At least one."
+    )
+
+
+class PurgeProjectContainerRegistryRelationsInput(BaseRequestModel):
+    """Input for purging relations between projects and container registries."""
+
+    items: NonEmptyList[ProjectContainerRegistryRelationInput] = Field(
+        description="The project and container registry pairs whose relations to purge. At least one."
+    )

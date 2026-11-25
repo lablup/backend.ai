@@ -945,3 +945,135 @@ class DomainsOfARegistryAndSomeone(Given[TestSeedingSession, DomainsOfARegistryA
             related=tuple(seeding.made(one) for one in related),
             caller=seeding.made(caller),
         )
+
+
+@dataclass(frozen=True)
+class ProjectsOfARegistryAndACaller:
+    """레지스트리 하나, 그 레지스트리와 relation이 있는 프로젝트들, 그리고 부를 사람."""
+
+    registry: ContainerRegistryData
+    related: tuple[ProjectData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ProjectsOfARegistryAndSomeone(Given[TestSeedingSession, ProjectsOfARegistryAndACaller]):
+    """레지스트리 하나와 프로젝트 셋. ``related`` 개만 그 레지스트리와 relation이 있다.
+
+    호출자는 그 레지스트리 범위에서 ``entity_type`` 에 대한 읽기 역할을 받는다.
+    """
+
+    related: int = 2
+    entity_type: EntityType = ProjectEntityType()
+
+    @override
+    def describe(self) -> str:
+        what_ko = "프로젝트" if self.entity_type == ProjectEntityType() else "레지스트리"
+        what_en = "project" if self.entity_type == ProjectEntityType() else "registry"
+        return Says(
+            f"레지스트리 하나, 그 레지스트리와 relation이 있는 프로젝트 {self.related}개와 없는 프로젝트 하나, "
+            f"그리고 그 레지스트리 범위의 {what_ko} 읽기 역할을 받은 사용자 한 명",
+            english=(
+                f"one registry, {self.related} projects related to it and one that is not, and one "
+                f"user granted the {what_en} read role in the registry scope"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ProjectsOfARegistryAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home"))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        related = [
+            await seeding.creating_from_two(TestSeedProject(name_hint="related"), home, policy)
+            for _ in range(self.related)
+        ]
+        for one in related:
+            await seeding.linking(AllowProject(), one, registry)
+        await seeding.linking(
+            AllowProject(),
+            await seeding.creating_from_two(TestSeedProject(name_hint="unrelated"), home, policy),
+            await seeding.creating(TestSeedContainerRegistry(name_hint="other")),
+        )
+        caller = await seeding.within(SomeoneOf(home, role=UserRole.USER))
+        await seeding.within(
+            SomeoneAllowingIn(
+                registry,
+                caller,
+                scope_of=lambda one: ContainerRegistryID(one.id),
+                entity_type=self.entity_type,
+                name_hint="read-in-registry",
+                permissions=(Permission.READ,),
+            )
+        )
+        return ProjectsOfARegistryAndACaller(
+            registry=seeding.made(registry),
+            related=tuple(seeding.made(one) for one in related),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class RegistriesOfAProjectAndACaller:
+    """프로젝트 하나, 그 프로젝트와 relation이 있는 레지스트리들, 그리고 부를 사람."""
+
+    project: ProjectData
+    related: tuple[ContainerRegistryData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class RegistriesOfAProjectAndSomeone(Given[TestSeedingSession, RegistriesOfAProjectAndACaller]):
+    """프로젝트 하나와 레지스트리 셋. ``related`` 개만 그 프로젝트와 relation이 있다.
+
+    호출자는 그 프로젝트 범위에서 ``entity_type`` 에 대한 읽기 역할을 받는다.
+    """
+
+    related: int = 2
+    entity_type: EntityType = ContainerRegistryEntityType()
+
+    @override
+    def describe(self) -> str:
+        what_ko = "레지스트리" if self.entity_type == ContainerRegistryEntityType() else "프로젝트"
+        what_en = "registry" if self.entity_type == ContainerRegistryEntityType() else "project"
+        return Says(
+            f"프로젝트 하나, 그 프로젝트와 relation이 있는 레지스트리 {self.related}개와 없는 레지스트리 하나, "
+            f"그리고 그 프로젝트 범위의 {what_ko} 읽기 역할을 받은 사용자 한 명",
+            english=(
+                f"one project, {self.related} registries related to it and one that is not, and "
+                f"one user granted the {what_en} read role in the project scope"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RegistriesOfAProjectAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home"))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), home, policy)
+        related = [
+            await seeding.creating(TestSeedContainerRegistry(name_hint="related"))
+            for _ in range(self.related)
+        ]
+        for one in related:
+            await seeding.linking(AllowProject(), project, one)
+        await seeding.linking(
+            AllowProject(),
+            await seeding.creating_from_two(TestSeedProject(name_hint="other"), home, policy),
+            await seeding.creating(TestSeedContainerRegistry(name_hint="unrelated")),
+        )
+        caller = await seeding.within(SomeoneOf(home, role=UserRole.USER))
+        await seeding.within(
+            SomeoneAllowingIn(
+                project,
+                caller,
+                scope_of=lambda one: ProjectID(one.id),
+                entity_type=self.entity_type,
+                name_hint="read-in-project",
+                permissions=(Permission.READ,),
+            )
+        )
+        return RegistriesOfAProjectAndACaller(
+            project=seeding.made(project),
+            related=tuple(seeding.made(one) for one in related),
+            caller=seeding.made(caller),
+        )

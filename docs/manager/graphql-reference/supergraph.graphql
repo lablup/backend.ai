@@ -4484,6 +4484,9 @@ type ContainerRegistryV2 implements Node
 
   """Added in 26.10.0. Domains this container registry is related to."""
   domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """Added in 26.10.0. Projects this container registry is related to."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """Added in 26.4.2. Paginated connection for container registries."""
@@ -5418,6 +5421,28 @@ input CreatePermissionInput
 
   """Operation type."""
   operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+}
+
+"""
+Added in 26.10.0. Input for creating relations between projects and container registries.
+"""
+input CreateProjectContainerRegistryRelationsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The project and container registry pairs to relate. At least one."""
+  items: [ProjectContainerRegistryRelationInput!]!
+}
+
+"""
+Added in 26.10.0. Payload for creating relations between projects and container registries.
+"""
+type CreateProjectContainerRegistryRelationsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The relations this request created. A relation that already exists is left out.
+  """
+  items: [ProjectContainerRegistryRelation!]!
 }
 
 """Added in 26.4.2. Input for creating a new project."""
@@ -15749,6 +15774,16 @@ type Mutation
   purgeDomainContainerRegistryRelations(input: PurgeDomainContainerRegistryRelationsInput!): PurgeDomainContainerRegistryRelationsPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Create relations between projects and container registries. A relation that already exists is left as it stands.
+  """
+  createProjectContainerRegistryRelations(input: CreateProjectContainerRegistryRelationsInput!): CreateProjectContainerRegistryRelationsPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge relations between projects and container registries. A relation that does not exist is skipped.
+  """
+  purgeProjectContainerRegistryRelations(input: PurgeProjectContainerRegistryRelationsInput!): PurgeProjectContainerRegistryRelationsPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
   """
   adminCreateProjectV2(input: CreateProjectInput!): ProjectPayload @join__field(graph: STRAWBERRY)
@@ -19591,6 +19626,32 @@ type ProjectBasicInfo
   integrationName: String
 }
 
+"""
+Added in 26.10.0. A relation between one project and one container registry.
+"""
+type ProjectContainerRegistryRelation
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the project."""
+  projectId: UUID!
+
+  """ID of the container registry."""
+  containerRegistryId: UUID!
+}
+
+"""
+Added in 26.10.0. One project and one container registry, the two ends of a relation.
+"""
+input ProjectContainerRegistryRelationInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the project."""
+  projectId: UUID!
+
+  """ID of the container registry."""
+  containerRegistryId: UUID!
+}
+
 """Added in 25.19.0. Scope for project-level deployment operations."""
 input ProjectDeploymentScope
   @join__type(graph: STRAWBERRY)
@@ -20004,6 +20065,11 @@ input ProjectScope
 
   """Resource groups whose projects are being read."""
   resourceGroup: [UUIDScope!] = null
+
+  """
+  Added in 26.10.0. Container registries whose related projects are being read.
+  """
+  containerRegistry: [UUIDScope!] = null
 }
 
 """
@@ -20298,6 +20364,9 @@ type ProjectV2 implements Node
   Added in 26.10.0. System session environ rows registered in this project, soft-deleted ones included.
   """
   systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
+
+  """Added in 26.10.0. Container registries this project is allowed to use."""
+  containerRegistries(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection
 }
 
 """
@@ -20817,6 +20886,30 @@ type PurgePermissionPayload
 
   """UUID of the purged permission."""
   fieldId: UUID!
+}
+
+"""
+Added in 26.10.0. Input for purging relations between projects and container registries.
+"""
+input PurgeProjectContainerRegistryRelationsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The project and container registry pairs whose relations to purge. At least one.
+  """
+  items: [ProjectContainerRegistryRelationInput!]!
+}
+
+"""
+Added in 26.10.0. Payload for purging relations between projects and container registries.
+"""
+type PurgeProjectContainerRegistryRelationsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The relations this request purged. A relation that does not exist is left out.
+  """
+  items: [ProjectContainerRegistryRelation!]!
 }
 
 """Added in 26.4.2. Payload for project permanent deletion mutation."""

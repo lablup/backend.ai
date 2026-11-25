@@ -9,11 +9,13 @@ from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
+    CreateProjectContainerRegistryRelationsInput,
     CreateProjectInput,
     DeleteProjectInput,
     PartialBulkDeleteProjectsInput,
     PartialBulkRestoreProjectsInput,
     PartialBulkUpdateProjectsInput,
+    PurgeProjectContainerRegistryRelationsInput,
     PurgeProjectInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
@@ -21,9 +23,11 @@ from ai.backend.common.dto.manager.v2.group.request import (
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
     AssignUsersToProjectPayload,
+    CreateProjectContainerRegistryRelationsPayload,
     DeleteProjectPayload,
     ProjectNode,
     ProjectPayload,
+    PurgeProjectContainerRegistryRelationsPayload,
     PurgeProjectPayload,
     RestoreProjectPayload,
     UnassignUsersFromProjectPayload,
@@ -185,4 +189,26 @@ class V2ProjectClient(BaseDomainClient):
             f"{_PATH}/{project_id}/users/unassign",
             request=request,
             response_model=UnassignUsersFromProjectPayload,
+        )
+
+    async def create_container_registry_relations(
+        self, request: CreateProjectContainerRegistryRelationsInput
+    ) -> CreateProjectContainerRegistryRelationsPayload:
+        """Create relations between projects and container registries."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/container-registry-relations/create",
+            request=request,
+            response_model=CreateProjectContainerRegistryRelationsPayload,
+        )
+
+    async def purge_container_registry_relations(
+        self, request: PurgeProjectContainerRegistryRelationsInput
+    ) -> PurgeProjectContainerRegistryRelationsPayload:
+        """Purge relations between projects and container registries."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/container-registry-relations/purge",
+            request=request,
+            response_model=PurgeProjectContainerRegistryRelationsPayload,
         )
