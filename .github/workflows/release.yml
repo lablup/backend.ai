@@ -1,6 +1,6 @@
 name: release
 
-# Release of `v2`: the full test, then the binaries of `cmd/` as artifacts.
+# Release of `v2`: the changelog batch, the full test, then the binaries of `cmd/` as artifacts.
 # The tag pattern is a placeholder; it is decided at the transition.
 
 on:
@@ -12,6 +12,26 @@ permissions:
   contents: read
 
 jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: release-changelog
+      - name: Batch the changelog fragments
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: go run ./tools/changelog batch "$VERSION"
+      - name: Upload the release notes
+        uses: actions/upload-artifact@v5
+        with:
+          name: changelog
+          path: changes/${{ github.ref_name }}.md
+
   test:
     uses: ./.github/workflows/test.yml
 

@@ -194,6 +194,11 @@ resolves #<issue-number> (BA-<jira-number>)
 - Rationale for implementation approach
 ```
 
+## Changelog Fragment
+
+A user-facing change adds `changes/unreleased/<issue key>.<kind>.md` with a short description for users.
+Kinds, format and the check: `changes/README.md`.
+
 ## PR Size Guidelines
 
 **Ideal size**

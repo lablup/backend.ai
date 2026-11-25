@@ -39,4 +39,12 @@ else
   fi
 fi
 
+if git diff --cached --name-only | grep -q '^changes/unreleased/'; then
+  echo "✓ Checking changelog fragments..."
+  if ! go run ./tools/changelog check; then
+    echo "❌ Changelog fragment check failed"
+    GO_EXIT=1
+  fi
+fi
+
 exit "$GO_EXIT"

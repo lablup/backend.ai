@@ -9,6 +9,7 @@ and how it affects users and other developers.
 **Checklist:** (if applicable)
 
 - [ ] Mention the original issue
+- [ ] Changelog fragment `changes/unreleased/<issue key>.<kind>.md` (see `changes/README.md`)
 - [ ] API server-client counterparts (for example, manager API → client SDK)
 - [ ] Test case(s) to:
   - Demonstrate the difference of before and after

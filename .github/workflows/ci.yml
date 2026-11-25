@@ -75,6 +75,8 @@ jobs:
           cache-prefix: build
       - name: Build
         run: go build ./...
+      - name: Check the changelog fragments
+        run: go run ./tools/changelog check
       - name: Tidy the module
         run: go mod tidy
       - name: Check that tidy changed nothing
