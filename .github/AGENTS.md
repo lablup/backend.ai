@@ -34,6 +34,7 @@ A script whose decision cannot be reproduced by running it by hand is in the wro
 - The Go setup is the composite action `go-setup`. The decision on the event and the branch stays in the workflow YAML.
 - The pull request gate is `fmt`, `lint` and `build`. `test-short` and `generate-diff` report on a pull request without being in the gate. The full test (`test`, with `-race` and Postgres) runs on a push to `v2` and on a release.
 - `release.yml` runs on a release tag push (the pattern is a placeholder until the transition). Its `build` job needs `test`, builds each `main` package under `cmd/` for linux amd64 and arm64 with `.github/scripts/build-release.sh`, and uploads them as the `binaries` artifact. It does not publish images, create a GitHub release or publish packages.
+- The `build` job runs `go run ./tools/changelog check`. A release batches `changes/unreleased/` with `go run ./tools/changelog batch <version> --allow-empty` in the `changelog` job and uploads `changes/<version>.md` as the `changelog` artifact. Fragments: `changes/README.md`.
 - The `build` job runs `.github/scripts/check-build-tag.sh './tests/integration/...'`: it fails when a Go file under `tests/integration/` lacks the `integration` build tag.
 - The Go caches (`GOCACHE`, `GOMODCACHE`) are restored by `actions/go-setup` and saved by each job on a push only: key `<job>-<os>-<sha>`, restored by the prefix.
 - A push to `v2` where `go generate ./...` changes files opens the pull request `go-generate/v2` with `.github/scripts/open-go-generate-pr.sh`.
