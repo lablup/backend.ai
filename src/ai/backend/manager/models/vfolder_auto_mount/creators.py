@@ -8,6 +8,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, Ru
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder_auto_mount.types import (
     VFolderAutoMountData,
     VFolderAutoMountSpec,
@@ -22,6 +23,7 @@ from ai.backend.manager.errors.vfolder_auto_mount import (
     VFolderAutoMountAlreadyExists,
     VFolderAutoMountVFolderOutsideScope,
 )
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.creator import GuardedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -33,7 +35,8 @@ from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
 
 @dataclass(frozen=True)
 class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderAutoMountData]):
-    """Add one vfolder to the auto-mounts of a project or a user; the vfolder must belong to it.
+    """Add one vfolder to the auto-mounts of a project or a user; the vfolder must belong to the
+    project, or to the user's personal project.
 
     The row carries the scope; the own and govern edges are derived from it.
     """
@@ -54,7 +57,13 @@ class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderA
             case VFolderAutoMountScopeType.PROJECT:
                 return VFolderRow.group.is_distinct_from(self.scope)
             case VFolderAutoMountScopeType.USER:
-                return VFolderRow.user.is_distinct_from(self.scope)
+                return sa.not_(
+                    sa.exists().where(
+                        ProjectRow.id == VFolderRow.group,
+                        ProjectRow.creator_id == self.scope,
+                        ProjectRow.type == ProjectType.PERSONAL,
+                    )
+                )
 
     @override
     def precondition_checks(self) -> Sequence[PreconditionCheck]:

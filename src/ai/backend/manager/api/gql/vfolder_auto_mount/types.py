@@ -409,7 +409,7 @@ class VFolderAutoMountScopeRefGQL(PydanticInputMixin[VFolderAutoMountScopeRefDTO
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Input for auto-mounting a vfolder into every session created in a project or by a "
-            "user. The vfolder must belong to that project, or be owned by that user."
+            "user. The vfolder must belong to that project, or to that user's personal project."
         ),
     ),
     name="CreateVFolderAutoMountInput",

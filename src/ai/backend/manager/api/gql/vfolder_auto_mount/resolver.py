@@ -79,8 +79,8 @@ async def scoped_vfolder_auto_mounts(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Auto-mount a vfolder into every session created in a project or by a user. The "
-            "vfolder must belong to the project, or be owned by the user, and the caller needs "
-            "the auto-mount create permission on that project or user."
+            "vfolder must belong to the project, or to the user's personal project, and the "
+            "caller needs the auto-mount create permission on that project or user."
         ),
     )
 )
