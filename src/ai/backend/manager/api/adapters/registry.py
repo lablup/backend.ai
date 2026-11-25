@@ -44,6 +44,7 @@ from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
 from ai.backend.manager.api.adapters.login_session.adapter import LoginSessionAdapter
+from ai.backend.manager.api.adapters.metric.adapter import MetricAdapter
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
@@ -132,6 +133,7 @@ class Adapters:
         secret: SecretAdapter,
         login_history: LoginHistoryAdapter,
         login_session: LoginSessionAdapter,
+        metric: MetricAdapter,
         notification: NotificationAdapter,
         object_storage: ObjectStorageAdapter,
         project: ProjectAdapter,
@@ -193,6 +195,7 @@ class Adapters:
         self.secret = secret
         self.login_history = login_history
         self.login_session = login_session
+        self.metric = metric
         self.notification = notification
         self.object_storage = object_storage
         self.project = project
@@ -285,6 +288,7 @@ class Adapters:
             secret=SecretAdapter(processors.secret),
             login_history=LoginHistoryAdapter(processors.auth),
             login_session=LoginSessionAdapter(processors.auth),
+            metric=MetricAdapter(processors.metric),
             notification=NotificationAdapter(processors.notification),
             object_storage=ObjectStorageAdapter(processors.object_storage),
             project=ProjectAdapter(
