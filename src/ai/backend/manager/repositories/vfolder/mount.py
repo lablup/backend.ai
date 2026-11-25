@@ -437,7 +437,13 @@ async def prepare_vfolder_mounts(
         # A personal folder also carries a project — its owner's personal project — so
         # project ownership is read off the ownership type, never off the column.
         is_project_vfolder = vfolder["ownership_type"] == VFolderOwnershipType.GROUP
-        # An auto-mount's folder belongs to the scope it is set on, whatever the session's project.
+        # A request may name any vfolder id, so a vfolder of another project is left out below.
+        # An auto-mount skips that check:
+        # - The scope search returns only the auto-mounts of the session's project and owner,
+        #   and registering one requires its vfolder to be in that project or in the owner's
+        #   personal project.
+        # - The owner's auto-mounts are mounted into the sessions of every project, so the check
+        #   would leave out a project-owned vfolder of the personal project.
         is_cross_project = (
             is_project_vfolder and vfolder["group"] != user_scope.group_id and not is_auto_mount
         )
