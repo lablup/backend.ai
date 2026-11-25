@@ -1629,6 +1629,12 @@ class AbstractAgent[
         cleanup_tasks: set[asyncio.Task[None]] = set()
         while True:
             try:
+                # A kernel that starts during the listing is absent from it.
+                kernel_ids_running_before_listing = {
+                    kid
+                    for kid, kernel in self.kernel_registry.items()
+                    if kernel.state == KernelLifecycleStatus.RUNNING
+                }
                 container_listing = await self.enumerate_containers()
                 alive_kernel_ids = {kid for kid, _ in container_listing.containers}
                 registered_kernel_ids = {
@@ -1637,7 +1643,7 @@ class AbstractAgent[
                     if kernel.state == KernelLifecycleStatus.RUNNING
                 }
                 dangling_kernel_ids = (
-                    registered_kernel_ids
+                    (registered_kernel_ids & kernel_ids_running_before_listing)
                     - alive_kernel_ids
                     - container_listing.kernel_ids_failed_to_inspect
                 )
@@ -1875,6 +1881,12 @@ class AbstractAgent[
 
         log.debug("container lifecycle sync started")
         try:
+            # A kernel that starts during the listing is absent from it.
+            kernel_ids_running_before_listing = {
+                kernel_id
+                for kernel_id, kernel_obj in self.kernel_registry.items()
+                if kernel_obj.state == KernelLifecycleStatus.RUNNING
+            }
             container_listing = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
             async with self.registry_lock:
                 try:
@@ -1950,6 +1962,7 @@ class AbstractAgent[
                         if (
                             kernel_id in self.restarting_kernels
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                            or kernel_id not in kernel_ids_running_before_listing
                             or kernel_id in container_listing.kernel_ids_failed_to_inspect
                         ):
                             continue
