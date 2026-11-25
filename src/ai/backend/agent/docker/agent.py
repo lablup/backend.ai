@@ -1908,7 +1908,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 async def _fetch_container_info(container: DockerContainer) -> None:
                     kernel_id_str: str = "(unknown)"
                     # An inspection replaces the listed fields.
-                    listed_kernel_ids = await self._get_listed_kernel_ids(container)
+                    listed_kernel_id = await get_kernel_id_from_container(
+                        # Docker adds more names only for container links, which kernels do not use.
+                        container._container["Names"][0]
+                    )
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
                         if kernel_id is None:
@@ -1934,12 +1937,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 kernel_id=kernel_id_str,
                             )
                             return
-                        failed_kernel_ids.update(listed_kernel_ids)
+                        if listed_kernel_id is not None:
+                            failed_kernel_ids.add(listed_kernel_id)
                         raise
                     except asyncio.CancelledError:
                         pass
                     except Exception:
-                        failed_kernel_ids.update(listed_kernel_ids)
+                        if listed_kernel_id is not None:
+                            failed_kernel_ids.add(listed_kernel_id)
                         log.exception(
                             "container info fetch failed",
                             container_id=container._id,
@@ -1953,14 +1958,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             containers=result,
             failed_kernel_ids=frozenset(failed_kernel_ids),
         )
-
-    async def _get_listed_kernel_ids(self, container: DockerContainer) -> set[KernelId]:
-        kernel_ids: set[KernelId] = set()
-        for name in container._container.get("Names") or []:
-            kernel_id = await get_kernel_id_from_container(name)
-            if kernel_id is not None:
-                kernel_ids.add(kernel_id)
-        return kernel_ids
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
