@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    AdminSearchVFolderAutoMountsInput,
     CreateVFolderAutoMountInput,
     DeleteVFolderAutoMountInput,
     ScopedSearchVFolderAutoMountsInput,
@@ -34,6 +35,14 @@ class V2VFolderAutoMountHandler:
         project or by that user."""
         result = await self._adapter.create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def admin_search(
+        self,
+        body: BodyParam[AdminSearchVFolderAutoMountsInput],
+    ) -> APIResponse:
+        """Search the auto-mounts of every project and user (superadmin only)."""
+        result = await self._adapter.global_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(
         self,
