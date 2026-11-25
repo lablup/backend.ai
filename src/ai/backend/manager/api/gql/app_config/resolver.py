@@ -28,7 +28,7 @@ from .types import AppConfigGQL
 async def my_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: list[str],
-) -> list[AppConfigGQL]:
+) -> list[AppConfigGQL] | None:
     payload = await info.context.adapters.app_config.my_app_configs(
         MyGetAppConfigsInput(config_names=config_names)
     )
