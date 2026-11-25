@@ -143,8 +143,8 @@ class VFolderAutoMountAdapter(BaseAdapter):
         return self._to_payload(result)
 
     async def create(self, input: CreateVFolderAutoMountInput) -> CreateVFolderAutoMountPayload:
-        """Auto-mount a vfolder of a project, or one a user owns, into every session created
-        in that project or by that user."""
+        """Auto-mount a vfolder of a project, or one in a user's personal project, into every
+        session created in that project or by that user."""
         creator = VFolderAutoMountCreator(
             scope=input.scope.scope_type.to_owner(input.scope.scope_id),
             spec=VFolderAutoMountSpec(

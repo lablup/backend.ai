@@ -130,7 +130,7 @@ class ScopedSearchVFolderAutoMountsInput(BaseRequestModel):
 class CreateVFolderAutoMountInput(BaseRequestModel):
     """Input for auto-mounting a vfolder into every session created in a project or by a user.
 
-    The vfolder must belong to that project, or be owned by that user.
+    The vfolder must belong to that project, or to that user's personal project.
     """
 
     scope: VFolderAutoMountScopeRef = Field(
