@@ -200,22 +200,13 @@ def _mountable_auto_mounts(
         for vfolder in accessible_vfolders
         if vfolder["permission"] != VFolderMountPolicy.NONE
     }
-    mountable_auto_mounts = [
-        _MountableAutoMount(
-            vfolder=vfolder,
-            destination=PurePosixPath("/home/work", _PROJECT_LOCAL_FOLDER_NAME),
-            subpath=".",
-            permission=MountPermission(vfolder["permission"].value),
-        )
-        for vfolder in mountable_vfolders.values()
-        if _is_local_folder_of_project(vfolder, session_project_id)
-    ]
+    registered_auto_mounts: list[_MountableAutoMount] = []
     for auto_mount in auto_mounts:
         vfolder = mountable_vfolders.get(auto_mount.vfolder_id)
         if vfolder is None:
             continue
         is_read_only = vfolder["permission"] == VFolderMountPolicy.READ_ONLY
-        mountable_auto_mounts.append(
+        registered_auto_mounts.append(
             _MountableAutoMount(
                 vfolder=vfolder,
                 destination=PurePosixPath("/home/work", auto_mount.mount_destination),
@@ -227,7 +218,23 @@ def _mountable_auto_mounts(
                 ),
             )
         )
-    return mountable_auto_mounts
+    local_vfolder = next(
+        (
+            vfolder
+            for vfolder in mountable_vfolders.values()
+            if _is_local_folder_of_project(vfolder, session_project_id)
+        ),
+        None,
+    )
+    if local_vfolder is None:
+        return registered_auto_mounts
+    local_vfolder_mount = _MountableAutoMount(
+        vfolder=local_vfolder,
+        destination=PurePosixPath("/home/work", _PROJECT_LOCAL_FOLDER_NAME),
+        subpath=".",
+        permission=MountPermission(local_vfolder["permission"].value),
+    )
+    return [local_vfolder_mount, *registered_auto_mounts]
 
 
 def _overlaps_any_mount(destination: PurePosixPath, mounts: Iterable[VFolderMount]) -> bool:
