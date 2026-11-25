@@ -312,13 +312,14 @@ async def prepare_vfolder_mounts(
     _ms_result = await conn.execute(_ms_query)
     model_store_project_ids: set[uuid.UUID] = {row.id for row in _ms_result.fetchall()}
 
+    local_folder_of_session_project = sa.and_(
+        VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
+        VFolderRow.ownership_type == VFolderOwnershipType.GROUP,
+        VFolderRow.group == user_scope.group_id,
+    )
     extra_vf_conds: sa.ColumnElement[bool] = sa.or_(
         VFolderRow.id.in_([auto_mount.vfolder_id for auto_mount in auto_mounts]),
-        sa.and_(
-            VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
-            VFolderRow.ownership_type == VFolderOwnershipType.GROUP,
-            VFolderRow.group == user_scope.group_id,
-        ),
+        local_folder_of_session_project,
     )
     if requested_vfolder_names:
         extra_vf_conds = sa.or_(
