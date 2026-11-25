@@ -148,6 +148,21 @@ async def query_reachable_vfolders(
     return reachable
 
 
+def _names_requested_at_auto_mount_path(
+    vfolders_by_uuid_request: Mapping[str | uuid.UUID | int, Mapping[str, Any]],
+    requested_dstpaths: Mapping[str | uuid.UUID | int, str],
+) -> set[str]:
+    """The names of the vfolders requested where an auto-mount of the same name is mounted."""
+    names: set[str] = set()
+    for request_key, vfolder in vfolders_by_uuid_request.items():
+        name = vfolder["name"]
+        auto_mount_path = PurePosixPath("/home/work", name)
+        requested_path = PurePosixPath("/home/work", requested_dstpaths.get(request_key, name))
+        if requested_path == auto_mount_path:
+            names.add(name)
+    return names
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -168,7 +183,7 @@ async def prepare_vfolder_mounts(
     requested_vfolder_dstpaths: dict[str | uuid.UUID | int, str] = {}
     requested_mount_options: dict[str | uuid.UUID | int, VFolderMountOptions] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
-    _already_resolved: set[str] = set()
+    names_excluded_from_auto_mount: set[str] = set()
     # A vfolder referenced by UUID may be requested several times, each with a
     # different subpath/destination. Key each such request by its index in
     # ``mount_requests`` instead of the bare UUID so the entries no longer
@@ -196,7 +211,7 @@ async def prepare_vfolder_mounts(
             requested_mount_options[req.ref] = req.options
             requested_vfolder_names[req.ref] = name
             requested_vfolder_subpaths[req.ref] = os.path.normpath(subpath)
-            _already_resolved.add(name)
+            names_excluded_from_auto_mount.add(name)
             if req.dst_path is not None:
                 requested_vfolder_dstpaths[req.ref] = req.dst_path
 
@@ -246,6 +261,14 @@ async def prepare_vfolder_mounts(
 
     requested_names = set(requested_vfolder_names.values())
     resolved_vfolder_ids: set[uuid.UUID] = set()
+    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {
+        index: row
+        for row in accessible_vfolders
+        for index in uuid_request_indices.get(row["id"], ())
+    }
+    names_excluded_from_auto_mount |= _names_requested_at_auto_mount_path(
+        vfolders_by_uuid_request, requested_vfolder_dstpaths
+    )
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
@@ -259,7 +282,7 @@ async def prepare_vfolder_mounts(
             for index in uuid_request_indices.get(vfid, ()):
                 requested_vfolder_names[index] = name
             continue
-        if name in _already_resolved:
+        if name in names_excluded_from_auto_mount:
             continue
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
@@ -281,6 +304,8 @@ async def prepare_vfolder_mounts(
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
+        if _vfolder["name"] in names_excluded_from_auto_mount:
+            continue
         if _vfolder["name"].startswith("."):
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
@@ -290,7 +315,10 @@ async def prepare_vfolder_mounts(
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
     for requested_key, vfolder_name in requested_vfolder_names.items():
-        if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
+        vfolder = vfolders_by_uuid_request.get(requested_key) or accessible_vfolders_map.get(
+            vfolder_name
+        )
+        if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             if vfolder["name"].startswith("."):
