@@ -1,1 +1,0 @@
-@layer reset,theme,base,astryx-base,astryx-theme;@layer ui-common{.uic-icon-with-tooltip{cursor:help;pointer-events:auto;display:inline-flex}.uic-icon-with-tooltip--button{appearance:none;font:inherit;color:inherit;background:0 0;border:0;margin:0;padding:0}.uic-icon-with-tooltip__icon{display:inline-flex}}@layer components,utilities;

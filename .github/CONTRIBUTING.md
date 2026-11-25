@@ -137,57 +137,8 @@ For example, `feature/add-pr-guidelines` and `fix/session-memory-leak`.
 ### 3. Create PR
 
 When implementation is complete, create a pull request.
-Write the changelog fragment (step 4) before opening the PR, so it goes into the same push as the code.
 
 **Tip**: For work still in progress, create a draft PR.
-
-**Backport targets**: a `fix:` PR is backported to every maintained release branch automatically. See [how backport targets are decided](https://docs.backend.ai/en/latest/dev/version-management-and-upgrades.html#backporting) to add or remove targets.
-
-### 4. Write Changelog Fragment (Towncrier)
-
-Write the changelog fragment before opening the PR and put it in the same push as the code. The release fills in the PR number.
-With a JIRA (`BA-`) or hejo (`BAI-`) issue key, pass `--issue`; when that issue belongs to an epic, also pass `--epic`.
-`{PR#}.{type}.md` written by hand with the PR number is the previous convention and is still accepted.
-The names, front matter and epic files are described in [`changes/README.md`](/changes/README.md#filename-convention).
-
-Backend.AI uses [Towncrier](https://towncrier.readthedocs.io/) to automatically generate release notes.
-
-**Important**: These fragments generate the changelog of the version branch
-being released, under [`CHANGELOG/`](/CHANGELOG/).
-Users and other developers read it, so write clearly and concisely about what you changed and its impact.
-
-**Create the fragment file**:
-```bash
-# Prints the path of the new file
-python3 scripts/new-changelog.py fix "Resolve deadlock in image rescan"
-python3 scripts/new-changelog.py fix "Resolve deadlock in image rescan" --issue BA-2790 --epic BA-2700
-```
-
-**Fragment types**:
-- `breaking` - Breaking changes
-- `feature` - New features
-- `enhance` - Enhancements to existing features (refactoring, optimization, performance improvements and others)
-- `deprecation` - Deprecation notices
-- `fix` - Bug fixes
-- `doc` - Documentation updates
-- `deps` - External dependency updates
-- `misc` - Other changes
-- `test` - Test updates
-
-**Fragment writing guidelines**:
-- Write changes **concisely and clearly** in one sentence
-- Focus on **user-facing changes** rather than technical details
-- Include the **situation before and after** or the **key changes** if necessary
-
-**Examples**:
-
-```bash
-# changes/6469.fix.md
-Resolve deadlock occurring due to incorrect use of semaphore in specific image rescan scenarios
-
-# changes/6449.doc.md
-Add comprehensive README documentation for Actions, Services, and Repositories layers in the manager, covering architecture patterns, design principles, and best practices for each layer.
-```
 
 ## PR Title Format
 
@@ -386,7 +337,6 @@ Pay more attention to the PR title: it becomes the final commit message on squas
 - Checklist before converting:
   - [ ] All CI checks pass
   - [ ] Self-review completed
-  - [ ] Changelog fragment written
   - [ ] Documentation and tests written
 
 ## Pre-Review Checklist
@@ -397,10 +347,9 @@ Pay more attention to the PR title: it becomes the final commit message on squas
 - [ ] Checked formatting and linting
 
 ### 2. CI/CD checks
-The git hook (pre-commit) runs the low-cost checks, and CI runs the pants-based checks (lint, typecheck, test). When a hook or CI fails, find the cause in its output or the failed job's log and fix it.
+The git hook (pre-commit) runs the low-cost checks. When a hook or CI fails, find the cause in its output or the failed job's log and fix it.
 
 - [ ] All lint passes
-- [ ] All typechecks pass
 - [ ] Related tests pass
 
 ### 3. Conflict resolution
@@ -492,121 +441,10 @@ git push
 Ensure the following:
 
 * Mandatory:
-  - Code naming and style must follow our flake8 and editorconfig settings and stay consistent with the existing codebase. Watch the lint and typecheck results generated automatically for every push and pull request.
+  - Code naming and style must follow our editorconfig settings and stay consistent with the existing codebase. Watch the lint and typecheck results generated automatically for every push and pull request.
   - The contributor must sign the CLA.
 * Highly recommended:
   - Provide one or more test cases that yield different results before and after the
     contribution.
   - Include patches for documentation or attach a link to a follow-up PR that updates
     related documents.
-
-
-## Documentation
-
-There are two documentation sets in this project.
-
-* [API and server-side docs](https://docs.backend.ai)
-  - Source of documentation: https://github.com/lablup/backend.ai/tree/master/docs
-* [Python client SDK docs](https://client-py.docs.backend.ai)
-  - Source of documentation: https://github.com/lablup/backend.ai-client-py/tree/master/docs
-* Javascript client SDK docs
-  - It uses JSDoc-style comments to generate documentation.
-  - Source: https://github.com/lablup/backend.ai-client-js/
-
-To build the documentation, prepare a Python environment for the cloned repositories
-and run:
-```console
-$ pip install -U -e '.[docs]'
-$ cd docs
-$ make html
-$ open _build/html/index.html
-```
-
-The documentation uses [Sphinx](http://sphinx-doc.org/). Be familiar with
-[RestructuredText](http://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html)
-and Sphinx's common and cross-reference directives.
-
-The `docs` directories are part of the project repositories and follow
-the X.Y version branch and X.Y.Z release tag policy.
-
-Send pull requests to add or modify documentation and to fix typos.
-To distinguish documentation-related PRs easily, prefix the PR title with
-"docs:" or apply the "docs" label.
-
-### Coding style for docs
-
-Wrap sentences at 75 characters (configured through editorconfig), but always break
-the line after the end of a sentence (a period).
-The purpose of this extra convention is to keep translations at the sentence level instead of the paragraph level.
-
-For example:
-```text
-This is the first long long ... long (75 chars here) long sentence.
-This is the second long long ... long (75 chars here) long sentence.
-```
-should be
-```text
-This is the first long long ... long
-long sentence.
-This is the second long long ... long
-long sentence.
-```
-but *NOT*
-```text
-This is the first long long long long ... long
-long sentence.  This is the second long ... long
-long ... long sentence.
-```
-
-
-## Translation
-
-The docs are written in English first and then translated into other languages such as
-Korean.
-
-Currently only the Python client SDK docs have [the Korean
-translation](https://client-py.docs.backend.ai/ko/latest/).
-
-
-### How to add a translation for a new language
-
-Add a project in readthedocs.org with the "-xx" suffix, where "xx" is an ISO 639-1
-language code (for example, "ko" for Korean), targeting the same GitHub address as the
-original project.
-
-Then configure the main project in readthedocs.org to use the new project as a
-specific language translation.
-Each readthedocs.org project should have the same set of active and public branch builds.
-
-Example:
-
-* https://readthedocs.org/projects/backendai-client-sdk-for-python
-* https://readthedocs.org/projects/backendai-client-sdk-for-python-ko
-
-Ask the documentation maintainers for help.
-
-
-### How to update the translation maps when the English version is updated
-
-Update the po message templates (generate or update `.po` files):
-```console
-$ make gettext
-$ sphinx-intl update -p _build/gettext -l xx
-```
-
-
-### How to write translations
-
-Edit the po messages (`.po` files):
-```console
-$ edit locales/xx/LC_MESSAGES/...
-```
-
-Run `git push` to let readthedocs update the online docs.
-
-Rebuild the compiled po messages (compile `.po` into `.mo` files) and preview the local build:
-```console
-$ sphinx-intl build
-$ make -e SPHINXOPTS="-D language='xx'" html
-$ open _build/html/index.html
-```

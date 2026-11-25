@@ -1,2 +1,0 @@
-Accelerators (aka Compute Plugins)
-==================================
