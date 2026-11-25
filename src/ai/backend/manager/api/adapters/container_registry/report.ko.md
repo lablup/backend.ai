@@ -54,8 +54,11 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [프로젝트 범위에서 레지스트리 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 그 프로젝트와 relation 이 있는 레지스트리만 응답으로 옵니다](#scoped_searching_by_project-a-user-granted-read-in-the-project-searches-its-registries) | 성공 |
 | [검색할 도메인에서 레지스트리 조회 권한을 받은 사용자가 그 도메인을 스코프로, 이름을 필터로, 이름순 정렬과 페이지 크기를 한 번에 검색하면, 그 도메인과 relation 이 있는 레지스트리 가운데 필터에 맞는 것만 이름순으로 반환됩니다](#scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries) | 성공 |
+| [relation 이 없는 프로젝트 범위에서 search 하면 빈 목록이 옵니다](#scoped_searching_by_project-a-user-searches-the-registries-of-a-project-with-no-relation) | 성공 |
 | [검색할 도메인에서 레지스트리 조회 권한을 받지 않은 사용자가 그 도메인을 스코프로 검색하면 권한 부족으로 거부됩니다](#scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused) | 거부 |
+| [프로젝트 범위에서 레지스트리 읽기 역할 없이 프로젝트 읽기 역할만 받은 사용자가 search 하면 권한 부족으로 거부됩니다](#scoped_searching_by_project-a-user-without-registry-read-may-not-search-the-registries-of-a-project) | 거부 |
 
 **admin_create**
 
@@ -509,6 +512,46 @@ Then
 
 ### scoped_search
 
+<a id="scoped_searching_by_project-a-user-granted-read-in-the-project-searches-its-registries"></a>
+
+#### [a-user-granted-read-in-the-project-searches-its-registries](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching_by_project.py): pass
+
+프로젝트 범위에서 레지스트리 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 그 프로젝트와 relation 이 있는 레지스트리만 응답으로 옵니다
+
+Given
+
+- 프로젝트 하나, 그 프로젝트와 relation 이 있는 레지스트리 2개와 없는 레지스트리 하나, 그리고 그 프로젝트 범위의 레지스트리 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 컨테이너 레지스트리 related-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 related-2: 이미지를 가져오는 곳
+  - 프로젝트 team-1 가 허용한 컨테이너 레지스트리 related-1
+  - 프로젝트 team-1 가 허용한 컨테이너 레지스트리 related-2
+  - 프로젝트 other-1
+  - 컨테이너 레지스트리 unrelated-1: 이미지를 가져오는 곳
+  - 프로젝트 other-1 가 허용한 컨테이너 레지스트리 unrelated-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-project 권한을 받은 사용자 준비
+    - 역할 read-in-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-project-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1이 프로젝트 team-1 범위에서 search 합니다
+
+Then
+
+- 그 프로젝트와 relation 이 있는 레지스트리만 남습니다
+  - items = ['related-1', 'related-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries"></a>
 
 #### [a-user-reading-registries-in-the-domain-scoped-searches-its-registries](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
@@ -583,6 +626,42 @@ Then
   - items[2].is_global = True
   - items[2].extra = None
 
+<a id="scoped_searching_by_project-a-user-searches-the-registries-of-a-project-with-no-relation"></a>
+
+#### [a-user-searches-the-registries-of-a-project-with-no-relation](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching_by_project.py): pass
+
+relation 이 없는 프로젝트 범위에서 search 하면 빈 목록이 옵니다
+
+Given
+
+- 프로젝트 하나, 그 프로젝트와 relation 이 있는 레지스트리 0개와 없는 레지스트리 하나, 그리고 그 프로젝트 범위의 레지스트리 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 컨테이너 레지스트리 unrelated-1: 이미지를 가져오는 곳
+  - 프로젝트 other-1 가 허용한 컨테이너 레지스트리 unrelated-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-project 권한을 받은 사용자 준비
+    - 역할 read-in-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-project-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1이 프로젝트 team-1 범위에서 search 합니다
+
+Then
+
+- 그 프로젝트와 relation 이 있는 레지스트리만 남습니다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused"></a>
 
 #### [a-user-not-reading-registries-in-the-domain-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
@@ -614,6 +693,43 @@ Given
 When
 
 - ContainerRegistryAdapter.scoped_search: user-1이 검색할 도메인을 스코프로, 다른 레지스트리를 빼는 이름 필터와 이름순 정렬, 페이지 크기를 한 번에 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="scoped_searching_by_project-a-user-without-registry-read-may-not-search-the-registries-of-a-project"></a>
+
+#### [a-user-without-registry-read-may-not-search-the-registries-of-a-project](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching_by_project.py): pass
+
+프로젝트 범위에서 레지스트리 읽기 역할 없이 프로젝트 읽기 역할만 받은 사용자가 search 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 프로젝트 하나, 그 프로젝트와 relation 이 있는 레지스트리 2개와 없는 레지스트리 하나, 그리고 그 프로젝트 범위의 프로젝트 읽기 역할을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 컨테이너 레지스트리 related-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 related-2: 이미지를 가져오는 곳
+  - 프로젝트 team-1 가 허용한 컨테이너 레지스트리 related-1
+  - 프로젝트 team-1 가 허용한 컨테이너 레지스트리 related-2
+  - 프로젝트 other-1
+  - 컨테이너 레지스트리 unrelated-1: 이미지를 가져오는 곳
+  - 프로젝트 other-1 가 허용한 컨테이너 레지스트리 unrelated-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-in-project 권한을 받은 사용자 준비
+    - 역할 read-in-project-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-in-project-1: project 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-in-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1이 프로젝트 team-1 범위에서 search 합니다
 
 Then
 

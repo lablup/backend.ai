@@ -41,7 +41,7 @@ Check options with `--help`.
 
 - **domain**: user(get, create-container-registry-relations, purge-container-registry-relations) | admin(search, create, update, delete, purge)
 - **user**: user(get, create, update, delete, search) | admin(create, delete, search)
-- **project**: user(get, assign-users, unassign-users | sub role: search) | admin(search, create, update, delete, purge)
+- **project**: user(get, assign-users, unassign-users, create-container-registry-relations, purge-container-registry-relations | sub role: search) | admin(search, create, update, delete, purge)
 - **agent**: user(empty group) | admin(search, total-resources, update-resource-group)
 - **image**: user(empty group) | admin(search, forget, purge, update | sub alias: create, remove, search)
 - **entity-label**: user(upsert, purge, search)

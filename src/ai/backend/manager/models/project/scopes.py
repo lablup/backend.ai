@@ -9,13 +9,19 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import (
@@ -29,6 +35,7 @@ from ai.backend.manager.models.virtual_entity.queries import (
 )
 
 __all__ = (
+    "ContainerRegistryProjectTarget",
     "DomainProjectTarget",
     "ProjectTarget",
     "ResourceGroupProjectTarget",
@@ -150,5 +157,40 @@ class ResourceGroupProjectTarget(ProjectTarget):
                 column=ResourceGroupRow.id,
                 value=self.resource_group_id,
                 error=ResourceGroupNotFound(str(self.resource_group_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class ContainerRegistryProjectTarget(ProjectTarget):
+    """The projects one container registry is related to."""
+
+    container_registry_id: ContainerRegistryID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.container_registry_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        container_registry_id = self.container_registry_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectRow.id.in_(
+                sa.select(AssociationContainerRegistriesGroupsRow.project_id).where(
+                    AssociationContainerRegistriesGroupsRow.registry_id == container_registry_id
+                )
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=ContainerRegistryRow.id,
+                value=self.container_registry_id,
+                error=ContainerRegistryNotFound(str(self.container_registry_id)),
             ),
         ]

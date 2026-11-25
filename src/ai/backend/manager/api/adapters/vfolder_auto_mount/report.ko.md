@@ -4,9 +4,10 @@
 
 시나리오: 완성
 
-- ops 구성 (4)
+- ops 구성 (5)
   - bulk_get_ids: 대표 성공 ✓ · 대표 거부 ✓
   - delete: 대표 성공 ✓ · 대표 거부 ✓
+  - global_search: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (1)
@@ -25,6 +26,13 @@
 |---|---|
 | [자동 마운트 삭제 권한을 받은 사용자가 그 자동 마운트를 soft delete 하면, 삭제된 자동 마운트가 응답으로 옵니다](#deleting-a-user-granted-auto-mount-delete-soft-deletes-it) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자동 마운트를 soft delete 하려 하면 권한 부족으로 거부됩니다](#deleting-a-user-granted-nothing-may-not-delete-an-auto-mount) | 거부 |
+
+**global_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 범위를 가리지 않고 주소 조각으로 걸러 주소 오름차순으로 한 페이지를 조회하면, 걸러진 프로젝트 자동 마운트와 사용자 자동 마운트가 주소 순서로 오고 삭제된 자동 마운트는 오지 않습니다. 이 호출은 superadmin 검사를 거칩니다](#searching-the-superadmin-finds-project-and-user-auto-mounts-across-every-scope) | 성공 |
+| [superadmin 이 아닌 사용자가 범위를 가리지 않고 자동 마운트를 조회하려 하면 권한 부족으로 거부됩니다. 이 호출은 superadmin 검사를 거칩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount) | 거부 |
 
 **scoped_search**
 
@@ -191,6 +199,108 @@ Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+### global_search
+
+<a id="searching-the-superadmin-finds-project-and-user-auto-mounts-across-every-scope"></a>
+
+#### [the-superadmin-finds-project-and-user-auto-mounts-across-every-scope](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_searching.py): pass
+
+superadmin 이 범위를 가리지 않고 주소 조각으로 걸러 주소 오름차순으로 한 페이지를 조회하면, 걸러진 프로젝트 자동 마운트와 사용자 자동 마운트가 주소 순서로 오고 삭제된 자동 마운트는 오지 않습니다. 이 호출은 superadmin 검사를 거칩니다
+
+Given
+
+- 주소에 match 가 든 프로젝트 자동 마운트 하나와 사용자 자동 마운트 하나, 주소에 match 가 들지 않은 자동 마운트 하나, 주소에 match 가 들고 삭제된 자동 마운트 하나, 그리고 superadmin 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 project-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-1: /home/work/match-one 에 ro 로 마운트됩니다
+  - 개인 vfolder folder-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-2: /home/work/match-two 에 ro 로 마운트됩니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-3: /home/work/other 에 ro 로 마운트됩니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-4: /home/work/match-three 에 ro 로 마운트됩니다
+  - 삭제된 vfolder 자동 마운트 deleted-auto-mount-1: 지운 시각이 기록돼 있습니다
+
+When
+
+- VFolderAutoMountAdapter.global_search: user-2이 범위를 가리지 않고 자동 마운트를 주소에 match 가 든 것만 주소 오름차순으로 2개까지 조회합니다
+
+Then
+
+- 걸러진 프로젝트 자동 마운트와 사용자 자동 마운트만 주소 순서로 실린 한 페이지가 응답으로 옵니다
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items.length = 2
+  - items[0].id: 응답의 entity_id 와 같다
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: 폴더가 놓인 프로젝트와 같다
+  - items[0].vfolder_id: 자동 마운트한 vfolder 와 같다
+  - items[0].mount_destination = '/home/work/match-one'
+  - items[0].subpath = '.'
+  - items[0].mount_permission = 'ro'
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[0].deleted_at = None
+  - items[1].id: 응답의 entity_id 와 같다
+  - items[1].scope_type = 'user'
+  - items[1].scope_id: 폴더를 소유한 사용자와 같다
+  - items[1].vfolder_id: 자동 마운트한 vfolder 와 같다
+  - items[1].mount_destination = '/home/work/match-two'
+  - items[1].subpath = '.'
+  - items[1].mount_permission = 'ro'
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - items[1].deleted_at = None
+  - items ids: 걸러진 프로젝트 자동 마운트와 사용자 자동 마운트
+
+<a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_searching.py): pass
+
+superadmin 이 아닌 사용자가 범위를 가리지 않고 자동 마운트를 조회하려 하면 권한 부족으로 거부됩니다. 이 호출은 superadmin 검사를 거칩니다
+
+Given
+
+- 주소에 match 가 든 프로젝트 자동 마운트 하나와 사용자 자동 마운트 하나, 주소에 match 가 들지 않은 자동 마운트 하나, 주소에 match 가 들고 삭제된 자동 마운트 하나, 그리고 일반 사용자 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 project-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-1: /home/work/match-one 에 ro 로 마운트됩니다
+  - 개인 vfolder folder-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-2: /home/work/match-two 에 ro 로 마운트됩니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-3: /home/work/other 에 ro 로 마운트됩니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-4: /home/work/match-three 에 ro 로 마운트됩니다
+  - 삭제된 vfolder 자동 마운트 deleted-auto-mount-1: 지운 시각이 기록돼 있습니다
+
+When
+
+- VFolderAutoMountAdapter.global_search: user-2이 범위를 가리지 않고 자동 마운트를 주소에 match 가 든 것만 주소 오름차순으로 2개까지 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
 
 ### scoped_search
 

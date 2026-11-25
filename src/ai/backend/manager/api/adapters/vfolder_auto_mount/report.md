@@ -4,9 +4,10 @@
 
 Scenario: complete
 
-- built from ops (4)
+- built from ops (5)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
   - delete: representative success ✓ · representative rejection ✓
+  - global_search: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (1)
@@ -25,6 +26,13 @@ Scenario: complete
 |---|---|
 | [when a user granted auto-mount delete soft deletes it, the deleted auto-mount comes back](#deleting-a-user-granted-auto-mount-delete-soft-deletes-it) | answered |
 | [when a user granted nothing tries to soft delete an auto-mount, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-delete-an-auto-mount) | rejected |
+
+**global_search**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches across every scope by a destination fragment, ordered by destination and limited to one page, the matching project auto-mount and user auto-mount come back in destination order and the deleted auto-mount does not. This call is gated by the global role](#searching-the-superadmin-finds-project-and-user-auto-mounts-across-every-scope) | answered |
+| [when a user who is not the superadmin searches auto-mounts across every scope, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount) | rejected |
 
 **scoped_search**
 
@@ -191,6 +199,108 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+### global_search
+
+<a id="searching-the-superadmin-finds-project-and-user-auto-mounts-across-every-scope"></a>
+
+#### [the-superadmin-finds-project-and-user-auto-mounts-across-every-scope](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_searching.py): pass
+
+when the superadmin searches across every scope by a destination fragment, ordered by destination and limited to one page, the matching project auto-mount and user auto-mount come back in destination order and the deleted auto-mount does not. This call is gated by the global role
+
+Given
+
+- one project auto-mount and one user auto-mount whose destination holds match, one auto-mount whose destination does not, one deleted auto-mount whose destination holds match, and one superadmin
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-1: is mounted at /home/work/match-one with ro
+  - Personal vfolder folder-2: is placed in that person's personal project and is ready to use
+  - Vfolder auto-mount auto-mount-2: is mounted at /home/work/match-two with ro
+  - Project vfolder folder-3: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-3: is mounted at /home/work/other with ro
+  - Project vfolder folder-4: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-4: is mounted at /home/work/match-three with ro
+  - Deleted vfolder auto-mount deleted-auto-mount-1: its deletion time is recorded
+
+When
+
+- VFolderAutoMountAdapter.global_search: user-2 lists up to 2 auto-mounts across every scope whose destination holds match, ordered by destination
+
+Then
+
+- one page holding only the matching project auto-mount and user auto-mount in destination order comes back
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items.length = 2
+  - items[0].id: same as the entity_id
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: same as the project the folder is in
+  - items[0].vfolder_id: same as the auto-mounted vfolder
+  - items[0].mount_destination = '/home/work/match-one'
+  - items[0].subpath = '.'
+  - items[0].mount_permission = 'ro'
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[0].deleted_at = None
+  - items[1].id: same as the entity_id
+  - items[1].scope_type = 'user'
+  - items[1].scope_id: same as the user who owns the folder
+  - items[1].vfolder_id: same as the auto-mounted vfolder
+  - items[1].mount_destination = '/home/work/match-two'
+  - items[1].subpath = '.'
+  - items[1].mount_permission = 'ro'
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[1].deleted_at = None
+  - items ids: the matching project auto-mount and user auto-mount
+
+<a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_searching.py): pass
+
+when a user who is not the superadmin searches auto-mounts across every scope, it is rejected for lack of permission. This call is gated by the global role
+
+Given
+
+- one project auto-mount and one user auto-mount whose destination holds match, one auto-mount whose destination does not, one deleted auto-mount whose destination holds match, and one regular user
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-1: is mounted at /home/work/match-one with ro
+  - Personal vfolder folder-2: is placed in that person's personal project and is ready to use
+  - Vfolder auto-mount auto-mount-2: is mounted at /home/work/match-two with ro
+  - Project vfolder folder-3: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-3: is mounted at /home/work/other with ro
+  - Project vfolder folder-4: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-4: is mounted at /home/work/match-three with ro
+  - Deleted vfolder auto-mount deleted-auto-mount-1: its deletion time is recorded
+
+When
+
+- VFolderAutoMountAdapter.global_search: user-2 lists up to 2 auto-mounts across every scope whose destination holds match, ordered by destination
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### scoped_search
 

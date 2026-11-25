@@ -1,4 +1,4 @@
-"""Write spec for a vfolder auto-mount."""
+"""Write specs for a vfolder auto-mount."""
 
 from __future__ import annotations
 
@@ -9,15 +9,21 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderMountPermission
 from ai.backend.manager.data.vfolder_auto_mount.types import (
     VFolderAutoMountData,
     VFolderAutoMountSpec,
 )
+from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 from ai.backend.manager.models.vfolder_auto_mount.creators import VFolderAutoMountCreator
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
+from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
+    VFolderAutoMountSearchableFields,
+)
 from ai.backend.testutils.scenario_steps import Says
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo, joined
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo, joined
 
 
 @dataclass(frozen=True)
@@ -80,3 +86,31 @@ class TestSeedVFolderAutoMount(TestSeedRowFromTwo[VFolderData, UserData, VFolder
         if folder.user is None:
             raise LookupError("the folder is not owned by a user")
         return UserID(folder.user)
+
+
+@dataclass(frozen=True)
+class TestSeedDeletedVFolderAutoMount(TestSeedRowFrom[VFolderAutoMountData, VFolderAutoMountData]):
+    """The auto-mount a previous seed laid, marked deleted as the manager's delete writes it."""
+
+    @override
+    def kind(self) -> str:
+        return Says("삭제된 vfolder 자동 마운트", english="Deleted vfolder auto-mount")
+
+    @override
+    def detail(self) -> str:
+        return Says("지운 시각이 기록돼 있습니다", english="its deletion time is recorded")
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming("deleted-auto-mount")
+
+    @override
+    def seed(
+        self, name: str, source: VFolderAutoMountData
+    ) -> SoftDeleteUpdater[VFolderAutoMountRow, VFolderAutoMountData]:
+        return SoftDeleteUpdater(
+            target_row=VFolderAutoMountRow,
+            target_column=VFolderAutoMountRow.id,
+            target_id=VFolderAutoMountID(source.id),
+            converter=VFolderAutoMountSearchableFields.own,
+        )

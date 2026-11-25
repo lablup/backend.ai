@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountEntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.response import (
     SearchVFolderAutoMountsPayload,
     VFolderAutoMountNode,
@@ -26,14 +27,18 @@ from ai.backend.testutils.scenario_steps import (
     Condition,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
     Says,
     Then,
     Verdict,
+    in_language,
 )
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.system import role_named
 from bai_scenario.components.vfolder import STORAGE_HOST
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
@@ -41,7 +46,10 @@ from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.vfolder.vfolder import TestSeedPersonalVFolder, TestSeedProjectVFolder
-from bai_scenario.seeds.vfolder_auto_mount.vfolder_auto_mount import TestSeedVFolderAutoMount
+from bai_scenario.seeds.vfolder_auto_mount.vfolder_auto_mount import (
+    TestSeedDeletedVFolderAutoMount,
+    TestSeedVFolderAutoMount,
+)
 
 MOUNTED_AT = "/home/work/extra"
 """Where the scenarios mount the folder."""
@@ -154,9 +162,11 @@ class AutoMountNodeLook:
     destination: str = MOUNTED_AT
     permission: str = "ro"
     deleted: bool = False
+    scope_type: str = "project"
+    scope_named: Says = Says("폴더가 놓인 프로젝트", english="the project the folder is in")
 
     def verdicts(
-        self, node: VFolderAutoMountNode, project_id: UUID, folder_id: UUID, at: str = ""
+        self, node: VFolderAutoMountNode, scope_id: UUID, folder_id: UUID, at: str = ""
     ) -> list[Verdict]:
         return [
             Held(
@@ -164,15 +174,8 @@ class AutoMountNodeLook:
                 node.id,
                 SameAs(node.entity_id, Says("응답의 entity_id", english="the entity_id")),
             ),
-            Same(f"{at}scope_type", node.scope_type, "project"),
-            Held(
-                f"{at}scope_id",
-                node.scope_id,
-                SameAs(
-                    project_id,
-                    Says("폴더가 놓인 프로젝트", english="the project the folder is in"),
-                ),
-            ),
+            Same(f"{at}scope_type", node.scope_type, self.scope_type),
+            Held(f"{at}scope_id", node.scope_id, SameAs(scope_id, self.scope_named)),
             Held(
                 f"{at}vfolder_id",
                 node.vfolder_id,
@@ -389,6 +392,167 @@ class TheMatchingAutoMountsInOrder(
                 TheseAutoMounts(
                     frozenset({laid.first[1].id, laid.second[1].id}),
                     Says("걸러진 자동 마운트 둘", english="the two matching auto-mounts"),
+                ),
+            )
+        )
+        return verdicts
+
+
+@dataclass(frozen=True)
+class AutoMountsOfAProjectAndAUser:
+    """프로젝트의 자동 마운트와 다른 사용자의 자동 마운트, 그리고 검색하는 사람."""
+
+    project: ProjectData
+    project_mount: MountedFolder
+    owner: UserData
+    user_mount: MountedFolder
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class AutoMountsOfAProjectAndAUserToSearch(Given[Any, AutoMountsOfAProjectAndAUser]):
+    """걸러질 자동 마운트가 프로젝트와 사용자에 하나씩, 걸러지지 않을 것과 삭제된 것이 하나씩.
+
+    ``fragment`` 는 걸러지지 않을 자동 마운트를 뺀 모든 주소에 드는 조각이다.
+    """
+
+    role: UserRole
+    fragment: str = "match"
+
+    @override
+    def describe(self) -> str:
+        caller_role_name = role_named(self.role)
+        return Says(
+            f"주소에 {self.fragment}가 든 프로젝트 자동 마운트 하나와 사용자 자동 마운트 하나, "
+            f"주소에 {self.fragment}가 들지 않은 자동 마운트 하나, 주소에 {self.fragment}가 들고 "
+            f"삭제된 자동 마운트 하나, 그리고 {caller_role_name} 한 명",
+            english=(
+                f"one project auto-mount and one user auto-mount whose destination holds "
+                f"{self.fragment}, one auto-mount whose destination does not, one deleted "
+                f"auto-mount whose destination holds {self.fragment}, and one "
+                f"{in_language(caller_role_name, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AutoMountsOfAProjectAndAUser:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        owner = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
+        project_folder = await seeding.creating_from_two(
+            TestSeedProjectVFolder(host=STORAGE_HOST), project, owner
+        )
+        project_mount = await seeding.creating_from_two(
+            TestSeedVFolderAutoMount(
+                in_project=True, mount_destination=f"/home/work/{self.fragment}-one"
+            ),
+            project_folder,
+            owner,
+        )
+        personal_folder = await seeding.creating_from(
+            TestSeedPersonalVFolder(host=STORAGE_HOST), owner
+        )
+        user_mount = await seeding.creating_from_two(
+            TestSeedVFolderAutoMount(
+                in_project=False, mount_destination=f"/home/work/{self.fragment}-two"
+            ),
+            personal_folder,
+            owner,
+        )
+        excluded_folder = await seeding.creating_from_two(
+            TestSeedProjectVFolder(host=STORAGE_HOST), project, owner
+        )
+        await seeding.creating_from_two(
+            TestSeedVFolderAutoMount(in_project=True, mount_destination="/home/work/other"),
+            excluded_folder,
+            owner,
+        )
+        deleted_folder = await seeding.creating_from_two(
+            TestSeedProjectVFolder(host=STORAGE_HOST), project, owner
+        )
+        deleted_mount = await seeding.creating_from_two(
+            TestSeedVFolderAutoMount(
+                in_project=True, mount_destination=f"/home/work/{self.fragment}-three"
+            ),
+            deleted_folder,
+            owner,
+        )
+        await seeding.creating_from(TestSeedDeletedVFolderAutoMount(), deleted_mount)
+        caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        return AutoMountsOfAProjectAndAUser(
+            project=seeding.made(project),
+            project_mount=(seeding.made(project_folder), seeding.made(project_mount)),
+            owner=seeding.made(owner),
+            user_mount=(seeding.made(personal_folder), seeding.made(user_mount)),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class TheProjectAndUserAutoMountsInOrder(
+    Then[AutoMountsOfAProjectAndAUser, SearchVFolderAutoMountsPayload]
+):
+    """걸러진 프로젝트와 사용자의 자동 마운트만 주소 순서로 실린 한 페이지가 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "걸러진 프로젝트 자동 마운트와 사용자 자동 마운트만 주소 순서로 실린 한 페이지가 "
+            "응답으로 옵니다",
+            english=(
+                "one page holding only the matching project auto-mount and user auto-mount in "
+                "destination order comes back"
+            ),
+        )
+
+    @override
+    def look(
+        self,
+        laid: AutoMountsOfAProjectAndAUser,
+        answered: Answered[SearchVFolderAutoMountsPayload],
+    ) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [MissingResponse(answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("total_count", page.total_count, 2),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+            Same("items.length", len(page.items), 2),
+        ]
+        if len(page.items) != 2:
+            return verdicts
+        project_folder, project_mount = laid.project_mount
+        personal_folder, user_mount = laid.user_mount
+        project_node, user_node = page.items
+        verdicts.extend(
+            AutoMountNodeLook(self.started, destination=project_mount.mount_destination).verdicts(
+                project_node, laid.project.id, project_folder.id, at="items[0]."
+            )
+        )
+        verdicts.extend(
+            AutoMountNodeLook(
+                self.started,
+                destination=user_mount.mount_destination,
+                scope_type="user",
+                scope_named=Says("폴더를 소유한 사용자", english="the user who owns the folder"),
+            ).verdicts(user_node, laid.owner.id, personal_folder.id, at="items[1].")
+        )
+        verdicts.append(
+            Held(
+                "items ids",
+                [node.id for node in page.items],
+                TheseAutoMounts(
+                    frozenset({project_mount.id, user_mount.id}),
+                    Says(
+                        "걸러진 프로젝트 자동 마운트와 사용자 자동 마운트",
+                        english="the matching project auto-mount and user auto-mount",
+                    ),
                 ),
             )
         )

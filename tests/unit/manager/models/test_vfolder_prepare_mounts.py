@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import enum
 import uuid
 from collections.abc import AsyncGenerator, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
@@ -72,6 +75,31 @@ from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+
+class _VFolderOwner(enum.Enum):
+    USER = enum.auto()
+    SESSION_PROJECT = enum.auto()
+
+
+@dataclass(frozen=True)
+class _MountOfOwner:
+    owner: _VFolderOwner
+    mount_destination: str | None
+
+
+@dataclass(frozen=True)
+class _SameNamedVFoldersCase:
+    name: str
+    vfolder_name: str
+    requested_mounts: list[_MountOfOwner]
+    expected_mounts: list[_MountOfOwner]
+
+
+@dataclass(frozen=True)
+class _SameNamedVFolders:
+    user_scope: UserScope
+    vfolder_ids: dict[_VFolderOwner, UUID]
 
 
 async def _held_in_full(
@@ -298,6 +326,7 @@ class TestPrepareVFolderMountsSubpathFlow:
         """
         client = MagicMock()
         client.get_mount_path = AsyncMock(return_value={"path": "/data/mount-base"})
+        client.mkdir = AsyncMock()
         sm = MagicMock()
         sm.get_proxy_and_volume = MagicMock(return_value=("proxy", "volume"))
         sm.get_manager_facing_client = MagicMock(return_value=client)
@@ -470,6 +499,106 @@ class TestPrepareVFolderMountsSubpathFlow:
 
         assert len(mounts) == 1
         assert mounts[0].vfsubpath == PurePosixPath("shards/a")
+
+    @pytest.fixture
+    async def same_named_vfolders(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        case: _SameNamedVFoldersCase,
+    ) -> _SameNamedVFolders:
+        user_uuid, domain_name, session_project_id, personal_vfolder_id = fixture_vfolder
+        project_vfolder_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(VFolderRow)
+                .where(VFolderRow.id == personal_vfolder_id)
+                .values(name=case.vfolder_name)
+            )
+            db_sess.add(
+                VFolderRow(
+                    id=project_vfolder_id,
+                    host="proxy:noop",
+                    domain_name=domain_name,
+                    quota_scope_id=QuotaScopeID.parse(f"project:{session_project_id}"),
+                    name=case.vfolder_name,
+                    ownership_type=VFolderOwnershipType.GROUP,
+                    user=None,
+                    group=session_project_id,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
+                )
+            )
+            await db_sess.flush()
+            seeder = VirtualEntitySeeder()
+            await seeder.enroll_user_in_project(db_sess, session_project_id, user_uuid)
+            await seeder.create_in(
+                db_sess,
+                VFolderEntityType(),
+                project_vfolder_id,
+                [(ProjectEntityType(), session_project_id)],
+            )
+        return _SameNamedVFolders(
+            user_scope=UserScope(
+                domain_name=domain_name,
+                group_id=session_project_id,
+                user_uuid=user_uuid,
+                user_role=UserRole.USER,
+            ),
+            vfolder_ids={
+                _VFolderOwner.USER: personal_vfolder_id,
+                _VFolderOwner.SESSION_PROJECT: project_vfolder_id,
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _SameNamedVFoldersCase(
+                name="both-requested",
+                vfolder_name="data",
+                requested_mounts=[
+                    _MountOfOwner(_VFolderOwner.USER, "/home/work/in1"),
+                    _MountOfOwner(_VFolderOwner.SESSION_PROJECT, "/home/work/in2"),
+                ],
+                expected_mounts=[
+                    _MountOfOwner(_VFolderOwner.USER, "/home/work/in1"),
+                    _MountOfOwner(_VFolderOwner.SESSION_PROJECT, "/home/work/in2"),
+                ],
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_a_request_mounts_the_vfolder_of_its_own_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        mock_storage_manager: MagicMock,
+        same_named_vfolders: _SameNamedVFolders,
+        case: _SameNamedVFoldersCase,
+    ) -> None:
+        async with db_with_cleanup.connect() as conn:
+            mounts = await prepare_vfolder_mounts(
+                conn=conn,
+                storage_manager=mock_storage_manager,
+                allowed_vfolder_types=["user", "group"],
+                user_scope=same_named_vfolders.user_scope,
+                resource_policy={
+                    "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
+                },
+                held_permissions=_held_in_full,
+                mount_requests=[
+                    VFolderMountRequest(
+                        ref=same_named_vfolders.vfolder_ids[requested.owner],
+                        dst_path=requested.mount_destination,
+                    )
+                    for requested in case.requested_mounts
+                ],
+            )
+
+        assert {str(mount.kernel_path): mount.vfid.folder_id for mount in mounts} == {
+            expected.mount_destination: same_named_vfolders.vfolder_ids[expected.owner]
+            for expected in case.expected_mounts
+        }
+        assert len(mounts) == len(case.expected_mounts)
 
     async def test_inaccessible_uuid_request_raises_not_found(
         self,

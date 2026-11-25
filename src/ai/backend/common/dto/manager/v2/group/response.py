@@ -19,13 +19,16 @@ from ai.backend.common.types import BackendAISchema
 __all__ = (
     "AdminSearchGroupsPayload",
     "AssignUsersToProjectPayload",
+    "CreateProjectContainerRegistryRelationsPayload",
     "DeleteProjectPayload",
     "ProjectBasicInfo",
+    "ProjectContainerRegistryRelation",
     "ProjectLifecycleInfo",
     "ProjectNode",
     "ProjectOrganizationInfo",
     "ProjectPayload",
     "ProjectStorageInfo",
+    "PurgeProjectContainerRegistryRelationsPayload",
     "PurgeProjectPayload",
     "RestoreProjectPayload",
     "SearchProjectsPayload",
@@ -210,4 +213,27 @@ class UnassignUsersFromProjectPayload(BaseResponseModel):
     failed: list[UnassignUserError] = Field(
         default_factory=list,
         description="List of errors for users that could not be unassigned.",
+    )
+
+
+class ProjectContainerRegistryRelation(BaseResponseModel):
+    """A relation between one project and one container registry."""
+
+    project_id: UUID = Field(description="ID of the project.")
+    container_registry_id: UUID = Field(description="ID of the container registry.")
+
+
+class CreateProjectContainerRegistryRelationsPayload(BaseResponseModel):
+    """Payload for creating relations between projects and container registries."""
+
+    items: list[ProjectContainerRegistryRelation] = Field(
+        description="The relations this request created. A relation that already exists is left out."
+    )
+
+
+class PurgeProjectContainerRegistryRelationsPayload(BaseResponseModel):
+    """Payload for purging relations between projects and container registries."""
+
+    items: list[ProjectContainerRegistryRelation] = Field(
+        description="The relations this request purged. A relation that does not exist is left out."
     )

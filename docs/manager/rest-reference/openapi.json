@@ -4822,21 +4822,41 @@
         "type": "object"
       },
       "ContainerRegistryScope": {
-        "description": "Scope for the scoped container registry query. The domains are OR'd.",
+        "description": "Scope for the scoped container registry query. Every item of every list is OR'd.",
         "properties": {
           "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Domains whose related container registries are being read",
-            "items": {
-              "$ref": "#/components/schemas/UUIDScope"
-            },
-            "minItems": 1,
-            "title": "Domain",
-            "type": "array"
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Projects whose related container registries are being read",
+            "title": "Project"
           }
         },
-        "required": [
-          "domain"
-        ],
         "title": "ContainerRegistryScope",
         "type": "object"
       },
@@ -20574,6 +20594,22 @@
             "default": null,
             "description": "Resource groups whose projects are being read",
             "title": "Resource Group"
+          },
+          "container_registry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Container registries whose related projects are being read",
+            "title": "Container Registry"
           }
         },
         "title": "ProjectScope",
@@ -20970,6 +21006,64 @@
           "user_ids"
         ],
         "title": "UnassignUsersFromProjectInput",
+        "type": "object"
+      },
+      "NonEmptyList_ProjectContainerRegistryRelationInput_": {
+        "items": {
+          "$ref": "#/components/schemas/ProjectContainerRegistryRelationInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "ProjectContainerRegistryRelationInput": {
+        "description": "One project and one container registry, the two ends of a relation.",
+        "properties": {
+          "project_id": {
+            "description": "ID of the project.",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "container_registry_id": {
+            "description": "ID of the container registry.",
+            "format": "uuid",
+            "title": "Container Registry Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "container_registry_id"
+        ],
+        "title": "ProjectContainerRegistryRelationInput",
+        "type": "object"
+      },
+      "CreateProjectContainerRegistryRelationsInput": {
+        "description": "Input for creating relations between projects and container registries.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_ProjectContainerRegistryRelationInput_",
+            "description": "The project and container registry pairs to relate. At least one."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CreateProjectContainerRegistryRelationsInput",
+        "type": "object"
+      },
+      "PurgeProjectContainerRegistryRelationsInput": {
+        "description": "Input for purging relations between projects and container registries.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_ProjectContainerRegistryRelationInput_",
+            "description": "The project and container registry pairs whose relations to purge. At least one."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PurgeProjectContainerRegistryRelationsInput",
         "type": "object"
       },
       "DeleteProjectInput": {
@@ -42679,7 +42773,7 @@
         "type": "object"
       },
       "CreateVFolderAutoMountInput": {
-        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or be owned by that user.",
+        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or to that user's personal project.",
         "properties": {
           "scope": {
             "$ref": "#/components/schemas/VFolderAutoMountScopeRef",
@@ -42746,6 +42840,123 @@
         ],
         "title": "VFolderAutoMountOrderField",
         "type": "string"
+      },
+      "AdminSearchVFolderAutoMountsInput": {
+        "description": "Input for searching every vfolder auto-mount (superadmin).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchVFolderAutoMountsInput",
+        "type": "object"
       },
       "VFolderAutoMountScope": {
         "description": "Scope for the scoped vfolder auto-mount query; the items are OR'd.",
@@ -61341,6 +61552,64 @@
         "description": "Unassign users from a project.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/projects/container-registry-relations/create": {
+      "post": {
+        "operationId": "v2/projects.create_container_registry_relations",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectContainerRegistryRelationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create relations between projects and container registries.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/projects/container-registry-relations/purge": {
+      "post": {
+        "operationId": "v2/projects.purge_container_registry_relations",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeProjectContainerRegistryRelationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge relations between projects and container registries.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/projects/delete": {
       "post": {
         "operationId": "v2/projects.admin_delete",
@@ -70138,6 +70407,35 @@
         },
         "parameters": [],
         "description": "Auto-mount a vfolder of a project or a user into every session created in that\nproject or by that user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolder-auto-mounts/search": {
+      "post": {
+        "operationId": "v2/vfolder-auto-mounts.admin_search",
+        "tags": [
+          "v2/vfolder-auto-mounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchVFolderAutoMountsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the auto-mounts of every project and user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/vfolder-auto-mounts/scoped/search": {

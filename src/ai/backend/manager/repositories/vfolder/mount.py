@@ -396,7 +396,6 @@ async def prepare_vfolder_mounts(
     requested_vfolder_dstpaths: dict[str | uuid.UUID | int, str] = {}
     requested_mount_options: dict[str | uuid.UUID | int, VFolderMountOptions] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
-    _already_resolved: set[str] = set()
     # A vfolder referenced by UUID may be requested several times, each with a
     # different subpath/destination. Key each such request by its index in
     # ``mount_requests`` instead of the bare UUID so the entries no longer
@@ -424,7 +423,6 @@ async def prepare_vfolder_mounts(
             requested_mount_options[req.ref] = req.options
             requested_vfolder_names[req.ref] = name
             requested_vfolder_subpaths[req.ref] = os.path.normpath(subpath)
-            _already_resolved.add(name)
             if req.dst_path is not None:
                 requested_vfolder_dstpaths[req.ref] = req.dst_path
 
@@ -471,8 +469,12 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound("There is no accessible vfolders at all.")
         return []
 
-    requested_names = set(requested_vfolder_names.values())
     resolved_vfolder_ids: set[uuid.UUID] = set()
+    vfolders_by_uuid_request: dict[str | uuid.UUID | int, dict[str, Any]] = {
+        index: row
+        for row in accessible_vfolders
+        for index in uuid_request_indices.get(row["id"], ())
+    }
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
@@ -485,12 +487,6 @@ async def prepare_vfolder_mounts(
             # overlap for these is enforced later by ``is_mount_duplicate``.
             for index in uuid_request_indices.get(vfid, ()):
                 requested_vfolder_names[index] = name
-            continue
-        if name in _already_resolved:
-            continue
-        if name not in requested_names:
-            requested_vfolder_names[vfid] = name
-        requested_mounts.append(name)
 
     # A UUID-referenced request that matched no accessible vfolder would
     # otherwise be silently dropped (its index never enters the mount loop
@@ -502,15 +498,15 @@ async def prepare_vfolder_mounts(
             + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
         )
 
-    # Check if there are overlapping mount sources
-    check_overlapping_mounts(requested_mounts)
-
     # The session's project comes first, so its folder wins a name shared with another.
     accessible_vfolders_map: dict[str, dict[str, Any]] = {}
     for accessible_vfolder in accessible_vfolders:
         accessible_vfolders_map.setdefault(accessible_vfolder["name"], accessible_vfolder)
     for requested_key, vfolder_name in requested_vfolder_names.items():
-        if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
+        vfolder = vfolders_by_uuid_request.get(requested_key) or accessible_vfolders_map.get(
+            vfolder_name
+        )
+        if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             raise VFolderPermissionError(f"VFolder {vfolder_name} is not permitted to be mounted.")

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -16,12 +17,14 @@ from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialB
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
+    CreateProjectContainerRegistryRelationsInput,
     CreateProjectInput,
     PartialBulkDeleteProjectsInput,
     PartialBulkRestoreProjectsInput,
     PartialBulkUpdateProjectsInput,
     ProjectFilter,
     ProjectOrder,
+    PurgeProjectContainerRegistryRelationsInput,
     PurgeProjectInput,
     ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
@@ -30,13 +33,16 @@ from ai.backend.common.dto.manager.v2.group.request import (
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
     AssignUsersToProjectPayload,
+    CreateProjectContainerRegistryRelationsPayload,
     DeleteProjectPayload,
     ProjectBasicInfo,
+    ProjectContainerRegistryRelation,
     ProjectLifecycleInfo,
     ProjectNode,
     ProjectOrganizationInfo,
     ProjectPayload,
     ProjectStorageInfo,
+    PurgeProjectContainerRegistryRelationsPayload,
     PurgeProjectPayload,
     RestoreProjectPayload,
     UnassignUserError,
@@ -70,6 +76,8 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryProjectCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryProjectPurger
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.deprecated_search import (
@@ -78,6 +86,7 @@ from ai.backend.manager.models.project.deprecated_search import (
 )
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import (
+    ContainerRegistryProjectTarget,
     DomainProjectTarget,
     ProjectTarget,
     ResourceGroupProjectTarget,
@@ -120,6 +129,9 @@ from ai.backend.manager.services.project.actions.search_projects import (
 )
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
+from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
+from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
 from ai.backend.manager.services.rbac.actions.roster.join_project import (
     JoinProjectAction,
 )
@@ -452,6 +464,10 @@ class ProjectAdapter(BaseAdapter):
             ResourceGroupProjectTarget(resource_group_id=ResourceGroupID(entry.value))
             for entry in scope.resource_group or ()
         )
+        targets.extend(
+            ContainerRegistryProjectTarget(container_registry_id=ContainerRegistryID(entry.value))
+            for entry in scope.container_registry or ()
+        )
         return targets
 
     async def scoped_search(
@@ -485,6 +501,60 @@ class ProjectAdapter(BaseAdapter):
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+    async def create_container_registry_relations(
+        self, input: CreateProjectContainerRegistryRelationsInput
+    ) -> CreateProjectContainerRegistryRelationsPayload:
+        """Create a relation for each named pair. The permission is asked of every project
+        and every registry; a relation that already exists is left as it stands."""
+        result = await self._rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[
+                    RelationPair(
+                        scope=ProjectID(item.project_id),
+                        target=ContainerRegistryID(item.container_registry_id),
+                    )
+                    for item in input.items
+                ],
+                creator=ContainerRegistryProjectCreator(),
+            )
+        )
+        return CreateProjectContainerRegistryRelationsPayload(
+            items=[
+                ProjectContainerRegistryRelation(
+                    project_id=relation.pair.scope, container_registry_id=relation.pair.target
+                )
+                for relation in result.results
+                if relation.linked
+            ]
+        )
+
+    async def purge_container_registry_relations(
+        self, input: PurgeProjectContainerRegistryRelationsInput
+    ) -> PurgeProjectContainerRegistryRelationsPayload:
+        """Purge the relation of each named pair. The permission is asked of every project
+        and every registry; a relation that does not exist is skipped."""
+        result = await self._rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(
+                        scope=ProjectID(item.project_id),
+                        target=ContainerRegistryID(item.container_registry_id),
+                    )
+                    for item in input.items
+                ],
+                purger=ContainerRegistryProjectPurger(),
+            )
+        )
+        return PurgeProjectContainerRegistryRelationsPayload(
+            items=[
+                ProjectContainerRegistryRelation(
+                    project_id=relation.pair.scope, container_registry_id=relation.pair.target
+                )
+                for relation in result.results
+                if relation.unlinked
+            ]
         )
 
     async def search_by_user(

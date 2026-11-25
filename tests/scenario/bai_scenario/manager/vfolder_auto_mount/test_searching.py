@@ -1,4 +1,4 @@
-"""프로젝트 범위에서 자동 마운트 훑기."""
+"""자동 마운트 훑기: 프로젝트 범위에서, 그리고 범위를 가리지 않고."""
 
 from __future__ import annotations
 
@@ -9,10 +9,12 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    AdminSearchVFolderAutoMountsInput,
     ScopedSearchVFolderAutoMountsInput,
     VFolderAutoMountFilter,
     VFolderAutoMountOrder,
@@ -25,6 +27,7 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
     VFolderAutoMountScope,
 )
 from ai.backend.manager.api.adapters.vfolder_auto_mount.adapter import VFolderAutoMountAdapter
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -35,7 +38,10 @@ from bai_scenario.components.vfolder_auto_mount import (
     AProjectFolderAndAutoMounts,
     AProjectFolderAndSomeone,
     AProjectWithAutoMountsToSearch,
+    AutoMountsOfAProjectAndAUser,
+    AutoMountsOfAProjectAndAUserToSearch,
     TheMatchingAutoMountsInOrder,
+    TheProjectAndUserAutoMountsInOrder,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -256,7 +262,145 @@ class AUserGrantedReadButNoAutoMountListsNone(
         return NothingIsFound()
 
 
+@dataclass(frozen=True)
+class SearchingEveryAutoMountByDestination(
+    When[AutoMountsOfAProjectAndAUser, VFolderAutoMountAdapter, SearchVFolderAutoMountsPayload]
+):
+    """범위를 가리지 않고 주소 조각으로 걸러 주소 오름차순으로, 크기만큼만 훑는다."""
+
+    fragment: str
+    limit: int
+
+    @override
+    def operation(self) -> str:
+        return "global_search"
+
+    @override
+    def describe(self, laid: AutoMountsOfAProjectAndAUser) -> str:
+        return Says(
+            f"{laid.caller.username}이 범위를 가리지 않고 자동 마운트를 주소에 {self.fragment}가 "
+            f"든 것만 주소 오름차순으로 {self.limit}개까지 조회합니다",
+            english=(
+                f"{laid.caller.username} lists up to {self.limit} auto-mounts across every scope "
+                f"whose destination holds {self.fragment}, ordered by destination"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: VFolderAutoMountAdapter, laid: AutoMountsOfAProjectAndAUser
+    ) -> SearchVFolderAutoMountsPayload:
+        with ActingAs(laid.caller):
+            return await adapter.global_search(
+                AdminSearchVFolderAutoMountsInput(
+                    filter=VFolderAutoMountFilter(
+                        mount_destination=StringFilter(contains=self.fragment)
+                    ),
+                    order=[
+                        VFolderAutoMountOrder(
+                            field=VFolderAutoMountOrderField.MOUNT_DESTINATION,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=self.limit,
+                )
+            )
+
+
+@dataclass(frozen=True)
+class TheSuperadminSearchesEveryAutoMount(
+    Scenario[
+        TestSeedingSession,
+        AutoMountsOfAProjectAndAUser,
+        VFolderAutoMountAdapter,
+        SearchVFolderAutoMountsPayload,
+    ]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-finds-project-and-user-auto-mounts-across-every-scope"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 범위를 가리지 않고 주소 조각으로 걸러 주소 오름차순으로 한 페이지를 "
+            "조회하면, 걸러진 프로젝트 자동 마운트와 사용자 자동 마운트가 주소 순서로 오고 "
+            "삭제된 자동 마운트는 오지 않습니다. 이 호출은 superadmin 검사를 거칩니다",
+            english=(
+                "when the superadmin searches across every scope by a destination fragment, "
+                "ordered by destination and limited to one page, the matching project auto-mount "
+                "and user auto-mount come back in destination order and the deleted auto-mount "
+                "does not. This call is gated by the global role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AutoMountsOfAProjectAndAUser]:
+        return AutoMountsOfAProjectAndAUserToSearch(role=UserRole.SUPERADMIN, fragment="match")
+
+    @override
+    def when(
+        self,
+    ) -> When[
+        AutoMountsOfAProjectAndAUser, VFolderAutoMountAdapter, SearchVFolderAutoMountsPayload
+    ]:
+        return SearchingEveryAutoMountByDestination(fragment="match", limit=2)
+
+    @override
+    def then(
+        self,
+    ) -> Then[AutoMountsOfAProjectAndAUser, SearchVFolderAutoMountsPayload]:
+        return TheProjectAndUserAutoMountsInOrder(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserWhoIsNotTheSuperadminMayNotSearchEveryAutoMount(
+    Scenario[
+        TestSeedingSession,
+        AutoMountsOfAProjectAndAUser,
+        VFolderAutoMountAdapter,
+        SearchVFolderAutoMountsPayload,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-may-not-search-every-auto-mount"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 아닌 사용자가 범위를 가리지 않고 자동 마운트를 조회하려 하면 권한 "
+            "부족으로 거부됩니다. 이 호출은 superadmin 검사를 거칩니다",
+            english=(
+                "when a user who is not the superadmin searches auto-mounts across every scope, "
+                "it is rejected for lack of permission. This call is gated by the global role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AutoMountsOfAProjectAndAUser]:
+        return AutoMountsOfAProjectAndAUserToSearch(role=UserRole.USER, fragment="match")
+
+    @override
+    def when(
+        self,
+    ) -> When[
+        AutoMountsOfAProjectAndAUser, VFolderAutoMountAdapter, SearchVFolderAutoMountsPayload
+    ]:
+        return SearchingEveryAutoMountByDestination(fragment="match", limit=2)
+
+    @override
+    def then(
+        self,
+    ) -> Then[AutoMountsOfAProjectAndAUser, SearchVFolderAutoMountsPayload]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
 SCENARIOS: list[SearchingStep] = [
+    TheSuperadminSearchesEveryAutoMount(started=datetime.now(UTC)),
+    AUserWhoIsNotTheSuperadminMayNotSearchEveryAutoMount(),
     AGrantedUserListsTheProjectAutoMounts(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotListTheProjectAutoMounts(),
     AUserGrantedReadButNoAutoMountListsNone(),

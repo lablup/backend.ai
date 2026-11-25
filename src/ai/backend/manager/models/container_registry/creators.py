@@ -16,7 +16,10 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.errors.image import ProjectDefaultContainerRegistryConflict
+from ai.backend.manager.errors.image import (
+    ContainerRegistryNotFound,
+    ProjectDefaultContainerRegistryConflict,
+)
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups.row import (
@@ -134,13 +137,17 @@ class ContainerRegistryProjectCreator(
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        """A project that is not there is the one violation a caller can act on. The
-        unique constraint is not among them: a pair already linked is skipped in SQL, so
-        naming one twice never reaches here."""
+        """A missing project or registry is what a caller can act on. A pair already
+        linked is skipped in SQL, so the unique constraint never reaches here."""
         return (
             IntegrityErrorCheck(
                 violation_type=ForeignKeyViolationError,
                 constraint_name="fk_association_container_registries_groups_project_id",
                 error=ProjectNotFound("The project to allow on the registry does not exist"),
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_association_container_registries_groups_registry_id",
+                error=ContainerRegistryNotFound("A container registry to link does not exist"),
             ),
         )

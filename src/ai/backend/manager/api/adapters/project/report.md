@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-Scenario: incomplete 13 / 17
+Scenario: incomplete 13 / 19
 
 - built from ops (10)
   - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
@@ -20,10 +20,12 @@ Scenario: incomplete 13 / 17
   - partial_bulk_update: success present 3 · rejection absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: success absent · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: success present 2 · rejection absent (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
-- direct implementation (3)
+- direct implementation (5)
   - admin_create: success present 1 · rejection present 1 (scope)
   - admin_purge: success absent · rejection absent (single_entity): SCENARIO-GAP
   - batch_load_registries: success present 3 · rejection present 1 (partial_bulk)
+  - create_container_registry_relations: success present 2 · rejection present 2 (relation)
+  - purge_container_registry_relations: success present 3 · rejection present 1 (relation)
 
 **partial_bulk_delete**
 
@@ -43,8 +45,11 @@ Scenario: incomplete 13 / 17
 | scenario | verdict |
 |---|---|
 | [when a user granted the project read role in a resource group scope searches in that scope, the same projects as the superadmin sees come back](#scoped_searching_by_resource_group-a-user-granted-read-in-the-group-searches-its-projects) | answered |
+| [when a user granted the project read role in a registry scope searches in that scope, only the projects related to the registry come back](#scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-projects) | answered |
+| [searching in the scope of a registry with no relation returns an empty list](#scoped_searching_by_registry-a-user-searches-the-projects-of-a-registry-with-no-relation) | answered |
 | [when the superadmin searches in a resource group scope, only the projects that can use the group come back](#scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group) | answered |
 | [when a user granted nothing searches in a resource group scope, the call is rejected for lack of permission](#scoped_searching_by_resource_group-a-user-granted-nothing-may-not-search-the-projects-of-a-resource-group) | rejected |
+| [when a user granted only the registry read role, not the project read role, in a registry scope searches, the call is rejected for lack of permission](#scoped_searching_by_registry-a-user-without-project-read-may-not-search-the-projects-of-a-registry) | rejected |
 
 **assign_users**
 
@@ -84,6 +89,24 @@ Scenario: incomplete 13 / 17
 | [with read permission, answers the container registry allowed as the default with a flag saying it is the default](#registries-read-default-registry) | answered |
 | [with read permission and no allowed container registry, answers an empty list](#registries-read-no-registry) | answered |
 | [without read permission, rejects the read of allowed container registries](#registries-registries-read-requires-permission) | rejected |
+
+**create_container_registry_relations**
+
+| scenario | verdict |
+|---|---|
+| [a user granted permission on both the project and the registry scopes can create a relation between them](#creating_registry_relations-a-user-granted-on-both-scopes-creates-a-project-registry-relation) | answered |
+| [creating a relation that already exists is not refused, and the relation is left out of the response](#creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response) | answered |
+| [creating a relation between a project and a registry that does not exist is refused because there is no such registry](#creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused) | rejected |
+| [a user granted permission on the registry alone is refused when creating a relation between a project and it](#creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-project-registry-relation) | rejected |
+
+**purge_container_registry_relations**
+
+| scenario | verdict |
+|---|---|
+| [a user granted permission on both the project and the registry scopes can purge the relation between them](#purging_registry_relations-a-user-granted-on-both-scopes-purges-a-project-registry-relation) | answered |
+| [purging a relation that does not exist is not refused, and the relation is left out of the response](#purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response) | answered |
+| [the relation to the project's default registry is purged without being refused](#purging_registry_relations-purging-the-relation-to-the-default-registry-is-not-refused) | answered |
+| [a user granted permission on the registry alone is refused when purging the relation between a project and it](#purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-project-registry-relation) | rejected |
 
 ### partial_bulk_delete
 
@@ -270,6 +293,82 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+<a id="scoped_searching_by_registry-a-user-granted-read-in-the-registry-searches-its-projects"></a>
+
+#### [a-user-granted-read-in-the-registry-searches-its-projects](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_registry.py): pass
+
+when a user granted the project read role in a registry scope searches in that scope, only the projects related to the registry come back
+
+Given
+
+- one registry, 2 projects related to it and one that is not, and one user granted the project read role in the registry scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Container registry host-1: image source
+  - Project related-1
+  - Project related-2
+  - Project related-1 allows Container registry host-1
+  - Project related-2 allows Container registry host-1
+  - Project unrelated-1
+  - Container registry other-1: image source
+  - Project unrelated-1 allows Container registry other-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-registry permission
+    - Role read-in-registry-1: applies only within the scope it is granted in
+    - Role read-in-registry-1: READ allowed on every project
+    - regular user user-1: holds Role read-in-registry-1
+
+When
+
+- ProjectAdapter.scoped_search: user-1 searches in the registry host-1
+
+Then
+
+- only the projects related to the registry are left
+  - items = ['related-1', 'related-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_by_registry-a-user-searches-the-projects-of-a-registry-with-no-relation"></a>
+
+#### [a-user-searches-the-projects-of-a-registry-with-no-relation](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_registry.py): pass
+
+searching in the scope of a registry with no relation returns an empty list
+
+Given
+
+- one registry, 0 projects related to it and one that is not, and one user granted the project read role in the registry scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Container registry host-1: image source
+  - Project unrelated-1
+  - Container registry other-1: image source
+  - Project unrelated-1 allows Container registry other-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-registry permission
+    - Role read-in-registry-1: applies only within the scope it is granted in
+    - Role read-in-registry-1: READ allowed on every project
+    - regular user user-1: holds Role read-in-registry-1
+
+When
+
+- ProjectAdapter.scoped_search: user-1 searches in the registry host-1
+
+Then
+
+- only the projects related to the registry are left
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="scoped_searching_by_resource_group-the-superadmin-searches-the-projects-of-a-resource-group"></a>
 
 #### [the-superadmin-searches-the-projects-of-a-resource-group](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_resource_group.py): pass
@@ -329,6 +428,43 @@ Given
 When
 
 - ProjectAdapter.scoped_search: user-1 searches in the resource group resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="scoped_searching_by_registry-a-user-without-project-read-may-not-search-the-projects-of-a-registry"></a>
+
+#### [a-user-without-project-read-may-not-search-the-projects-of-a-registry](/tests/scenario/bai_scenario/manager/project/test_scoped_searching_by_registry.py): pass
+
+when a user granted only the registry read role, not the project read role, in a registry scope searches, the call is rejected for lack of permission
+
+Given
+
+- one registry, 2 projects related to it and one that is not, and one user granted the registry read role in the registry scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Container registry host-1: image source
+  - Project related-1
+  - Project related-2
+  - Project related-1 allows Container registry host-1
+  - Project related-2 allows Container registry host-1
+  - Project unrelated-1
+  - Container registry other-1: image source
+  - Project unrelated-1 allows Container registry other-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-in-registry permission
+    - Role read-in-registry-1: applies only within the scope it is granted in
+    - Role read-in-registry-1: READ allowed on every container_registry
+    - regular user user-1: holds Role read-in-registry-1
+
+When
+
+- ProjectAdapter.scoped_search: user-1 searches in the registry host-1
 
 Then
 
@@ -849,5 +985,299 @@ Then
 - answers each request with the allowed container registries or a permission rejection
   - count = 2
   - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### create_container_registry_relations
+
+<a id="creating_registry_relations-a-user-granted-on-both-scopes-creates-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-creates-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+a user granted permission on both the project and the registry scopes can create a relation between them
+
+Given
+
+- one registry, one project, and one user holding permission on the registry and the project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-project permission
+    - Role allow-on-project-1: applies only within the scope it is granted in
+    - Role allow-on-project-1: CREATE allowed on every project
+    - Role allow-on-project-1: SOFT_DELETE allowed on every project
+    - regular user user-1: holds Role allow-on-project-1
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1 creates a relation between project-1 and that registry
+
+Then
+
+- the newly created project and registry relation comes back
+  - items: same as the requested project and registry pair
+
+<a id="creating_registry_relations-creating-an-existing-relation-leaves-it-out-of-the-response"></a>
+
+#### [creating-an-existing-relation-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+creating a relation that already exists is not refused, and the relation is left out of the response
+
+Given
+
+- one registry, one project, and one user holding permission on the registry and the project, and the project is already allowed
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Project project-1 allows Container registry host-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-project permission
+    - Role allow-on-project-1: applies only within the scope it is granted in
+    - Role allow-on-project-1: CREATE allowed on every project
+    - Role allow-on-project-1: SOFT_DELETE allowed on every project
+    - regular user user-1: holds Role allow-on-project-1
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1 creates a relation between project-1 and that registry
+
+Then
+
+- an empty list comes back
+  - items = []
+
+<a id="creating_registry_relations-a-superadmin-naming-a-registry-that-does-not-exist-is-refused"></a>
+
+#### [a-superadmin-naming-a-registry-that-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+creating a relation between a project and a registry that does not exist is refused because there is no such registry
+
+Given
+
+- one registry, one project, and one user holding permission on the registry and the project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - superadmin user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-project permission
+    - Role allow-on-project-1: applies only within the scope it is granted in
+    - Role allow-on-project-1: CREATE allowed on every project
+    - Role allow-on-project-1: SOFT_DELETE allowed on every project
+    - superadmin user-1: holds Role allow-on-project-1
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1 creates a relation between project-1 and a registry that does not exist
+
+Then
+
+- the call is rejected
+  - rejected: ContainerRegistryNotFound
+
+<a id="creating_registry_relations-a-user-granted-on-the-registry-alone-may-not-create-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-create-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_creating_registry_relations.py): pass
+
+a user granted permission on the registry alone is refused when creating a relation between a project and it
+
+Given
+
+- one registry, one project, and one user holding permission on the registry
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+
+When
+
+- ProjectAdapter.create_container_registry_relations: user-1 creates a relation between project-1 and that registry
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### purge_container_registry_relations
+
+<a id="purging_registry_relations-a-user-granted-on-both-scopes-purges-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-both-scopes-purges-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+a user granted permission on both the project and the registry scopes can purge the relation between them
+
+Given
+
+- one registry, one project, and one user holding permission on the registry and the project, and the project is already allowed
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Project project-1 allows Container registry host-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-project permission
+    - Role allow-on-project-1: applies only within the scope it is granted in
+    - Role allow-on-project-1: CREATE allowed on every project
+    - Role allow-on-project-1: SOFT_DELETE allowed on every project
+    - regular user user-1: holds Role allow-on-project-1
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1 purges the relation between project-1 and that registry
+
+Then
+
+- the purged project and registry relation comes back
+  - items: same as the requested project and registry pair
+
+<a id="purging_registry_relations-purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response"></a>
+
+#### [purging-a-relation-that-does-not-exist-leaves-it-out-of-the-response](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+purging a relation that does not exist is not refused, and the relation is left out of the response
+
+Given
+
+- one registry, one project, and one user holding permission on the registry and the project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-project permission
+    - Role allow-on-project-1: applies only within the scope it is granted in
+    - Role allow-on-project-1: CREATE allowed on every project
+    - Role allow-on-project-1: SOFT_DELETE allowed on every project
+    - regular user user-1: holds Role allow-on-project-1
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1 purges the relation between project-1 and that registry
+
+Then
+
+- an empty list comes back
+  - items = []
+
+<a id="purging_registry_relations-purging-the-relation-to-the-default-registry-is-not-refused"></a>
+
+#### [purging-the-relation-to-the-default-registry-is-not-refused](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+the relation to the project's default registry is purged without being refused
+
+Given
+
+- one registry, one project, and one user holding permission on the registry and the project, and the project already has this registry as its default
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Project project-1 defaults to Container registry host-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+  - Prepare a user granted the allow-on-project permission
+    - Role allow-on-project-1: applies only within the scope it is granted in
+    - Role allow-on-project-1: CREATE allowed on every project
+    - Role allow-on-project-1: SOFT_DELETE allowed on every project
+    - regular user user-1: holds Role allow-on-project-1
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1 purges the relation between project-1 and that registry
+
+Then
+
+- the purged project and registry relation comes back
+  - items: same as the requested project and registry pair
+
+<a id="purging_registry_relations-a-user-granted-on-the-registry-alone-may-not-purge-a-project-registry-relation"></a>
+
+#### [a-user-granted-on-the-registry-alone-may-not-purge-a-project-registry-relation](/tests/scenario/bai_scenario/manager/project/test_purging_registry_relations.py): pass
+
+a user granted permission on the registry alone is refused when purging the relation between a project and it
+
+Given
+
+- one registry, one project, and one user holding permission on the registry, and the project is already allowed
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry host-1: image source
+  - Project project-1 allows Container registry host-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the allow-on-registry permission
+    - Role allow-on-registry-1: applies only within the scope it is granted in
+    - Role allow-on-registry-1: CREATE allowed on every container_registry
+    - Role allow-on-registry-1: SOFT_DELETE allowed on every container_registry
+    - regular user user-1: holds Role allow-on-registry-1
+
+When
+
+- ProjectAdapter.purge_container_registry_relations: user-1 purges the relation between project-1 and that registry
+
+Then
+
+- the call is rejected
   - rejected: NotEnoughPermission
 

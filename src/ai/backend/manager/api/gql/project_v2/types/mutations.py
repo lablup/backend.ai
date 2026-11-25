@@ -8,6 +8,9 @@ from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
+    CreateProjectContainerRegistryRelationsInput as CreateProjectContainerRegistryRelationsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput as CreateProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
@@ -23,19 +26,34 @@ from ai.backend.common.dto.manager.v2.group.request import (
     PartialBulkUpdateProjectsInput as PartialBulkUpdateProjectsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
+    ProjectContainerRegistryRelationInput as ProjectContainerRegistryRelationInputDTO,
+)
+from ai.backend.common.dto.manager.v2.group.request import (
+    PurgeProjectContainerRegistryRelationsInput as PurgeProjectContainerRegistryRelationsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.group.request import (
     UnassignUsersFromProjectInput as UnassignUsersFromProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
     UpdateProjectInput as UpdateProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
+    CreateProjectContainerRegistryRelationsPayload as CreateProjectContainerRegistryRelationsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
     DeleteProjectPayload as DeleteProjectPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    ProjectContainerRegistryRelation as ProjectContainerRegistryRelationDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     ProjectNode,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload as ProjectPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    PurgeProjectContainerRegistryRelationsPayload as PurgeProjectContainerRegistryRelationsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     PurgeProjectPayload as PurgeProjectPayloadDTO,
@@ -307,4 +325,93 @@ class PartialBulkProjectsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[Proje
     )
     failed: list[PartialBulkFailureGQL] = gql_field(
         description="The projects not processed, each with the reason."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One project and one container registry, the two ends of a relation.",
+    ),
+    name="ProjectContainerRegistryRelationInput",
+)
+class ProjectContainerRegistryRelationInputGQL(
+    PydanticInputMixin[ProjectContainerRegistryRelationInputDTO]
+):
+    project_id: UUID = gql_field(description="ID of the project.")
+    container_registry_id: UUID = gql_field(description="ID of the container registry.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for creating relations between projects and container registries.",
+    ),
+    name="CreateProjectContainerRegistryRelationsInput",
+)
+class CreateProjectContainerRegistryRelationsInputGQL(
+    PydanticInputMixin[CreateProjectContainerRegistryRelationsInputDTO]
+):
+    items: list[ProjectContainerRegistryRelationInputGQL] = gql_field(
+        description="The project and container registry pairs to relate. At least one."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging relations between projects and container registries.",
+    ),
+    name="PurgeProjectContainerRegistryRelationsInput",
+)
+class PurgeProjectContainerRegistryRelationsInputGQL(
+    PydanticInputMixin[PurgeProjectContainerRegistryRelationsInputDTO]
+):
+    items: list[ProjectContainerRegistryRelationInputGQL] = gql_field(
+        description="The project and container registry pairs whose relations to purge. At least one."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A relation between one project and one container registry.",
+    ),
+    model=ProjectContainerRegistryRelationDTO,
+    name="ProjectContainerRegistryRelation",
+)
+class ProjectContainerRegistryRelationGQL(PydanticOutputMixin[ProjectContainerRegistryRelationDTO]):
+    project_id: UUID = gql_field(description="ID of the project.")
+    container_registry_id: UUID = gql_field(description="ID of the container registry.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for creating relations between projects and container registries.",
+    ),
+    model=CreateProjectContainerRegistryRelationsPayloadDTO,
+    name="CreateProjectContainerRegistryRelationsPayload",
+)
+class CreateProjectContainerRegistryRelationsPayloadGQL(
+    PydanticOutputMixin[CreateProjectContainerRegistryRelationsPayloadDTO]
+):
+    items: list[ProjectContainerRegistryRelationGQL] = gql_field(
+        description="The relations this request created. A relation that already exists is left out."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for purging relations between projects and container registries.",
+    ),
+    model=PurgeProjectContainerRegistryRelationsPayloadDTO,
+    name="PurgeProjectContainerRegistryRelationsPayload",
+)
+class PurgeProjectContainerRegistryRelationsPayloadGQL(
+    PydanticOutputMixin[PurgeProjectContainerRegistryRelationsPayloadDTO]
+):
+    items: list[ProjectContainerRegistryRelationGQL] = gql_field(
+        description="The relations this request purged. A relation that does not exist is left out."
     )

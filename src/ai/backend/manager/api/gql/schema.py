@@ -383,10 +383,12 @@ from ai.backend.manager.api.gql.project_v2.resolver.mutation import (
     admin_purge_project_v2,
     admin_restore_project_v2,
     admin_update_project_v2,
+    create_project_container_registry_relations,
     delete_project_v2,
     partial_bulk_delete_projects_v2,
     partial_bulk_restore_projects_v2,
     partial_bulk_update_projects_v2,
+    purge_project_container_registry_relations,
     restore_project_v2,
     unassign_users_from_project_v2,
     update_project_v2,
@@ -714,6 +716,7 @@ from ai.backend.manager.api.gql.user.resolver.query import (
     scoped_users_v2,
 )
 from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    admin_vfolder_auto_mounts,
     create_vfolder_auto_mount,
     delete_vfolder_auto_mount,
     scoped_vfolder_auto_mounts,
@@ -943,6 +946,7 @@ class Query:
     session_group = session_group
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
+    admin_vfolder_auto_mounts = admin_vfolder_auto_mounts
     scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
     auto_generated_file = auto_generated_file
     scoped_auto_generated_files = scoped_auto_generated_files
@@ -1315,6 +1319,8 @@ class Mutation:
     partial_bulk_restore_domains_v2 = partial_bulk_restore_domains_v2
     create_domain_container_registry_relations = create_domain_container_registry_relations
     purge_domain_container_registry_relations = purge_domain_container_registry_relations
+    create_project_container_registry_relations = create_project_container_registry_relations
+    purge_project_container_registry_relations = purge_project_container_registry_relations
     # Project V2 APIs
     admin_create_project_v2 = admin_create_project_v2
     admin_update_project_v2 = admin_update_project_v2

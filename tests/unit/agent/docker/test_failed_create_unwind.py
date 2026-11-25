@@ -908,3 +908,46 @@ class TestCreateKernelWhoseContainerStartFails:
             (LifecycleEvent.DESTROY, KernelLifecycleEventReason.USER_REQUESTED, "cid-1")
         ]
         assert agent._deferred_destroys == {}
+
+    @pytest.fixture
+    def kernel_id(self) -> KernelId:
+        return KernelId(uuid.uuid4())
+
+    @pytest.fixture
+    def agent_whose_kernel_is_cleaned_up_during_the_start(self, kernel_id: KernelId) -> Any:
+        ctx = self._context(kernel_id, RuntimeError("unused"))
+        agent = self._creating_agent(ctx)
+
+        async def _starts_while_cleaned_up(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            agent.kernel_registry.pop(kernel_id)
+            return {"container_id": "cid-1"}
+
+        ctx.start_container = AsyncMock(side_effect=_starts_while_cleaned_up)
+        return agent
+
+    async def test_a_kernel_cleaned_up_during_the_start_fails_the_create_and_gets_no_destroy(
+        self, kernel_id: KernelId, agent_whose_kernel_is_cleaned_up_during_the_start: Any
+    ) -> None:
+        agent = agent_whose_kernel_is_cleaned_up_during_the_start
+        kernel_config = {
+            "environ": {},
+            "image": {"labels": {}, "digest": "sha256:0", "registry": {}},
+            "resource_opts": {},
+            "mounts": [],
+            "session_type": SessionTypes.INTERACTIVE,
+        }
+
+        with (
+            patch("ai.backend.agent.agent.get_arch_name", return_value="x86_64"),
+            patch("ai.backend.agent.agent.allocate"),
+            pytest.raises(ContainerCreationFailedError, match="Kernel cleaned up"),
+        ):
+            await AbstractAgent.create_kernel(
+                agent,
+                cast(Any, SimpleNamespace(kernel_id=kernel_id, session_id=uuid.uuid4())),
+                MagicMock(),
+                cast(Any, kernel_config),
+                cast(Any, {"replicas": {}}),
+            )
+
+        assert agent.container_lifecycle_queue.empty()

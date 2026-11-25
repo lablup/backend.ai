@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -123,6 +123,7 @@ class _Folder:
     project: _Project
     ownership_type: VFolderOwnershipType
     default_mount_permission: VFolderMountPolicy = VFolderMountPolicy.READ_WRITE
+    vfolder_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,7 @@ class _ResolvingSessionMounts:
     repository: SchedulerRepository
     draft: SessionSpecDraft
     owner_id: UserID
+    folder_names_by_id: dict[UUID, str]
 
 
 class TestAutoMountVFolderResolution:
@@ -310,7 +312,7 @@ class TestAutoMountVFolderResolution:
                         host=NOOP_VFOLDER_HOST,
                         domain_name=session_owner.domain_name,
                         quota_scope_id=QuotaScopeID.parse(f"project:{project_id}"),
-                        name=folder.name,
+                        name=folder.vfolder_name or folder.name,
                         creator="owner@example.com",
                         ownership_type=folder.ownership_type,
                         user=(
@@ -436,6 +438,7 @@ class TestAutoMountVFolderResolution:
                 ),
             ),
             owner_id=session_owner.user_id,
+            folder_names_by_id={folder_id: name for name, folder_id in folder_ids.items()},
         )
 
     @pytest.mark.parametrize(
@@ -598,6 +601,47 @@ class TestAutoMountVFolderResolution:
                 ],
                 expected_mounts=[_ResolvedMount("of-project", "/home/work/data")],
             ),
+            _SessionMountsCase(
+                name="own-local-requested-where-the-project-local-is-mounted",
+                folders=[
+                    _Folder(
+                        "of-user",
+                        _Project.PERSONAL,
+                        VFolderOwnershipType.USER,
+                        vfolder_name=".local",
+                    ),
+                    _Folder(
+                        "of-project",
+                        _Project.OF_THE_SESSION,
+                        VFolderOwnershipType.GROUP,
+                        vfolder_name=".local",
+                    ),
+                ],
+                requested_mounts=[_RequestedMount("of-user", "/home/work/.local")],
+                expected_mounts=[_ResolvedMount("of-user", "/home/work/.local")],
+            ),
+            _SessionMountsCase(
+                name="own-local-requested-away-from-the-project-local",
+                folders=[
+                    _Folder(
+                        "of-user",
+                        _Project.PERSONAL,
+                        VFolderOwnershipType.USER,
+                        vfolder_name=".local",
+                    ),
+                    _Folder(
+                        "of-project",
+                        _Project.OF_THE_SESSION,
+                        VFolderOwnershipType.GROUP,
+                        vfolder_name=".local",
+                    ),
+                ],
+                requested_mounts=[_RequestedMount("of-user", "/home/work/in1")],
+                expected_mounts=[
+                    _ResolvedMount("of-user", "/home/work/in1"),
+                    _ResolvedMount("of-project", "/home/work/.local"),
+                ],
+            ),
         ],
         ids=lambda case: case.name,
     )
@@ -611,7 +655,11 @@ class TestAutoMountVFolderResolution:
         )
 
         assert [
-            _ResolvedMount(mount.name, str(mount.kernel_path), mount.mount_perm)
+            _ResolvedMount(
+                resolving.folder_names_by_id[mount.vfid.folder_id],
+                str(mount.kernel_path),
+                mount.mount_perm,
+            )
             for mount in mounts_by_role["main"]
         ] == case.expected_mounts
 
