@@ -3180,11 +3180,13 @@ class AbstractAgent[
                         "kernel container started", container_id=container_data.get("container_id")
                     )
                     async with self.registry_lock:
-                        self.kernel_registry[kernel_id].data.update(container_data)
-                        if "container_id" in container_data:
-                            self.kernel_registry[kernel_id].set_container_id(
-                                container_data["container_id"]
+                        if self.kernel_registry.get(kernel_id) is not kernel_obj:
+                            raise ContainerCreationFailedError(
+                                f"Kernel cleaned up during container creation (k:{kernel_id!s})"
                             )
+                        kernel_obj.data.update(container_data)
+                        if "container_id" in container_data:
+                            kernel_obj.set_container_id(container_data["container_id"])
                         if kernel_id in self._deferred_destroys:
                             # Destroyed while its container was being made.
                             raise ContainerStartupCancelledError(
