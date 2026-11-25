@@ -2,7 +2,7 @@
 
 > 규칙은 `../AGENTS.md`, 연결은 `backend.ai mgr ops list` 로 확인한다.
 
-`vfolder_auto_mount` row 는 vfolder 하나를 프로젝트나 사용자의 자동 마운트 vfolder 로 정한다. 세션 시작은 domain repository 를 통해 row 를 조회하고, 이 패키지는 호출자가 API 로 도달하는 operation 을 담는다.
+`vfolder_auto_mount` row 는 vfolder 하나를 프로젝트나 사용자의 자동 마운트 vfolder 로 정한다. 이 패키지는 호출자가 API 로 도달하는 operation 을 담는다.
 
 ## processor fields
 
@@ -19,7 +19,7 @@
 
 ## create 만 service method 를 둔다
 
-- create 의 spec 은 전제 조건(vfolder 가 그 프로젝트나 그 사용자의 것이다)을 담는데 generic create 는 이를 받지 않는다. service 가 이를 domain repository 에 전달한다.
+- create 의 spec 은 vfolder 가 속한 프로젝트에 대한 전제 조건을 담는데 generic create 는 이를 받지 않는다. service 가 이를 domain repository 에 전달한다.
 - 다른 operation 은 generic ops service 에 spec 을 전달하므로 `service.py` method 를 갖지 않는다.
 
 ## admin search 는 global 이다

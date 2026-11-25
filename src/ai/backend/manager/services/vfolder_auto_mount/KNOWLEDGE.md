@@ -21,8 +21,7 @@ status: draft
 Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A `vfolder_auto_mount` row makes one vfolder an auto-mount vfolder of a project or a user.
-The session launch reads the rows through the domain repositories; this package holds the
-operations a caller reaches through the API.
+This package holds the operations a caller reaches through the API.
 
 ## The processor fields
 
@@ -39,9 +38,8 @@ operations a caller reaches through the API.
 
 ## Only the create has a service method
 
-- The create's spec carries a precondition (the vfolder belongs to the project, or the user
-  owns it), which the generic create does not take. The service hands it to the domain
-  repository.
+- The create's spec carries a precondition on the project the vfolder belongs to, which the
+  generic create does not take. The service hands it to the domain repository.
 - The other operations hand a spec to the generic ops services, so they have no
   `service.py` method.
 
