@@ -3167,11 +3167,13 @@ class AbstractAgent[
                         pretty_container_id,
                     )
                     async with self.registry_lock:
-                        self.kernel_registry[kernel_id].data.update(container_data)
-                        if "container_id" in container_data:
-                            self.kernel_registry[kernel_id].set_container_id(
-                                container_data["container_id"]
+                        if self.kernel_registry.get(kernel_id) is not kernel_obj:
+                            raise ContainerCreationFailedError(
+                                f"Kernel cleaned up during container creation (k:{kernel_id!s})"
                             )
+                        kernel_obj.data.update(container_data)
+                        if "container_id" in container_data:
+                            kernel_obj.set_container_id(container_data["container_id"])
                     await kernel_obj.init(self.event_producer)
                     log.info(
                         "create_kernel(kernel:{}, session:{}, container:{}) kernel object initialized",
