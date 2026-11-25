@@ -1637,13 +1637,14 @@ class AbstractAgent[
                 }
                 alive_containers = await self.enumerate_containers()
                 alive_kernel_ids = {kid for kid, _ in alive_containers}
-                kernel_ids_running_throughout_listing = {
+                registered_kernel_ids = {
                     kid
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING
-                    and kid in kernel_ids_running_before_listing
                 }
-                dangling_kernel_ids = kernel_ids_running_throughout_listing - alive_kernel_ids
+                dangling_kernel_ids = (
+                    registered_kernel_ids & kernel_ids_running_before_listing
+                ) - alive_kernel_ids
                 if dangling_kernel_ids:
                     log.info(
                         "dangling kernel objects cleanup started",
