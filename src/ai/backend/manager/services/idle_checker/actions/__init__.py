@@ -1,1 +1,0 @@
-"""Idle checker service actions."""

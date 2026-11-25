@@ -1,1 +1,0 @@
-"""Webhook notification channel implementation."""

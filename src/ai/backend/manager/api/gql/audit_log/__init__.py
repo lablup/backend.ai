@@ -1,1 +1,0 @@
-"""AuditLog GraphQL API package."""

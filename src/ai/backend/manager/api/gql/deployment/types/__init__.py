@@ -1,1 +1,0 @@
-"""Deployment GraphQL types package."""

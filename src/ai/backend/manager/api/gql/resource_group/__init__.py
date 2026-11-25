@@ -1,1 +1,0 @@
-"""GraphQL resource group module."""

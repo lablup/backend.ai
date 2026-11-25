@@ -1,1 +1,0 @@
-"""LoginHistory GraphQL API package."""

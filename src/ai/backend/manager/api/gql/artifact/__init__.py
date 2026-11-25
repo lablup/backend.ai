@@ -1,1 +1,0 @@
-"""GraphQL artifact module."""

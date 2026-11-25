@@ -1,1 +1,0 @@
-"""Keypair GraphQL types package."""

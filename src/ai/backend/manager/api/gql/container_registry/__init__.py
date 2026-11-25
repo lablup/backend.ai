@@ -1,1 +1,0 @@
-"""GraphQL container registry module."""

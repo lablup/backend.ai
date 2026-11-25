@@ -1,1 +1,0 @@
-"""Role preset GQL resolvers."""

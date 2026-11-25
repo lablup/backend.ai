@@ -1,1 +1,0 @@
-"""RBAC GQL types package."""
