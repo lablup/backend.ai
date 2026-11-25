@@ -155,6 +155,10 @@ func checkRequire(root, base string) error {
 func render(version, date string, frags []fragment) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## %s (%s)\n", version, date)
+	if len(frags) == 0 {
+		b.WriteString("\nNo user-facing changes.\n")
+		return b.String()
+	}
 	for _, k := range kinds {
 		var group []fragment
 		for _, f := range frags {
@@ -205,7 +209,7 @@ func insertAfterTitle(changelog, section string) string {
 	return head + section + "\n" + rest
 }
 
-func batch(root, version string, date time.Time) error {
+func batch(root, version string, date time.Time, allowEmpty bool) error {
 	if !versionRe.MatchString(version) {
 		return fmt.Errorf("invalid version %q", version)
 	}
@@ -219,7 +223,7 @@ func batch(root, version string, date time.Time) error {
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
-	if len(frags) == 0 {
+	if len(frags) == 0 && !allowEmpty {
 		return fmt.Errorf("no fragment under %s", unreleasedDir)
 	}
 	section := render(version, date.Format("2006-01-02"), frags)

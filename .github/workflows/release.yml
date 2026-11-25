@@ -25,7 +25,7 @@ jobs:
       - name: Batch the changelog fragments
         env:
           VERSION: ${{ github.ref_name }}
-        run: go run ./tools/changelog batch "$VERSION"
+        run: go run ./tools/changelog batch "$VERSION" --allow-empty
       - name: Upload the release notes
         uses: actions/upload-artifact@v5
         with:

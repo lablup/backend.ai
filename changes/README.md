@@ -18,7 +18,7 @@ Run from the repository root.
 |---|---|
 | `go run ./tools/changelog check` | Checks the name, kind and content of every fragment. CI (`build` job) and pre-commit run it |
 | `go run ./tools/changelog check --require --base <ref>` | Also fails when no fragment was added since `<ref>` |
-| `go run ./tools/changelog batch <version> [--date YYYY-MM-DD]` | Writes `changes/<version>.md`, adds the same section under the title of `CHANGELOG.md` and deletes the fragments. Fails when the version exists. The date defaults to today (UTC) |
+| `go run ./tools/changelog batch <version> [--date YYYY-MM-DD] [--allow-empty]` | Writes `changes/<version>.md`, adds the same section under the title of `CHANGELOG.md` and deletes the fragments. Fails when the version exists or there is no fragment; `--allow-empty` writes `No user-facing changes.` instead. The date defaults to today (UTC) |
 
 Release output per version:
 

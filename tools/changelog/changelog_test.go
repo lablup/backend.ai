@@ -108,7 +108,7 @@ func TestBatch(t *testing.T) {
 	writeFile(t, root, unreleasedDir+"/BAI-3.breaking.md", "Renamed the flag.\n")
 	writeFile(t, root, unreleasedDir+"/BAI-4.misc.md", "Tidied up.\n")
 
-	if err := batch(root, "1.0.0", time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)); err != nil {
+	if err := batch(root, "1.0.0", time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC), false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -169,7 +169,7 @@ func TestBatchRejects(t *testing.T) {
 			writeFile(t, root, changelogFile, titleChangelog)
 			writeFile(t, root, unreleasedDir+"/.gitkeep", "")
 			tt.setup(t, root)
-			err := batch(root, tt.version, time.Now())
+			err := batch(root, tt.version, time.Now(), false)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("err = %v, want containing %q", err, tt.wantErr)
 			}
@@ -244,5 +244,22 @@ func TestRun(t *testing.T) {
 	}
 	if err := run([]string{"nope"}); err == nil {
 		t.Fatal("unknown command: want an error")
+	}
+}
+
+func TestBatchAllowEmpty(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, changelogFile, titleChangelog)
+	writeFile(t, root, unreleasedDir+"/.gitkeep", "")
+
+	if err := batch(root, "1.0.0", time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC), true); err != nil {
+		t.Fatal(err)
+	}
+	want := "## 1.0.0 (2026-12-01)\n\nNo user-facing changes.\n"
+	if got := readFile(t, root, "changes/1.0.0.md"); got != want {
+		t.Errorf("changes/1.0.0.md = %q, want %q", got, want)
+	}
+	if got := readFile(t, root, changelogFile); got != "Changes\n=======\n\n"+want+"\nOld notes.\n" {
+		t.Errorf("CHANGELOG.md = %q", got)
 	}
 }

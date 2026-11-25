@@ -3,7 +3,7 @@
 // Usage, from the repository root:
 //
 //	go run ./tools/changelog check [--require --base <ref>]
-//	go run ./tools/changelog batch <version> [--date YYYY-MM-DD]
+//	go run ./tools/changelog batch <version> [--date YYYY-MM-DD] [--allow-empty]
 package main
 
 import (
@@ -47,6 +47,7 @@ func run(args []string) error {
 		fs := flag.NewFlagSet("batch", flag.ContinueOnError)
 		root := fs.String("root", ".", "repository root")
 		date := fs.String("date", "", "release date, YYYY-MM-DD (default today, UTC)")
+		allowEmpty := fs.Bool("allow-empty", false, "write a version without fragments as 'No user-facing changes.'")
 		// The version comes first: flags after it are still parsed.
 		if len(args) < 2 {
 			return fmt.Errorf("usage: changelog batch <version> [--date YYYY-MM-DD]")
@@ -62,7 +63,7 @@ func run(args []string) error {
 				return fmt.Errorf("invalid --date: %w", err)
 			}
 		}
-		return batch(*root, version, when)
+		return batch(*root, version, when, *allowEmpty)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
