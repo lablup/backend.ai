@@ -1,516 +1,197 @@
 name: ci
 
+# The Go checks of `v2`.
+
 on:
   push:
     branches:
-      - 'main'
-      - '[0-9][0-9].[0-9]'
-      - '[0-9][0-9].[0-9][0-9]'
-    tags:
-      - '[0-9][0-9].[0-9].*'
-      - '[0-9][0-9].[0-9][0-9].*'
+      - 'v2'
   pull_request:
-    branches-ignore: [v2]
-    types: [opened, synchronize, reopened]
+    branches:
+      - 'v2'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  # A pull request run is superseded by the next push to it; a push run to `v2`
+  # runs to the end for every commit.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# `contents: read`: `plan-targets` and `determine-release-grade` only read the source
 permissions:
   contents: read
 
 jobs:
-
-  labeler:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: lablup/auto-labeler@98637c08ff3e0abc1f8706e36cd45d292879dc89  # main
-
-  detect-changes:
-    # `contents: read`: only diffs against the base revision
-    # `pull-requests: read`: `dorny/paths-filter` only lists the changed files
-    permissions:
-      contents: read
-      pull-requests: read
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-      models: ${{ steps.filter.outputs.models }}
-      seeds: ${{ steps.filter.outputs.seeds }}
-      release: ${{ steps.release.outputs.release }}
-      full-run: ${{ steps.full.outputs.full-run }}
-      base-ref: ${{ steps.base.outputs.ref }}
-    steps:
-    - uses: actions/checkout@v6
-      with:
-        fetch-depth: 2
-        lfs: false
-    - name: Find the revision a changed-only run compares against
-      id: base
-      # A PR checks out the synthetic refs/pull/N/merge commit, a merge of the PR
-      # head into the current base tip, so its first parent is the base the merge was
-      # built on -- whatever the PR's commit count, rebases, or merges of main back
-      # into the topic branch. A push's first parent is the previous commit.
-      run: echo "ref=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
-    - name: Detect release PR
-      id: release
-      uses: ./.github/actions/detect-release-pr
-    - name: Decide whether the run covers every target
-      id: full
-      # A tag, a release PR, a push to a version branch and a PR into one check every
-      # target; anything else only what changed since `base-ref`.
-      env:
-        EVENT: ${{ github.event_name }}
-        REF: ${{ github.ref }}
-        REF_NAME: ${{ github.ref_name }}
-        BASE_REF: ${{ github.base_ref }}
-        RELEASE: ${{ steps.release.outputs.release }}
-      run: |
-        full=false
-        case "$EVENT" in
-          push)
-            case "$REF" in
-              refs/tags/*) full=true ;;
-              refs/heads/*)
-                case "$REF_NAME" in
-                  [0-9][0-9].[0-9]|[0-9][0-9].[0-9][0-9]) full=true ;;
-                esac ;;
-            esac ;;
-          pull_request)
-            if [ "$RELEASE" == "true" ]; then full=true; fi
-            case "$BASE_REF" in
-              [0-9][0-9].[0-9]|[0-9][0-9].[0-9][0-9]) full=true ;;
-            esac ;;
-        esac
-        echo "full-run=$full" >> "$GITHUB_OUTPUT"
-    - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad  # v3
-      id: filter
-      with:
-        filters: |
-          code:
-            - 'src/**'
-            - 'tests/**'
-            - '**/BUILD'
-            - 'pants.toml'
-            - 'pants.ci.toml'
-            - 'get-pants.sh'
-            - 'python*.lock'
-            - 'tools/*.lock'
-            - '.github/workflows/ci*.yml'
-            - '.github/workflows/docker-images.yml'
-            - '.github/actions/pants-caches/**'
-            - '.github/scripts/plan-ci-targets.py'
-            - '.github/scripts/run-pytest-shard.py'
-          models:
-            - 'src/ai/backend/manager/models/**'
-          seeds:
-            - 'seeds/**'
-
-  # A run `detect-changes` marks `full-run` checks every target; anything else only what
-  # changed since `base-ref`. A fork PR gets no problem-matcher annotations. Only a push to
-  # a branch passes `cache-branch`, and the caches are saved only when
-  # `decide-cache-save.sh` finds it at the tip of main or of a maintained version.
-  check-build-and-lint:
-    # `contents: read`: only lints and builds
-    # `actions: write`: `pants-caches` deletes superseded caches
-    permissions:
-      contents: read
-      actions: write
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    uses: ./.github/workflows/ci-lint.yml
-    with:
-      detect-changes-result: ${{ needs.detect-changes.result }}
-      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
-      annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      full-run: ${{ needs.detect-changes.outputs.full-run == 'true' }}
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
-
-  # Builds the dependents map once and hands every typecheck and test job its
-  # targets in the `ci-targets` artifact, with the shards that hold a target. A
-  # job with no targets is not started, so each gate below also checks this job.
-  plan-targets:
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    runs-on: ubuntu-latest
-    outputs:
-      typecheck: ${{ steps.plan.outputs.typecheck }}
-      unit-shards: ${{ steps.plan.outputs.unit-shards }}
-      component-shards: ${{ steps.plan.outputs.component-shards }}
-      integration-shards: ${{ steps.plan.outputs.integration-shards }}
-      scenario-shards: ${{ steps.plan.outputs.scenario-shards }}
-    steps:
-    - name: Verify detect-changes
-      if: needs.detect-changes.result != 'success'
-      env:
-        RESULT: ${{ needs.detect-changes.result }}
-      run: |
-        echo "detect-changes did not succeed: $RESULT"
-        exit 1
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        # Depth 2 holds `base-ref`.
-        fetch-depth: 2
-        lfs: false
-    - name: Install uv
-      run: pip install uv
-    - name: Restore the test durations
-      id: durations
-      uses: actions/cache/restore@v5
-      with:
-        path: test-durations.json
-        key: test-durations-main-${{ github.sha }}
-        restore-keys: test-durations-main-
-    - name: Plan the targets and shards
-      id: plan
-      env:
-        BASE_REF: ${{ needs.detect-changes.outputs.base-ref }}
-        FULL_RUN: ${{ needs.detect-changes.outputs.full-run }}
-      run: |
-        flags=()
-        if [ "$FULL_RUN" == "true" ]; then flags=(--full-run); fi
-        if [ -f test-durations.json ]; then flags+=(--durations test-durations.json); fi
-        .github/scripts/plan-ci-targets.py --base-ref "$BASE_REF" "${flags[@]}" \
-          --out dist/ci-targets | tee -a "$GITHUB_OUTPUT"
-    - name: Upload the targets
-      uses: actions/upload-artifact@v5
-      with:
-        name: ci-targets
-        path: dist/ci-targets
-
-  typecheck:
-    permissions:
-      contents: read
-    needs: plan-targets
-    # Always runs on a tag push: a skipped `typecheck` skips `release` even past `lint-and-typecheck`.
-    if: >-
-      needs.plan-targets.result == 'success'
-      && (needs.plan-targets.outputs.typecheck == 'true' || startsWith(github.ref, 'refs/tags/'))
-    uses: ./.github/workflows/ci-typecheck.yml
-    with:
-      targets-artifact: ci-targets
-      annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-
-  lint-and-typecheck:
-    needs: [check-build-and-lint, plan-targets, typecheck]
-    if: always()
+  fmt:
     runs-on: ubuntu-latest
     steps:
-    - run: |
-        lint_result="${{ needs.check-build-and-lint.result }}"
-        plan_result="${{ needs.plan-targets.result }}"
-        typecheck_result="${{ needs.typecheck.result }}"
-        echo "check-build-and-lint: $lint_result"
-        echo "plan-targets: $plan_result"
-        echo "typecheck: $typecheck_result"
-        for r in "$lint_result" "$plan_result" "$typecheck_result"; do
-          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
-            echo "FAIL: unexpected result $r"
-            exit 1
-          fi
-        done
-        echo "OK"
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: fmt
+      - name: Format
+        run: go tool golangci-lint fmt
+      - name: Check that formatting changed nothing
+        run: git diff --exit-code
+      - name: Save the Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
 
-  alembic:
-    # `contents: read`: only checks the migration history
-    # `actions: read`: `ci-alembic.yml` declares it
-    permissions:
-      contents: read
-      actions: read
-    needs: detect-changes
-    if: |
-      needs.detect-changes.result == 'success'
-      && (
-        (github.event_name == 'pull_request'
-          && (needs.detect-changes.outputs.models == 'true' || needs.detect-changes.outputs.release == 'true'))
-        || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
-      )
-    uses: ./.github/workflows/ci-alembic.yml
-
-  # The seed files are data no test reads, and what they must state follows the entity
-  # types the code defines, so a change to either runs the check.
-  seed:
-    # `contents: read`: only reads the seed files
-    # `actions: read`: `ci-seed.yml` declares it
-    permissions:
-      contents: read
-      actions: read
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || needs.detect-changes.outputs.seeds == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    uses: ./.github/workflows/ci-seed.yml
-
-  check-alembic-migrations:
-    needs: [alembic]
-    if: always()
+  lint:
     runs-on: ubuntu-latest
     steps:
-    - run: |
-        r="${{ needs.alembic.result }}"
-        echo "alembic: $r"
-        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: lint
+      - name: Lint
+        run: go tool golangci-lint run
+      - name: Save the Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: build
+      - name: Build
+        run: go build ./...
+      - name: Tidy the module
+        run: go mod tidy
+      - name: Check that tidy changed nothing
+        run: git diff --exit-code go.mod go.sum
+      - name: Save the Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
+
+  # Not in `ci-gate` on a pull request: it reports without blocking.
+  test-short:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: test-short
+      - name: Test
+        run: go test -short ./...
+      - name: Save the Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
+
+  test:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: test
+      - name: Test
+        run: go test -race ./...
+      - name: Save the Go caches
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
+
+  # Not in `ci-gate` on a pull request: it reports without blocking. On a push
+  # a difference opens a pull request with the regenerated code.
+  generate-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+          # The pull request's checks only run when its branch is pushed by
+          # something other than the workflow's own token.
+          token: ${{ github.event_name == 'push' && secrets.OCTODOG || github.token }}
+      - name: Set up Go
+        id: go
+        uses: ./.github/actions/go-setup
+        with:
+          cache-prefix: generate
+      - name: Generate
+        run: go generate ./...
+      - name: Check that generation changed nothing
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code
+      - name: Open a pull request with the regenerated code
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
+          COMMIT: ${{ github.sha }}
+          BASE: ${{ github.ref_name }}
+        run: .github/scripts/open-go-generate-pr.sh "$COMMIT" "$BASE"
+      - name: Save the Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go.outputs.cache-paths }}
+          key: ${{ steps.go.outputs.cache-key-prefix }}${{ github.sha }}
+
+  ci-gate:
+    needs: [fmt, lint, build]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for name in fmt lint build; do
+            case "$name" in
+              fmt) r="${{ needs.fmt.result }}" ;;
+              lint) r="${{ needs.lint.result }}" ;;
+              build) r="${{ needs.build.result }}" ;;
+            esac
+            echo "$name: $r"
+            if [ "$r" != "success" ]; then
+              echo "FAIL"
+              exit 1
+            fi
+          done
           echo "OK"
-        else
-          echo "FAIL"
-          exit 1
-        fi
-
-  test-unit:
-    # `contents: read`: only runs the unit tests
-    permissions:
-      contents: read
-    needs: [detect-changes, plan-targets]
-    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
-    uses: ./.github/workflows/ci-pytest.yml
-    with:
-      suite: unit
-      shards: ${{ needs.plan-targets.outputs.unit-shards }}
-      runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-      targets-artifact: ci-targets
-
-  test-scenario:
-    # `contents: read`: only runs the scenario tests
-    # `actions: write`: `pants-caches` deletes superseded caches
-    permissions:
-      contents: read
-      actions: write
-    needs: plan-targets
-    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
-    uses: ./.github/workflows/ci-test-scenario.yml
-    with:
-      shards: ${{ needs.plan-targets.outputs.scenario-shards }}
-      runner: ubuntu-latest
-      targets-artifact: ci-targets
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
-
-  test-component:
-    # `contents: read`: only runs the component tests
-    permissions:
-      contents: read
-    needs: [detect-changes, plan-targets]
-    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
-    uses: ./.github/workflows/ci-pytest.yml
-    with:
-      suite: component
-      shards: ${{ needs.plan-targets.outputs.component-shards }}
-      runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-      sentinel-hosts: true
-      targets-artifact: ci-targets
-
-  test-integration:
-    # `contents: read`: only runs the integration tests
-    # `actions: write`: `pants-caches` deletes superseded caches
-    permissions:
-      contents: read
-      actions: write
-    needs: [detect-changes, plan-targets]
-    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
-    uses: ./.github/workflows/ci-test.yml
-    with:
-      suite: integration
-      shards: ${{ needs.plan-targets.outputs.integration-shards }}
-      runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-      sentinel-hosts: true
-      targets-artifact: ci-targets
-      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
-
-  test-unit-gate:
-    needs: [plan-targets, test-unit]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-    - run: |
-        for name in plan-targets test-unit; do
-          case "$name" in
-            plan-targets) r="${{ needs.plan-targets.result }}" ;;
-            test-unit) r="${{ needs.test-unit.result }}" ;;
-          esac
-          echo "$name: $r"
-          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
-            echo "FAIL"
-            exit 1
-          fi
-        done
-        echo "OK"
-
-  test-component-gate:
-    needs: [plan-targets, test-component, test-scenario]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-    - run: |
-        for name in plan-targets test-component test-scenario; do
-          case "$name" in
-            plan-targets) r="${{ needs.plan-targets.result }}" ;;
-            test-component) r="${{ needs.test-component.result }}" ;;
-            test-scenario) r="${{ needs.test-scenario.result }}" ;;
-          esac
-          echo "$name: $r"
-          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
-            echo "FAIL"
-            exit 1
-          fi
-        done
-        echo "OK"
-
-  test-integration-gate:
-    needs: [plan-targets, test-integration]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-    - run: |
-        for name in plan-targets test-integration; do
-          case "$name" in
-            plan-targets) r="${{ needs.plan-targets.result }}" ;;
-            test-integration) r="${{ needs.test-integration.result }}" ;;
-          esac
-          echo "$name: $r"
-          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
-            echo "FAIL"
-            exit 1
-          fi
-        done
-        echo "OK"
-
-  determine-release-grade:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    outputs:
-      RELEASE_AUDIENCE: ${{ steps.grade.outputs.RELEASE_AUDIENCE }}
-      IS_PRERELEASE: ${{ steps.grade.outputs.IS_PRERELEASE }}
-    steps:
-    - name: Check out the revision
-      uses: actions/checkout@v6
-      with:
-        lfs: false
-    - name: Determine the release grade
-      id: grade
-      run: python3 ./scripts/determine-release-type.py "$(cat VERSION)" >> "$GITHUB_OUTPUT"
-
-  release:
-    # `contents: write`: `ci-release.yml` creates the GitHub release
-    # `actions: read`: `ci-release.yml` declares it
-    # `id-token`, `attestations: write`: `sbom.yml` signs the SBOM attestations
-    permissions:
-      contents: write
-      actions: read
-      id-token: write
-      attestations: write
-    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations, seed]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    uses: ./.github/workflows/ci-release.yml
-    with:
-      tag: ${{ github.ref_name }}
-      release-audience: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
-      is-prerelease: ${{ needs.determine-release-grade.outputs.IS_PRERELEASE }}
-    secrets: inherit
-
-  # Publishes the lablup/backend.ai-* service images from the wheels built in
-  # this run. The release never waits for images, so a Docker Hub outage must
-  # not block the PyPI/GitHub release. The reverse dependency does hold: images
-  # wait for a successful release so that a failed release cannot publish
-  # images (and `latest`) for a version that was never released. Like PyPI,
-  # only public releases are published; internal alphas are not.
-  build-docker-images:
-    needs: [determine-release-grade, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
-    permissions:
-      contents: read
-      actions: read  # the called workflow downloads wheel artifacts via the REST API
-      id-token: write  # the called workflow mints the OIDC token for Docker Hub
-    uses: ./.github/workflows/docker-images.yml
-
-  post-release:
-    # `contents: write`: uploads the Windows conda pack to the release
-    # `actions: read`: `ci-post-release.yml` declares it
-    permissions:
-      contents: write
-      actions: read
-    needs: [determine-release-grade, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    uses: ./.github/workflows/ci-post-release.yml
-    with:
-      tag: ${{ github.ref_name }}
-      release-audience: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
-    secrets: inherit
-
-  publish-to-pypi:
-    needs: [determine-release-grade, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    environment: deploy-to-pypi
-    steps:
-    - uses: actions/checkout@v6
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'twine~=6.0'
-    - name: Download wheels
-      uses: actions/download-artifact@v6
-      with:
-        name: wheels
-        path: dist
-    - name: mint API token
-      id: mint-token
-      run: |
-          # retrieve the ambient OIDC token
-          resp=$(curl --fail-with-body -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=pypi")
-          oidc_token=$(jq -r '.value' <<< "${resp}")
-
-          # exchange the OIDC token for an API token
-          resp=$(curl --fail-with-body -X POST https://pypi.org/_/oidc/mint-token -d "{\"token\": \"${oidc_token}\"}")
-          api_token=$(jq -r '.token' <<< "${resp}")
-
-          # mask the newly minted API token, so that we don't accidentally leak it
-          echo "::add-mask::${api_token}"
-
-          # see the next step in the workflow for an example of using this step output
-          echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
-      # We don't use `pants publish ::` because we manually rename the
-      # wheels after building them to add arch-specific tags.
-      run: |
-        twine upload --skip-existing dist/*.whl dist/*.tar.gz

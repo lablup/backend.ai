@@ -14,8 +14,8 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
-| `install-dev.sh` | Installs a full source setup: Pants, halfstack, configs, git hooks | person; `integration.yml` |
-| `setup-venv.py` | Builds the python-default virtualenv from `python.lock` without Pants, at the path `pants export` writes (`--venv <dir>` overrides) and fails when a package differs from the lock | person; `.github/actions/python-venv` |
+| `install-dev.sh` | Installs a full source setup: Pants, halfstack, configs, git hooks | person |
+| `setup-venv.py` | Builds the python-default virtualenv from `python.lock` without Pants, at the path `pants export` writes (`--venv <dir>` overrides) and fails when a package differs from the lock | person |
 | `check-docker.py` | Verifies the Docker and Compose setup and reports the preferred Pants exec root | auto: `install-dev.sh` |
 | `configure-minio.sh` | Configures the MinIO bucket used by the `storage` halfstack profile | auto: sourced by `install-dev.sh` |
 | `delete-dev.sh` | Tears down what `install-dev.sh` created | person |
@@ -46,28 +46,17 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
-| `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | auto: `ci.yml` (`check-build-and-lint`) |
-| `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto: `ci.yml`, `.github/scripts/merge-alembic-heads.sh` |
-| `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
-| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto: `knowledge-check.yml`; person |
-| `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | auto: `knowledge-check.yml`; person |
-| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`; person |
-| `knowledge/check_bep_length.py` | Checks the length limits of BEP-1080 and later BEPs: lines, list items, design subsections | auto: `knowledge-check.yml`; person |
-| `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto: `ci.yml`, `build-test.yml` |
-| `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto: `backport.yml` |
-| `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto: `backport-migration-check.yml` |
-| `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames, and the new manager migrations without a `# Part of:` comment; `allow:migration-edit` records an intended edit, not a missing comment | auto: `migration-edit-check.yml` |
-| `.github/scripts/check-new-alembic-migration.sh` | Fails when a pull request to `main` adds a manager alembic migration; `allow:alembic-migration` lets a bug fix through | auto: `alembic-freeze-check.yml` |
-| `.github/scripts/merge-alembic-heads.sh` | Opens a `skip:changelog` pull request adding an empty merge migration when the manager's alembic graph on `main` has more than one head | auto: `alembic-merge-heads.yml` |
-| `.github/scripts/open-go-generate-pr.sh` | Opens a `skip:changelog` pull request with the files `go generate ./...` changed on a push to `v2` | auto: `ci-go.yml` |
-| `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files from the changed files and the `ruff analyze graph` import graph, assigns the `unit` and `component` files to shards by their run time in `test-durations.json`, and prints the `--shard` values that hold a target | auto: `ci.yml`, `test-record.yml` |
-| `.github/scripts/list-typecheck-files.sh` | Prints the existing `.py` and `.pyi` files of `typecheck.txt`, without the duplicates | auto: `ci-typecheck.yml` |
-| `.github/scripts/run-pytest-shard.py` | Runs the files of one shard list (`unit.<k>.txt` or `component.<k>.txt`) with pytest in parallel processes, one per file or per batch, and writes the failed tests to a summary and `::error` annotations | auto: `ci-pytest.yml`; person |
-| `.github/scripts/compute-test-durations.py` | Sums the testcase times of the junit reports into the run time of each `unit` and `component` test file, as `test-durations.json` | auto: `test-record.yml` |
-| `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto: `ci-lint.yml`, `ci-test.yml`, `ci-test-scenario.yml` |
-| `.github/scripts/prune-ref-caches.sh` | Deletes the cache entries under a ref that a newer save of the same key prefix superseded | auto: `.github/actions/pants-caches`, `mypy-cache.yml`, `test-record.yml` |
+| `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | person |
+| `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | person |
+| `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | person |
+| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | person |
+| `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | person |
+| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | person |
+| `knowledge/check_bep_length.py` | Checks the length limits of BEP-1080 and later BEPs: lines, list items, design subsections | person |
+| `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | person |
+| `.github/scripts/open-go-generate-pr.sh` | Opens a `skip:changelog` pull request with the files `go generate ./...` changed on a push to `v2` | auto: `ci.yml` |
 | `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto: `cleanup-pr-caches.yml` |
-| `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto: `update-seccomp-profile.yml` (monthly); person |
+| `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | person |
 | `check-docs-label.sh` | Skips a Read the Docs PR preview build unless the PR carries `area:docs`. **Currently unreferenced**: `.readthedocs.yaml` does the same check inline | none |
 
 ## Release
@@ -85,17 +74,14 @@ current, see `AGENTS.md` in this directory.
 | `changelog_files.py` | Module, not a command: maps a version to its `CHANGELOG/<version>.md` | auto: imported by `run-towncrier.py`, `extract-release-changelog.py` |
 | `bump_next_release_version.py` | Rewrites or prints `NEXT_RELEASE_VERSION` in `meta.py` | auto: `.github/scripts/bump-next-release-on-main.sh` |
 | `.github/scripts/update-maintained-versions.sh` | Registers a newly cut release line in `.github/maintained-versions.yml` and retires the due ones | auto: `release.sh` |
-| `.github/scripts/create-version-branch.sh` | Tags the `X.Y.0rc1` a release commit made and cuts the `X.Y` branch at that same commit | auto: `create-version-branch.yml` |
-| `.github/scripts/bump-next-release-on-main.sh` | Opens the pull request freezing `main`'s `NEXT_RELEASE_VERSION` references to the `X.Y.0` an `X.Y.0rc1` cut, and advancing `NEXT_RELEASE_VERSION` past that release line (`--next` overrides the target, for example for a year rollover) | auto: `create-version-branch.yml` |
-| `.github/scripts/sync-changelog-to-main.sh` | Opens the pull request carrying a final release's `CHANGELOG/X.Y.md` back to `main` | auto: `changelog-sync.yml` |
-| `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body; fails when it exceeds GitHub's 125,000-character limit | auto: `ci.yml` (release job), `check-version-change.yml` (release PRs that change VERSION) |
-| `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto: `sbom.yml`; `docker-images.yml` (via `check-bake-targets.sh`); `osv-scanner.yml` (also scheduled: weekly cron and push to `main`) |
-| `check-bake-targets.sh` | Fails when `docker-bake.hcl`'s default group and the `list-dockerfiles.sh --service` registry drift apart | auto: `docker-images.yml` |
-| `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | auto: `ci.yml` (`determine-release-grade`) |
-| `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | auto: `ci.yml` (`check-build-and-lint`) |
-| `test_freeze_release_version.py` | Checks `freeze_release_version.py` against standalone, one-line and multi-line imports | auto: `ci.yml` (`check-build-and-lint`) |
-| `normalize-version.py` | Prints the PEP 440-normalized version used for docker image tags, rejecting local segments (`+` is not a legal docker tag character) | auto: `docker-images.yml` |
-| `build-wheels.sh` | Builds the platform-specific and generic wheels | auto: `ci.yml` (release job) |
+| `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body; fails when it exceeds GitHub's 125,000-character limit | person |
+| `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto: `osv-scanner.yml` |
+| `check-bake-targets.sh` | Fails when `docker-bake.hcl`'s default group and the `list-dockerfiles.sh --service` registry drift apart | person |
+| `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | person |
+| `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | person |
+| `test_freeze_release_version.py` | Checks `freeze_release_version.py` against standalone, one-line and multi-line imports | person |
+| `normalize-version.py` | Prints the PEP 440-normalized version used for docker image tags, rejecting local segments (`+` is not a legal docker tag character) | person |
+| `build-wheels.sh` | Builds the platform-specific and generic wheels | person |
 | `build-scies.sh` | Builds the scie executables locally (CI runs the equivalent pants commands inline) | person |
 | `diff-release.py` | Lists the commits between two refs with their original and backport PR numbers | person |
 
