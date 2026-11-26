@@ -74,7 +74,7 @@ class StatsReporterTask(PeriodicTask):
                 GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
             )
 
-            async with self._db.begin_readonly() as conn:
+            async with self._db.begin_readonly_read_committed() as conn:
                 query = (
                     sa.select(sa.func.count())
                     .select_from(kernels)
