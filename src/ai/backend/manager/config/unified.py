@@ -670,6 +670,24 @@ class AuthConfig(BaseConfigSchema):
             example=ConfigExample(local="604800", prod="604800"),
         ),
     ]
+    login_session_db: Annotated[
+        int,
+        Field(
+            default=0,
+            ge=0,
+            validation_alias=AliasChoices("login-session-db", "login_session_db"),
+            serialization_alias="login-session-db",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Redis database number to store the login sessions and the login failures in. "
+                "The web server reads and writes the same keys, so this must equal its "
+                "`session.redis.db`."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="0", prod="0"),
+        ),
+    ]
 
 
 class RBACConfig(BaseConfigSchema):

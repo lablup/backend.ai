@@ -48,7 +48,11 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+<<<<<<< HEAD
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+=======
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+>>>>>>> 1544dae42 (fix(BAI-911): store web server sessions in the configured redis database (#17392))
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -332,6 +336,20 @@ def _bind_session_to_manager_token(session: Session, session_token: str | None) 
     session._new = True
 
 
+async def _check_login_session_database(
+    valkey_client: ValkeySessionClient, session_db: int, session_token: str | None
+) -> None:
+    # The manager has just written the login session to `auth.login-session-db`.
+    if not session_token:
+        return
+    if await valkey_client.get_login_session(session_token) is None:
+        log.error(
+            "login session written by the manager is not in the session database; "
+            "session.redis.db differs from the manager's auth.login-session-db",
+            session_db=session_db,
+        )
+
+
 def build_cors_options(
     allowed_origins: Sequence[str], *, allow_all_origins: bool = False
 ) -> dict[str, aiohttp_cors.ResourceOptions]:
@@ -492,6 +510,9 @@ async def login_handler(request: web.Request) -> web.Response:
                     "status": token.status,
                 }
                 _bind_session_to_manager_token(session, token.session_token)
+                await _check_login_session_database(
+                    valkey_client, config.session.redis.db, token.session_token
+                )
                 session["authenticated"] = True
                 session["token"] = stored_token  # store full token
                 result["authenticated"] = True
@@ -743,6 +764,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
             "status": token.status,
         }
         _bind_session_to_manager_token(session, token.session_token)
+        await _check_login_session_database(
+            request.app["redis"], config.session.redis.db, token.session_token
+        )
         session["authenticated"] = True
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
@@ -838,7 +862,46 @@ async def redis_ctx(
     )
     setup_session(app, redis_storage)
     try:
+<<<<<<< HEAD
         yield
+=======
+        # Create ValkeySessionClient for session management
+        valkey_session_client = await ValkeySessionClient.create(
+            valkey_target=valkey_target,
+            db_id=config.session.redis.db,
+            human_readable_name="web.session",
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
+        )
+        # Keep app["redis"] key for compatibility
+        app["redis"] = valkey_session_client
+
+        valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+            valkey_target=rate_limit_valkey_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="web.ratelimit",
+            sentinel_monitor=sentinel_monitors.monitor_for(rate_limit_valkey_target),
+        )
+        app["valkey_rate_limit"] = valkey_rate_limit_client
+
+        if pidx == 0 and config.session.flush_on_startup:
+            await valkey_session_client.flush_all_sessions()
+            log.info("session storage flushed")
+
+        if config.session.login_session_extension_sec is None:
+            config.session.login_session_extension_sec = config.session.max_age
+        redis_storage = RedisStorage(
+            valkey_session_client,
+            max_age=config.session.max_age,
+            secure=config.security.cookie_secure,
+            samesite=config.security.cookie_samesite.value,
+        )
+        setup_session(app, redis_storage)
+        try:
+            yield
+        finally:
+            await valkey_rate_limit_client.close()
+            await valkey_session_client.close()
+>>>>>>> 1544dae42 (fix(BAI-911): store web server sessions in the configured redis database (#17392))
     finally:
         await valkey_session_client.close()
 

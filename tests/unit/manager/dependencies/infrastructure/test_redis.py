@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import pytest
 
+<<<<<<< HEAD
 from ai.backend.common.config import redis_config_iv
+=======
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.config import redis_config_iv
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.defs import RedisRole
+>>>>>>> 1544dae42 (fix(BAI-911): store web server sessions in the configured redis database (#17392))
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -72,3 +80,46 @@ class TestValkeyDependency:
 
         # Clients should be closed - we can't easily verify this,
         # but the test should complete without hanging
+
+
+class TestValkeyDependencyLoginSessionDatabase:
+    @pytest.fixture
+    def manager_config(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> ManagerUnifiedConfig:
+        _container_id, redis_addr = redis_container
+        return ManagerUnifiedConfig.model_validate({
+            "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
+            "etcd": {"user": "test", "password": "test"},
+            "auth": {"login-session-db": 10},
+        })
+
+    async def _client_on(
+        self, manager_config: ManagerUnifiedConfig, db: int
+    ) -> ValkeySessionClient:
+        target = manager_config.redis.to_valkey_profile_target().profile_target(
+            RedisRole.STATISTICS
+        )
+        return await ValkeySessionClient.create(
+            target, db_id=db, human_readable_name="test.manager.session"
+        )
+
+    async def test_login_sessions_are_stored_in_the_configured_database(
+        self,
+        manager_config: ManagerUnifiedConfig,
+    ) -> None:
+        async with ValkeyDependency().provide(
+            ValkeyInput(config=manager_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as clients:
+            await clients.session.set_login_session("BAI-911-manager", "data", 60)
+
+        configured_db = await self._client_on(manager_config, 10)
+        default_db = await self._client_on(manager_config, 0)
+        try:
+            assert await configured_db.get_login_session("BAI-911-manager") == b"data"
+            assert await default_db.get_login_session("BAI-911-manager") is None
+        finally:
+            await configured_db.delete_login_session("BAI-911-manager")
+            await configured_db.close()
+            await default_db.close()

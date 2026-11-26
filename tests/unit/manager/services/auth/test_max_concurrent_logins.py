@@ -38,6 +38,7 @@ def _make_auth_config() -> AuthConfig:
         password_hash_rounds=100_000,
         password_hash_salt_size=32,
         login_session_max_age=604800,
+        login_session_db=0,
     )
 
 
