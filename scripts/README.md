@@ -34,9 +34,8 @@ Run one of these once per clone, from the repository root.
 | `.github/scripts/cancel-superseded-runs.sh` | Cancels the workflow runs that a newer push to the same branch superseded | auto: `cancel-superseded.yml` |
 | `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto: `cleanup-pr-caches.yml` |
 
-## Release and scheduled runs
+## Release
 
 | Script | What it does | Called by |
 |---|---|---|
 | `.github/scripts/build-release.sh` | Builds every `main` package under `cmd/` for linux amd64 and arm64 | auto: `release.yml` |
-| `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto: `osv-scanner.yml` |

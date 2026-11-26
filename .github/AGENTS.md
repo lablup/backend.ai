@@ -42,4 +42,5 @@ A script whose decision cannot be reproduced by running it by hand is in the wro
 - Read the Docs skips the docs build on `v2`: the root `.readthedocs.yaml` exits `183` in `build.commands`, which cancels the build (BAI-1162 restores it).
 - `nvd-cve-watch.yml` runs `go run ./tools/cvewatch find` and `notify`. The script rules above hold for that tool. Its run log is public: `notify` prints only the number of CVEs sent, and its errors do not carry the webhook URL.
 - The other workflows: `pr-prefix.yml`, `auto-author-assign.yml`, `cancel-superseded.yml` (cancels superseded `ci.yml` runs), `cleanup-pr-caches.yml`, `stale-pr.yml`, `devskim.yml`, `osv-scanner.yml`, `nvd-cve-watch.yml`.
-- `osv-scanner.yml` scans `go.mod` for vulnerabilities.
+- `osv-scanner.yml` scans `go.mod` for vulnerabilities on a schedule and on pushes to `main` and `v2`. It scans no container image.
+- `devskim.yml` runs on a schedule and on pushes to `main` and `v2`.
