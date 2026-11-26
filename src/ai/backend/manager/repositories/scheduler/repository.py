@@ -408,8 +408,7 @@ class SchedulerRepository:
         Lives at the repository level because it composes a DB read with
         the storage-manager RPC. Each group's request list resolves to a
         single ``VFolderMount`` tuple that every replica sharing the role
-        copies verbatim. The auto-mounts of the session's project and owner
-        follow the requests of every group.
+        copies verbatim.
         """
         user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
@@ -456,6 +455,10 @@ class SchedulerRepository:
                             ),
                         )
                     )
+                # Always resolve mounts even when the request list is empty:
+                # ``prepare_vfolder_mounts`` injects auto-mount vfolders
+                # regardless of explicit requests, so skipping here
+                # would silently drop them.
                 vfolder_mounts_by_role[group.role] = tuple(
                     await prepare_vfolder_mounts(
                         conn,
@@ -480,8 +483,8 @@ class SchedulerRepository:
             VFolderAutoMountSearcher(
                 pagination=NoPagination(),
                 conditions=[fields.deleted_at.filter.is_null()],
-                # Of auto-mounts whose destinations overlap, the first is mounted: the project's
-                # before the user's, then the one set earlier. Migrated rows share created_at.
+                # Of auto-mounts at one destination, the first is mounted: the project's before
+                # the user's, then the one set earlier. Migrated rows share created_at.
                 orders=[
                     ConditionOrder(
                         fields.scope_type.filter.equals(VFolderAutoMountScopeType.PROJECT)
