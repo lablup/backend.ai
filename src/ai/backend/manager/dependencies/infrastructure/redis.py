@@ -182,7 +182,7 @@ class ValkeyDependency(DependencyProvider[ValkeyInput, ValkeyClients]):
             ),
             session=await ValkeySessionClient.create(
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
-                db_id=REDIS_STATISTICS_DB,
+                db_id=setup_input.config.auth.login_session_db,
                 human_readable_name="session",
                 sentinel_monitor=sentinel_monitors.monitor_for(
                     valkey_profile_target.profile_target(RedisRole.STATISTICS)
