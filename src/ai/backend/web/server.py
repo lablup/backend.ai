@@ -51,7 +51,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -341,6 +341,20 @@ def _bind_session_to_manager_token(session: Session, session_token: str | None) 
     session._new = True
 
 
+async def _check_login_session_database(
+    valkey_client: ValkeySessionClient, session_db: int, session_token: str | None
+) -> None:
+    # The manager has just written the login session to `auth.login-session-db`.
+    if not session_token:
+        return
+    if await valkey_client.get_login_session(session_token) is None:
+        log.error(
+            "login session written by the manager is not in the session database; "
+            "session.redis.db differs from the manager's auth.login-session-db",
+            session_db=session_db,
+        )
+
+
 def build_cors_options(
     allowed_origins: Sequence[str], *, allow_all_origins: bool = False
 ) -> dict[str, aiohttp_cors.ResourceOptions]:
@@ -502,6 +516,9 @@ async def login_handler(request: web.Request) -> web.Response:
                     "status": token.status,
                 }
                 _bind_session_to_manager_token(session, token.session_token)
+                await _check_login_session_database(
+                    valkey_client, config.session.redis.db, token.session_token
+                )
                 session["authenticated"] = True
                 session["token"] = stored_token  # store full token
                 result["authenticated"] = True
@@ -749,6 +766,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
             "status": token.status,
         }
         _bind_session_to_manager_token(session, token.session_token)
+        await _check_login_session_database(
+            request.app["redis"], config.session.redis.db, token.session_token
+        )
         session["authenticated"] = True
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
@@ -825,7 +845,7 @@ async def redis_ctx(
         # Create ValkeySessionClient for session management
         valkey_session_client = await ValkeySessionClient.create(
             valkey_target=valkey_target,
-            db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+            db_id=config.session.redis.db,
             human_readable_name="web.session",
             sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
         )

@@ -7,7 +7,7 @@ from typing import override
 
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.health_checker import CID_REDIS_SESSION, ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
@@ -42,7 +42,7 @@ class RedisProvider(DependencyProvider[RedisProviderInput, ValkeySessionClient])
         # Create ValkeySessionClient for session management
         valkey_session_client = await ValkeySessionClient.create(
             valkey_target=valkey_target,
-            db_id=REDIS_STATISTICS_DB,
+            db_id=setup_input.config.session.redis.db,
             human_readable_name="web.session",
             sentinel_monitor=setup_input.sentinel_monitors.monitor_for(valkey_target),
         )

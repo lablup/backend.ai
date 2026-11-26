@@ -940,6 +940,11 @@
   # older than this are considered expired.
   # Added in 26.4.2
   login-session-max-age = 604800
+  # Redis database number to store the login sessions and the login failures in.
+  # The web server reads and writes the same keys, so this must equal its
+  # `session.redis.db`.
+  # Added in 26.10.0
+  login-session-db = 0
 
 # At-rest encryption for secret columns such as the keypair secret key. Names
 # which key provider writes new secrets and configures the providers. New
