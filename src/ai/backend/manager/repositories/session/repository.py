@@ -262,6 +262,14 @@ class SessionRepository:
         return await self._db_source.get_target_session_ids(session_id, recursive)
 
     @session_repository_resilience.apply()
+    async def batch_get_owner_id_by_session(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, uuid.UUID]:
+        """Read the user id owning each session; one not found is absent."""
+        return await self._db_source.batch_get_owner_id_by_session(session_ids)
+
+    @session_repository_resilience.apply()
     async def find_dependency_sessions(
         self,
         session_id: SessionId,
