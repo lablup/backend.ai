@@ -341,6 +341,20 @@ def _bind_session_to_manager_token(session: Session, session_token: str | None) 
     session._new = True
 
 
+async def _check_login_session_database(
+    valkey_client: ValkeySessionClient, session_db: int, session_token: str | None
+) -> None:
+    # The manager has just written the login session to `auth.login-session-db`.
+    if not session_token:
+        return
+    if await valkey_client.get_login_session(session_token) is None:
+        log.error(
+            "login session written by the manager is not in the session database; "
+            "session.redis.db differs from the manager's auth.login-session-db",
+            session_db=session_db,
+        )
+
+
 def build_cors_options(
     allowed_origins: Sequence[str], *, allow_all_origins: bool = False
 ) -> dict[str, aiohttp_cors.ResourceOptions]:
@@ -502,6 +516,9 @@ async def login_handler(request: web.Request) -> web.Response:
                     "status": token.status,
                 }
                 _bind_session_to_manager_token(session, token.session_token)
+                await _check_login_session_database(
+                    valkey_client, config.session.redis.db, token.session_token
+                )
                 session["authenticated"] = True
                 session["token"] = stored_token  # store full token
                 result["authenticated"] = True
@@ -749,6 +766,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
             "status": token.status,
         }
         _bind_session_to_manager_token(session, token.session_token)
+        await _check_login_session_database(
+            request.app["redis"], config.session.redis.db, token.session_token
+        )
         session["authenticated"] = True
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
