@@ -24,6 +24,8 @@ Run one of these once per clone, from the repository root.
 | `pre-commit` | The git hook: calls `pre-commit.sh` | auto: git, once installed |
 | `pre-commit.sh` | Runs `go tool golangci-lint fmt` and `run --fast-only --new-from-rev HEAD` when a `.go` file is staged, `go run ./tools/changelog check` when a file in `changes/unreleased/` is staged, and `go run ./tools/doclint check --staged` when a `.md` file, a file in `glossary/registry/` or `doclint.yaml` is staged | auto: `pre-commit` |
 
+On a merge commit `pre-commit.sh` skips the document check: the pull request CI of each parent checks its documents.
+
 ## Pull-request CI
 
 | Script | What it does | Called by |
