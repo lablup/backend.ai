@@ -34,6 +34,21 @@ Let’s check if they are created correctly.
 
 Also, you can create a directory using GUI console with same name.
 
+Then set it as an auto-mount of your user with the ``createVfolderAutoMount`` GraphQL mutation.
+``backend.ai vfolder info .linuxbrew`` shows the vfolder ID and your user ID.
+
+.. code-block:: console
+
+   $ backend.ai vfolder info .linuxbrew
+   $ backend.ai v2 gql --v2 'mutation {
+       createVfolderAutoMount(input: {
+         scope: {scopeType: USER, scopeId: "<user ID>"}
+         vfolderId: "<vfolder ID>"
+         mountDestination: "/home/work/.linuxbrew"
+         mountPermission: READ_WRITE
+       }) { vfolderAutoMount { id } }
+     }'
+
 
 Installing linuxbrew
 ^^^^^^^^^^^^^^^^^^^^
@@ -126,6 +141,21 @@ Let’s check if they are created correctly.
    $ backend.ai vfolder list
 
 Also, you can create a directory using GUI console with same name.
+
+Then set each of them as an auto-mount of your user with the ``createVfolderAutoMount`` GraphQL mutation.
+``backend.ai vfolder info .conda`` shows the vfolder ID and your user ID. Run the same for ``.continuum`` at ``/home/work/.continuum``.
+
+.. code-block:: console
+
+   $ backend.ai vfolder info .conda
+   $ backend.ai v2 gql --v2 'mutation {
+       createVfolderAutoMount(input: {
+         scope: {scopeType: USER, scopeId: "<user ID>"}
+         vfolderId: "<vfolder ID>"
+         mountDestination: "/home/work/.conda"
+         mountPermission: READ_WRITE
+       }) { vfolderAutoMount { id } }
+     }'
 
 
 miniconda test
