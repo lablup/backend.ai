@@ -240,14 +240,6 @@ def _mountable_auto_mounts(
     return [local_vfolder_mount, *registered_auto_mounts]
 
 
-def _overlaps_any_mount(destination: PurePosixPath, mounts: Iterable[VFolderMount]) -> bool:
-    return any(
-        destination.is_relative_to(mount.kernel_path)
-        or mount.kernel_path.is_relative_to(destination)
-        for mount in mounts
-    )
-
-
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -404,11 +396,12 @@ async def prepare_vfolder_mounts(
         if vfolder is None:
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         is_auto_mount = requested_key in auto_mount_keys
-        # Overlapping destinations are equal, or one is a parent directory of the other.
-        # A session with overlapping mounts is rejected, so the auto-mount gives way to the
-        # requested mounts and the auto-mounts before it.
-        if is_auto_mount and _overlaps_any_mount(
-            PurePosixPath(requested_vfolder_dstpaths[requested_key]), matched_vfolder_mounts
+        # Two mounts at one destination reject the session, so the auto-mount gives way to the
+        # requested mounts and the auto-mounts before it there. One above or below another
+        # mount still rejects the session, as a requested mount does.
+        if is_auto_mount and any(
+            mount.kernel_path == PurePosixPath(requested_vfolder_dstpaths[requested_key])
+            for mount in matched_vfolder_mounts
         ):
             log.trace("auto-mount skipped, destination already used", vfolder_id=vfolder["id"])
             continue

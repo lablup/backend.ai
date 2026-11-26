@@ -44,6 +44,7 @@ from ai.backend.manager.data.session.draft import (
     SessionSpecDraft,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
@@ -551,28 +552,14 @@ class TestAutoMountVFolderResolution:
                 ],
             ),
             _SessionMountsCase(
-                name="requested-mount-above-the-auto-mount-destination",
+                name="requested-mount-at-the-auto-mount-destination",
                 folders=[
                     _Folder("data", _Project.PERSONAL, VFolderOwnershipType.USER),
                     _Folder("requested", _Project.PERSONAL, VFolderOwnershipType.USER),
                 ],
-                auto_mounts=[
-                    _AutoMount("data", VFolderAutoMountScopeType.USER, "/home/work/shared/data")
-                ],
-                requested_mounts=[_RequestedMount("requested", "/home/work/shared")],
-                expected_mounts=[_ResolvedMount("requested", "/home/work/shared")],
-            ),
-            _SessionMountsCase(
-                name="requested-mount-below-the-auto-mount-destination",
-                folders=[
-                    _Folder("data", _Project.PERSONAL, VFolderOwnershipType.USER),
-                    _Folder("requested", _Project.PERSONAL, VFolderOwnershipType.USER),
-                ],
-                auto_mounts=[
-                    _AutoMount("data", VFolderAutoMountScopeType.USER, "/home/work/shared")
-                ],
-                requested_mounts=[_RequestedMount("requested", "/home/work/shared/requested")],
-                expected_mounts=[_ResolvedMount("requested", "/home/work/shared/requested")],
+                auto_mounts=[_AutoMount("data", VFolderAutoMountScopeType.USER, "/home/work/data")],
+                requested_mounts=[_RequestedMount("requested", "/home/work/data")],
+                expected_mounts=[_ResolvedMount("requested", "/home/work/data")],
             ),
             _SessionMountsCase(
                 name="auto-mounted-folder-requested-at-another-destination",
@@ -731,3 +718,28 @@ class TestAutoMountVFolderResolution:
         (project_local_mount,) = mounts_by_role["main"]
         assert project_local_mount.kernel_path == PurePosixPath("/home/work/.local")
         assert project_local_mount.vfsubpath == PurePosixPath(resolving.owner_id.hex)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _SessionMountsCase(
+                name="requested-mount-below-the-auto-mount-destination",
+                folders=[
+                    _Folder("data", _Project.PERSONAL, VFolderOwnershipType.USER),
+                    _Folder("requested", _Project.PERSONAL, VFolderOwnershipType.USER),
+                ],
+                auto_mounts=[
+                    _AutoMount("data", VFolderAutoMountScopeType.USER, "/home/work/shared")
+                ],
+                requested_mounts=[_RequestedMount("requested", "/home/work/shared/requested")],
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_rejects_a_mount_above_or_below_an_auto_mount(
+        self, resolving_session_mounts: _ResolvingSessionMounts
+    ) -> None:
+        resolving = resolving_session_mounts
+
+        with pytest.raises(InvalidAPIParameters):
+            await resolving.repository._resolve_vfolder_mounts_by_role(resolving.draft, None)

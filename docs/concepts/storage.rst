@@ -58,7 +58,8 @@ Auto-mount vfolders
 A vfolder set as an auto-mount of a user is mounted into all sessions created by the user, and one set as an auto-mount of a project into all sessions created in the project.
 Each auto-mount states the mount path, the path inside the vfolder and the mount permission.
 A good usecase is ``.config`` and ``.local`` directories to keep your local configurations and user-installed packages (e.g., ``pip install --user``) persistent across all your sessions.
-When a session requests the same vfolder, or any vfolder at the same path or at a path above or below it, the requested mount is used instead of the auto-mount.
+When a session requests the same vfolder, or any vfolder at the same path, the requested mount is used instead of the auto-mount.
+A mount at a path above or below an auto-mount's path rejects the session.
 
 A project's ``.local`` vfolder needs no auto-mount: each user gets their own directory of it at ``/home/work/.local``.
 
