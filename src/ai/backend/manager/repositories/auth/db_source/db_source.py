@@ -18,12 +18,26 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+<<<<<<< HEAD
 from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+=======
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginSessionStatus,
+)
+from ai.backend.manager.data.auth.types import (
+    AccessKeyOwner,
+    GroupMembershipData,
+    KeyPairSigningMaterial,
+    UserCreationData,
+)
+from ai.backend.manager.data.keypair.types import KeyPairData
+>>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 from ai.backend.manager.errors.auth import (
     AccessKeyNotFound,
     AuthorizationFailed,
@@ -300,22 +314,39 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
+<<<<<<< HEAD
     async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
         """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
+=======
+    async def lookup[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID | None:
+        """The id a key names, or None when it names nothing."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.lookup_entity_id(lookup)
 
-        Raises ``ValueError`` if the access key is unknown.
+    @auth_db_source_resilience.apply()
+    async def fetch_access_key_owner(self, access_key: str) -> AccessKeyOwner:
+        """Join keypairs→users to get the owner of *access_key*.
+>>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
+
+        Raises ``AccessKeyNotFound`` if the access key is unknown.
         """
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(users.c.domain_name, users.c.role)
+                sa.select(users.c.uuid, users.c.domain_name, users.c.role)
                 .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
                 .where(keypairs.c.access_key == access_key)
             )
             result = await conn.execute(query)
             row = result.first()
             if row is None:
-                raise ValueError("Unknown owner access key")
-            return row.domain_name, row.role
+                raise AccessKeyNotFound("Unknown owner access key")
+            return AccessKeyOwner(
+                user_id=UserID(row.uuid),
+                domain_name=row.domain_name,
+                role=row.role,
+            )
 
     @auth_db_source_resilience.apply()
     async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:

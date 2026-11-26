@@ -8,6 +8,7 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+<<<<<<< HEAD
 from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
@@ -15,6 +16,20 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserRow
+=======
+from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
+from ai.backend.manager.data.auth.types import (
+    AccessKeyOwner,
+    GroupMembershipData,
+    KeyPairSigningMaterial,
+    UserCreationData,
+)
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import UserRole, UserRow
+>>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -85,8 +100,8 @@ class AuthRepository:
         await self._db_source.modify_ssh_public_key(access_key, public_key)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        return await self._db_source.fetch_user_info_by_access_key(access_key)
+    async def get_access_key_owner(self, access_key: str) -> AccessKeyOwner:
+        return await self._db_source.fetch_access_key_owner(access_key)
 
     @auth_repository_resilience.apply()
     async def get_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
