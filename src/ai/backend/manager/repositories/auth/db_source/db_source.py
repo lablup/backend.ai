@@ -30,12 +30,14 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginSessionStatus,
 )
 from ai.backend.manager.data.auth.types import (
+    AccessKeyOwner,
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
+    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -301,22 +303,26 @@ class AuthDBSource:
             return await r.lookup_entity_id(lookup)
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
+    async def fetch_access_key_owner(self, access_key: str) -> AccessKeyOwner:
+        """Join keypairs→users to get the owner of *access_key*.
 
-        Raises ``ValueError`` if the access key is unknown.
+        Raises ``AccessKeyNotFound`` if the access key is unknown.
         """
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(users.c.domain_name, users.c.role)
+                sa.select(users.c.uuid, users.c.domain_name, users.c.role)
                 .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
                 .where(keypairs.c.access_key == access_key)
             )
             result = await conn.execute(query)
             row = result.first()
             if row is None:
-                raise ValueError("Unknown owner access key")
-            return row.domain_name, row.role
+                raise AccessKeyNotFound("Unknown owner access key")
+            return AccessKeyOwner(
+                user_id=UserID(row.uuid),
+                domain_name=row.domain_name,
+                role=row.role,
+            )
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:

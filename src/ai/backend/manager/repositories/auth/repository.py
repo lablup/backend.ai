@@ -13,6 +13,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
+    AccessKeyOwner,
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
@@ -116,8 +117,8 @@ class AuthRepository:
         return await self._db_source.lookup(lookup)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        return await self._db_source.fetch_user_info_by_access_key(access_key)
+    async def get_access_key_owner(self, access_key: str) -> AccessKeyOwner:
+        return await self._db_source.fetch_access_key_owner(access_key)
 
     @auth_repository_resilience.apply()
     async def get_delegation_target_by_email(self, email: str) -> tuple[UUID, UserRole, str]:

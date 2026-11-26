@@ -92,6 +92,15 @@ class KeyPairSigningMaterial:
 
 
 @dataclass(frozen=True)
+class AccessKeyOwner:
+    """The user who owns an access key."""
+
+    user_id: UserID
+    domain_name: str
+    role: UserRole
+
+
+@dataclass(frozen=True)
 class AuthorizingUser:
     """The user record the authorize flow reads, and hands to its POST_AUTHORIZE plugins.
 
