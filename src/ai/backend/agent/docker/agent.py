@@ -101,6 +101,7 @@ from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesy
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
+    EnumerateContainersResult,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -564,10 +565,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     continue
                 try:
                     os.chown(p, int_uid, int_gid)
-                except OSError as e:
-                    log.exception(
-                        "failed to chown {} to {}/{} (error: {})", p, int_uid, int_gid, repr(e)
-                    )
+                except OSError:
+                    log.exception("failed to chown {} to {}/{}", p, int_uid, int_gid)
 
     @override
     async def prepare_scratch(self) -> None:
@@ -1849,14 +1848,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> EnumerateContainersResult:
         result = []
+        failed_kernel_ids: set[KernelId] = set()
         fetch_tasks = []
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
 
                 async def _fetch_container_info(container: DockerContainer) -> None:
                     kernel_id_str: str = "(unknown)"
+                    # An inspection replaces the listed fields.
+                    listed_kernel_id = await get_kernel_id_from_container(
+                        # Docker adds more names only for container links, which kernels do not use.
+                        container._container["Names"][0]
+                    )
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
                         if kernel_id is None:
@@ -1878,10 +1883,19 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         if e.status == HTTPStatus.NOT_FOUND:
                             log.warning(e.message)
                             return
+                        if listed_kernel_id is not None:
+                            failed_kernel_ids.add(listed_kernel_id)
+                        log.exception(
+                            "container info fetch failed",
+                            container_id=container._id,
+                            kernel_id=kernel_id_str,
+                        )
                         raise
                     except asyncio.CancelledError:
                         pass
                     except Exception:
+                        if listed_kernel_id is not None:
+                            failed_kernel_ids.add(listed_kernel_id)
                         log.exception(
                             "error while fetching container information (cid:{}, k:{})",
                             container._id,
@@ -1891,7 +1905,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 fetch_tasks.append(_fetch_container_info(container))
 
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        return result
+        return EnumerateContainersResult(
+            containers=result,
+            failed_kernel_ids=frozenset(failed_kernel_ids),
+        )
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
@@ -2185,7 +2202,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
             return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error('Failed to purge image "{}": {}', request.image, e)
+            log.exception('Failed to purge image "{}"', request.image)
             return PurgeImageResp.failure(image=request.image, error=str(e))
 
     @override

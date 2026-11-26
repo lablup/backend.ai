@@ -36,9 +36,9 @@ class HostPortObserver(AbstractObserver):
 
     @override
     async def observe(self) -> None:
-        containers = await self._agent.enumerate_containers(ContainerStatus.active_set())
+        enumeration_result = await self._agent.enumerate_containers(ContainerStatus.active_set())
         occupied_host_ports: set[int] = set()
-        for _, container in containers:
+        for _, container in enumeration_result.containers:
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
 
