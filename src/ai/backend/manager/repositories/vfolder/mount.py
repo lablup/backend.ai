@@ -196,8 +196,9 @@ def _mountable_auto_mounts(
     auto_mounts: Sequence[VFolderAutoMountData],
     project_id: ProjectID,
 ) -> list[_MountableAutoMount]:
-    """The session project's ``.local`` folder, then ``auto_mounts``, without the folders the
-    user cannot reach or whose mount policy is none. A read-only folder is mounted read-only."""
+    """The mounts added without a request: the project's ``.local`` at ``/home/work/.local``,
+    then each of ``auto_mounts`` whose vfolder is in ``accessible_vfolders`` at the row's path.
+    A vfolder of the mount policy none is left out, one of read-only is mounted read-only."""
     accessible_vfolders_by_id: dict[VFolderUUID, dict[str, Any]] = {
         VFolderUUID(vfolder["id"]): vfolder for vfolder in accessible_vfolders
     }
