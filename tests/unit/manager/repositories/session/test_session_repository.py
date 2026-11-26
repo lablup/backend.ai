@@ -415,6 +415,20 @@ class TestSessionRepository:
             await db_sess.commit()
         return other_key
 
+    async def test_batch_get_owner_id_by_session_leaves_out_an_unknown_session(
+        self,
+        repository: SessionRepository,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        unknown_id = SessionId(uuid.uuid4())
+
+        owner_ids = await repository.batch_get_owner_id_by_session([
+            session_with_kernel.session_id,
+            unknown_id,
+        ])
+
+        assert owner_ids == {session_with_kernel.session_id: session_with_kernel.user_id}
+
     async def test_resolve_session_id_by_name_and_user(
         self,
         repository: SessionRepository,
