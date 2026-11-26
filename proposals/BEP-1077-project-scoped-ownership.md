@@ -83,7 +83,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ➕ | The graph has two relations, own and govern. Creation (`created_in`) writes both; a share writes a capped own only. Projects and users are created in their domain and in global. A user's virtual entity is governed by its domain and global, never by a project; a user on a project roster is a READ-capped share |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
 | ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `replace_share` to the accessible set |
-| ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
+| ➕ | Blank unreadable fields and reject filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
 
 ### 4.3 Reaching an entity from another scope
 

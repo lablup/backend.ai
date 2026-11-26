@@ -11,7 +11,7 @@ Implemented-Version:
 
 ## 관련 이슈
 
-- BA-7467 — (액션이 엔티티를 가리키는 방식)
+- BA-7467 — (액션이 엔티티를 참조하는 방식)
 - BA-7468
 - BA-7469
 - BA-7470
@@ -35,12 +35,12 @@ Implemented-Version:
 | domain · project 의 허용 resource group 편집 | 쓴다 | 쓴다 |
 | domain 생성 · 편집 중 resource group 지정 | 쓴다 | 쓰지 않는다 |
 
-API 가 관계를 가리키는 방식도 관계마다 다르다. `user_roles` 와 `idle_checker_bindings` 는 행 id 를
-API 에 내보내고, 나머지 관계는 양 끝으로 가리킨다. 행 id 를 받는 API 는 그 id 를 저장한 클라이언트가
-있어야 관계를 바꿀 수 있고, 행 id 로 찾은 관계는 양 끝으로 권한을 다시 확인해야 한다.
+API 가 관계를 참조하는 방식도 관계마다 다르다. `user_roles` 와 `idle_checker_bindings` 는 행 id 를
+API 에 내보내고, 나머지 관계는 양 끝으로 참조한다. 행 id 를 받는 API 는 그 id 를 저장한 클라이언트가
+있어야 관계를 변경할 수 있고, 행 id 로 찾은 관계는 양 끝으로 권한을 다시 확인해야 한다.
 
 **virtual scope 는 소유만 표현한다.** 관계는 비즈니스 로직이 읽는 것을 만들고, 그 연산의 권한은
-관계가 가리키는 두 scope 가 답한다. 관계 자신은 양 끝으로만 식별한다.
+관계가 참조하는 두 scope 가 답한다. 관계 자신은 양 끝으로만 식별한다.
 
 ## 현재 설계
 
@@ -72,15 +72,15 @@ API 에 내보내고, 나머지 관계는 양 끝으로 가리킨다. 행 id 를
 WebUI 는 role 할당 id 를 목록 행 키로만 쓰고 revoke 는 (userIds, roleId) 로 한다. idle checker 할당은
 WebUI 에 붙지 않았다.
 
-### resource group 연결은 이름 목록을 통째로 바꾼다
+### resource group 연결은 이름 목록 전체를 변경한다
 
 `adminUpdateAllowedResourceGroupsForDomainV2` · `…ForProjectV2` 와 그 반대 방향 두 개는 이름 목록을 받아
-관계를 통째로 교체한다. 한 쌍을 잇거나 끊는 연산이 없다.
+관계 전체를 교체한다. 한 쌍을 잇거나 끊는 연산이 없다.
 
 ### 비즈니스 로직이 관계 테이블을 읽는다
 
 `query_allowed_sgroups(domain_name, group, access_key)` 는 세 테이블을 union 으로 읽어 세션이 돌 수 있는
-resource group 을 정한다. 세션 생성과 스케줄링이 이것을 부른다. project ↔ user 검색도 같은 방식으로
+resource group 을 정한다. 세션 생성과 스케줄링이 이것을 호출한다. project ↔ user 검색도 같은 방식으로
 관계 테이블을 읽는다.
 
 ### virtual scope 는 소유를 표현한다
@@ -109,7 +109,7 @@ virtual scope 간선은 값 하나(`permission_cap`)를 싣고, 그래프는 (us
 
 | 자리 | 식별 |
 | --- | --- |
-| 테이블 | 행 id 컬럼 없음. 양 끝 쌍이 기본 키 |
+| 테이블 | 행 id column 없음. 양 끝 쌍이 기본 키 |
 | repository · 권한 검사 | 양 끝 UUID 로만 조회 |
 | adapter · DTO | 양 끝 UUID 만 다룬다 |
 | GraphQL 의 관계 id | 관계 타입 이름과 양 끝 UUID 로 만든 global ID. GraphQL 층에서만 만들고 푼다. 타입은 `ID!` |
@@ -121,7 +121,7 @@ global ID 는 `node(id:)` 조회와 Relay store 의 키에만 쓴다. 관계를 
 `node(id:)` 로 관계를 읽으려면 양 끝 scope 모두에 read 권한이 있어야 한다. global ID 가 양 끝을 모두
 담고 있으므로 양쪽을 다 묻는다.
 
-양 끝이 정해지면 관계가 정해진다. 쌍 밖의 id 는 같은 관계를 가리키는 두 번째 이름이 될 뿐이고,
+양 끝이 정해지면 관계가 정해진다. 쌍 밖의 id 는 같은 관계를 참조하는 두 번째 이름이 될 뿐이고,
 그 id 로 찾은 관계는 양 끝을 다시 읽어야 권한을 물을 수 있다.
 
 다형 참조가 있는 관계는 다형 쪽의 타입까지 키에 넣는다. idle checker 할당의 키는 unique 제약과 같은
@@ -138,7 +138,7 @@ global ID 는 `node(id:)` 조회와 Relay store 의 키에만 쓴다. 관계를 
 | 담기지 않음 | resource group ↔ domain | `scope_targets` = 양쪽, `entity_type` 없음 |
 
 resource group 은 여러 domain 이 나눠 쓰는 클러스터 자원이라 어느 쪽도 다른 쪽 안에 있지 않다.
-이때 권한은 가리킨 scope 각각에 직접 묻는다.
+이때 권한은 참조한 scope 각각에 직접 묻는다.
 
 ```
 link · unlink  →  왼쪽 scope 의 권한  AND  오른쪽 scope 의 권한
@@ -165,19 +165,19 @@ purge_relation  (scope, target, purger)    행과 양쪽 read 를 지운다
 ### spec 이 정하는 것
 
 - create 는 새 행만 넣는다. 이미 이어진 쌍은 soft delete 됐든 아니든 기본 키 위반이고, spec 의
-  `integrity_error_checks` 가 도메인 에러로 바꾼다. 되살리는 것은 restore 라서 create 에 upsert 는 없다.
+  `integrity_error_checks` 가 도메인 에러로 변경한다. 되살리는 것은 restore 라서 create 에 upsert 는 없다.
 - soft delete · restore 는 `deleted_at` 만 쓴다. 각 쪽이 상대를 읽는 것(scope 의 govern READ, target 의
-  share READ)은 남는다. soft delete 된 관계도 양쪽에서 보여야 restore 할 수 있다. 접근을 지우는 것은
+  share READ)은 남는다. soft delete 된 관계도 양쪽에서 보여야 restore 할 수 있다. 접근을 삭제하는 것은
   purge 뿐이다. soft delete 된 관계를 쓰지 않는 것은 읽는 쪽 일이다 (resource group 을 고르는 스케줄러,
   적용하는 idle checker).
 - soft delete Mixin 이 없는 관계는 create 와 purge 만 있다.
 - `idle_checker_bindings.enabled` 는 켜고 끄는 업무 값이다. soft delete 가 아니다.
 
-### resource group 연결은 link · unlink 로 바꾼다
+### resource group 연결은 link · unlink 로 변경한다
 
 resource group 과 domain, project 의 연결은 이름 목록 통째 교체(`adminUpdateAllowed*`) 대신 쌍 하나를
 link · unlink 하는 연산으로 다룬다. 두 연산은 양 끝 UUID 를 받는다. resource group 과 keypair 의 연결은
-BA-8459 가 user 연결로 바꾸면서 다룬다.
+BA-8459 가 user 연결로 변경하면서 다룬다.
 
 ### 관계를 읽는 방식
 
@@ -191,10 +191,10 @@ BA-8459 가 user 연결로 바꾸면서 다룬다.
 | `scope_targets()` | domain — 권한을 여기에 묻는다 |
 | `operation_scopes()` | 관계 테이블에서 만든 조건 |
 
-resource group 마다 간선을 둘 필요가 없다. 관계에서 권한을 끌어내면 같은 엔티티가 여러 관계로 닿을 때
+resource group 마다 간선을 둘 필요가 없다. 관계에서 권한을 끌어내면 같은 엔티티가 여러 관계로 접근될 때
 참조 횟수 세기가 되고, 비즈니스 연산의 부수 효과로 쓴 권한은 권한 모델에 보이지 않는다.
 
-### 관계를 바꾸는 연산의 응답
+### 관계를 변경하는 연산의 응답
 
 | 연산 | DTO · REST | GraphQL payload |
 | --- | --- | --- |
@@ -217,9 +217,9 @@ class DomainResourceGroupOperationScope(OperationScope):
         )
 ```
 
-관계가 자기 테이블과 두 참조 컬럼을 선언하면 그 9개는 손으로 쓰지 않고 선언에서 나온다.
+관계가 자기 테이블과 두 참조 column 을 선언하면 그 9개는 손으로 쓰지 않고 선언에서 나온다.
 
-**scope 검색 전체가 하나로 합쳐지지는 않는다.** 나머지 39개는 대상 행의 컬럼에 scope id 를 싣고
+**scope 검색 전체가 하나로 합쳐지지는 않는다.** 나머지 39개는 대상 행의 column 에 scope id 를 싣고
 (`SessionRow.group_id == project_id`) 관계를 거치지 않는다. 합쳐지는 것은 관계를 거치는 9개다.
 
 ## 마이그레이션 / 호환성
@@ -233,14 +233,14 @@ class DomainResourceGroupOperationScope(OperationScope):
 | 대상 | 순서 |
 | --- | --- |
 | resource group 관계가 쓴 권한 그래프 간선 | 남겨 두면 그 경로로 만든 관계만 domain 관리자에게 상속된다 |
-| `sgroups_for_*` 셋 · `association_groups_users` · `association_container_registries_groups` 의 행 id | 바로 지운다. 기본 키를 양 끝 쌍으로 되돌린다 |
-| `user_roles` · `idle_checker_bindings` 의 행 id | API 를 양 끝 기반으로 옮긴 뒤 지운다 |
+| `sgroups_for_*` 셋 · `association_groups_users` · `association_container_registries_groups` 의 행 id | 바로 삭제한다. 기본 키를 양 끝 쌍으로 되돌린다 |
+| `user_roles` · `idle_checker_bindings` 의 행 id | API 를 양 끝 기반으로 옮긴 뒤 삭제한다 |
 | `adminUpdateAllowed*` 네 mutation | link · unlink 를 더하고 deprecated |
 
 ### API 호환
 
 - `RoleAssignment.id` 와 `IdleCheckerAssignment.id` 는 `ID!` 그대로 두고 값만 양 끝 global ID 로 바뀐다.
-- 행 id 를 받던 입력 · REST 경로는 양 끝 UUID 를 받는 것을 더하고 deprecated 로 둔다. 행 id 컬럼이
+- 행 id 를 받던 입력 · REST 경로는 양 끝 UUID 를 받는 것을 더하고 deprecated 로 둔다. 행 id column 이
   없어지면 행 id 로는 찾을 수 없다.
 - 관계 타입(`RoleAssignmentV2`, `IdleCheckerAssignment`, `SessionIdleCheck`)이 Node 를 구현한다. 필드를
   더하는 변경이다.
@@ -258,9 +258,9 @@ class DomainResourceGroupOperationScope(OperationScope):
 이미 따르는 규칙이다 — 바뀔 때 다른 쓰기를 끌고 오는 값은 일반 updater 에 두지 않는다. 그 전이를 할 수
 있는 편집 경로는 잘못된 전이도 할 수 있다. 두 field 는 관계 연산으로 옮긴다.
 
-### 참조하는 엔티티가 지워질 때
+### 참조하는 엔티티가 삭제될 때
 
-`purge_relation` 은 두 값을 받아야 행을 지운다. 한쪽만 알고 그 엔티티의 관계를 쓸어 내는 연산은 없다.
+`purge_relation` 은 두 값을 받아야 행을 삭제한다. 한쪽만 알고 그 엔티티의 관계를 쓸어 내는 연산은 없다.
 
 FK CASCADE 는 로직에 대한 보장이지 소유의 표현이 아니다. 둘 수는 있지만 다형 참조에는 걸 수 없다.
 
@@ -271,12 +271,12 @@ sweep 이 치운다. 관계 테이블은 `RetentionCategory` 에 자기 항목�
 
 - 관계 타입이 Node 를 구현하게 한다. GraphQL 층이 global ID 를 양 끝 UUID 로 만들고 풀며, `node(id:)` 는
   양 끝 scope 의 read 를 묻는다.
-- user ↔ role: global ID 를 양 끝으로 바꾸고, 바꾸는 mutation · REST 가 (user, role) 를 바디로 받게 한다.
+- user ↔ role: global ID 를 양 끝으로 변경하고, 변경하는 mutation · REST 가 (user, role) 를 바디로 받게 한다.
   data loader · cursor · lookup · SDK 응답을 양 끝 기반으로 옮긴다.
 - idle checker ↔ scope: 같은 방식으로 (scope type, scope id, idle checker) 를 받게 하고 경로의 id 를 뺀다.
   GraphQL 입력 · 응답, CLI, cursor, lookup key 를 옮긴다.
 - resource group ↔ domain · project: link · unlink 를 더하고 `adminUpdateAllowed*` 를 deprecated 로 둔다.
-- 관계 테이블 7개의 행 id 컬럼을 지우고 양 끝 쌍을 기본 키로 둔다. `user_roles` · `idle_checker_bindings`
+- 관계 테이블 7개의 행 id column 을 삭제하고 양 끝 쌍을 기본 키로 둔다. `user_roles` · `idle_checker_bindings`
   는 앞의 두 단계 뒤에 한다.
 - 관계 ops(create · delete · restore · purge_relation)와 관계 선언에서 `OperationScope` 9개를 만든다.
 
@@ -284,11 +284,11 @@ sweep 이 치운다. 관계 테이블은 `RetentionCategory` 에 자기 항목�
 
 | ID | 날짜 | 결정 | 이유 | 검토한 대안 |
 | --- | --- | --- | --- | --- |
-| D1 | 2026-10-20 | 관계는 양 끝 엔티티의 UUID 로만 식별한다. API 의 관계 id 는 양 끝으로 만든 global ID 이고, repository 와 권한 검사는 양 끝으로만 조회한다. | 쌍 밖의 id 는 같은 관계의 두 번째 이름이고, 그 id 로 찾은 관계는 양 끝을 다시 읽어야 권한을 물을 수 있다. | 행 id 를 Node id 로 유지 — 클라이언트가 행 id 를 저장해야 관계를 바꿀 수 있다. |
-| D2 | 2026-10-20 | 관계 테이블의 행 id 컬럼을 모두 지우고 양 끝 쌍을 기본 키로 둔다. | 행 id 를 FK 로 참조하는 테이블이 없고, 다섯 테이블은 행 id 를 쓰지 않는다. 앞의 네 테이블은 원래 쌍이 기본 키였다. | 행 id 를 남기고 API 에서만 숨김 — 쓰지 않는 키가 남아 다시 API 로 나갈 수 있다. |
-| D3 | 2026-10-20 | 관계의 unlink(purge) 응답은 GraphQL 에서 `purgedId`(관계 global ID)와 양 끝 UUID, DTO · REST 에서 양 끝 UUID 를 준다. 관계가 남는 연산은 관계를 돌려준다. | Relay 의 `@deleteEdge` · `@deleteRecord` 는 global ID 를 받는다. global ID 는 GraphQL 층만 만든다. | payload `id` 에 global ID — Relay store 에서 지운 관계와 같은 키가 되어 충돌한다. |
-| D4 | 2026-10-20 | resource group 과 domain, project 의 연결은 link · unlink 로 다룬다. 이름 목록 통째 교체는 deprecated. | 통째 교체는 한 쌍의 권한을 따로 물을 수 없고 양 끝 UUID 로 관계를 가리키지 않는다. |  |
-| D5 | 2026-10-20 | 관계 타입은 Node 를 구현한다. global ID 는 `node(id:)` 에만 쓰고, 개별 query · mutation 은 양 끝 UUID 를 받는다. `node(id:)` 는 양 끝 scope 모두의 read 를 묻는다. | 양 끝으로 만든 global ID 로 id 만 가지고 다시 읽을 수 있어 Node 계약을 지킨다. global ID 가 양 끝을 모두 담으므로 양쪽 권한을 묻는다. | 관계 타입을 Node 가 아닌 타입으로 두고 `id` 를 두지 않음 — Relay store 가 관계를 정규화하지 못하고 unlink 응답으로 edge 를 지울 수 없다. |
+| D1 | 2026-10-20 | 관계는 양 끝 엔티티의 UUID 로만 식별한다. API 의 관계 id 는 양 끝으로 만든 global ID 이고, repository 와 권한 검사는 양 끝으로만 조회한다. | 쌍 밖의 id 는 같은 관계의 두 번째 이름이고, 그 id 로 찾은 관계는 양 끝을 다시 읽어야 권한을 물을 수 있다. | 행 id 를 Node id 로 유지 — 클라이언트가 행 id 를 저장해야 관계를 변경할 수 있다. |
+| D2 | 2026-10-20 | 관계 테이블의 행 id column 을 모두 삭제하고 양 끝 쌍을 기본 키로 둔다. | 행 id 를 FK 로 참조하는 테이블이 없고, 다섯 테이블은 행 id 를 쓰지 않는다. 앞의 네 테이블은 원래 쌍이 기본 키였다. | 행 id 를 남기고 API 에서만 숨김 — 쓰지 않는 키가 남아 다시 API 로 나갈 수 있다. |
+| D3 | 2026-10-20 | 관계의 unlink(purge) 응답은 GraphQL 에서 `purgedId`(관계 global ID)와 양 끝 UUID, DTO · REST 에서 양 끝 UUID 를 준다. 관계가 남는 연산은 관계를 돌려준다. | Relay 의 `@deleteEdge` · `@deleteRecord` 는 global ID 를 받는다. global ID 는 GraphQL 층만 만든다. | payload `id` 에 global ID — Relay store 에서 삭제한 관계와 같은 키가 되어 충돌한다. |
+| D4 | 2026-10-20 | resource group 과 domain, project 의 연결은 link · unlink 로 다룬다. 이름 목록 통째 교체는 deprecated. | 통째 교체는 한 쌍의 권한을 따로 물을 수 없고 양 끝 UUID 로 관계를 참조하지 않는다. |  |
+| D5 | 2026-10-20 | 관계 타입은 Node 를 구현한다. global ID 는 `node(id:)` 에만 쓰고, 개별 query · mutation 은 양 끝 UUID 를 받는다. `node(id:)` 는 양 끝 scope 모두의 read 를 요구한다. | 양 끝으로 만든 global ID 로 id 만 가지고 다시 읽을 수 있어 Node 계약을 지킨다. global ID 가 양 끝을 모두 담으므로 양쪽 권한을 요구한다. | 관계 타입을 Node 가 아닌 타입으로 두고 `id` 를 두지 않음 — Relay store 가 관계를 정규화하지 못하고 unlink 응답으로 edge 를 삭제할 수 없다. |
 
 ## 열린 질문
 
@@ -296,7 +296,7 @@ sweep 이 치운다. 관계 테이블은 `RetentionCategory` 에 자기 항목�
 | --- | --- |
 | Q1 | 참조가 사라진 관계 행을 어떻게 찾을지. 참조가 다형(`entity_type`, `entity_id`)이라 anti-join 은 그 타입이   어느 테이블에 사는지 알아야 한다. `virtual_scopes` 가 이미 살아 있는 엔티티를 `(scope_type, scope_id)` 로   색인하므로 맞대 볼 수 있지만, virtual scope 도입 전에 만든 행은 scope 가 없을 수 있어 살아 있는 엔티티의   관계를 끊긴 것으로 읽게 된다. |
 | Q2 | `sgroups_for_*` 셋을 다형 테이블 하나로 합칠지 — 합치면 `query_allowed_sgroups` 가 쿼리 하나가 되고   새 종류의 scope 가 값이 된다. |
-| Q3 | resource group ↔ keypair 관계를 user 로 바꿀지 — BA-8459 로 넘어갔다. |
+| Q3 | resource group ↔ keypair 관계를 user 로 변경할지 — BA-8459 로 넘어갔다. |
 | Q4 | domain 관리자가 resource group 을 편집할 권한은 무엇이 주는지. 관계에서 나오지 않으므로 role 이나   grant 로 적어야 한다. |
 
 ## 참고

@@ -329,7 +329,8 @@ func loadWords(directory string) (english, korean []word, err error) {
 					if strings.EqualFold(text, own) {
 						continue
 					}
-					variant := word{text: text, replacement: own, reason: term.Meaning[lang], advisory: true}
+					reason := strings.TrimSpace(term.Meaning[lang] + " " + term.Note[lang])
+					variant := word{text: text, replacement: own, reason: reason, advisory: true}
 					if err := add(lang, variant); err != nil {
 						return nil, nil, err
 					}

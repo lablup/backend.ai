@@ -167,7 +167,7 @@ renaming that secret.
 `INDEX(version_id)`.
 
 **Only the side that needs referential integrity is a foreign key.** `version_id` is a real
-foreign key, so deleting a referenced version is refused by the database.
+foreign key, so deleting a referenced version is rejected by the database.
 `INDEX(version_id)` serves the reverse lookup — finding the sessions and revisions that use
 a version is how a leaked value is answered. The owner side spans two types, so it is an
 enumerated column, and 3.9 covers its cleanup.
@@ -270,7 +270,7 @@ leaving it in would store the same values twice.
 
 ### 3.7 Name collisions
 
-A secret carries an environment variable name. Two cases are refused at creation.
+A secret carries an environment variable name. Two cases are rejected at creation.
 
 | | |
 |---|---|
@@ -355,7 +355,7 @@ switch to references from the next session or revision.
 | Version cleanup | The user deletes when nothing references it. No automatic cleanup, not a retention subject |
 | Exposure boundary | The container surface. Outside is closed; inside is plaintext by the nature of environment variable delivery |
 | The RPC split | Exists for log masking alone. Removed from the config after the merge |
-| Name collisions | A name colliding with `environ` and the `BACKENDAI_` prefix are refused at creation |
+| Name collisions | A name colliding with `environ` and the `BACKENDAI_` prefix are rejected at creation |
 
 ## Open Questions
 

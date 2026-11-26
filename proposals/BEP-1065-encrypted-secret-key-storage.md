@@ -90,7 +90,7 @@ A key is 32 random bytes in base64, produced by `openssl rand -base64 32`. Both 
 
 | | Item |
 |---|---|
-| ✅ | The TypeDecorator convention in `models/base.py`, and the **`PasswordColumn` precedent** - it refuses raw string binding and demands a value object |
+| ✅ | The TypeDecorator convention in `models/base.py`, and the **`PasswordColumn` precedent** - it rejects raw string binding and demands a value object |
 | ✅ | Dependencies are already available (`cryptography`) |
 | ❌ | **There is no precedent for reversible at-rest encryption.** |
 | ➕ | `SecretColumn` - converts between the stored string and its parsed form, and performs no cryptography (3.3) |
@@ -267,7 +267,7 @@ Rollout order:
 | Length prefixes | None. The three trailing fields are base64url, so splitting from the right is unambiguous |
 | Extra metadata column | None |
 | Scope of a data encryption key | **One row.** Two users' values are never encrypted under the same key |
-| Column type | Converts between the stored string and its parsed form only. **It performs no cryptography** - encryption is asynchronous and finishes before binding. A raw string is refused |
+| Column type | Converts between the stored string and its parsed form only. **It performs no cryptography** - encryption is asynchronous and finishes before binding. A raw string is rejected |
 | Decryption site | Explicit calls through the pool where plaintext is needed. Every read path is modified, and anything missed fails type checking |
 | Algorithm | AEAD (AES-256-GCM). No separate plaintext hash. The column's name is bound as associated data |
 | Key management | Each provider holds keys by id and names an active id. Decrypt with the id the value names, wrap new values under the active one |
