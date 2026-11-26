@@ -52,10 +52,6 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-<<<<<<< HEAD
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
-=======
-from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import (
     Container,
     EnumerateContainersResult,
@@ -63,7 +59,6 @@ from ai.backend.agent.types import (
     MountInfo,
     Port,
 )
->>>>>>> 34afcfb9 (fix(BAI-1024): keep a kernel whose container failed to be inspected (#17365))
 from ai.backend.agent.utils import SECRET_MASK
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import CgroupController
