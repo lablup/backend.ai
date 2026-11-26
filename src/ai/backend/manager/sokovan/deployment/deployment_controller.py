@@ -89,9 +89,6 @@ from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
     DeploymentRevisionValidator,
 )
-from ai.backend.manager.sokovan.deployment.validators.no_parent_segment_in_mount_destination_rule import (
-    NoParentSegmentInMountDestinationRule,
-)
 from ai.backend.manager.sokovan.deployment.validators.required_resource_slot_rule import (
     RequiredResourceSlotRule,
 )
@@ -157,7 +154,6 @@ class DeploymentController:
         self._deployment_revision_preset_repository = args.deployment_revision_preset_repository
         self._deployment_revision_validator = DeploymentRevisionValidator([
             RequiredResourceSlotRule(),
-            NoParentSegmentInMountDestinationRule(),
         ])
 
     async def create_deployment(

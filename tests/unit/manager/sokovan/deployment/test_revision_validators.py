@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 from uuid import uuid4
 
 import pytest
@@ -10,13 +9,7 @@ import pytest
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import (
-    ClusterMode,
-    MountInfoEntry,
-    MountPermission,
-    ResourceSlot,
-    SlotName,
-)
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot, SlotName
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ModelRevisionSpec,
@@ -30,19 +23,9 @@ from ai.backend.manager.models.deployment_revision.creators import (
 from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
 )
-from ai.backend.manager.sokovan.deployment.validators.no_parent_segment_in_mount_destination_rule import (
-    NoParentSegmentInMountDestinationRule,
-)
 from ai.backend.manager.sokovan.deployment.validators.required_resource_slot_rule import (
     RequiredResourceSlotRule,
 )
-
-
-@dataclass(frozen=True)
-class _MountDestinationsCase:
-    name: str
-    model_mount_destination: str
-    extra_mount_destinations: list[str | None]
 
 
 def _creator_spec(resource_slots: dict[str, int]) -> DeploymentRevisionCreator:
@@ -154,138 +137,3 @@ class TestRequiredResourceSlotRule:
 
         with pytest.raises(InvalidAPIParameters, match=expected_missing_slot):
             rule.validate_legacy_revision_spec(spec, validation_context)
-
-
-class TestNoParentSegmentInMountDestinationRule:
-    @pytest.fixture
-    def validation_context(self) -> DeploymentRevisionValidationContext:
-        return DeploymentRevisionValidationContext()
-
-    @pytest.fixture
-    def rule(self) -> NoParentSegmentInMountDestinationRule:
-        return NoParentSegmentInMountDestinationRule()
-
-    @pytest.fixture
-    def creator_mounting_at_case_destinations(
-        self, case: _MountDestinationsCase
-    ) -> DeploymentRevisionCreator:
-        return replace(
-            _creator_spec({"cpu": 1}),
-            model_mount_destination=case.model_mount_destination,
-            extra_mounts=[
-                MountInfoEntry(vfolder_id=VFolderUUID(uuid4()), mount_destination=destination)
-                for destination in case.extra_mount_destinations
-            ],
-        )
-
-    @pytest.fixture
-    def legacy_spec_mounting_at_case_destinations(
-        self, case: _MountDestinationsCase
-    ) -> ModelRevisionSpec:
-        spec = _legacy_spec({"cpu": 1})
-        return spec.model_copy(
-            update={
-                "mounts": replace(
-                    spec.mounts,
-                    model_mount_destination=case.model_mount_destination,
-                    extra_mounts=[
-                        MountInfoEntry(
-                            vfolder_id=VFolderUUID(uuid4()), mount_destination=destination
-                        )
-                        for destination in case.extra_mount_destinations
-                    ],
-                )
-            }
-        )
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _MountDestinationsCase(
-                name="model-mount-destination",
-                model_mount_destination="/models/../models",
-                extra_mount_destinations=[],
-            ),
-            _MountDestinationsCase(
-                name="extra-mount-destination",
-                model_mount_destination="/models",
-                extra_mount_destinations=[None, "/home/work/../data"],
-            ),
-        ],
-        ids=lambda case: case.name,
-    )
-    def test_v2_rejects_parent_segment(
-        self,
-        validation_context: DeploymentRevisionValidationContext,
-        rule: NoParentSegmentInMountDestinationRule,
-        creator_mounting_at_case_destinations: DeploymentRevisionCreator,
-    ) -> None:
-        with pytest.raises(InvalidAPIParameters, match=r"must not contain a '\.\.' segment"):
-            rule.validate(creator_mounting_at_case_destinations, validation_context)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _MountDestinationsCase(
-                name="model-mount-destination",
-                model_mount_destination="/models/../models",
-                extra_mount_destinations=[],
-            ),
-            _MountDestinationsCase(
-                name="extra-mount-destination",
-                model_mount_destination="/models",
-                extra_mount_destinations=[None, "/home/work/../data"],
-            ),
-        ],
-        ids=lambda case: case.name,
-    )
-    def test_legacy_rejects_parent_segment(
-        self,
-        validation_context: DeploymentRevisionValidationContext,
-        rule: NoParentSegmentInMountDestinationRule,
-        legacy_spec_mounting_at_case_destinations: ModelRevisionSpec,
-    ) -> None:
-        with pytest.raises(InvalidAPIParameters, match=r"must not contain a '\.\.' segment"):
-            rule.validate_legacy_revision_spec(
-                legacy_spec_mounting_at_case_destinations, validation_context
-            )
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _MountDestinationsCase(
-                name="without-parent-segment",
-                model_mount_destination="/models",
-                extra_mount_destinations=[None, "/home/work/data"],
-            ),
-        ],
-        ids=lambda case: case.name,
-    )
-    def test_v2_passes_without_parent_segment(
-        self,
-        validation_context: DeploymentRevisionValidationContext,
-        rule: NoParentSegmentInMountDestinationRule,
-        creator_mounting_at_case_destinations: DeploymentRevisionCreator,
-    ) -> None:
-        rule.validate(creator_mounting_at_case_destinations, validation_context)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _MountDestinationsCase(
-                name="without-parent-segment",
-                model_mount_destination="/models",
-                extra_mount_destinations=[None, "/home/work/data"],
-            ),
-        ],
-        ids=lambda case: case.name,
-    )
-    def test_legacy_passes_without_parent_segment(
-        self,
-        validation_context: DeploymentRevisionValidationContext,
-        rule: NoParentSegmentInMountDestinationRule,
-        legacy_spec_mounting_at_case_destinations: ModelRevisionSpec,
-    ) -> None:
-        rule.validate_legacy_revision_spec(
-            legacy_spec_mounting_at_case_destinations, validation_context
-        )
