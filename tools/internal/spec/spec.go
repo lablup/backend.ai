@@ -168,12 +168,19 @@ func Load(root string) (*Spec, error) {
 	return &loaded, nil
 }
 
-// Decode reads one YAML document into target. An unknown key is an error, and so is a missing
-// or empty value of a field without the `spec:"optional"` tag.
+// Decode reads one YAML document into target. A mapping in flow style and an unknown key are
+// errors, and so is a missing or empty value of a field without the `spec:"optional"` tag.
 func Decode(path string, target any) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
+	}
+	var document yaml.Node
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	if line := flowMapping(&document); line > 0 {
+		return fmt.Errorf("%s:%d: mapping in flow style, write one key per line", path, line)
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
@@ -188,6 +195,19 @@ func Decode(path string, target any) error {
 		return fmt.Errorf("%s: %w", path, err)
 	}
 	return nil
+}
+
+// flowMapping returns the line of the first mapping in flow style, or 0.
+func flowMapping(node *yaml.Node) int {
+	if node.Kind == yaml.MappingNode && node.Style&yaml.FlowStyle != 0 {
+		return node.Line
+	}
+	for _, child := range node.Content {
+		if line := flowMapping(child); line > 0 {
+			return line
+		}
+	}
+	return 0
 }
 
 func required(value reflect.Value, at string) error {

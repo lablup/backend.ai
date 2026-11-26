@@ -1,72 +1,133 @@
 title:
-  en: {page: "Infrastructure", link: "Infrastructure", description: "installation and operating environment"}
-  ko: {page: "인프라", link: "인프라", description: "설치와 운영 환경"}
+  en:
+    page: "Infrastructure"
+    link: "Infrastructure"
+    description: "installation and operating environment"
+  ko:
+    page: "인프라"
+    link: "인프라"
+    description: "설치와 운영 환경"
 terms:
   - english: "AppProxy tunnel"
     korean: "AppProxy tunnel"
-    meaning: {en: "An AppProxy path used to access a container.", ko: "컨테이너에 접근할 때 사용하는 AppProxy 경로입니다."}
-    avoid: {en: ["App Proxy tunnel"], ko: ["App Proxy tunnel"]}
+    meaning:
+      en: "An AppProxy path used to access a container."
+      ko: "컨테이너에 접근할 때 사용하는 AppProxy 경로입니다."
+    avoid:
+      en: ["App Proxy tunnel"]
+      ko: ["App Proxy tunnel"]
   - english: "bai"
     korean: "bai"
-    meaning: {en: "A command of the Backend.AI v2 CLI.", ko: "Backend.AI v2 CLI 명령입니다."}
-    avoid: {en: ["v2 CLI"], ko: ["v2 CLI"]}
+    meaning:
+      en: "A command of the Backend.AI v2 CLI."
+      ko: "Backend.AI v2 CLI 명령입니다."
+    avoid:
+      en: ["v2 CLI"]
+      ko: ["v2 CLI"]
   - english: "BEP"
     korean: "BEP"
-    meaning: {en: "Backend.AI Enhancement Proposal, a proposal document that contains the design background.", ko: "Backend.AI Enhancement Proposal, 설계 배경을 담은 제안 문서입니다."}
+    meaning:
+      en: "Backend.AI Enhancement Proposal, a proposal document that contains the design background."
+      ko: "Backend.AI Enhancement Proposal, 설계 배경을 담은 제안 문서입니다."
   - english: "Event Stream API"
     korean: "Event Stream API"
-    meaning: {en: "A manager API that emits events via Server-Sent Events.", ko: "Server-Sent Events 로 event 를 내보내는 manager API 입니다."}
-    avoid: {en: ["Server-Sent Events"], ko: ["Server-Sent Events"]}
+    meaning:
+      en: "A manager API that emits events via Server-Sent Events."
+      ko: "Server-Sent Events 로 event 를 내보내는 manager API 입니다."
+    avoid:
+      en: ["Server-Sent Events"]
+      ko: ["Server-Sent Events"]
   - english: "halfstack"
     korean: "halfstack"
-    meaning: {en: "A development environment setup launched with Docker Compose that includes PostgreSQL, etcd, and Valkey containers.", ko: "Docker Compose 로 띄우는 개발 환경 구성으로 PostgreSQL, etcd, Valkey 컨테이너를 담습니다."}
-    avoid: {en: ["Backend.AI halfstack"], ko: ["Backend.AI halfstack"]}
+    meaning:
+      en: "A development environment setup launched with Docker Compose that includes PostgreSQL, etcd, and Valkey containers."
+      ko: "Docker Compose 로 띄우는 개발 환경 구성으로 PostgreSQL, etcd, Valkey 컨테이너를 담습니다."
+    avoid:
+      en: ["Backend.AI halfstack"]
+      ko: ["Backend.AI halfstack"]
   - english: "installer channel"
     korean: "설치 채널"
-    meaning: {en: "An installation channel determined by reading the latest maintained version and the latest LTS from the registry.", ko: "레지스트리에서 최신 maintained version 과 최신 LTS 를 읽어 정하는 설치 채널입니다."}
+    meaning:
+      en: "An installation channel determined by reading the latest maintained version and the latest LTS from the registry."
+      ko: "레지스트리에서 최신 maintained version 과 최신 LTS 를 읽어 정하는 설치 채널입니다."
   - english: "local config"
     korean: "로컬 설정"
-    meaning: {en: "A TOML configuration of each component that is read at boot and applied only after a restart.", ko: "각 컴포넌트의 TOML 설정으로 boot 때 읽어 재시작해야 반영됩니다."}
-    avoid: {ko: ["local config 파일"]}
+    meaning:
+      en: "A TOML configuration of each component that is read at boot and applied only after a restart."
+      ko: "각 컴포넌트의 TOML 설정으로 boot 때 읽어 재시작해야 반영됩니다."
+    avoid:
+      ko: ["local config 파일"]
   - english: "LTS"
     korean: "LTS"
-    meaning: {en: "A release line promised to be supported for one year.", ko: "1년 지원을 약속하는 release line 입니다."}
-    avoid: {en: ["long-term support"], ko: ["long-term support"]}
+    meaning:
+      en: "A release line promised to be supported for one year."
+      ko: "1년 지원을 약속하는 release line 입니다."
+    avoid:
+      en: ["long-term support"]
+      ko: ["long-term support"]
   - english: "management node"
     korean: "관리 노드"
-    meaning: {en: "A node that installs most components except the agent.", ko: "agent 를 제외한 대부분 컴포넌트를 설치하는 노드입니다."}
+    meaning:
+      en: "A node that installs most components except the agent."
+      ko: "agent 를 제외한 대부분 컴포넌트를 설치하는 노드입니다."
   - english: "mount path"
     korean: "마운트 경로"
-    meaning: {en: "The path where a vfolder is mounted in a container.", ko: "vfolder 가 container 에 마운트되는 경로입니다."}
+    meaning:
+      en: "The path where a vfolder is mounted in a container."
+      ko: "vfolder 가 container 에 마운트되는 경로입니다."
   - english: "overlay network"
     korean: "오버레이 네트워크"
-    meaning: {en: "A network that the manager automatically configures for a multi-kernel session spanning multiple agents.", ko: "여러 agent 에 걸친 멀티 커널 세션 에서 manager 가 자동 구성하는 네트워크입니다."}
-    avoid: {en: ["private overlay network"], ko: ["private overlay network"]}
+    meaning:
+      en: "A network that the manager automatically configures for a multi-kernel session spanning multiple agents."
+      ko: "여러 agent 에 걸친 멀티 커널 세션 에서 manager 가 자동 구성하는 네트워크입니다."
+    avoid:
+      en: ["private overlay network"]
+      ko: ["private overlay network"]
   - english: "private bridge network"
     korean: "사설 브리지 네트워크"
-    meaning: {en: "A network in which the containers of a single-node multi-kernel session communicate privately.", ko: "단일 노드 멀티 커널 세션 의 container 들이 사적으로 통신하는 네트워크입니다."}
+    meaning:
+      en: "A network in which the containers of a single-node multi-kernel session communicate privately."
+      ko: "단일 노드 멀티 커널 세션 의 container 들이 사적으로 통신하는 네트워크입니다."
   - english: "profile"
     korean: "프로필"
-    meaning: {en: "A unit of CLI connection information that stores an endpoint, an account, and a session together.", ko: "endpoint 와 계정, session 을 하나로 묶어 저장하는 CLI 접속 정보 단위입니다."}
+    meaning:
+      en: "A unit of CLI connection information that stores an endpoint, an account, and a session together."
+      ko: "endpoint 와 계정, session 을 하나로 묶어 저장하는 CLI 접속 정보 단위입니다."
   - english: "RC"
     korean: "RC"
-    meaning: {en: "A release type value that stands for a release candidate.", ko: "release 후보를 가리키는 release type 값입니다."}
-    avoid: {en: ["Release Candidate"], ko: ["Release Candidate"]}
+    meaning:
+      en: "A release type value that stands for a release candidate."
+      ko: "release 후보를 가리키는 release type 값입니다."
+    avoid:
+      en: ["Release Candidate"]
+      ko: ["Release Candidate"]
   - english: "resource-seconds"
     korean: "resource-seconds"
-    meaning: {en: "A usage unit obtained by multiplying the resource amount by the seconds of the usage period, not mixed with the raw unit of capacity.", ko: "자원량에 사용 기간의 초를 곱한 사용량 단위로 capacity 의 raw unit 과 섞지 않습니다."}
+    meaning:
+      en: "A usage unit obtained by multiplying the resource amount by the seconds of the usage period, not mixed with the raw unit of capacity."
+      ko: "자원량에 사용 기간의 초를 곱한 사용량 단위로 capacity 의 raw unit 과 섞지 않습니다."
   - english: "stable"
     korean: "stable"
-    meaning: {en: "A channel that points to the latest LTS version among installer download links.", ko: "installer 다운로드 링크 중 최신 LTS version 을 가리키는 채널입니다."}
+    meaning:
+      en: "A channel that points to the latest LTS version among installer download links."
+      ko: "installer 다운로드 링크 중 최신 LTS version 을 가리키는 채널입니다."
   - english: "storage backend"
     korean: "스토리지 백엔드"
-    meaning: {en: "A normalized record that refers to the storage appliance where a storage volume resides.", ko: "storage volume 이 놓이는 storage appliance 를 가리키는 정규화된 레코드입니다."}
+    meaning:
+      en: "A normalized record that refers to the storage appliance where a storage volume resides."
+      ko: "storage volume 이 놓이는 storage appliance 를 가리키는 정규화된 레코드입니다."
   - english: "storage backend type"
     korean: "스토리지 백엔드 유형"
-    meaning: {en: "An implementation of a storage backend that can serve a volume.", ko: "volume 을 서비스할 수 있는 storage backend 구현입니다."}
+    meaning:
+      en: "An implementation of a storage backend that can serve a volume."
+      ko: "volume 을 서비스할 수 있는 storage backend 구현입니다."
   - english: "v1 CLI"
     korean: "v1 CLI"
-    meaning: {en: "A legacy CLI separate from the v2 CLI. Do not use it.", ko: "v2 CLI 와 분리된 legacy CLI 로 사용하지 말라고 안내합니다."}
+    meaning:
+      en: "A legacy CLI separate from the v2 CLI. Do not use it."
+      ko: "v2 CLI 와 분리된 legacy CLI 로 사용하지 말라고 안내합니다."
   - english: "WebUI"
     korean: "WebUI"
-    meaning: {en: "A web client that mainly consumes the manager's GraphQL API.", ko: "manager 의 GraphQL API 를 주로 소비하는 웹 클라이언트입니다."}
+    meaning:
+      en: "A web client that mainly consumes the manager's GraphQL API."
+      ko: "manager 의 GraphQL API 를 주로 소비하는 웹 클라이언트입니다."
