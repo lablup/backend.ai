@@ -29,7 +29,11 @@ from ai.backend.common.types import (
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+    verify_mount_destination,
+)
 from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
@@ -197,8 +201,8 @@ def _mountable_auto_mounts(
     project_id: ProjectID,
 ) -> list[_MountableAutoMount]:
     """The mounts added without a request: the project's ``.local`` at ``/home/work/.local``,
-    then each of ``auto_mounts`` whose vfolder is in ``accessible_vfolders`` at the row's path.
-    A vfolder of the mount policy none is left out, one of read-only is mounted read-only."""
+    then the ``auto_mounts`` on ``accessible_vfolders`` at their paths, but not those at a reserved
+    path, out of the vfolder or on a vfolder of policy none. A read-only vfolder mounts read-only."""
     accessible_vfolders_by_id: dict[VFolderUUID, dict[str, Any]] = {
         VFolderUUID(vfolder["id"]): vfolder for vfolder in accessible_vfolders
     }
@@ -210,12 +214,27 @@ def _mountable_auto_mounts(
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             log.trace("auto-mount vfolder skipped, mount policy is none", vfolder_id=vfolder["id"])
             continue
+        # The auto-mount API stores the destination and the subpath unchecked, and a row that
+        # fails these checks would reject every session of its project or user.
+        destination = PurePosixPath("/home/work", auto_mount.mount_destination)
+        if not verify_mount_destination(str(destination)):
+            log.trace(
+                "auto-mount vfolder skipped, destination is reserved", vfolder_id=vfolder["id"]
+            )
+            continue
+        try:
+            subpath = _normalize_mount_subpath(auto_mount.subpath)
+        except InvalidAPIParameters:
+            log.trace(
+                "auto-mount vfolder skipped, subpath leaves the vfolder", vfolder_id=vfolder["id"]
+            )
+            continue
         is_read_only = vfolder["permission"] == VFolderMountPolicy.READ_ONLY
         registered_auto_mounts.append(
             _MountableAutoMount(
                 vfolder=vfolder,
-                destination=PurePosixPath("/home/work", auto_mount.mount_destination),
-                subpath=_normalize_mount_subpath(auto_mount.subpath),
+                destination=destination,
+                subpath=subpath,
                 permission=(
                     MountPermission.READ_ONLY
                     if is_read_only
