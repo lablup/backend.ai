@@ -111,7 +111,7 @@ class TestResolveAccessKeyScope:
             role=UserRole.USER,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
-        with with_user_context(acting_user(UserRole.USER)):
+        with with_user(acting_user(UserRole.USER)):
             result = await auth_service.resolve_access_key_scope(action)
         assert result.requester_access_key == AccessKey(REQUESTER_AK)
         assert result.owner_access_key == AccessKey(OWNER_AK)
@@ -142,13 +142,8 @@ class TestResolveAccessKeyScope:
             "Unknown owner access key"
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key="NONEXISTENT_KEY")
-<<<<<<< HEAD
         with with_user(acting_user(UserRole.SUPERADMIN)):
-            with pytest.raises(InvalidAPIParameters):
-=======
-        with with_user_context(acting_user(UserRole.SUPERADMIN)):
             with pytest.raises(AccessKeyNotFound):
->>>>>>> cb0a9970 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
                 await auth_service.resolve_access_key_scope(action)
 
     async def test_cross_domain_admin_raises_forbidden(

@@ -17,12 +17,8 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
-<<<<<<< HEAD
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.auth.types import UserData
-=======
 from ai.backend.manager.data.auth.types import AccessKeyOwner, UserData
->>>>>>> cb0a9970 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
