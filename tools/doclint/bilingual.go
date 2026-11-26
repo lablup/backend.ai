@@ -182,7 +182,13 @@ func runBilingual(sc *scope, out *report) error {
 			return err
 		}
 		problems = append(problems, added...)
-		problems = append(problems, updates...)
+		if sc.allowOneSide {
+			for _, update := range updates {
+				out.review(update)
+			}
+		} else {
+			problems = append(problems, updates...)
+		}
 	}
 	for _, problem := range problems {
 		out.fail(problem)

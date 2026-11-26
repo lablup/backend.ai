@@ -345,6 +345,29 @@ func TestCheckBilingualBase(t *testing.T) {
 	if !failed || out != want {
 		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
 	}
+
+	// --allow-one-side leaves the other failures.
+	out, failed = runCheck(t, root, "--only", "bilingual", "--base", "base", "--allow-one-side")
+	want = "review: doc.md: changed without doc.ko.md\ndoc.md: Korean added, move it to the .ko.md file: New 한글 line.\n"
+	if !failed || out != want {
+		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
+	}
+
+	writeFile(t, root, "doc.md", "# A\n\nNew line.\n")
+	gitRun("commit", "-qam", "english only")
+	out, failed = runCheck(t, root, "--only", "bilingual", "--base", "base", "--allow-one-side")
+	want = "review: doc.md: changed without doc.ko.md\n"
+	if failed || out != want {
+		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
+	}
+
+	writeFile(t, root, "doc.md", "# A\n\n## B\n")
+	gitRun("commit", "-qam", "new section")
+	out, failed = runCheck(t, root, "--only", "bilingual", "--base", "base", "--allow-one-side")
+	want = "review: doc.md: changed without doc.ko.md\ndoc.ko.md: headings differ from doc.md: [(1, 1)] and [(1, 1), (2, 1)]\n"
+	if !failed || out != want {
+		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
+	}
 }
 
 func TestCheckFrontmatter(t *testing.T) {
