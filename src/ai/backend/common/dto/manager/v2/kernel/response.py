@@ -17,6 +17,8 @@ __all__ = (
     "KernelClusterInfoGQLDTO",
     "KernelLifecycleInfo",
     "KernelLifecycleInfoGQLDTO",
+    "KernelLiveStatInfo",
+    "KernelLiveStatMetricInfo",
     "KernelNetworkInfoGQLDTO",
     "KernelNode",
     "KernelResourceInfo",
