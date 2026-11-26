@@ -692,7 +692,7 @@ class AuthConfig(BaseConfigSchema):
                 "The web server reads and writes the same keys, so this must equal its "
                 "`session.redis.db`."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.9",
             example=ConfigExample(local="0", prod="0"),
         ),
     ]

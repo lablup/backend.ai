@@ -922,7 +922,7 @@
   # Redis database number to store the login sessions and the login failures in.
   # The web server reads and writes the same keys, so this must equal its
   # `session.redis.db`.
-  # Added in 26.10.0
+  # Added in 26.9.9
   login-session-db = 0
 
 # At-rest encryption for secret columns such as the keypair secret key. Names

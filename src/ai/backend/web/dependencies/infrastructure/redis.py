@@ -36,7 +36,7 @@ class RedisProvider(DependencyProvider[WebServerUnifiedConfig, ValkeySessionClie
         # Create ValkeySessionClient for session management
         valkey_session_client = await ValkeySessionClient.create(
             valkey_target=valkey_target,
-            db_id=setup_input.config.session.redis.db,
+            db_id=setup_input.session.redis.db,
             human_readable_name="web.session",
         )
 

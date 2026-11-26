@@ -146,7 +146,7 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
             ),
             session=await ValkeySessionClient.create(
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
-                db_id=setup_input.config.auth.login_session_db,
+                db_id=setup_input.auth.login_session_db,
                 human_readable_name="session",
             ),
         )
