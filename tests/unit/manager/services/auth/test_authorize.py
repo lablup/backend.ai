@@ -589,6 +589,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             password_hash_rounds=100_000,
             password_hash_salt_size=32,
             login_session_max_age=604800,
+            login_session_db=0,
         ),
         login_client_type_id=test_client_type_id,
     )
