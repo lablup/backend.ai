@@ -9,10 +9,11 @@ Use ``ai.backend.common.dto.manager.v2.deployment``.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.config import ModelDefinitionDraft
@@ -264,6 +265,13 @@ class ModelMountConfigInput(BaseRequestModel):
         ),
     )
 
+    @field_validator("mount_destination")
+    @classmethod
+    def mount_destination_must_not_contain_parent_segment(cls, v: str) -> str:
+        if ".." in PurePosixPath(v).parts:
+            raise ValueError("mount_destination must not contain a '..' segment")
+        return v
+
 
 class ModelRuntimeConfigInput(BaseRequestModel):
     """Model runtime configuration input."""
@@ -296,6 +304,13 @@ class ExtraVFolderMountInput(BaseRequestModel):
             "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
         ),
     )
+
+    @field_validator("mount_destination")
+    @classmethod
+    def mount_destination_must_not_contain_parent_segment(cls, v: str | None) -> str | None:
+        if v is not None and ".." in PurePosixPath(v).parts:
+            raise ValueError("mount_destination must not contain a '..' segment")
+        return v
 
 
 class RevisionInput(BaseRequestModel):

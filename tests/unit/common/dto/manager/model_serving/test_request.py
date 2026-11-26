@@ -119,6 +119,17 @@ class TestServiceConfigModel:
                 resources={"cuda.shares": -0.5},
             )
 
+    def test_model_mount_destination_with_parent_segment_rejected(self) -> None:
+        with pytest.raises(
+            (BackendAISchemaValidationFailed, ValidationError),
+            match=r"model_mount_destination must not contain a '\.\.' segment",
+        ):
+            ServiceConfigModel.model_validate({
+                "model": "test-model",
+                "scalingGroup": "default",
+                "modelMountDestination": "/models/../models",
+            })
+
 
 class TestNewServiceRequestModel:
     def test_minimal_creation(self) -> None:
