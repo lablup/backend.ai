@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Status sets
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [statuses.ko.md](statuses.ko.md)

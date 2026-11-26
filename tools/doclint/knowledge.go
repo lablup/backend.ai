@@ -12,13 +12,11 @@ import (
 
 var linkPattern = regexp.MustCompile(`\[[^\]]*\]\(([^)\s]+)\)`)
 
-var externalPrefixes = []string{"http://", "https://", "mailto:", "#"}
-
-// runFrontmatter validates the KNOWLEDGE.md files: frontmatter schema, unique names, existing
-// scope and sources paths, and resolvable body links. Names are unique over every document
-// even when the run covers a few.
+// runFrontmatter validates the knowledge documents: frontmatter schema, unique values,
+// existing paths and resolvable body links. Values are unique over every document even when
+// the run covers a few.
 func runFrontmatter(sc *scope, out *report) error {
-	paths, err := kdoc.IterFiles(sc.root)
+	paths, err := kdoc.IterFiles(sc.root, &sc.spec.Knowledge)
 	if err != nil {
 		return err
 	}
@@ -38,16 +36,16 @@ func runFrontmatter(sc *scope, out *report) error {
 	for _, path := range selected {
 		inScope[path] = true
 	}
-	names := map[string]string{}
+	used := map[string]string{}
 	for _, path := range relative {
-		for _, problem := range checkKnowledge(sc, path, names, inScope[path]) {
+		for _, problem := range checkKnowledge(sc, path, used, inScope[path]) {
 			out.fail(problem)
 		}
 	}
 	return nil
 }
 
-func checkKnowledge(sc *scope, relPath string, names map[string]string, report bool) []string {
+func checkKnowledge(sc *scope, relPath string, used map[string]string, report bool) []string {
 	root := sc.root
 	full := filepath.Join(root, relPath)
 	var raw kdoc.Raw
@@ -62,27 +60,17 @@ func checkKnowledge(sc *scope, relPath string, names map[string]string, report b
 		}
 		return nil
 	}
-	document, schema := kdoc.Build(raw)
+	document, violations := kdoc.Build(&sc.spec.Knowledge, raw)
 	var problems []string
-	for _, problem := range schema {
+	for _, problem := range violations {
 		problems = append(problems, fmt.Sprintf("%s: %s", relPath, problem))
 	}
 	if document != nil {
-		if first, used := names[document.Name]; used {
-			problems = append(problems, fmt.Sprintf("%s: name '%s' is already used by %s", relPath, document.Name, first))
-		} else {
-			names[document.Name] = relPath
-		}
-		if !exists(filepath.Join(root, document.Scope)) {
-			problems = append(problems, fmt.Sprintf("%s: scope path does not exist: %s", relPath, document.Scope))
-		}
-		for _, source := range document.Sources {
-			if !exists(filepath.Join(root, source)) {
-				problems = append(problems, fmt.Sprintf("%s: sources path does not exist: %s", relPath, source))
-			}
+		for _, problem := range checkEnvironment(sc, relPath, document, used) {
+			problems = append(problems, fmt.Sprintf("%s: %s", relPath, problem))
 		}
 	}
-	for _, target := range bodyLinks(body) {
+	for _, target := range bodyLinks(body, sc.spec.Knowledge.ExternalLinkPrefixes) {
 		resolved := filepath.Join(filepath.Dir(full), target)
 		if strings.HasPrefix(target, "/") {
 			resolved = filepath.Join(root, strings.TrimLeft(target, "/"))
@@ -97,12 +85,37 @@ func checkKnowledge(sc *scope, relPath string, names map[string]string, report b
 	return problems
 }
 
+// checkEnvironment checks the unique values, against those of the documents before, and the
+// existence of the paths.
+func checkEnvironment(sc *scope, relPath string, document kdoc.Document, used map[string]string) []string {
+	var problems []string
+	for _, field := range sc.spec.Knowledge.Fields {
+		if value := document.Text(field.Name); field.Unique && value != "" {
+			key := field.Name + "\x00" + value
+			if first, ok := used[key]; ok {
+				problems = append(problems, fmt.Sprintf("%s '%s' is already used by %s", field.Name, value, first))
+			} else {
+				used[key] = relPath
+			}
+		}
+		if !field.Path {
+			continue
+		}
+		for _, path := range document.Texts(field.Name) {
+			if !exists(filepath.Join(sc.root, path)) {
+				problems = append(problems, fmt.Sprintf("%s path does not exist: %s", field.Name, path))
+			}
+		}
+	}
+	return problems
+}
+
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-func bodyLinks(body []string) []string {
+func bodyLinks(body, externalPrefixes []string) []string {
 	var prose []string
 	fenced := false
 	for _, line := range body {

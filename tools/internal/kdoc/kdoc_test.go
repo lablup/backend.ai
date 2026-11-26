@@ -7,11 +7,13 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
 func load(t *testing.T, text string) (Raw, error) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), FileName)
+	path := filepath.Join(t.TempDir(), "KNOWLEDGE.md")
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -73,6 +75,8 @@ func TestBuild(t *testing.T) {
 		want   []string
 	}{
 		{"valid", func(Raw) {}, nil},
+		{"missing generated", func(r Raw) { delete(r, "generated") }, []string{"missing 'generated' with 'by' and 'at'"}},
+		{"unknown status", func(r Raw) { r["status"] = "old" }, []string{"status 'old' is not one of ['deprecated', 'draft', 'stable']"}},
 		{"empty type", func(r Raw) { r["type"] = " " }, []string{"missing or empty required field 'type'"}},
 		{"keywords not list", func(r Raw) { r["keywords"] = "x" }, []string{"'keywords' must be a list of strings"}},
 		{"updated before generated", func(r Raw) { r["updated"] = map[string]string{"by": "a", "at": "2025-01-01"} },
@@ -80,11 +84,15 @@ func TestBuild(t *testing.T) {
 		{"verified single mapping ok", func(r Raw) { r["verified"] = map[string]string{"by": "a", "at": "2026-01-02"} }, nil},
 		{"status deprecated ok", func(r Raw) { r["status"] = "deprecated" }, nil},
 	}
+	loaded, err := spec.Load("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			raw := full()
 			tt.change(raw)
-			_, problems := Build(raw)
+			_, problems := Build(&loaded.Knowledge, raw)
 			if strings.Join(problems, "|") != strings.Join(tt.want, "|") {
 				t.Fatalf("got %q, want %q", problems, tt.want)
 			}

@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Permissions
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [permissions.ko.md](permissions.ko.md)

@@ -3,22 +3,18 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/lablup/backend.ai/tools/internal/kdoc"
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
-var (
-	hangulAny    = regexp.MustCompile(`[\x{1100}-\x{11ff}\x{3130}-\x{318f}\x{ac00}-\x{d7a3}]`)
-	headingStart = regexp.MustCompile(`^(#{1,6}) `)
-)
+var headingStart = regexp.MustCompile(`^(#{1,6}) `)
 
-// oneSideChangeAllowed is the glossary: a wording fix can change only one language.
-const oneSideChangeAllowed = "glossary/"
-
-func englishPath(koPath string) string {
-	return strings.TrimSuffix(koPath, koSuffix) + ".md"
+func englishPath(sc *scope, koPath string) string {
+	return strings.TrimSuffix(koPath, sc.spec.Documents.TranslationSuffix) + sc.spec.Documents.Extension
 }
 
 func headingCounts(sc *scope, path string) (map[int]int, error) {
@@ -28,7 +24,7 @@ func headingCounts(sc *scope, path string) (map[int]int, error) {
 	}
 	lines := kdoc.SplitLines(string(data))
 	if len(lines) > 0 && lines[0] == "---" {
-		if at := indexOf(lines[1:], "---"); at >= 0 {
+		if at := slices.Index(lines[1:], "---"); at >= 0 {
 			lines = lines[at+2:]
 		}
 	}
@@ -71,16 +67,16 @@ func sameCounts(a, b map[int]int) bool {
 	return true
 }
 
-// checkPairs validates the .ko.md files: an English file beside each, with the same number of
+// checkPairs validates the translations: an English file beside each, with the same number of
 // headings at each level. A restricted run checks the pairs with a file among the changed.
 func checkPairs(sc *scope, changed map[string]bool) ([]string, error) {
-	koFiles, err := sc.listFiles("*" + koSuffix)
+	koFiles, err := sc.listFiles(sc.pathspec(sc.spec.Documents.TranslationSuffix))
 	if err != nil {
 		return nil, err
 	}
 	var problems []string
 	for _, koPath := range koFiles {
-		enPath := englishPath(koPath)
+		enPath := englishPath(sc, koPath)
 		if sc.restricted() && !changed[koPath] && !changed[enPath] {
 			continue
 		}
@@ -104,9 +100,11 @@ func checkPairs(sc *scope, changed map[string]bool) ([]string, error) {
 	return problems, nil
 }
 
-// checkAddedKorean rejects Korean added to a .md file.
+// checkAddedKorean rejects Korean added to a document that is not a translation.
 func checkAddedKorean(sc *scope) ([]string, error) {
-	diff, err := git(sc.root, "diff", "--unified=0", "--no-color", sc.diffRange(), "--", "*.md")
+	diff, err := git(sc.root, "diff", "--unified=0", "--no-color", sc.diffRange(),
+		"--", sc.pathspec(sc.spec.Documents.Extension))
+	suffix := sc.spec.Documents.TranslationSuffix
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +114,9 @@ func checkAddedKorean(sc *scope) ([]string, error) {
 		if match := diffFilePattern.FindStringSubmatch(line); match != nil {
 			current = match[1]
 		} else if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") &&
-			!strings.HasSuffix(current, koSuffix) && hangulAny.MatchString(line) {
-			problems = append(problems, fmt.Sprintf("%s: Korean added, move it to the .ko.md file: %s",
-				current, strings.TrimSpace(line[1:])))
+			!strings.HasSuffix(current, suffix) && sc.spec.Pairs.TranslationCharacters.MatchString(line) {
+			problems = append(problems, fmt.Sprintf("%s: Korean added, move it to the %s file: %s",
+				current, suffix, strings.TrimSpace(line[1:])))
 		}
 	}
 	return problems, nil
@@ -127,11 +125,12 @@ func checkAddedKorean(sc *scope) ([]string, error) {
 // checkPairUpdates requires both files of a pair to change together. A newly added .ko.md is
 // exempt, since it translates an English file that does not change.
 func checkPairUpdates(sc *scope) ([]string, error) {
-	changedList, err := gitLines(sc.root, "diff", "--name-only", sc.diffRange(), "--", "*.md")
+	pathspec := sc.pathspec(sc.spec.Documents.Extension)
+	changedList, err := gitLines(sc.root, "diff", "--name-only", sc.diffRange(), "--", pathspec)
 	if err != nil {
 		return nil, err
 	}
-	addedList, err := gitLines(sc.root, "diff", "--name-only", "--diff-filter=A", sc.diffRange(), "--", "*.md")
+	addedList, err := gitLines(sc.root, "diff", "--name-only", "--diff-filter=A", sc.diffRange(), "--", pathspec)
 	if err != nil {
 		return nil, err
 	}
@@ -146,17 +145,17 @@ func checkPairUpdates(sc *scope) ([]string, error) {
 	sort.Strings(changedList)
 	var problems []string
 	for _, path := range changedList {
-		if strings.HasPrefix(path, oneSideChangeAllowed) {
+		if matchesAny(sc.spec.Pairs.OneSideChangeAllowed, path) {
 			continue
 		}
 		var partner string
-		if strings.HasSuffix(path, koSuffix) {
+		if strings.HasSuffix(path, sc.spec.Documents.TranslationSuffix) {
 			if added[path] {
 				continue
 			}
-			partner = englishPath(path)
+			partner = englishPath(sc, path)
 		} else {
-			partner = strings.TrimSuffix(path, ".md") + koSuffix
+			partner = strings.TrimSuffix(path, sc.spec.Documents.Extension) + sc.spec.Documents.TranslationSuffix
 			if !sc.has(partner) {
 				continue
 			}
@@ -166,6 +165,10 @@ func checkPairUpdates(sc *scope) ([]string, error) {
 		}
 	}
 	return problems, nil
+}
+
+func matchesAny(patterns []spec.Pattern, text string) bool {
+	return slices.ContainsFunc(patterns, func(p spec.Pattern) bool { return p.MatchString(text) })
 }
 
 func runBilingual(sc *scope, out *report) error {

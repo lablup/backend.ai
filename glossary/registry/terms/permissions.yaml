@@ -1,0 +1,187 @@
+title:
+  en: {page: "Permissions", link: "Permissions", description: "RBAC, scopes, roles and operation prefixes"}
+  ko: {page: "권한", link: "권한", description: "RBAC, scope, 역할, 연산 접두사"}
+terms:
+  - english: "2FA"
+    korean: "이중 인증"
+    meaning: {en: "An authentication feature that requires a 2FA code at login when configured.", ko: "설정하면 login 시 이중 인증 코드를 요구하는 인증 기능입니다."}
+    avoid: {en: ["two-factor authentication"], ko: ["two-factor authentication", "이중인중 활성화"]}
+  - english: "access key"
+    korean: "액세스 키"
+    meaning: {en: "A key used for programmatic access in keypair authentication.", ko: "keypair 인증에서 프로그래밍 접근에 사용하는 키입니다."}
+    avoid: {ko: ["접근 키"]}
+  - english: "admin_"
+    korean: "admin_"
+    meaning: {en: "A prefix for API operations reserved for the superadmin.", ko: "superadmin 전용 동작에 붙는 API 접두사입니다."}
+    note: {en: "This is a code name.", ko: "코드 이름입니다"}
+  - english: "agent selection policy"
+    korean: "에이전트 선택 정책"
+    meaning: {en: "A method that determines whether to enforce designated_agent_ids or allow alternatives.", ko: "designated_agent_ids 를 강제할지 대체를 허용할지 정하는 방식입니다."}
+  - english: "allowed client ip"
+    korean: "허용된 클라이언트 IP"
+    meaning: {en: "A client IP list that, when specified, allows login only from those addresses.", ko: "지정하면 그 주소에서만 login 할 수 있게 하는 client IP 목록입니다."}
+  - english: "allowed container registry"
+    korean: "허용된 컨테이너 레지스트리"
+    meaning: {en: "A list of container registries allowed in a domain.", ko: "domain 에서 허용하는 container registry 목록입니다."}
+    avoid: {en: ["allowed docker registries"], ko: ["allowed docker registries", "허용 Docker 레지스트리"]}
+  - english: "allowed resource group"
+    korean: "허용된 자원 그룹"
+    meaning: {en: "A list of resource groups allowed for use by a domain or project.", ko: "domain 이나 project 가 쓸 수 있도록 허용된 resource group 목록입니다."}
+    avoid: {ko: ["허용 자원 그룹"]}
+  - english: "allowed storage host"
+    korean: "허용된 스토리지 호스트"
+    meaning: {en: "A list of storage hosts allowed by a domain.", ko: "domain 이 허용하는 storage host 목록입니다."}
+    avoid: {en: ["allowed vfolder hosts"], ko: ["allowed vfolder hosts", "가상 폴더 호스트"]}
+    note: {en: "This will be unified into storage group later.", ko: "앞으로 storage group 으로 통합합니다"}
+  - english: "API keypair"
+    korean: "API 키페어"
+    meaning: {en: "A pair of an access key and a secret key used for programmatic access.", ko: "프로그래밍 접근에 사용하는 access key 와 secret key 짝입니다."}
+  - english: "authentication mode"
+    korean: "인증 방식"
+    meaning: {en: "The authentication method of a user account, with session based on a browser session and keypair based on an access/secret key pair.", ko: "사용자 계정의 인증 방식으로 브라우저 세션 기반 session 과 access/secret key 짝의 keypair 가 있습니다."}
+  - english: "authority"
+    korean: "authority"
+    meaning: {en: "An identification string registered by app proxy worker nodes.", ko: "appproxy worker 노드들이 등록하는 식별 문자열입니다."}
+    note: {en: "Will be moved to ingress group later.", ko: "앞으로 ingress group 으로 옮깁니다"}
+  - english: "client IP allowlist"
+    korean: "클라이언트 IP 허용 목록"
+    meaning: {en: "A feature that allows access to exposed apps only from addresses allowed by the circuit.", ko: "회선이 허용한 주소에서만 공개된 앱에 접근하게 하는 기능입니다."}
+  - english: "client IP masking policy"
+    korean: "클라이언트 IP 마스킹 정책"
+    meaning: {en: "A policy that determines how to mask client addresses before storing them in login history or audit log.", ko: "client 주소를 login history 나 audit log 에 저장하기 전에 어떻게 가릴지 정하는 정책입니다."}
+  - english: "default access key"
+    korean: "기본 액세스 키"
+    meaning: {en: "The access key that a user uses as their primary key, which can be changed to another key.", ko: "사용자가 대표로 사용하는 access key 이며 다른 key 로 바꿀 수 있습니다."}
+    avoid: {en: ["main access key"], ko: ["기본 키페어", "main access key"]}
+    note: {en: "The error message in the code is already default access key.", ko: "코드 에러 문구는 이미 default access key 입니다"}
+  - english: "deployment token"
+    korean: "배포 토큰"
+    meaning: {en: "A token that calls a deployment and fixes which user to act as.", ko: "deployment 를 호출하는 token 으로, 어떤 사용자로 행동할지 고정합니다."}
+    avoid: {en: ["access token", "deployment access token"], ko: ["access token", "액세스 토큰", "접근 토큰", "deployment access token"]}
+  - english: "domain admin"
+    korean: "도메인 관리자"
+    meaning: {en: "An administrator role with full permissions within the domain scope.", ko: "domain scope 안에서 전체 권한을 가지는 관리자 역할입니다."}
+    note: {en: "Exists only as an RBAC role.", ko: "RBAC 역할로만 있습니다"}
+  - english: "domain member"
+    korean: "도메인 멤버"
+    meaning: {en: "The basic member role of the domain scope.", ko: "domain scope 의 기본 구성원 역할입니다."}
+  - english: "effective permission"
+    korean: "최종 적용 권한"
+    meaning: {en: "The permission actually applied by combining multiple role grants and caps.", ko: "여러 역할 부여와 cap 을 합쳐 실제로 적용되는 권한입니다."}
+    avoid: {ko: ["실효 권한"]}
+  - english: "entity share"
+    korean: "엔티티 공유"
+    meaning: {en: "A grant that proposes transferring an entity to another user or project.", ko: "한 entity 를 다른 사용자나 project 에 제안해 넘겨 주는 권한 부여입니다."}
+    avoid: {en: ["invitation", "offer"], ko: ["invitation", "offer"]}
+  - english: "gate"
+    korean: "gate"
+    meaning: {en: "A validator that checks action execution and authorizes each scope.", ko: "action 실행을 검사하고 각 scope 를 허가하는 validator 입니다."}
+  - english: "idle checker assignment"
+    korean: "유휴 검사기 할당"
+    meaning: {en: "An assignment that binds a global idle checker to a single scope.", ko: "global idle checker 를 scope 하나에 묶는 배정입니다."}
+    avoid: {en: ["idle checker binding"], ko: ["idle checker binding"]}
+  - english: "impersonation"
+    korean: "사용자 가장"
+    meaning: {en: "A feature that lets a superadmin run operations in the permission context of a target user.", ko: "super admin 이 대상 사용자의 권한 맥락으로 작업을 실행하게 하는 기능입니다."}
+    avoid: {en: ["Act As"], ko: ["Act As"]}
+  - english: "keypair"
+    korean: "키페어"
+    meaning: {en: "A pair of an access key and a secret key with which a user signs API calls.", ko: "user 가 API 호출에 서명하는 access key 와 secret key 짝입니다."}
+    avoid: {ko: ["키 쌍", "키 페어"]}
+  - english: "keypair resource policy"
+    korean: "키페어 자원 정책"
+    meaning: {en: "A resource policy bound to a keypair that controls session-related resource limits.", ko: "keypair 에 묶여 세션 관련 자원 한도를 제어하는 자원 정책입니다."}
+    note: {en: "Scheduled for removal. Do not use it for new work.", ko: "제거 예정입니다. 새로 쓰지 않습니다"}
+  - english: "mount policy"
+    korean: "마운트 정책"
+    meaning: {en: "The mount level that a user has on a vfolder, with the values none, ro, and rw.", ko: "한 user 가 한 vfolder 에 갖는 mount 수준으로 none, ro, rw 값을 가집니다."}
+  - english: "my"
+    korean: "my"
+    meaning: {en: "A prefix for operations that handle only the current user's own resources.", ko: "현재 사용자 자신의 자원만 다루는 연산 접두사입니다."}
+  - english: "permission"
+    korean: "권한"
+    meaning: {en: "A single authority that a role grants on one entity type within a scope.", ko: "role 이 한 scope 안에서 한 entity type 에 부여하는 권한 하나입니다."}
+  - english: "permission bit"
+    korean: "권한 비트"
+    meaning: {en: "A value that represents a granted action as one bit of a permission mask.", ko: "permission mask 의 한 bit 로 부여된 동작을 나타내는 값입니다."}
+  - english: "project admin"
+    korean: "프로젝트 관리자"
+    meaning: {en: "An administrator role with full authority within a project scope.", ko: "project scope 안에서 전체 권한을 가지는 관리자 역할입니다."}
+    note: {en: "Exists only as an RBAC role.", ko: "RBAC 역할로만 있습니다"}
+  - english: "project member"
+    korean: "프로젝트 멤버"
+    meaning: {en: "The default member role of a project scope.", ko: "project scope 의 기본 구성원 역할입니다."}
+  - english: "project resource policy"
+    korean: "프로젝트 자원 정책"
+    meaning: {en: "A resource policy that controls the shared quota of resources at the project level.", ko: "project 단위 자원의 공유 쿼터를 제어하는 자원 정책입니다."}
+  - english: "public"
+    korean: "public"
+    meaning: {en: "A prefix for operations allowed to all authenticated users without a permission check. It is not anonymous access.", ko: "권한 검사 없이 인증된 모든 사용자에게 허용하는 연산 접두사입니다. 익명 접근은 아닙니다."}
+  - english: "RBAC"
+    korean: "RBAC"
+    meaning: {en: "A system that expresses authority through combinations of roles, scope types, entity types, and permission bits.", ko: "role 과 scope 종류, entity 종류, permission bit 조합으로 권한을 표현하는 체계입니다."}
+    avoid: {en: ["Role-Based Access Control"], ko: ["Role-Based Access Control"]}
+  - english: "resource policy"
+    korean: "자원 정책"
+    meaning: {en: "A policy that defines resource limits per keypair, user, and project.", ko: "keypair, user, project 별로 자원 한도를 정하는 정책입니다."}
+    avoid: {ko: ["리소스 정책"]}
+  - english: "role"
+    korean: "역할"
+    meaning: {en: "A unit that bundles permissions and grants them to a user within a scope.", ko: "권한을 묶어 scope 안에서 사용자에게 부여하는 단위입니다."}
+  - english: "role assignment"
+    korean: "역할 할당"
+    meaning: {en: "An assignment relation linking a user and a role. Revoking it deletes the row.", ko: "사용자와 role 을 잇는 할당 관계입니다. 회수하면 row 가 삭제됩니다."}
+  - english: "role permission preset"
+    korean: "권한 프리셋"
+    meaning: {en: "A permission entry granted by a role preset.", ko: "role preset 이 부여하는 권한 항목입니다."}
+    avoid: {en: ["permission entry"], ko: ["permission entry", "권한 항목", "프리셋 권한"]}
+  - english: "role preset"
+    korean: "역할 프리셋"
+    meaning: {en: "A template used when creating a role, loaded as seed YAML.", ko: "role 을 만들 때 사용하는 template 이며 seed YAML 로 적재됩니다."}
+  - english: "role status"
+    korean: "역할 상태"
+    meaning: {en: "A set of role status values where inactive means temporary deactivation and deleted means purge.", ko: "role 상태 값 묶음으로 inactive 는 일시 비활성, deleted 는 영구 제거를 뜻합니다."}
+  - english: "RPC keypair"
+    korean: "RPC 키페어"
+    meaning: {en: "A keypair used for RPC authentication and encryption between the manager and the agent.", ko: "manager 와 agent 사이 RPC 인증과 암호화에 사용하는 keypair 입니다."}
+  - english: "scope"
+    korean: "스코프"
+    meaning: {en: "A range that defines an access boundary, with units such as domain, project, and user.", ko: "접근 경계를 정의하는 범위로 domain, project, user 같은 단위입니다."}
+  - english: "scope cap"
+    korean: "스코프 상한"
+    meaning: {en: "An upper limit that narrows granted permissions per scope.", ko: "scope 단위로 granted 권한을 좁히는 상한입니다."}
+  - english: "scoped permission"
+    korean: "스코프 권한"
+    meaning: {en: "An operation permission on entity types within a specific scope.", ko: "특정 스코프 안의 entity 타입에 대한 연산 권한입니다."}
+    avoid: {en: ["Scope-Level Permission"], ko: ["Scope-Level Permission"]}
+  - english: "secret key"
+    korean: "secret key"
+    meaning: {en: "The confidential counterpart of the access key in an API keypair.", ko: "API keypair 에서 access key 와 짝을 이루는 비밀 키입니다."}
+    avoid: {ko: ["시크릿 키", "비밀 키"]}
+    note: {en: "A different concept from the secret key of pk and sk.", ko: "pk, sk 의 비밀 키와 다른 개념입니다"}
+  - english: "SSH keypair"
+    korean: "SSH 키페어"
+    meaning: {en: "A keypair owned by a user, used for SSH/SFTP access.", ko: "user 가 소유하는 SSH keypair 로 SSH/SFTP 접근에 쓰입니다."}
+  - english: "storage proxy client API"
+    korean: "storage proxy client API"
+    meaning: {en: "An API that the Storage Proxy exposes to users.", ko: "Storage Proxy 에서 사용자에게 열린 API 입니다."}
+    avoid: {en: ["client-facing API", "client API"], ko: ["client-facing API", "client API"]}
+  - english: "storage proxy manager API"
+    korean: "storage proxy manager API"
+    meaning: {en: "An API that the Manager calls on the Storage Proxy.", ko: "Storage Proxy 에서 Manager 가 호출하는 API 입니다."}
+    avoid: {en: ["manager-facing API"], ko: ["manager-facing API"]}
+  - english: "sudo session"
+    korean: "sudo 세션"
+    meaning: {en: "A privileged session that a user can create.", ko: "user 가 만들 수 있는 privileged session 입니다."}
+  - english: "superadmin"
+    korean: "superadmin"
+    meaning: {en: "A system-wide administrator who passes all permission checks without a role row.", ko: "role row 없이 모든 권한 검사를 통과하는 시스템 전체 관리자입니다."}
+    avoid: {en: ["suerp-admin", "super-admin"], ko: ["suerp-admin", "super-admin", "슈퍼관리자", "슈퍼 관리자"]}
+  - english: "vfolder permission"
+    korean: "vfolder 권한"
+    meaning: {en: "The permission that a user has on a vfolder.", ko: "한 사용자가 한 vfolder 에 갖는 권한입니다."}
+    avoid: {ko: ["폴더 권한"]}
+    note: {en: "Going forward, everything except the mount policy is integrated into RBAC.", ko: "앞으로 mount 정책 외에는 RBAC 으로 통합합니다"}
+  - english: "virtual scope"
+    korean: "가상 스코프"
+    meaning: {en: "A hub node for permission decisions, placed one per owning scope.", ko: "소유 스코프마다 하나씩 두는 권한 판정 허브 노드입니다."}

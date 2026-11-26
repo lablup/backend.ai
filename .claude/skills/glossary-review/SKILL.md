@@ -1,6 +1,6 @@
 ---
 name: glossary-review
-description: Review a document people review (KNOWLEDGE.md, BEP, AGENTS.md, skill, README, PR description) against the glossary - the glossary of the document's language, check_words.py, and the items the script does not find
+description: Review a document people review (KNOWLEDGE.md, BEP, AGENTS.md, skill, README, PR description) against the glossary - the glossary of the document's language, the doclint words check, and the items the script does not find
 disable-model-invocation: false
 tags:
   - docs
@@ -30,7 +30,7 @@ After translating a Korean draft into English, review it again with the English 
 
 ## Items to check
 
-`check_words.py` finds only registered words. Check these by hand.
+The `words` check finds only registered words. Check these by hand.
 
 | Item | Rule |
 |---|---|
@@ -39,6 +39,8 @@ After translating a Korean draft into English, review it again with the English 
 | Notation | Arrows, dashes, parentheses and list separators follow the notation rules of the document's glossary |
 | Headings, table headers | Use concrete nouns, not a nominalized clause |
 
-Verbs to avoid are registered in the expressions-to-avoid table of each glossary, so `check_words.py` finds them. A match with a qualifier prints as `review:`: decide it by the qualifier.
+Verbs to avoid are registered in the expressions-to-avoid table of each glossary, so the `words` check finds them. A match with a qualifier prints as `review:`: decide it by the qualifier.
 
 Report a word the glossary lacks as a registration candidate when the document uses it repeatedly.
+Register a word in `glossary/registry/` and run `go generate ./...`; do not edit the generated
+glossary documents.

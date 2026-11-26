@@ -2,44 +2,22 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/lablup/backend.ai/tools/internal/kdoc"
-)
-
-const (
-	firstCheckedBEP      = 1080
-	maxLines             = 300
-	maxItems             = 7
-	maxDesignSubsections = 4
-	maxDesignTables      = 2
-	maxTableRows         = 7
-	maxDesignSentences   = 3
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
 var (
-	bepFile = regexp.MustCompile(`^BEP-(\d{4})-.+\.md$`)
-	bepDir  = regexp.MustCompile(`^BEP-(\d{4})$`)
-
-	maxItemChars = map[string]int{"ko": 80, "en": 120}
-
-	goalTitles     = []string{"목표", "Goals"}
-	countedLists   = []string{"목표가 아닌 것", "Non-goals", "영향", "Impact", "구현 순서", "Implementation Order"}
-	designTitles   = []string{"설계", "Design"}
-	rejectedPrefix = []string{"기각한 대안:", "Rejected:"}
-
 	listItem     = regexp.MustCompile(`^(\s*)(?:[-*]|\d+\.) (.*)$`)
 	tableRow     = regexp.MustCompile(`^\s*\|`)
 	tableDivider = regexp.MustCompile(`^\s*\|[\s:|-]+\|\s*$`)
 	imageLine    = regexp.MustCompile(`^\s*!\[`)
 	sentenceEnd  = regexp.MustCompile(`[^\d\s.]\.(?:\s|$)`)
-	abbreviation = regexp.MustCompile(`(?i)\b(?:e\.g|i\.e|etc|vs|cf)\.`)
 )
 
 type numberedLine struct {
@@ -58,7 +36,7 @@ func contentLines(text string) []numberedLine {
 	lines := kdoc.SplitLines(text)
 	start := 0
 	if len(lines) > 0 && lines[0] == "---" {
-		if at := indexOf(lines[1:], "---"); at >= 0 {
+		if at := slices.Index(lines[1:], "---"); at >= 0 {
 			start = at + 2
 		}
 	}
@@ -128,15 +106,34 @@ func topItems(body []numberedLine) int {
 	return count
 }
 
-func checkBEPLength(data []byte, display string) []string {
-	lang := "en"
-	if strings.HasSuffix(display, koSuffix) {
-		lang = "ko"
+// bepChecker checks proposals against the limits of the spec.
+type bepChecker struct {
+	limits       spec.BEP
+	translation  string
+	abbreviation *regexp.Regexp
+}
+
+func newBEPChecker(loaded *spec.Spec) bepChecker {
+	quoted := make([]string, len(loaded.BEP.Design.Abbreviations))
+	for i, word := range loaded.BEP.Design.Abbreviations {
+		quoted[i] = regexp.QuoteMeta(word)
+	}
+	return bepChecker{
+		limits:       loaded.BEP,
+		translation:  loaded.Documents.TranslationSuffix,
+		abbreviation: regexp.MustCompile(`(?i)\b(?:` + strings.Join(quoted, "|") + `)\.`),
+	}
+}
+
+func (c bepChecker) check(data []byte, display string) []string {
+	lang := spec.English
+	if strings.HasSuffix(display, c.translation) {
+		lang = spec.Korean
 	}
 	lines := contentLines(string(data))
 	var problems []string
-	if len(lines) > maxLines {
-		problems = append(problems, fmt.Sprintf("%s:1: %d lines, limit %d", display, len(lines), maxLines))
+	if limit := c.limits.MaxLines; len(lines) > limit {
+		problems = append(problems, fmt.Sprintf("%s:1: %d lines, limit %d", display, len(lines), limit))
 	}
 	for _, line := range lines {
 		match := listItem.FindStringSubmatch(line.text)
@@ -146,34 +143,35 @@ func checkBEPLength(data []byte, display string) []string {
 		if match[1] != "" {
 			problems = append(problems, fmt.Sprintf("%s:%d: nested list item, keep lists one level", display, line.number))
 		}
-		if length := utf8.RuneCountInString(match[2]); length > maxItemChars[lang] {
-			problems = append(problems, fmt.Sprintf("%s:%d: list item of %d chars, limit %d", display, line.number, length, maxItemChars[lang]))
+		if length, limit := utf8.RuneCountInString(match[2]), c.limits.MaxItemChars[lang]; length > limit {
+			problems = append(problems, fmt.Sprintf("%s:%d: list item of %d chars, limit %d", display, line.number, length, limit))
 		}
 	}
+	limit := c.limits.MaxItems
 	for _, sec := range sections(lines, "##") {
 		switch {
-		case indexOf(goalTitles, sec.title) >= 0:
+		case slices.Contains(c.limits.GoalSections, sec.title):
 			for _, tbl := range tables(sec.body) {
-				if tbl.rows > maxItems {
-					problems = append(problems, fmt.Sprintf("%s:%d: %d goal rows, limit %d", display, tbl.first, tbl.rows, maxItems))
+				if tbl.rows > limit {
+					problems = append(problems, fmt.Sprintf("%s:%d: %d goal rows, limit %d", display, tbl.first, tbl.rows, limit))
 				}
 			}
-		case indexOf(countedLists, sec.title) >= 0:
-			if count := topItems(sec.body); count > maxItems {
-				problems = append(problems, fmt.Sprintf("%s:%d: %d items in '%s', limit %d", display, sec.line, count, sec.title, maxItems))
+		case slices.Contains(c.limits.CountedSections, sec.title):
+			if count := topItems(sec.body); count > limit {
+				problems = append(problems, fmt.Sprintf("%s:%d: %d items in '%s', limit %d", display, sec.line, count, sec.title, limit))
 			}
-		case indexOf(designTitles, sec.title) >= 0:
-			problems = append(problems, checkDesign(sec, display)...)
+		case slices.Contains(c.limits.Design.Sections, sec.title):
+			problems = append(problems, c.design(sec, display)...)
 		}
 	}
 	return problems
 }
 
-func checkDesign(sec section, display string) []string {
+func (c bepChecker) design(sec section, display string) []string {
 	var problems []string
 	subsections := sections(sec.body, "###")
-	if len(subsections) > maxDesignSubsections {
-		problems = append(problems, fmt.Sprintf("%s:%d: %d design subsections, limit %d", display, sec.line, len(subsections), maxDesignSubsections))
+	if limit := c.limits.Design.MaxSubsections; len(subsections) > limit {
+		problems = append(problems, fmt.Sprintf("%s:%d: %d design subsections, limit %d", display, sec.line, len(subsections), limit))
 	}
 	var lead []numberedLine
 	for _, line := range sec.body {
@@ -183,22 +181,23 @@ func checkDesign(sec section, display string) []string {
 	}
 	units := append([]section{{title: sec.title, line: sec.line, body: lead}}, subsections...)
 	for _, unit := range units {
-		problems = append(problems, checkDesignUnit(unit, display)...)
+		problems = append(problems, c.designUnit(unit, display)...)
 	}
 	return problems
 }
 
-// checkDesignUnit checks the table and sentence limits of a design subsection, or of the text
+// designUnit checks the table and sentence limits of a design subsection, or of the text
 // before the first one.
-func checkDesignUnit(unit section, display string) []string {
+func (c bepChecker) designUnit(unit section, display string) []string {
+	limits := c.limits.Design
 	var problems []string
 	found := tables(unit.body)
-	if len(found) > maxDesignTables {
-		problems = append(problems, fmt.Sprintf("%s:%d: %d tables, limit %d", display, unit.line, len(found), maxDesignTables))
+	if len(found) > limits.MaxTables {
+		problems = append(problems, fmt.Sprintf("%s:%d: %d tables, limit %d", display, unit.line, len(found), limits.MaxTables))
 	}
 	for _, tbl := range found {
-		if tbl.rows > maxTableRows {
-			problems = append(problems, fmt.Sprintf("%s:%d: %d table rows, limit %d", display, tbl.first, tbl.rows, maxTableRows))
+		if tbl.rows > limits.MaxTableRows {
+			problems = append(problems, fmt.Sprintf("%s:%d: %d table rows, limit %d", display, tbl.first, tbl.rows, limits.MaxTableRows))
 		}
 	}
 	sentences := 0
@@ -207,70 +206,46 @@ func checkDesignUnit(unit section, display string) []string {
 		if text == "" || tableRow.MatchString(line.text) || imageLine.MatchString(line.text) {
 			continue
 		}
-		if hasAnyPrefix(text, rejectedPrefix) {
+		if hasAnyPrefix(text, limits.SkippedLinePrefixes) {
 			continue
 		}
-		count := len(sentenceEnd.FindAllString(abbreviation.ReplaceAllString(line.text, ""), -1))
+		count := len(sentenceEnd.FindAllString(c.abbreviation.ReplaceAllString(line.text, ""), -1))
 		if listItem.MatchString(line.text) {
 			count = max(count, 1)
 		}
 		sentences += count
 	}
-	if sentences > maxDesignSentences {
-		problems = append(problems, fmt.Sprintf("%s:%d: %d sentences in '%s', limit %d", display, unit.line, sentences, unit.title, maxDesignSentences))
+	if sentences > limits.MaxSentences {
+		problems = append(problems, fmt.Sprintf("%s:%d: %d sentences in '%s', limit %d", display, unit.line, sentences, unit.title, limits.MaxSentences))
 	}
 	return problems
 }
 
 func hasAnyPrefix(text string, prefixes []string) bool {
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(text, prefix) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(prefixes, func(prefix string) bool { return strings.HasPrefix(text, prefix) })
 }
 
-// bepPaths returns the BEP documents from BEP-1080 on: proposals/BEP-<number>-*.md and the
-// .md files in proposals/BEP-<number>/.
-func bepPaths(root string) ([]string, error) {
-	entries, err := os.ReadDir(filepath.Join(root, "proposals"))
+// bepPaths returns the documents of the proposals the limits apply to.
+func bepPaths(sc *scope) ([]string, error) {
+	all, err := sc.allDocuments()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	var paths []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			match := bepDir.FindStringSubmatch(entry.Name())
-			if match == nil || bepNumber(match[1]) < firstCheckedBEP {
-				continue
-			}
-			sub, err := filepath.Glob(filepath.Join(root, "proposals", entry.Name(), "*.md"))
-			if err != nil {
-				return nil, err
-			}
-			sort.Strings(sub)
-			for _, path := range sub {
-				rel, _ := filepath.Rel(root, path)
-				paths = append(paths, filepath.ToSlash(rel))
-			}
-		} else if match := bepFile.FindStringSubmatch(entry.Name()); match != nil && bepNumber(match[1]) >= firstCheckedBEP {
-			paths = append(paths, "proposals/"+entry.Name())
+	for _, path := range all {
+		match := sc.spec.BEP.Path.FindStringSubmatch(path)
+		if match == nil {
+			continue
+		}
+		if number, err := strconv.Atoi(match[1]); err == nil && number >= sc.spec.BEP.FirstNumber {
+			paths = append(paths, path)
 		}
 	}
 	return paths, nil
 }
 
-func bepNumber(text string) int {
-	number, _ := strconv.Atoi(text)
-	return number
-}
-
 func runBEPLength(sc *scope, out *report) error {
-	candidates, err := bepPaths(sc.root)
+	candidates, err := bepPaths(sc)
 	if err != nil {
 		return err
 	}
@@ -278,12 +253,13 @@ func runBEPLength(sc *scope, out *report) error {
 	if err != nil {
 		return err
 	}
+	checker := newBEPChecker(sc.spec)
 	for _, path := range paths {
 		data, err := sc.read(path)
 		if err != nil {
 			return err
 		}
-		for _, problem := range checkBEPLength(data, path) {
+		for _, problem := range checker.check(data, path) {
 			out.fail(problem)
 		}
 	}

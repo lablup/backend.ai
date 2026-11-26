@@ -1,0 +1,57 @@
+title:
+  en: {page: "Status sets", link: "Status sets", description: "sets of status values"}
+  ko: {page: "상태 묶음", link: "상태 묶음", description: "상태 값 묶음"}
+terms:
+  - english: "activeness status"
+    korean: "활성 상태"
+    meaning: {en: "The status of whether a deployment is active, with the values ACTIVE and INACTIVE.", ko: "deployment 의 활성 여부 상태로 ACTIVE, INACTIVE 값을 가집니다."}
+  - english: "agent status"
+    korean: "에이전트 상태"
+    meaning: {en: "The operational status of an agent, with the values ALIVE, LOST, RESTARTING, and TERMINATED.", ko: "agent 의 운영 상태로 ALIVE, LOST, RESTARTING, TERMINATED 값을 가집니다."}
+  - english: "artifact revision status"
+    korean: "아티팩트 리비전 상태"
+    meaning: {en: "The processing status of an artifact revision, with the values SCANNED, PULLING, PULLED, VERIFYING, NEEDS_APPROVAL, AVAILABLE, FAILED, REJECTED.", ko: "artifact revision 의 처리 상태로 SCANNED, PULLING, PULLED, VERIFYING, NEEDS_APPROVAL, AVAILABLE, FAILED, REJECTED 값을 가집니다."}
+  - english: "audit log status"
+    korean: "감사 로그 상태"
+    meaning: {en: "The processing status of an audit log record, with the values success, error, unknown, running, denied.", ko: "audit log 기록의 처리 상태로 success, error, unknown, running, denied 값을 가집니다."}
+  - english: "deployment status"
+    korean: "배포 상태"
+    meaning: {en: "The deployment status in v2, which has the values PENDING, READY, DEPLOYING, SCALING, STOPPING and STOPPED.", ko: "v2 의 deployment 상태로 PENDING, READY, DEPLOYING, SCALING, STOPPING, STOPPED 값을 가집니다."}
+  - english: "endpoint lifecycle"
+    korean: "엔드포인트 수명 주기"
+    meaning: {en: "The status representing the lifecycle stages of a deployment endpoint.", ko: "배포 endpoint 의 수명 주기 단계를 나타내는 상태입니다."}
+  - english: "endpoint status"
+    korean: "엔드포인트 상태"
+    meaning: {en: "The serving status of an endpoint, with values READY, PROVISIONING, HEALTHY, UNHEALTHY, DESTROYING, DESTROYED, DEGRADED.", ko: "endpoint 의 서빙 상태로 READY, PROVISIONING, HEALTHY, UNHEALTHY, DESTROYING, DESTROYED, DEGRADED 값을 가집니다."}
+  - english: "image role"
+    korean: "이미지 역할"
+    meaning: {en: "The usage classification of an image, with values COMPUTE, INFERENCE, SYSTEM.", ko: "이미지의 용도 구분으로 COMPUTE, INFERENCE, SYSTEM 값을 가집니다."}
+  - english: "image status"
+    korean: "이미지 상태"
+    meaning: {en: "The status of an image, with values ALIVE, DELETED, PURGING and PURGE_ERROR.", ko: "image 의 상태로 ALIVE, DELETED, PURGING, PURGE_ERROR 값을 가집니다."}
+    avoid: {en: ["ImageStatusType"], ko: ["ImageStatusType"]}
+  - english: "kernel status"
+    korean: "커널 상태"
+    meaning: {en: "The lifecycle status of a kernel, with values PENDING, RESERVED, SCHEDULED, PREPARING, BUILDING, PULLING, PREPARED, CREATING, RUNNING, RESTARTING, RESIZING, SUSPENDED, TERMINATING, TERMINATED, ERROR and CANCELLED.", ko: "kernel 의 생애 상태로 PENDING, RESERVED, SCHEDULED, PREPARING, BUILDING, PULLING, PREPARED, CREATING, RUNNING, RESTARTING, RESIZING, SUSPENDED, TERMINATING, TERMINATED, ERROR, CANCELLED 값을 가집니다."}
+  - english: "network type"
+    korean: "네트워크 유형"
+    meaning: {en: "The type of network used between containers in a session.", ko: "세션이 사용하는 container 간 network 종류입니다."}
+  - english: "route status"
+    korean: "라우트 상태"
+    meaning: {en: "The lifecycle status of a route within a deployment.", ko: "deployment 안 route 의 생애 주기 상태입니다."}
+  - english: "service catalog status"
+    korean: "서비스 카탈로그 상태"
+    meaning: {en: "A bundle of status values for service instances registered in the service catalog.", ko: "service catalog 에 등록된 service instance 의 상태 값 묶음입니다."}
+  - english: "session status"
+    korean: "세션 상태"
+    meaning: {en: "The lifecycle status of a session, with values such as PENDING, PREPARING, RUNNING, and TERMINATED.", ko: "세션의 생애 상태로 PENDING, PREPARING, RUNNING, TERMINATED 등의 값을 가집니다."}
+  - english: "usage mode"
+    korean: "사용 방식"
+    meaning: {en: "A set of purpose values for a vfolder, consisting of general, model, and data.", ko: "vfolder 의 용도 값 묶음으로 general, model, data 가 있습니다."}
+  - english: "user status"
+    korean: "사용자 상태"
+    meaning: {en: "The status of a user account, with the values active, inactive, deleted, and before-verification.", ko: "user 계정 상태로 active, inactive, deleted, before-verification 값을 가집니다."}
+  - english: "vfolder operation status"
+    korean: "vfolder 작업 상태"
+    meaning: {en: "A set of status values that holds both the work status and the delete stage of a vfolder.", ko: "vfolder 의 업무 상태와 삭제 단계를 함께 담는 상태 값 묶음입니다."}
+    avoid: {ko: ["폴더 작업 상태"]}

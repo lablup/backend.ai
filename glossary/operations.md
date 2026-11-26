@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Operations
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [operations.ko.md](operations.ko.md)

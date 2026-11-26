@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Layers and components
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [architecture.ko.md](architecture.ko.md)

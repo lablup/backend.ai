@@ -52,7 +52,7 @@ cp proposals/BEP-0000-template.md proposals/BEP-XXXX-title.md
 cp proposals/BEP-0000-template.ko.md proposals/BEP-XXXX-title.ko.md
 ```
 
-Over 300 lines, use the segmented structure. See Document Segmentation below.
+Over `bep.max_lines` of `doclint.yaml`, use the segmented structure. See Document Segmentation below.
 
 ### Step 4: Fill Metadata
 
@@ -80,7 +80,7 @@ Write in the template order: Goals, Non-goals, Design, Impact, Implementation Or
 | Implementation Order | One step per issue, each with the goal or result it resolves |
 | References | Related BEPs and documents |
 
-- The template comments set the length limits. `go run ./tools/doclint check --only bep-length` checks them from BEP-1080.
+- The `bep` values of `doclint.yaml` set the length limits and the first BEP they apply to. `go run ./tools/doclint check --only bep-length` checks them.
 - Settle open questions in the review and write the result into the design. The BEP keeps no decision log.
 - Before requesting the review, run `/glossary-review`.
 
@@ -105,7 +105,7 @@ Each sub-document of a segmented BEP is a pair too, such as `component-a.md` and
 ### When to Segment
 
 Segment a BEP when **any** of these apply:
-- Total document exceeds 300 lines
+- Total document exceeds `bep.max_lines` of `doclint.yaml`
 - Design has 3+ distinct components
 - Implementation Order has 3+ independent steps
 - Document covers multiple subsystems

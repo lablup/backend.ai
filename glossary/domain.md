@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Product and domain concepts
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [domain.ko.md](domain.ko.md)

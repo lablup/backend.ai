@@ -3,15 +3,19 @@
 // Usage, from the repository root:
 //
 //	go run ./tools/doclint check [--only <check>[,<check>...]] [--base <ref> | --staged] [--root <dir>] [file ...]
+//	go run ./tools/doclint generate [--root <dir>]
 //
-// The checks are frontmatter (KNOWLEDGE.md schema, names, paths, links), bilingual (.md and
-// .ko.md pairs), words (words the glossary rejects), bep-length (BEP-1080 and later limits)
-// and agents-lines (AGENTS.md of at most 200 lines).
+// The checks are frontmatter (knowledge document schema, names, paths, links), bilingual
+// (document pairs), words (words the glossary rejects), bep-length (proposal limits) and
+// agents-lines (rule document length). Their criteria are in doclint.yaml and in the glossary
+// registry. generate writes the glossary documents from the registry.
 //
 // With --base, a check covers the documents changed since the ref, and the words check the
 // lines added since it. --staged does the same for the staged changes. With files, a check
 // covers those files. With none of these, it covers all.
 // A failure exits 1. A line starting with "review:" is printed and does not fail.
+//
+//go:generate go run . generate --root ../..
 package main
 
 import (
@@ -47,6 +51,9 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer) (failed bool, err error) {
+	if len(args) > 0 && args[0] == "generate" {
+		return false, runGenerate(args[1:])
+	}
 	if len(args) == 0 || args[0] != "check" {
 		return false, fmt.Errorf("usage: doclint check [--only <check>] [--base <ref> | --staged] [file ...]")
 	}

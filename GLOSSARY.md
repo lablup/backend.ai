@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary
 
 Sets the words and writing style for Backend.AI documents, code comments, BEPs and PRs. One concept, one word.

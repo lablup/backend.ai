@@ -2,14 +2,8 @@ package main
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/lablup/backend.ai/tools/internal/kdoc"
-)
-
-const (
-	agentsFile     = "AGENTS.md"
-	maxAgentsLines = 200
 )
 
 func checkAgentsLines(sc *scope, rel string) (string, error) {
@@ -17,20 +11,20 @@ func checkAgentsLines(sc *scope, rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if count := len(kdoc.SplitLines(string(data))); count > maxAgentsLines {
-		return fmt.Sprintf("%s:1: %d lines, limit %d", rel, count, maxAgentsLines), nil
+	if limit, count := sc.spec.Agents.MaxLines, len(kdoc.SplitLines(string(data))); count > limit {
+		return fmt.Sprintf("%s:1: %d lines, limit %d", rel, count, limit), nil
 	}
 	return "", nil
 }
 
 func runAgentsLines(sc *scope, out *report) error {
-	all, err := sc.allMarkdown()
+	all, err := sc.allDocuments()
 	if err != nil {
 		return err
 	}
 	var candidates []string
 	for _, rel := range all {
-		if path.Base(rel) == agentsFile {
+		if sc.spec.Agents.Path.MatchString(rel) {
 			candidates = append(candidates, rel)
 		}
 	}

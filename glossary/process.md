@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Process and documents
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [process.ko.md](process.ko.md)

@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Technology and tool names
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [tools.ko.md](tools.ko.md)

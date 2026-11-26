@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
 func TestCheckBEPLength(t *testing.T) {
@@ -32,9 +34,14 @@ func TestCheckBEPLength(t *testing.T) {
 		{"design table rows", "BEP-1090-x.md", "## Design\n\n### a\n\n| a |\n|---|\n" + strings.Repeat("| 1 |\n", 8), []string{"BEP-1090-x.md:5: 8 table rows, limit 7"}},
 		{"design lead text", "BEP-1090-x.md", "## Design\n\nOne. Two. Three. Four.\n\n### a\n", []string{"BEP-1090-x.md:1: 4 sentences in 'Design', limit 3"}},
 	}
+	loaded, err := spec.Load("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checker := newBEPChecker(loaded)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := checkBEPLength([]byte(tt.doc), tt.path)
+			got := checker.check([]byte(tt.doc), tt.path)
 			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
@@ -43,14 +50,18 @@ func TestCheckBEPLength(t *testing.T) {
 }
 
 func TestBEPPaths(t *testing.T) {
-	root := t.TempDir()
+	root := newRepo(t)
 	for _, rel := range []string{
 		"proposals/BEP-1079-old.md", "proposals/BEP-1080-new.md", "proposals/BEP-1080-new.ko.md",
 		"proposals/BEP-1081/a.md", "proposals/BEP-1070/a.md", "proposals/AGENTS.md",
 	} {
 		writeFile(t, root, rel, "x\n")
 	}
-	got, err := bepPaths(root)
+	sc, err := newScope(root, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := bepPaths(sc)
 	if err != nil {
 		t.Fatal(err)
 	}

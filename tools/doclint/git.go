@@ -39,14 +39,15 @@ func gitLines(root string, args ...string) ([]string, error) {
 	return lines, nil
 }
 
-// changedFiles returns the changed .md files, without the deleted ones.
+// changedFiles returns the changed documents, without the deleted ones.
 func changedFiles(sc *scope) ([]string, error) {
-	return gitLines(sc.root, "diff", "--name-only", "--diff-filter=d", sc.diffRange(), "--", "*.md")
+	return gitLines(sc.root, "diff", "--name-only", "--diff-filter=d", sc.diffRange(), "--", sc.pathspec(sc.spec.Documents.Extension))
 }
 
-// addedLines returns the line numbers added to each changed .md file.
+// addedLines returns the line numbers added to each changed document.
 func addedLines(sc *scope) (map[string]map[int]bool, error) {
-	diff, err := git(sc.root, "diff", "--unified=0", "--no-color", "--diff-filter=d", sc.diffRange(), "--", "*.md")
+	diff, err := git(sc.root, "diff", "--unified=0", "--no-color", "--diff-filter=d", sc.diffRange(),
+		"--", sc.pathspec(sc.spec.Documents.Extension))
 	if err != nil {
 		return nil, err
 	}

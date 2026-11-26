@@ -8,43 +8,79 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
-const glossaryEN = `# Glossary
-
-| Do not write | Write |
-|---|---|
-| refuse | reject |
-| leave out (a flag) | omit |
-| bring up, brought up | start |
-
-| Name | Value | Note |
-|---|---|---|
-| after | before | x |
+const testRules = `topics: [process]
+documents:
+  en:
+    path: GLOSSARY.md
+    term_path: "glossary/{topic}.md"
+    generated_note: "Generated."
+    title: "Glossary"
+    intro: [["Intro."]]
+    index: {heading: "Term files", lead: "Read."}
+    expressions: {heading: "Avoid", lead: "Verbs.", columns: ["Do not write", "Write"]}
+    terms: {title_prefix: "Glossary: ", lead: "See {topic}.", columns: ["English", "Meaning", "Do not write", "Note"]}
+  ko:
+    path: GLOSSARY.ko.md
+    term_path: "glossary/{topic}.ko.md"
+    generated_note: "생성."
+    title: "용어집"
+    intro: [["소개."]]
+    index: {heading: "용어 파일", lead: "읽습니다."}
+    expressions: {heading: "표현", lead: "서술어.", columns: ["사용하지 않는 표현", "대신"]}
+    terms: {title_prefix: "용어집: ", lead: "{topic} 참고.", columns: ["한글", "English", "뜻", "사용하지 않는 어휘", "메모"]}
+style:
+  en: [{heading: "Style", rules: ["One rule"]}]
+  ko: [{heading: "문체", rules: ["규칙"]}]
+expressions:
+  - {lang: en, word: "refuse", instead: "reject"}
+  - {lang: en, word: "leave out", qualifier: "a flag", instead: "omit"}
+  - {lang: en, word: "bring up, brought up", instead: "start"}
+  - {lang: en, word: "stand for", instead: "represent", except: ["stand for election"]}
+  - {lang: ko, word: "지우다", instead: "삭제하다"}
+  - {lang: ko, word: "막다 / 풀다", qualifier: "조건", instead: "차단하다"}
+korean:
+  particles: [은, 는, 이, 가, 을, 를, 의, 에, 도, 로, 와, 과, 만, 으로, 이다, 입니다]
+  verb:
+    dictionary_ending: 다
+    consonant_endings: [다, 고, 지, 는, 면, 며, 기, 게, 던, 니, 시, 겠]
+    vowel_endings: [아, 어, 았, 었, 은, 을, 습]
+    open_stem_finals: [ㄴ, ㄹ, ㅂ]
+    past_final: ㅆ
+    dropped_final: {final: ㄹ, endings: [는, 니], added: ㄴ}
+    contracted_syllables: {하: 해}
+    contracted_vowels: {ㅡ: ㅓ, ㅣ: ㅕ, ㅜ: ㅝ, ㅗ: ㅘ}
+    irregular: {syllable: 르, added_final: ㄹ, endings: [러, 라, 렀, 랐]}
+english:
+  inflections: [s, es, d, ed, ing]
 `
 
-const glossaryKO = `# 용어집
-
-| 사용하지 않는 표현 | 대신 |
-|---|---|
-| 지우다 | 삭제하다 |
-| 막다 / 풀다 (조건) | 차단하다 |
+const testTerms = `title:
+  en: {page: "Process", link: "Process", description: "process"}
+  ko: {page: "절차", link: "절차", description: "절차"}
+terms:
+  - english: "agent heartbeat"
+    korean: "에이전트 heartbeat"
+    meaning: {en: "A signal.", ko: "신호입니다."}
+    avoid: {en: ["heartbeat", "bgtask"]}
+  - english: "Agent"
+    korean: "컬럼"
+    meaning: {en: "The agent.", ko: "열입니다."}
+    avoid: {en: ["agent"], ko: ["컬럼", "칼럼"]}
 `
 
-const termsEN = `# Terms
-
-| English | Meaning | Do not write | Note |
-|---|---|---|---|
-| agent heartbeat | A signal. | heartbeat, bgtask | |
-| Agent | The agent. | agent | |
-`
-
-const termsKO = `# 용어
-
-| 한글 | English | 뜻 | 사용하지 않는 어휘 | 메모 |
-|---|---|---|---|---|
-| 컬럼 | column | 열 | 컬럼, 칼럼 | |
-`
+// repositorySpec is the doclint.yaml of this repository.
+func repositorySpec(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile("../../doclint.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
 
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
@@ -63,16 +99,15 @@ func newRepo(t *testing.T) string {
 	if out, err := exec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, out)
 	}
-	writeFile(t, root, "GLOSSARY.md", glossaryEN)
-	writeFile(t, root, "GLOSSARY.ko.md", glossaryKO)
-	writeFile(t, root, "glossary/process.md", termsEN)
-	writeFile(t, root, "glossary/process.ko.md", termsKO)
+	writeFile(t, root, "doclint.yaml", repositorySpec(t))
+	writeFile(t, root, "glossary/registry/rules.yaml", testRules)
+	writeFile(t, root, "glossary/registry/terms/process.yaml", testTerms)
 	return root
 }
 
 func TestMatchWords(t *testing.T) {
 	root := newRepo(t)
-	english, korean, err := loadWords(root)
+	english, korean, err := loadWords(filepath.Join(root, "glossary/registry"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +127,8 @@ func TestMatchWords(t *testing.T) {
 		{"alternative lowercase", english, "it was brought up", "brought up", false},
 		{"term variant is advisory", english, "the heartbeat arrives", "heartbeat", true},
 		{"same word as term skipped", english, "an agent", "", false},
-		{"second table is not read", english, "after that", "", false},
+		{"allowed expression", english, "I stand for election.", "", false},
+		{"outside the allowed expression", english, "They stand for it.", "stand for", false},
 		{"korean verb form", korean, "파일을 지운다", "지우다", false},
 		{"korean verb past", korean, "파일을 지웠다", "지우다", false},
 		{"korean other word", korean, "파일을 삭제한다", "", false},
@@ -106,7 +142,7 @@ func TestMatchWords(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var found *word
 			for i := range tt.words {
-				if tt.words[i].pattern.MatchString(tt.line) {
+				if tt.words[i].match(tt.line) {
 					found = &tt.words[i]
 					break
 				}
@@ -135,13 +171,17 @@ func TestProseLines(t *testing.T) {
 	}
 }
 
-func TestIsSkipped(t *testing.T) {
+func TestSkippedPaths(t *testing.T) {
+	loaded, err := spec.Load(newRepo(t))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for path, want := range map[string]bool{
 		"glossary/process.md": true, "GLOSSARY.md": true, "a/report.ko.md": true,
 		"CHANGELOG/26.9.md": true, "proposals/BEP-1.md": false, "AGENTS.md": false,
 	} {
-		if got := isSkipped(path); got != want {
-			t.Errorf("isSkipped(%q) = %v, want %v", path, got, want)
+		if got := matchesAny(loaded.Words.SkippedPaths, path); got != want {
+			t.Errorf("skipped(%q) = %v, want %v", path, got, want)
 		}
 	}
 }
@@ -361,5 +401,135 @@ func TestStagedTakesNoBaseOrFiles(t *testing.T) {
 		if _, err := run(args, io.Discard); err == nil {
 			t.Errorf("run(%v): want an error", args)
 		}
+	}
+}
+
+func TestSpecChangesTheCheck(t *testing.T) {
+	long := "- " + strings.Repeat("a", 121) + "\n"
+	tests := []struct {
+		name     string
+		check    string
+		file     string
+		content  string
+		old, new string
+		before   string
+		after    string
+	}{
+		{"agents limit", "agents-lines", "AGENTS.md", strings.Repeat("rule\n", 11),
+			"max_lines: 200", "max_lines: 10", "", "AGENTS.md:1: 11 lines, limit 10\n"},
+		{"bep item length", "bep-length", "proposals/BEP-1090-x.md", long,
+			"{en: 120, ko: 80}", "{en: 130, ko: 80}", "proposals/BEP-1090-x.md:1: list item of 121 chars, limit 120\n", ""},
+		{"bep first number", "bep-length", "proposals/BEP-1090-x.md", long,
+			"first_number: 1080", "first_number: 1091", "proposals/BEP-1090-x.md:1: list item of 121 chars, limit 120\n", ""},
+		{"skipped words path", "words", "notes.md", "We refuse.\n",
+			"- '(^|/)(glossary|CHANGELOG)(/|$)'", "- '(^|/)(glossary|CHANGELOG)(/|$)'\n    - '^notes'",
+			"notes.md:1: refuse -> reject: We refuse.\n", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newRepo(t)
+			writeFile(t, root, tt.file, tt.content)
+			out, _ := runCheck(t, root, "--only", tt.check, tt.file)
+			if out != tt.before {
+				t.Fatalf("before: out=%q, want %q", out, tt.before)
+			}
+			changed := strings.Replace(repositorySpec(t), tt.old, tt.new, 1)
+			if changed == repositorySpec(t) {
+				t.Fatalf("the spec has no %q", tt.old)
+			}
+			writeFile(t, root, "doclint.yaml", changed)
+			out, _ = runCheck(t, root, "--only", tt.check, tt.file)
+			if out != tt.after {
+				t.Fatalf("after: out=%q, want %q", out, tt.after)
+			}
+		})
+	}
+}
+
+func TestInvalidSpecIsRejected(t *testing.T) {
+	const (
+		specFile  = "doclint.yaml"
+		rulesPath = "glossary/registry/rules.yaml"
+		termsPath = "glossary/registry/terms/process.yaml"
+	)
+	tests := []struct {
+		name     string
+		file     string
+		old, new string
+		want     string
+	}{
+		{"unknown key", specFile, "max_lines: 200", "max_lines: 200\n  max_line: 1", "field max_line not found"},
+		{"missing value", specFile, "  max_lines: 200\n", "", "missing value agents.max_lines"},
+		{"empty list", specFile, "goal_sections: [Goals, 목표]", "goal_sections: []", "missing value bep.goal_sections"},
+		{"missing pattern", specFile, "  path: '(^|/)AGENTS\\.md$'\n", "", "missing value agents.path"},
+		{"bad pattern", specFile, "'(^|/)AGENTS\\.md$'", "'('", "error parsing regexp"},
+		{"missing language", specFile, "{en: 120, ko: 80}", "{en: 120}", "missing value bep.max_item_chars.ko"},
+		{"unknown kind", specFile, "kind: enum", "kind: choice", "unknown kind"},
+		{"unknown field reference", specFile, "title: name", "title: nothing", "unknown field"},
+		{"default outside the values", specFile, "default: stable", "default: old", "default must be one of the values"},
+		{"unknown rules key", rulesPath, "english:\n", "extra: 1\nenglish:\n", "field extra not found"},
+		{"missing rules value", rulesPath, "    past_final: ㅆ\n", "", "missing value korean.verb.past_final"},
+		{"missing instead", rulesPath, `, instead: "reject"`, "", "missing value expressions[0].instead"},
+		{"unknown language", rulesPath, "{lang: en, word: \"refuse\"", "{lang: fr, word: \"refuse\"", "unknown lang"},
+		{"not a jamo", rulesPath, "past_final: ㅆ", "past_final: x", "is not a jamo"},
+		{"unlisted topic", rulesPath, "topics: [process]", "topics: [other]", "has no term file"},
+		{"missing meaning", termsPath, `meaning: {en: "A signal.", ko: "신호입니다."}`, `meaning: {en: "A signal."}`, "terms[0]: missing value meaning.ko"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newRepo(t)
+			data, err := os.ReadFile(filepath.Join(root, tt.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			changed := strings.Replace(string(data), tt.old, tt.new, 1)
+			if changed == string(data) {
+				t.Fatalf("%s has no %q", tt.file, tt.old)
+			}
+			writeFile(t, root, tt.file, changed)
+			_, err = run([]string{"check", "--root", root, "--only", "words"}, io.Discard)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestGeneratedGlossaryIsCurrent(t *testing.T) {
+	loaded, err := spec.Load("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := loadRegistry(filepath.Join("../..", loaded.Words.Registry))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range reg.render() {
+		got, err := os.ReadFile(filepath.Join("../..", path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != want {
+			t.Errorf("%s differs from the registry: run go generate ./...", path)
+		}
+	}
+}
+
+func TestGenerate(t *testing.T) {
+	root := newRepo(t)
+	if err := os.MkdirAll(filepath.Join(root, "glossary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run([]string{"generate", "--root", root}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(root, "glossary/process.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "<!-- Generated. -->\n# Glossary: Process\n\nSee process.\n\n| English | Meaning | Do not write | Note |\n|---|---|---|---|\n" +
+		"| agent heartbeat | A signal. | heartbeat, bgtask |   |\n| Agent | The agent. | agent |   |\n"
+	if string(got) != want {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }

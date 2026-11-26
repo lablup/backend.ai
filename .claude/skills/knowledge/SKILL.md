@@ -25,6 +25,8 @@ Judge by the printed description; open only the files you actually need.
 
 ## Frontmatter schema
 
+The `knowledge` values of `doclint.yaml` define the schema the check reads: change a field there.
+
 | Field | Required | Value |
 |---|---|---|
 | `name` | yes | stable id, kebab-case, unique across the repo. Do not rename |
@@ -75,7 +77,8 @@ Actor convention: `<producer>/<version>` for agents (for example `claude-code/fa
 - Frontmatter goes only in `KNOWLEDGE.md`. Search and the schema check read only that file.
 - Both files keep the same headings in the same order. Update both in the same change.
 - Do not add Korean to `KNOWLEDGE.md`.
-- Use the words in `GLOSSARY.md` and `glossary/<topic>.md`.
+- Use the words in `GLOSSARY.md` and `glossary/<topic>.md`. To change a word, edit
+  `glossary/registry/` and run `go generate ./...`.
 
 ## Size and splitting
 
@@ -105,7 +108,7 @@ go run ./tools/doclint check --base origin/v2
 
 Validates the schema, scope and sources path existence, body links, name
 uniqueness, and the verified-not-older-than-generated invariant.
-`go run ./tools/doclint check` runs five checks: `frontmatter`, `bilingual` (the
+The criteria are in `doclint.yaml`. `go run ./tools/doclint check` runs five checks: `frontmatter`, `bilingual` (the
 `.md` and `.ko.md` pairs, no Korean added to a `.md` file), `words` (the words the
 glossary rejects, in added lines), `bep-length` and `agents-lines`. `--only <check>`
 picks one, and file arguments check whole files. The `build` job of `ci.yml` runs
@@ -119,6 +122,7 @@ it on pull requests.
 | Rationale, decision tables, constraints, canonical examples | `KNOWLEDGE.md` |
 | Human-facing component overview | `README.md` |
 | Pointer to `AGENTS.md` | `CLAUDE.md` (symlink) |
-| Words and writing style | `GLOSSARY.md`, `glossary/<topic>.md` |
+| Words and writing style | `glossary/registry/`, generated into `GLOSSARY.md`, `glossary/<topic>.md` |
+| Criteria of the document checks | `doclint.yaml` |
 | Scenario test results, generated and not edited by hand | `report.md`, `report.ko.md` |
 | Issue-scoped working notes | outside the repo |

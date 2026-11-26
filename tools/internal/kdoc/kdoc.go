@@ -1,4 +1,5 @@
-// Package kdoc parses the frontmatter of KNOWLEDGE.md files and validates it against the schema.
+// Package kdoc parses the frontmatter of knowledge documents and validates it against the
+// schema of doclint.yaml.
 //
 // The parser accepts only the YAML subset the schema uses: scalars, inline lists, block lists
 // (of scalars or flat mappings) and one level of nested mapping. Anything else is a parse error.
@@ -10,24 +11,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
-const (
-	// FileName is the name of a knowledge document.
-	FileName = "KNOWLEDGE.md"
-
-	defaultStatus = "stable"
-)
-
-var (
-	namePattern  = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-	datePattern  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-	keyValue     = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$`)
-	statusValues = []string{"deprecated", "draft", "stable"}
-)
+var keyValue = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$`)
 
 // Signature is an actor and the date they acted.
 type Signature struct {
@@ -35,18 +27,25 @@ type Signature struct {
 	At string
 }
 
-// Document is a KNOWLEDGE.md frontmatter validated against the schema.
-type Document struct {
-	Name        string
-	Type        string
-	Description string
-	Scope       string
-	Generated   Signature
-	Keywords    []string
-	Sources     []string
-	Updated     *Signature
-	Verified    []Signature
-	Status      string
+// Document is a frontmatter validated against the schema. A value is a string (kinds string
+// and enum), a []string, a Signature or a []Signature, under the name of its field.
+type Document map[string]any
+
+// Text returns the value of a string or enum field.
+func (d Document) Text(name string) string {
+	text, _ := d[name].(string)
+	return text
+}
+
+// Texts returns the values of a string, enum or strings field.
+func (d Document) Texts(name string) []string {
+	if list, ok := d[name].([]string); ok {
+		return list
+	}
+	if text := d.Text(name); text != "" {
+		return []string{text}
+	}
+	return nil
 }
 
 // ParseError is a frontmatter that cannot be parsed.
@@ -63,8 +62,8 @@ func (e *ParseError) Error() string {
 // map[string]string, or a map[string]string.
 type Raw map[string]any
 
-// IterFiles returns every KNOWLEDGE.md under root, skipping hidden and build directories.
-func IterFiles(root string) ([]string, error) {
+// IterFiles returns every knowledge document under root, outside the skipped directories.
+func IterFiles(root string, schema *spec.Knowledge) ([]string, error) {
 	var found []string
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -72,12 +71,12 @@ func IterFiles(root string) ([]string, error) {
 		}
 		if entry.IsDir() {
 			name := entry.Name()
-			if path != root && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "dist" || name == "build") {
+			if path != root && skipped(name, schema) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if entry.Name() == FileName {
+		if entry.Name() == schema.FileName {
 			found = append(found, path)
 		}
 		return nil
@@ -85,7 +84,14 @@ func IterFiles(root string) ([]string, error) {
 	return found, err
 }
 
-// Load returns the raw frontmatter and the body lines of a KNOWLEDGE.md file.
+func skipped(name string, schema *spec.Knowledge) bool {
+	return slices.Contains(schema.SkippedDirectoryNames, name) ||
+		slices.ContainsFunc(schema.SkippedDirectoryPrefixes, func(prefix string) bool {
+			return strings.HasPrefix(name, prefix)
+		})
+}
+
+// Load returns the raw frontmatter and the body lines of a knowledge document.
 func Load(path string) (Raw, []string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -94,7 +100,7 @@ func Load(path string) (Raw, []string, error) {
 	return Parse(data)
 }
 
-// Parse returns the raw frontmatter and the body lines of the content of a KNOWLEDGE.md.
+// Parse returns the raw frontmatter and the body lines of the content of a knowledge document.
 func Parse(data []byte) (Raw, []string, error) {
 	front, body, ok := splitDocument(string(data))
 	if !ok {
@@ -263,142 +269,174 @@ func parseListItem(lines []string, start int) (any, int, error) {
 	return entry, index, nil
 }
 
-// Build validates raw frontmatter. It returns the document (nil when a required field is
-// unusable) and every schema violation found.
-func Build(raw Raw) (*Document, []string) {
-	var problems []string
+// Build validates raw frontmatter against the schema. It returns the document (nil when a
+// required field is unusable) and every violation found.
+func Build(schema *spec.Knowledge, raw Raw) (Document, []string) {
+	b := &builder{schema: schema, raw: raw, document: Document{}}
+	usable := true
+	for _, field := range schema.Fields {
+		b.field(field)
+		if _, ok := b.document[field.Name]; field.Required && !ok {
+			usable = false
+		}
+	}
+	for _, field := range schema.Fields {
+		b.order(field)
+	}
+	b.signOff()
+	if !usable {
+		return nil, b.problems
+	}
+	return b.document, b.problems
+}
 
-	name := requiredString(raw, "name", &problems)
-	if name != "" && !namePattern.MatchString(name) {
-		problems = append(problems, fmt.Sprintf("name %s is not kebab-case", pyRepr(name)))
-	}
-	docType := requiredString(raw, "type", &problems)
-	description := requiredString(raw, "description", &problems)
-	scope := requiredString(raw, "scope", &problems)
-	generated := signature(raw["generated"], "generated", &problems)
+type builder struct {
+	schema   *spec.Knowledge
+	raw      Raw
+	document Document
+	problems []string
+}
 
-	var rawStatus any = defaultStatus
-	if value, ok := raw["status"]; ok {
-		rawStatus = value
-	}
-	status, _ := rawStatus.(string)
-	if !contains(statusValues, status) {
-		problems = append(problems, fmt.Sprintf("status %s is not one of %s", pyRepr(rawStatus), pyRepr(anyStrings(statusValues))))
-		status = defaultStatus
-	}
+func (b *builder) problem(format string, args ...any) {
+	b.problems = append(b.problems, fmt.Sprintf(format, args...))
+}
 
-	keywords := stringList(raw, "keywords", &problems)
-	sources := stringList(raw, "sources", &problems)
-	var updated *Signature
-	if value := raw["updated"]; value != nil {
-		updated = signature(value, "updated", &problems)
-	}
-	verified := verifiedList(raw["verified"], &problems)
-
-	if generated != nil && updated != nil && updated.At < generated.At {
-		problems = append(problems, fmt.Sprintf("updated (%s) is older than generated (%s)", updated.At, generated.At))
-	}
-	changed := updated
-	if changed == nil {
-		changed = generated
-	}
-	if changed != nil && len(verified) > 0 {
-		latest := verified[0].At
-		for _, entry := range verified {
-			if entry.At > latest {
-				latest = entry.At
+// field validates one field and keeps its usable value in the document.
+func (b *builder) field(field spec.Field) {
+	value, present := b.raw[field.Name]
+	switch field.Kind {
+	case spec.KindString:
+		text, ok := value.(string)
+		if !ok || strings.TrimSpace(text) == "" {
+			if field.Required {
+				b.problem("missing or empty required field '%s'", field.Name)
+			} else if present {
+				b.problem("'%s' must be a non-empty string", field.Name)
 			}
+			return
+		}
+		text = strings.TrimSpace(text)
+		b.document[field.Name] = text
+		if field.Pattern != nil && !field.Pattern.MatchString(text) {
+			b.problem("%s %s is not %s", field.Name, pyRepr(text), field.PatternName)
+		}
+	case spec.KindEnum:
+		if !present {
+			b.document[field.Name] = field.Default
+			return
+		}
+		text, _ := value.(string)
+		if !slices.Contains(field.Values, text) {
+			values := slices.Sorted(slices.Values(field.Values))
+			b.problem("%s %s is not one of %s", field.Name, pyRepr(value), pyRepr(anyStrings(values)))
+			text = field.Default
+		}
+		b.document[field.Name] = text
+	case spec.KindStrings:
+		if !present {
+			if field.Required {
+				b.problem("missing or empty required field '%s'", field.Name)
+			}
+			return
+		}
+		if list, ok := stringList(value); ok {
+			b.document[field.Name] = list
+			return
+		}
+		b.problem("'%s' must be a list of strings", field.Name)
+	case spec.KindSignature:
+		if value == nil && !field.Required {
+			return
+		}
+		if sig := b.signature(value, field.Name); sig != nil {
+			b.document[field.Name] = *sig
+		}
+	case spec.KindSignatures:
+		if value == nil {
+			if field.Required {
+				b.signature(value, field.Name)
+			}
+			return
+		}
+		if list := b.signatures(value, field.Name); list != nil {
+			b.document[field.Name] = list
+		}
+	}
+}
+
+// order checks that the date of a field is not older than the field it must not precede.
+func (b *builder) order(field spec.Field) {
+	later, ok := b.document[field.Name].(Signature)
+	earlier, found := b.document[field.NotBefore].(Signature)
+	if ok && found && later.At < earlier.At {
+		b.problem("%s (%s) is older than %s (%s)", field.Name, later.At, field.NotBefore, earlier.At)
+	}
+}
+
+func (b *builder) signOff() {
+	name := b.schema.SignOff.Field
+	entries, _ := b.document[name].([]Signature)
+	if len(entries) == 0 {
+		return
+	}
+	latest := slices.MaxFunc(entries, func(x, y Signature) int { return strings.Compare(x.At, y.At) }).At
+	for _, changedName := range b.schema.SignOff.Changed {
+		changed, ok := b.document[changedName].(Signature)
+		if !ok {
+			continue
 		}
 		if latest < changed.At {
-			problems = append(problems, fmt.Sprintf(
-				"verified (%s) is older than the last change (%s) — a meaningful change must clear 'verified'",
-				latest, changed.At))
+			b.problem("%s (%s) is older than the last change (%s) — a meaningful change must clear '%s'",
+				name, latest, changed.At, name)
 		}
+		return
 	}
-
-	if name == "" || docType == "" || description == "" || scope == "" || generated == nil {
-		return nil, problems
-	}
-	return &Document{
-		Name:        name,
-		Type:        docType,
-		Description: description,
-		Scope:       scope,
-		Generated:   *generated,
-		Keywords:    keywords,
-		Sources:     sources,
-		Updated:     updated,
-		Verified:    verified,
-		Status:      status,
-	}, problems
 }
 
-func requiredString(raw Raw, key string, problems *[]string) string {
-	value, ok := raw[key].(string)
-	if !ok || strings.TrimSpace(value) == "" {
-		*problems = append(*problems, fmt.Sprintf("missing or empty required field '%s'", key))
-		return ""
-	}
-	return strings.TrimSpace(value)
-}
-
-func stringList(raw Raw, key string, problems *[]string) []string {
-	value, present := raw[key]
-	if !present {
-		return nil
-	}
+func stringList(value any) ([]string, bool) {
 	list, ok := value.([]any)
 	if !ok {
-		*problems = append(*problems, fmt.Sprintf("'%s' must be a list of strings", key))
-		return nil
+		return nil, false
 	}
 	result := make([]string, 0, len(list))
 	for _, item := range list {
 		text, ok := item.(string)
 		if !ok {
-			*problems = append(*problems, fmt.Sprintf("'%s' must be a list of strings", key))
-			return nil
+			return nil, false
 		}
 		result = append(result, text)
 	}
-	return result
+	return result, true
 }
 
-func signature(value any, key string, problems *[]string) *Signature {
+func (b *builder) signature(value any, key string) *Signature {
+	keys := b.schema.Signature
 	mapping, ok := value.(map[string]string)
-	if !ok || mapping["by"] == "" || mapping["at"] == "" {
-		*problems = append(*problems, fmt.Sprintf("missing '%s' with 'by' and 'at'", key))
+	if !ok || mapping[keys.Actor] == "" || mapping[keys.Date] == "" {
+		b.problem("missing '%s' with '%s' and '%s'", key, keys.Actor, keys.Date)
 		return nil
 	}
-	if !datePattern.MatchString(mapping["at"]) {
-		*problems = append(*problems, fmt.Sprintf("%s.at must be YYYY-MM-DD, got %s", key, pyRepr(mapping["at"])))
+	if !keys.DatePattern.MatchString(mapping[keys.Date]) {
+		b.problem("%s.%s must be %s, got %s", key, keys.Date, keys.DateFormat, pyRepr(mapping[keys.Date]))
 		return nil
 	}
-	return &Signature{By: mapping["by"], At: mapping["at"]}
+	return &Signature{By: mapping[keys.Actor], At: mapping[keys.Date]}
 }
 
-func verifiedList(value any, problems *[]string) []Signature {
-	if value == nil {
-		return nil
-	}
+func (b *builder) signatures(value any, key string) []Signature {
 	entries, ok := value.([]any)
 	if !ok {
 		entries = []any{value}
 	}
 	var result []Signature
 	for _, entry := range entries {
-		sig := signature(entry, "verified", problems)
+		sig := b.signature(entry, key)
 		if sig == nil {
 			return nil
 		}
 		result = append(result, *sig)
 	}
 	return result
-}
-
-func contains(values []string, value string) bool {
-	i := sort.SearchStrings(values, value)
-	return i < len(values) && values[i] == value
 }
 
 func anyStrings(values []string) []any {

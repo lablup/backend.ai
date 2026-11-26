@@ -1,0 +1,360 @@
+title:
+  en: {page: "Product and domain concepts", link: "Product and domain concepts", description: "concepts the product handles, such as sessions, deployments, vfolders and resources"}
+  ko: {page: "제품, 도메인 개념", link: "제품, 도메인 개념", description: "세션, 배포, vfolder, 자원처럼 제품이 다루는 개념"}
+terms:
+  - english: "accelerator"
+    korean: "가속기"
+    meaning: {en: "A plugin installed on an agent to add resource slots.", ko: "agent 에 설치해 resource slot 을 추가하는 플러그인입니다."}
+    avoid: {en: ["Compute Plugins"], ko: ["Compute Plugins", "액셀러레이터"]}
+  - english: "Agent"
+    korean: "에이전트"
+    meaning: {en: "A component that manages the container lifecycle on a node, monitors resource usage, and reports its status to the manager.", ko: "노드에서 컨테이너 라이프사이클을 관리하고 자원 사용을 감시하며 Manager 에 상태를 보고하는 컴포넌트입니다."}
+    avoid: {en: ["compute node"], ko: ["실행 노드", "compute node", "컴퓨트 노드"]}
+    note: {en: "In Backend.AI documentation, Agent alone is fine. Use node when referring only to the node where it runs, not to the agent.", ko: "Backend.AI 문서 안에서는 Agent 만 써도 됩니다. 에이전트를 가리키지 않고 실행되는 노드만 말할 때는 node 로 씁니다"}
+  - english: "agent selection strategy"
+    korean: "에이전트 선택 전략"
+    meaning: {en: "A strategy for choosing the agent on which to place a session.", ko: "세션을 배치할 agent 를 고르는 전략입니다."}
+  - english: "alert"
+    korean: "알림"
+    meaning: {en: "A feature that sends automatic notifications to external messaging services based on monitoring metric thresholds.", ko: "모니터링 지표 임계값에 따라 외부 메시징 서비스로 자동 알림을 보내는 기능입니다."}
+  - english: "alias"
+    korean: "별칭"
+    meaning: {en: "A path used instead of the folder name when mounting.", ko: "마운트할 때 폴더 이름 대신 사용하는 경로입니다."}
+    avoid: {ko: ["대체 이름", "대체이름"]}
+  - english: "API endpoint"
+    korean: "엔드포인트"
+    meaning: {en: "The address of the API server to connect to.", ko: "접속할 API 서버 주소입니다."}
+    avoid: {ko: ["엔트포인트"]}
+  - english: "app config"
+    korean: "앱 설정"
+    meaning: {en: "The value of an app config key merged from the fragments of all visible scopes.", ko: "보이는 모든 scope 의 fragment 를 병합한 app config key 의 값입니다."}
+    avoid: {en: ["AppConfig"], ko: ["AppConfig"]}
+  - english: "app config allow list"
+    korean: "앱 설정 허용 목록"
+    meaning: {en: "A list that determines, per config name, whether a scope can write a value and the fragment merge priority.", ko: "config 이름별로 scope 가 값을 쓸 수 있는지와 fragment 병합 순위를 정하는 목록입니다."}
+  - english: "app service"
+    korean: "앱 서비스"
+    meaning: {en: "An application service started inside a session.", ko: "세션 안에서 시작하는 application service 입니다."}
+    avoid: {ko: ["세션 앱 서비스"]}
+  - english: "artifact"
+    korean: "아티팩트"
+    meaning: {en: "A model, package, or image in an artifact registry.", ko: "아티팩트 레지스트리에 있는 모델, 패키지, 이미지입니다."}
+  - english: "artifact registry"
+    korean: "아티팩트 레지스트리"
+    meaning: {en: "A registry that manages AI models, packages and images from external sources such as HuggingFace Hub and Reservoir.", ko: "HuggingFace Hub, Reservoir 같은 외부 소스의 AI 모델, 패키지, 이미지를 관리합니다."}
+  - english: "artifact revision"
+    korean: "아티팩트 리비전"
+    meaning: {en: "A version of an artifact that is created by a registry scan and imported separately.", ko: "registry scan 으로 만들어지고 따로 import 되는 artifact 의 버전입니다."}
+  - english: "artifact storage"
+    korean: "아티팩트 저장소"
+    meaning: {en: "A destination for storing artifacts that is preconfigured in the system settings.", ko: "시스템 설정에 미리 구성된 아티팩트 저장 목적지입니다."}
+  - english: "artifact type"
+    korean: "아티팩트 유형"
+    meaning: {en: "A grouping of artifact kinds.", ko: "artifact 의 종류 묶음입니다."}
+  - english: "audit log"
+    korean: "감사 로그"
+    meaning: {en: "A record of who executed which action on what.", ko: "누가 어떤 action 을 무엇에 실행했는지 남긴 기록입니다."}
+  - english: "auto-mount vfolder"
+    korean: "자동 마운트 vfolder"
+    meaning: {en: "A vfolder that is automatically mounted to every session created by a project or a user.", ko: "project 나 사용자가 만드는 모든 session 에 자동으로 마운트되는 vfolder 입니다."}
+    avoid: {en: ["Auto-mount vfolders", "vfolder auto-mount"], ko: ["Auto-mount vfolders", "자동 마운트", "vfolder auto-mount", "자동 마운트 폴더"]}
+  - english: "auto-scaling rule"
+    korean: "오토스케일링 규칙"
+    meaning: {en: "A rule that adjusts the number of replicas of a deployment based on metrics.", ko: "지표에 따라 deployment 의 replica 수를 조정하는 규칙입니다."}
+  - english: "Backend.AI"
+    korean: "Backend.AI"
+    meaning: {en: "A container-based computing cluster platform.", ko: "컨테이너 기반 컴퓨팅 클러스터 플랫폼입니다."}
+  - english: "base image"
+    korean: "기본 이미지"
+    meaning: {en: "An image attached to a container-based or VM-based kernel.", ko: "container 나 VM 기반 kernel 에 붙는 이미지입니다."}
+  - english: "bootstrap script"
+    korean: "부트스트랩 스크립트"
+    meaning: {en: "A script that runs when a session starts.", ko: "session 이 시작할 때 실행하는 스크립트입니다."}
+  - english: "channel type"
+    korean: "알림 채널 유형"
+    meaning: {en: "A classification of notification channel kinds.", ko: "알림 채널의 종류 구분입니다."}
+  - english: "circuit"
+    korean: "circuit"
+    meaning: {en: "A routing rule from the client to the session service.", ko: "client 에서 session service 로 가는 라우팅 규칙입니다."}
+    note: {en: "Will be moved to manager management and replaced with ingress later.", ko: "앞으로 manager 관리로 옮기며 ingress 로 대체합니다"}
+  - english: "client IP masking"
+    korean: "클라이언트 IP 마스킹"
+    meaning: {en: "Masks the client IP with one policy row per target_type.", ko: "target_type 하나당 하나의 정책 행으로 client IP 를 마스킹합니다."}
+  - english: "cluster mode"
+    korean: "클러스터 모드"
+    meaning: {en: "A value that indicates whether a session runs on a single node or multiple nodes.", ko: "session 이 단일 node 인지 여러 node 인지 나타내는 값입니다."}
+  - english: "code execution"
+    korean: "코드 실행"
+    meaning: {en: "An API that interacts with an interactive session.", ko: "interactive 세션과 상호작용하는 API 입니다."}
+  - english: "compute environment"
+    korean: "실행 환경"
+    meaning: {en: "A list of image environments scanned from the container registry and shown on the screen.", ko: "container registry 에서 스캔해 화면에 표시하는 image 환경 목록입니다."}
+    avoid: {ko: ["계산 환경", "계산환경"]}
+  - english: "compute schedule"
+    korean: "세션 배치 계산"
+    meaning: {en: "An operation that calculates whether a session can be placed in a resource group without provisioning.", ko: "프로비저닝 없이 세션이 resource group 에 배치 가능한지 계산하는 동작입니다."}
+  - english: "container registry"
+    korean: "컨테이너 레지스트리"
+    meaning: {en: "A registry for pulling container images and its access credentials.", ko: "container image 를 받아 오는 registry 와 접근 자격 증명입니다."}
+    avoid: {ko: ["레지스트리"]}
+  - english: "Control Panel"
+    korean: "컨트롤 패널"
+    meaning: {en: "An add-on service for advanced management and monitoring of the manager.", ko: "manager 용 고급 관리·감시 add-on 서비스입니다."}
+  - english: "custom image"
+    korean: "커스텀 이미지"
+    meaning: {en: "An image created by a session commit.", ko: "session commit 으로 만들어진 image 입니다."}
+    avoid: {en: ["customized image"], ko: ["customized image", "사용자 정의 이미지"]}
+  - english: "dashboard"
+    korean: "대시보드"
+    meaning: {en: "An add-on service that shows real-time and past performance metrics.", ko: "실시간과 과거 성능 지표를 보여주는 add-on 서비스입니다."}
+    avoid: {en: ["Backend.AI Dashboard"], ko: ["Backend.AI Dashboard"]}
+  - english: "deployment"
+    korean: "배포"
+    meaning: {en: "A model service that has the number of replicas to maintain and the replica group serving them.", ko: "유지할 replica 수와 그것을 서비스하는 replica group 을 가진 model service 입니다."}
+    avoid: {en: ["Model Service"], ko: ["Model Service", "모델 배포"]}
+  - english: "deployment agent designation"
+    korean: "배포 에이전트 지정"
+    meaning: {en: "A feature that designates the agent on which a deployment is placed.", ko: "배포를 배치할 agent 를 지정하는 기능입니다."}
+    avoid: {en: ["deployment designated agent"], ko: ["deployment designated agent", "배포 지정 에이전트"]}
+  - english: "deployment endpoint"
+    korean: "배포 엔드포인트"
+    meaning: {en: "A model serving unit that has replicas, revisions and autoscaling.", ko: "replica 와 revision, autoscaling 을 가진 모델 서빙 단위입니다."}
+    avoid: {en: ["endpoint"], ko: ["endpoint"]}
+  - english: "deployment preset"
+    korean: "배포 프리셋"
+    meaning: {en: "A named template for a single runtime variant that holds the initial values of a deployment.", ko: "runtime variant 하나에 대한 이름 있는 템플릿으로 deployment 의 시작 값을 담습니다."}
+  - english: "deployment strategy"
+    korean: "배포 전략"
+    meaning: {en: "A way to release the revisions of a deployment, which has the values ROLLING and BLUE_GREEN.", ko: "deployment 의 리비전을 배포하는 방식으로 ROLLING, BLUE_GREEN 값을 가집니다."}
+  - english: "domain"
+    korean: "도메인"
+    meaning: {en: "The top-level tenant that contains projects and users.", ko: "project 와 user 를 담는 최상위 tenant 입니다."}
+  - english: "error log"
+    korean: "에러 로그"
+    meaning: {en: "An error record exposed to users that can be marked as read or deleted.", ko: "사용자에게 노출되어 읽음 처리하거나 지울 수 있는 오류 기록입니다."}
+    avoid: {ko: ["오류 로그"]}
+  - english: "fair share"
+    korean: "fair share"
+    meaning: {en: "A scheduling feature that fairly distributes resources based on usage history.", ko: "사용 이력에 따라 자원을 공평하게 배분하는 스케줄링 기능입니다."}
+  - english: "fair share factor"
+    korean: "fair share 계수"
+    meaning: {en: "A metric calculated by reflecting past usage, where a higher value means higher scheduling priority.", ko: "지난 사용량을 반영해 계산되며 값이 높을수록 스케줄링 우선순위가 높은 지표입니다."}
+    avoid: {en: ["Fairness Score"], ko: ["Fairness Score", "우선 순위 계수"]}
+  - english: "fractional GPU sharing"
+    korean: "GPU 분할"
+    meaning: {en: "A GPU sharing feature available only in the enterprise edition.", ko: "enterprise 버전에서만 쓸 수 있는 GPU 나눠 쓰기 기능입니다."}
+    avoid: {en: ["GPU sharing", "fractional sharing of GPUs"], ko: ["GPU sharing", "fractional sharing of GPUs", "GPU 분할 공유"]}
+  - english: "GUI desktop client"
+    korean: "데스크톱 클라이언트"
+    meaning: {en: "A desktop client that enables GUI features not possible on the web.", ko: "웹에서 불가능한 GUI 기능을 쓰게 해주는 데스크톱 클라이언트입니다."}
+    avoid: {en: ["Backend.AI Web UI App"], ko: ["Backend.AI Web UI App"]}
+  - english: "HuggingFace registry"
+    korean: "허깅 페이스 레지스트리"
+    meaning: {en: "A registry entry that holds a HuggingFace Hub address and an access token.", ko: "HuggingFace Hub 주소와 접근 token 을 담은 registry 항목입니다."}
+    avoid: {ko: ["HuggingFace 레지스트리"]}
+  - english: "idle checker"
+    korean: "유휴 검사기"
+    meaning: {en: "A rule that terminates a session based on lifetime, network unresponsiveness, and resource utilization.", ko: "수명, 네트워크 무응답, 자원 사용률 기준으로 session 을 종료하는 규칙입니다."}
+  - english: "image"
+    korean: "이미지"
+    meaning: {en: "A container image that launches sessions and belongs to a registry.", ko: "세션을 띄우는 container image 로 registry 에 속합니다."}
+  - english: "image alias"
+    korean: "이미지 별칭"
+    meaning: {en: "An alias attached to an image, whose registration and removal are protected by superadmin validation.", ko: "이미지에 붙이는 별칭으로 등록과 해제는 superadmin 검사로 보호됩니다."}
+    avoid: {ko: ["별명"]}
+  - english: "intrinsic service"
+    korean: "기본 제공 서비스"
+    meaning: {en: "A service available in every kernel without separate support from the image author.", ko: "이미지 저자가 따로 지원하지 않아도 모든 kernel 에서 쓸 수 있는 서비스입니다."}
+  - english: "kernel"
+    korean: "커널"
+    meaning: {en: "A container that runs a session.", ko: "세션 을 실행하는 container 입니다."}
+  - english: "kernel group"
+    korean: "커널 그룹"
+    meaning: {en: "One role in a session, the unit in which its member kernels share one execution spec.", ko: "session 의 한 role 로 속한 kernel 들이 하나의 execution spec 을 공유하는 단위입니다."}
+  - english: "kernel group role"
+    korean: "커널 그룹 역할"
+    meaning: {en: "The role a kernel takes in a multi-kernel session, where the first container is main and the rest are sub.", ko: "클러스터 세션에서 kernel 이 맡는 역할로 첫 컨테이너가 main, 나머지가 sub 입니다."}
+    avoid: {en: ["cluster role"], ko: ["cluster role", "클러스터 역할"]}
+  - english: "login client type"
+    korean: "로그인 클라이언트 유형"
+    meaning: {en: "The type of client that opens a login session.", ko: "login session 을 여는 client 의 종류입니다."}
+  - english: "login history"
+    korean: "로그인 이력"
+    meaning: {en: "A single login attempt recorded for a user.", ko: "사용자에 대해 기록된 login 시도 하나입니다."}
+  - english: "login session"
+    korean: "로그인 세션"
+    meaning: {en: "A session that persists while a user stays authenticated, with values active, invalidated and revoked.", ko: "사용자가 인증한 상태로 남는 session 이며 active, invalidated, revoked 값을 가집니다."}
+  - english: "model card"
+    korean: "모델 카드"
+    meaning: {en: "A description of a model contained in a vfolder.", ko: "vfolder 에 담긴 model 에 대한 설명입니다."}
+  - english: "model definition"
+    korean: "모델 정의"
+    meaning: {en: "A configuration that defines the model composition and metadata of a model service.", ko: "model service 의 model 구성과 메타데이터를 정의하는 설정입니다."}
+  - english: "model revision"
+    korean: "모델 리비전"
+    meaning: {en: "An immutable version of a model within a model deployment.", ko: "model deployment 안에서 모델의 불변 버전입니다."}
+  - english: "model store"
+    korean: "모델 스토어"
+    meaning: {en: "A store where a user picks models and imports them into their own vfolder.", ko: "사용자가 모델을 골라 자신의 vfolder 로 가져오는 스토어입니다."}
+  - english: "model store project"
+    korean: "모델 스토어 프로젝트"
+    meaning: {en: "A project of the MODEL_STORE project type to which a model card belongs.", ko: "model card 가 속하는 MODEL_STORE project type 의 project 입니다."}
+  - english: "model vfolder"
+    korean: "모델 vfolder"
+    meaning: {en: "A vfolder that holds model parameters and execution configuration files.", ko: "모델 파라미터와 실행 구성 파일을 담은 vfolder 입니다."}
+    avoid: {ko: ["모델 폴더"]}
+  - english: "multi-kernel session"
+    korean: "멀티 커널 세션"
+    meaning: {en: "A session that has multiple kernels.", ko: "여러 kernel 을 가진 세션입니다."}
+    avoid: {en: ["cluster session"], ko: ["cluster session", "클러스터 세션"]}
+  - english: "notification channel"
+    korean: "알림 채널"
+    meaning: {en: "The target to which a notification is sent.", ko: "notification 을 보내는 대상입니다."}
+  - english: "notification rule"
+    korean: "알림 규칙"
+    meaning: {en: "A rule that defines the message to use when sending one type of event to a channel.", ko: "한 종류의 event 를 channel 로 보내며 쓸 메시지를 정하는 규칙입니다."}
+  - english: "object storage"
+    korean: "오브젝트 스토리지"
+    meaning: {en: "An S3-compatible object storage accessed with an endpoint and credentials.", ko: "endpoint 와 자격 증명으로 접근하는 S3 호환 object storage 입니다."}
+  - english: "personal project"
+    korean: "개인 프로젝트"
+    meaning: {en: "A project for an individual user, with only one per user.", ko: "user 마다 하나만 두는 개인 project 입니다."}
+  - english: "pipeline"
+    korean: "파이프라인"
+    meaning: {en: "A unit for designing and executing computational tasks in sequence.", ko: "연산 작업을 이어서 설계·실행하는 단위입니다."}
+  - english: "project"
+    korean: "프로젝트"
+    meaning: {en: "A group of users that owns sessions and vfolders within a domain.", ko: "domain 안에서 session 과 vfolder 를 소유하는 사용자 묶음입니다."}
+    avoid: {en: ["group"], ko: ["group"]}
+  - english: "project type"
+    korean: "프로젝트 유형"
+    meaning: {en: "A type that defines the purpose and behavior of a project.", ko: "project 의 용도와 동작을 정하는 종류입니다."}
+  - english: "prometheus query preset"
+    korean: "프로메테우스 쿼리 프리셋"
+    meaning: {en: "A named Prometheus query template and execution time range saved in advance.", ko: "이름 붙은 Prometheus 질의 템플릿과 실행 시간 범위를 미리 저장해 둔 대상입니다."}
+  - english: "quota scope"
+    korean: "가용량 범위"
+    meaning: {en: "A storage usage limit per user and per project.", ko: "사용자별과 프로젝트별 스토리지 사용량 한도입니다."}
+  - english: "rate limit"
+    korean: "최대 요청수"
+    meaning: {en: "A limit that caps the number of API requests so that a client does not overload the server.", ko: "client 가 서버에 과부하를 주지 않도록 API 요청 수를 제한하는 한도입니다."}
+  - english: "replica"
+    korean: "복제본"
+    meaning: {en: "A single session serving a deployment, which receives part of the traffic when healthy.", ko: "deployment 를 서비스하는 session 하나로, healthy 이면 트래픽의 일부를 받습니다."}
+  - english: "replica group"
+    korean: "복제본 그룹"
+    meaning: {en: "A unit that groups the replicas of a deployment and adjusts traffic while moving between revisions.", ko: "deployment 의 replica 들을 묶어 리비전 사이를 옮겨가며 트래픽을 조정하는 단위입니다."}
+  - english: "Reservoir"
+    korean: "Reservoir"
+    meaning: {en: "A type of artifact registry used as an artifact storage.", ko: "artifact 저장소로 사용되는 artifact registry 종류입니다."}
+    avoid: {ko: ["리저버", "레저버"]}
+    note: {en: "Written only in English because it is a product name.", ko: "제품 이름이라 영어로만 씁니다"}
+  - english: "resource allocation"
+    korean: "자원 할당"
+    meaning: {en: "An entry that records the amount of a resource that a kernel requested, received, and actually used.", ko: "커널이 한 자원을 요청하고 받아 실제로 사용한 양을 기록하는 항목입니다."}
+  - english: "resource group"
+    korean: "자원 그룹"
+    meaning: {en: "A unit that groups agents and places sessions with an independent scheduler.", ko: "agent 를 묶어 독립된 scheduler 로 세션을 배치하는 단위입니다."}
+    avoid: {en: ["scaling group", "sgroup"], ko: ["scaling group", "sgroup", "리소스 그룹", "스케일링 그룹"]}
+  - english: "resource preset"
+    korean: "자원 프리셋"
+    meaning: {en: "A named bundle of resource amounts that a session can request.", ko: "session 이 요청할 수 있는 이름 있는 자원량 묶음입니다."}
+    avoid: {ko: ["리소스 프리셋"]}
+  - english: "resource slot"
+    korean: "자원 슬롯"
+    meaning: {en: "A resource unit such as CPU, memory, and GPU allocated to a session.", ko: "세션에 할당되는 CPU, memory, GPU 등 자원 단위입니다."}
+    avoid: {ko: ["리소스 슬롯"]}
+  - english: "resource slot type"
+    korean: "자원 슬롯 유형"
+    meaning: {en: "A classification of the resource slot value shape, with the values count, bytes, unique, and unified.", ko: "resource slot 값의 형태 구분으로 count, bytes, unique, unified 값을 가집니다."}
+    avoid: {ko: ["리소스 슬롯 유형", "슬롯 타입"]}
+  - english: "resource weight"
+    korean: "자원별 가중치"
+    meaning: {en: "A fair share priority multiplier set per resource type.", ko: "자원 종류별로 두는 fair share 우선순위 배율입니다."}
+  - english: "revision"
+    korean: "리비전"
+    meaning: {en: "A snapshot of a deployment configuration at a single point in time.", ko: "deployment 의 구성 한 시점 스냅샷입니다."}
+  - english: "rolling update"
+    korean: "롤링 업데이트"
+    meaning: {en: "A method in which a deployment gradually deploys a new revision.", ko: "deployment 가 새 revision 을 점진적으로 배포하는 방식입니다."}
+  - english: "runtime variant"
+    korean: "인퍼런스 런타임 종류"
+    meaning: {en: "The model serving runtime in which a deployment revision runs.", ko: "deployment revision 이 실행되는 model serving runtime 입니다."}
+    avoid: {ko: ["런타임", "런타임 변형", "변형"]}
+  - english: "runtime variant preset"
+    korean: "런타임 파라미터"
+    meaning: {en: "A stored configuration of a single runtime variant.", ko: "runtime variant 하나의 저장된 설정입니다."}
+  - english: "scheduler type"
+    korean: "스케줄러 유형"
+    meaning: {en: "The kind of scheduler used by a resource group.", ko: "resource group 의 scheduler 종류입니다."}
+  - english: "scratch storage"
+    korean: "스크래치 스토리지"
+    meaning: {en: "A local temporary storage space given to each kernel and cleaned up on termination.", ko: "kernel 마다 주어지고 종료 시 정리되는 로컬 임시 저장 공간입니다."}
+  - english: "service catalog"
+    korean: "서비스 카탈로그"
+    meaning: {en: "A catalog where running components register themselves with the manager.", ko: "실행 중인 컴포넌트가 manager 에 자신을 알려 등록되는 카탈로그입니다."}
+    avoid: {en: ["SD catalog"], ko: ["SD catalog"]}
+  - english: "service group"
+    korean: "서비스 그룹"
+    meaning: {en: "An identifier that groups service instances of the same kind in the service catalog.", ko: "service catalog 에서 같은 종류의 service instance 를 묶는 식별자입니다."}
+  - english: "service port"
+    korean: "서비스 포트"
+    meaning: {en: "A port through which a container exposes its service to the outside.", ko: "container 가 외부에 노출하는 서비스 포트입니다."}
+    avoid: {en: ["Service Proxies"], ko: ["Service Proxies"]}
+  - english: "session"
+    korean: "세션"
+    meaning: {en: "A unit that groups kernels for execution. Kernels with the same execution spec are managed as a kernel group within the session.", ko: "kernel 을 묶어 실행하는 단위입니다. 같은 실행 스펙을 가진 kernel 은 세션 안에서 kernel group 으로 관리합니다."}
+    avoid: {en: ["compute session", "computing session"], ko: ["계산 세션", "compute session", "연산 세션", "computing session"]}
+  - english: "session dependency"
+    korean: "세션 의존 관계"
+    meaning: {en: "A dependency between sessions in which one session waits for another.", ko: "다른 session 이 기다리는 session 간 의존 관계입니다."}
+  - english: "session group"
+    korean: "세션 그룹"
+    meaning: {en: "A unit that places multiple sessions together on the same agent or spreads them across agents.", ko: "여러 세션을 같은 agent 에 모으거나 흩어 배치하는 단위입니다."}
+    avoid: {en: ["placement group"], ko: ["placement group"]}
+  - english: "session history"
+    korean: "세션 이력"
+    meaning: {en: "A record that leaves status changes and results each time a session scheduling handler runs.", ko: "세션 스케줄링 handler 가 한 번 실행될 때 상태 변화와 결과를 남긴 기록입니다."}
+  - english: "session lifetime"
+    korean: "세션 수명"
+    meaning: {en: "The maximum time a session can run.", ko: "세션이 실행될 수 있는 최대 시간입니다."}
+  - english: "session template"
+    korean: "세션 템플릿"
+    meaning: {en: "A stored configuration used when creating a session.", ko: "세션을 만들 때 사용하는 저장된 설정입니다."}
+    avoid: {en: ["task template"], ko: ["task template"]}
+  - english: "session type"
+    korean: "세션 유형"
+    meaning: {en: "A bundle of session kind values, including interactive, batch, inference, and system.", ko: "session 의 종류 값 묶음으로 interactive, batch, inference, system 이 있습니다."}
+    avoid: {ko: ["세션 타입"]}
+  - english: "storage host"
+    korean: "스토리지 호스트"
+    meaning: {en: "A storage backend host that holds vfolders.", ko: "vfolder 를 두는 storage backend host 입니다."}
+  - english: "storage namespace"
+    korean: "스토리지 네임스페이스"
+    meaning: {en: "A bucket of an object storage or a subpath of a VFS storage.", ko: "object storage 의 bucket 이나 VFS storage 의 subpath 입니다."}
+    avoid: {ko: ["네임스페이스"]}
+  - english: "storage volume"
+    korean: "스토리지 볼륨"
+    meaning: {en: "A logical volume on a storage backend, identified by the name that each service declares.", ko: "storage backend 위의 논리 볼륨으로 각 서비스가 선언한 이름으로 식별됩니다."}
+  - english: "system session"
+    korean: "시스템 세션"
+    meaning: {en: "A system type of session that a user launches, such as an SFTP session.", ko: "SFTP session 처럼 사용자가 띄우는 system 종류의 session 입니다."}
+  - english: "terminate"
+    korean: "종료"
+    meaning: {en: "An operation that ends a session.", ko: "세션을 끝내는 동작입니다."}
+  - english: "unmanaged vfolder"
+    korean: "unmanaged vfolder"
+    meaning: {en: "A vfolder that points directly to a path on the storage host and keeps that path in unmanaged_path.", ko: "storage host 의 경로를 그대로 가리키는 vfolder 로 unmanaged_path 에 그 경로를 둡니다."}
+    avoid: {en: ["unmanaged virtual folder"], ko: ["unmanaged virtual folder", "Unmanaged 폴더"]}
+  - english: "user"
+    korean: "사용자"
+    meaning: {en: "An account within a domain.", ko: "domain 안의 계정입니다."}
+  - english: "user resource policy"
+    korean: "사용자 자원 정책"
+    meaning: {en: "A resource limit policy applied per user.", ko: "user 단위로 적용되는 자원 한도 정책입니다."}
+    avoid: {ko: ["사용자 정책"]}
+  - english: "vfolder"
+    korean: "vfolder"
+    meaning: {en: "A storage space owned by a user or project and mounted to a container at runtime.", ko: "사용자나 project 가 소유하고 container 에 실행 시 마운트되는 저장 공간입니다."}
+    avoid: {en: ["virtual folder"], ko: ["virtual folder", "가상 폴더", "폴더"]}
+    note: {en: "A concept distinct from an ordinary folder.", ko: "일반 폴더와 다른 개념입니다"}

@@ -1,3 +1,4 @@
+<!-- 생성 파일입니다. glossary/registry/ 를 고치고 go generate ./... 를 실행합니다. -->
 # 용어집: 기술, 도구 이름
 
 문체 규칙은 [용어집](../GLOSSARY.ko.md)을 따릅니다.

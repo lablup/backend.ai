@@ -1,3 +1,4 @@
+<!-- 생성 파일입니다. glossary/registry/ 를 고치고 go generate ./... 를 실행합니다. -->
 # 용어집
 
 Backend.AI 문서, 코드 주석, BEP, PR 에서 사용하는 어휘와 문체를 정합니다. 개념 하나에 어휘 하나입니다.

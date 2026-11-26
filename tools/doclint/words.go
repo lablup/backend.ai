@@ -1,57 +1,50 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"maps"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/lablup/backend.ai/tools/internal/kdoc"
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
+// Unicode composition of the Hangul syllables: initial, vowel and final jamo in the order of
+// the compatibility jamo below.
 const (
-	koSuffix  = ".ko.md"
-	hangul    = "가-힣"
-	particles = "은는이가을를의에도로와과만"
-
-	syllableBase = 0xAC00
+	syllableBase = '가'
+	syllableLast = '힣'
 	vowelCount   = 21
 	finalCount   = 28
-	finalN       = 4
-	finalL       = 8
-	finalB       = 17
-	finalSS      = 20
+	vowelJamo    = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+	finalJamo    = "ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+	hangulClass  = string(syllableBase) + "-" + string(syllableLast)
+)
 
-	consonantEndings = "다고지는면며기게던니시겠"
-	vowelEndings     = "아어았었은을습"
+// The notation of a registry word: "a, b / c" lists alternatives and "~" stands for any text.
+const (
+	gapMarker = "~"
 
-	// beforeWord and afterWord stand for the lookarounds of the Python version, which RE2 lacks.
-	// They consume a character, which does not matter when only a match is looked for.
+	// The boundaries stand for lookarounds, which RE2 lacks. They consume a character, which
+	// does not matter when only a match is looked for.
 	wordBoundaryBefore = `(?:^|[^\p{L}\p{N}_-])`
 	wordBoundaryAfter  = `(?:$|[^\p{L}\p{N}_-])`
-	hangulBefore       = `(?:^|[^` + hangul + `])`
-	hangulAfter        = `(?:$|[^` + hangul + `])`
+	hangulBefore       = `(?:^|[^` + hangulClass + `])`
+	hangulAfter        = `(?:$|[^` + hangulClass + `])`
 	space              = `[\s\p{Z}]`
 )
 
 var (
-	expressionHeaders = []string{"사용하지 않는 표현", "Do not write"}
-	termHeaders       = []string{"사용하지 않는 어휘", "Do not write"}
-	skippedNames      = []string{"report.md", "report.ko.md", "GLOSSARY.md", "GLOSSARY.ko.md", "CHANGELOG.md"}
-	skippedParts      = []string{"glossary", "CHANGELOG"}
-
-	qualifier  = regexp.MustCompile(`\s*\([^)]*\)\s*$`)
 	fence      = regexp.MustCompile("^\\s*(```|~~~)")
 	codeSpan   = regexp.MustCompile("`[^`]*`")
-	hangulText = regexp.MustCompile("[" + hangul + "]")
+	hangulText = regexp.MustCompile("[" + hangulClass + "]")
 	altSplit   = regexp.MustCompile(`\s*/\s*|,\s+`)
-	commaSplit = regexp.MustCompile(`,\s+`)
-
-	// The vowel index of the stem to the vowel index after adding 아/어.
-	contractedVowels = map[int]int{18: 4, 20: 6, 13: 14, 8: 9}
 )
 
 type word struct {
@@ -59,6 +52,16 @@ type word struct {
 	replacement string
 	pattern     *regexp.Regexp
 	advisory    bool
+	// allowed are longer expressions in which the word is not reported.
+	allowed []string
+}
+
+// match reports whether the line uses the word outside the allowed expressions.
+func (w word) match(line string) bool {
+	for _, expression := range w.allowed {
+		line = strings.ReplaceAll(line, expression, " ")
+	}
+	return w.pattern.MatchString(line)
 }
 
 func floorDiv(a, b int) int {
@@ -73,64 +76,124 @@ func floorMod(a, b int) int {
 	return a - floorDiv(a, b)*b
 }
 
-func withFinal(syllable rune, final int) rune {
-	return syllable + rune(final)
-}
-
 func split(syllable rune) (initial, vowel, final int) {
-	offset := int(syllable) - syllableBase
+	offset := int(syllable - syllableBase)
 	return floorDiv(offset, vowelCount*finalCount), floorMod(floorDiv(offset, finalCount), vowelCount), floorMod(offset, finalCount)
 }
 
 func join(initial, vowel, final int) rune {
-	return rune(syllableBase + (initial*vowelCount+vowel)*finalCount + final)
+	return syllableBase + rune((initial*vowelCount+vowel)*finalCount+final)
+}
+
+// jamoIndex returns the position of a jamo among the finals (from 1) or the vowels (from 0).
+func jamoIndex(jamo, set string, first int) (int, error) {
+	i := slices.Index([]rune(set), []rune(jamo)[0])
+	if i < 0 || utf8.RuneCountInString(jamo) != 1 {
+		return 0, fmt.Errorf("%q is not a jamo of %q", jamo, set)
+	}
+	return i + first, nil
+}
+
+// matcher builds the patterns of the words from the inflections of the registry.
+type matcher struct {
+	particles        []string
+	verb             verbRules
+	openStemFinals   []int
+	pastFinal        int
+	droppedFinal     int
+	droppedAdded     int
+	contractedVowels map[int]int
+	irregularFinal   int
+	inflections      []string
+}
+
+func newMatcher(korean koreanRules, english englishRules) (*matcher, error) {
+	m := &matcher{
+		particles:        korean.Particles,
+		verb:             korean.Verb,
+		contractedVowels: map[int]int{},
+		inflections:      english.Inflections,
+	}
+	var errs []error
+	final := func(jamo string) int {
+		i, err := jamoIndex(jamo, finalJamo, 1)
+		errs = append(errs, err)
+		return i
+	}
+	vowel := func(jamo string) int {
+		i, err := jamoIndex(jamo, vowelJamo, 0)
+		errs = append(errs, err)
+		return i
+	}
+	for _, jamo := range korean.Verb.OpenStemFinals {
+		m.openStemFinals = append(m.openStemFinals, final(jamo))
+	}
+	m.pastFinal = final(korean.Verb.PastFinal)
+	m.droppedFinal = final(korean.Verb.DroppedFinal.Final)
+	m.droppedAdded = final(korean.Verb.DroppedFinal.Added)
+	m.irregularFinal = final(korean.Verb.Irregular.AddedFinal)
+	for from, to := range korean.Verb.ContractedVowels {
+		m.contractedVowels[vowel(from)] = vowel(to)
+	}
+	return m, errors.Join(errs...)
+}
+
+// class returns the character class of single syllables.
+func class(syllables []string) string {
+	return "[" + regexp.QuoteMeta(strings.Join(syllables, "")) + "]"
+}
+
+func alternation(items []string) string {
+	quoted := make([]string, len(items))
+	for i, item := range items {
+		quoted[i] = regexp.QuoteMeta(item)
+	}
+	return "(?:" + strings.Join(quoted, "|") + ")"
 }
 
 // verbForms returns the regex alternatives of the inflected forms of a verb stem.
-func verbForms(stem string) []string {
+func (m *matcher) verbForms(stem string) []string {
 	runes := []rune(stem)
 	head, last := string(runes[:len(runes)-1]), runes[len(runes)-1]
 	initial, vowel, final := split(last)
-	consonant := fmt.Sprintf("%s[%s]", stem, consonantEndings)
-	if final == finalL {
+	consonant := stem + class(m.verb.ConsonantEndings)
+	if final == m.droppedFinal {
 		dropped := head + string(join(initial, vowel, 0))
 		return []string{
 			consonant,
-			fmt.Sprintf("%s[%s]", stem, vowelEndings),
-			fmt.Sprintf("%s[는니]", dropped),
-			head + string(withFinal(join(initial, vowel, 0), finalN)),
+			stem + class(m.verb.VowelEndings),
+			dropped + class(m.verb.DroppedFinal.Endings),
+			head + string(join(initial, vowel, m.droppedAdded)),
 		}
 	}
 	if final != 0 {
-		return []string{consonant, fmt.Sprintf("%s[%s]", stem, vowelEndings)}
+		return []string{consonant, stem + class(m.verb.VowelEndings)}
 	}
-	forms := []string{
-		consonant,
-		head + string(withFinal(last, finalN)),
-		head + string(withFinal(last, finalL)),
-		head + string(withFinal(last, finalB)),
+	forms := []string{consonant}
+	for _, added := range m.openStemFinals {
+		forms = append(forms, head+string(last+rune(added)))
 	}
 	var contracted rune
-	switch {
-	case last == '하':
-		contracted = '해'
-	case last == '르' && head != "":
+	switch replacement, ok := m.verb.ContractedSyllables[string(last)]; {
+	case ok:
+		contracted = []rune(replacement)[0]
+	case string(last) == m.verb.Irregular.Syllable && head != "":
 		headRunes := []rune(head)
 		priorInitial, priorVowel, _ := split(headRunes[len(headRunes)-1])
-		return append(forms, string(headRunes[:len(headRunes)-1])+string(join(priorInitial, priorVowel, finalL))+"[러라렀랐]")
+		return append(forms, string(headRunes[:len(headRunes)-1])+
+			string(join(priorInitial, priorVowel, m.irregularFinal))+class(m.verb.Irregular.Endings))
 	default:
-		replaced, ok := contractedVowels[vowel]
+		replaced, ok := m.contractedVowels[vowel]
 		if !ok {
 			replaced = vowel
 		}
 		contracted = join(initial, replaced, 0)
 	}
-	return append(forms, head+string(contracted), head+string(withFinal(contracted, finalSS)))
+	return append(forms, head+string(contracted), head+string(contracted+rune(m.pastFinal)))
 }
 
-func koreanPattern(text string) (string, error) {
-	clean := strings.TrimSpace(strings.ReplaceAll(text, "~", " "))
-	tokens := strings.Fields(clean)
+func (m *matcher) koreanPattern(text string) (string, error) {
+	tokens := strings.Fields(strings.ReplaceAll(text, gapMarker, " "))
 	if len(tokens) == 0 {
 		return "", fmt.Errorf("empty word %q", text)
 	}
@@ -143,57 +206,55 @@ func koreanPattern(text string) (string, error) {
 		return strings.Join(parts, sep)
 	}
 	prefix := quoted(tokens[:len(tokens)-1], space+"+")
-	if len(tokens) > 1 && strings.Contains(text, "~") && strings.Index(text, "~") > 0 {
+	if len(tokens) > 1 && strings.Index(text, gapMarker) > 0 {
 		prefix = regexp.QuoteMeta(tokens[0]) + space + "+.*?" + quoted(tokens[1:len(tokens)-1], space+"*")
 	}
 	var ending string
-	if strings.HasSuffix(last, "다") && utf8.RuneCountInString(last) > 1 {
-		ending = "(?:" + strings.Join(verbForms(strings.TrimSuffix(last, "다")), "|") + ")"
+	if stem, ok := strings.CutSuffix(last, m.verb.DictionaryEnding); ok && stem != "" {
+		ending = "(?:" + strings.Join(m.verbForms(stem), "|") + ")"
 	} else {
 		quotedLast := regexp.QuoteMeta(last)
-		ending = "(?:" + quotedLast + "(?:[" + particles + "]|으로|이다|입니다)" + hangulAfter +
-			"|" + quotedLast + hangulAfter + ")"
+		ending = "(?:" + quotedLast + alternation(m.particles) + hangulAfter + "|" + quotedLast + hangulAfter + ")"
 	}
 	body := ending
 	if prefix != "" {
 		body = prefix + space + "+" + ending
 	}
-	if strings.HasPrefix(text, "~") {
+	if strings.HasPrefix(text, gapMarker) {
 		return body, nil
 	}
 	return hangulBefore + body, nil
 }
 
-func englishPattern(text string) string {
+func (m *matcher) englishPattern(text string) string {
 	fields := strings.Fields(text)
 	for i, field := range fields {
 		fields[i] = regexp.QuoteMeta(field)
 	}
-	words := strings.Join(fields, space+"+")
-	return wordBoundaryBefore + words + "(?:s|es|d|ed|ing)?" + wordBoundaryAfter
+	return wordBoundaryBefore + strings.Join(fields, space+"+") + alternation(m.inflections) + "?" + wordBoundaryAfter
 }
 
-func newWord(text, replacement string, advisory bool) (word, error) {
+func (m *matcher) newWord(text, replacement string, advisory bool, allowed []string) (word, error) {
 	var source string
 	if hangulText.MatchString(text) {
 		var err error
-		if source, err = koreanPattern(text); err != nil {
+		if source, err = m.koreanPattern(text); err != nil {
 			return word{}, err
 		}
 	} else {
-		source = englishPattern(text)
+		source = m.englishPattern(text)
 	}
 	pattern, err := regexp.Compile(source)
 	if err != nil {
 		return word{}, fmt.Errorf("word %q: %w", text, err)
 	}
-	return word{text: text, replacement: replacement, pattern: pattern, advisory: advisory}, nil
+	return word{text: text, replacement: replacement, pattern: pattern, advisory: advisory, allowed: allowed}, nil
 }
 
-// alternatives splits a cell, carrying a shared leading word into the alternatives after it.
-func alternatives(cell string) []string {
+// alternatives splits an expression, carrying a shared leading word into the verbs after it.
+func (m *matcher) alternatives(expression string) []string {
 	var parts []string
-	for _, part := range altSplit.Split(cell, -1) {
+	for _, part := range altSplit.Split(expression, -1) {
 		if part = strings.TrimSpace(part); part != "" {
 			parts = append(parts, part)
 		}
@@ -205,7 +266,7 @@ func alternatives(cell string) []string {
 	leading := fields[:len(fields)-1]
 	result := []string{parts[0]}
 	for _, part := range parts[1:] {
-		if len(leading) > 0 && len(strings.Fields(part)) == 1 && strings.HasSuffix(part, "다") {
+		if len(leading) > 0 && len(strings.Fields(part)) == 1 && strings.HasSuffix(part, m.verb.DictionaryEnding) {
 			part = strings.Join(append(append([]string{}, leading...), part), " ")
 		}
 		result = append(result, part)
@@ -213,141 +274,50 @@ func alternatives(cell string) []string {
 	return result
 }
 
-func tableRows(path string) ([][]string, error) {
-	data, err := os.ReadFile(path)
+// loadWords returns the rejected words of the English documents and of the Korean documents:
+// the expressions, then the term variants by topic file. A term variant, and an expression
+// with a qualifier, have other valid meanings, so they are advisory.
+func loadWords(directory string) (english, korean []word, err error) {
+	reg, err := loadRegistry(directory)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var rows [][]string
-	for _, line := range kdoc.SplitLines(string(data)) {
-		if strings.HasPrefix(line, "|") && !strings.HasPrefix(line, "|---") {
-			cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
-			for i := range cells {
-				cells[i] = strings.TrimSpace(cells[i])
+	m, err := newMatcher(reg.rules.Korean, reg.rules.English)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", directory, err)
+	}
+	words := map[string][]word{}
+	add := func(lang, text, replacement string, advisory bool, allowed []string) error {
+		built, err := m.newWord(text, replacement, advisory, allowed)
+		words[lang] = append(words[lang], built)
+		return err
+	}
+	for _, entry := range reg.rules.Expressions {
+		for _, text := range m.alternatives(entry.Word) {
+			if strings.Contains(strings.ToLower(entry.Instead), strings.ToLower(text)) {
+				continue
 			}
-			rows = append(rows, cells)
+			if err := add(entry.Lang, text, entry.Instead, entry.Qualifier != "", entry.Except); err != nil {
+				return nil, nil, err
+			}
 		}
 	}
-	return rows, nil
-}
-
-func indexOf(values []string, value string) int {
-	for i, candidate := range values {
-		if candidate == value {
-			return i
-		}
-	}
-	return -1
-}
-
-func expressions(path string) ([]word, error) {
-	rows, err := tableRows(path)
-	if err != nil {
-		return nil, err
-	}
-	var words []word
-	inTable := false
-	for _, row := range rows {
-		if indexOf(expressionHeaders, row[0]) >= 0 && len(row) == 2 {
-			inTable = true
-			continue
-		}
-		if !inTable || len(row) != 2 {
-			inTable = false
-			continue
-		}
-		cell, replacement := row[0], row[1]
-		advisory := qualifier.MatchString(cell)
-		for _, text := range alternatives(qualifier.ReplaceAllString(cell, "")) {
-			if !strings.Contains(strings.ToLower(replacement), strings.ToLower(text)) {
-				built, err := newWord(text, replacement, advisory)
-				if err != nil {
-					return nil, err
+	for _, name := range slices.Sorted(maps.Keys(reg.topics)) {
+		for _, term := range reg.topics[name].Terms {
+			for _, lang := range []string{spec.English, spec.Korean} {
+				own := term.name(lang)
+				for _, text := range term.Avoid[lang] {
+					if strings.EqualFold(text, own) {
+						continue
+					}
+					if err := add(lang, text, own, true, nil); err != nil {
+						return nil, nil, err
+					}
 				}
-				words = append(words, built)
 			}
 		}
 	}
-	return words, nil
-}
-
-func terms(path string) ([]word, error) {
-	rows, err := tableRows(path)
-	if err != nil {
-		return nil, err
-	}
-	headerAt := -1
-	for i, row := range rows {
-		if indexOf(row, termHeaders[0]) >= 0 || indexOf(row, termHeaders[1]) >= 0 {
-			headerAt = i
-			break
-		}
-	}
-	if headerAt < 0 {
-		return nil, nil
-	}
-	header := rows[headerAt]
-	variantAt := indexOf(header, termHeaders[0])
-	if variantAt < 0 {
-		variantAt = indexOf(header, termHeaders[1])
-	}
-	var words []word
-	for i, row := range rows {
-		if i == headerAt || len(row) != len(header) {
-			continue
-		}
-		term := row[0]
-		for _, text := range commaSplit.Split(row[variantAt], -1) {
-			if text != "" && !strings.EqualFold(text, term) {
-				built, err := newWord(text, term, true)
-				if err != nil {
-					return nil, err
-				}
-				words = append(words, built)
-			}
-		}
-	}
-	return words, nil
-}
-
-// loadWords returns the rejected words of the English documents and of the Korean documents.
-func loadWords(root string) (english, korean []word, err error) {
-	if english, err = expressions(filepath.Join(root, "GLOSSARY.md")); err != nil {
-		return nil, nil, err
-	}
-	if korean, err = expressions(filepath.Join(root, "GLOSSARY.ko.md")); err != nil {
-		return nil, nil, err
-	}
-	paths, err := filepath.Glob(filepath.Join(root, "glossary", "*.md"))
-	if err != nil {
-		return nil, nil, err
-	}
-	sort.Strings(paths)
-	for _, path := range paths {
-		found, err := terms(path)
-		if err != nil {
-			return nil, nil, err
-		}
-		if strings.HasSuffix(path, koSuffix) {
-			korean = append(korean, found...)
-		} else {
-			english = append(english, found...)
-		}
-	}
-	return english, korean, nil
-}
-
-func isSkipped(path string) bool {
-	parts := strings.Split(path, "/")
-	if indexOf(skippedNames, parts[len(parts)-1]) >= 0 {
-		return true
-	}
-	for _, part := range parts {
-		if indexOf(skippedParts, part) >= 0 {
-			return true
-		}
-	}
-	return false
+	return words[spec.English], words[spec.Korean], nil
 }
 
 // proseLines returns line number to text, without frontmatter, fenced blocks and code spans.
@@ -355,7 +325,7 @@ func proseLines(text string) map[int]string {
 	lines := kdoc.SplitLines(text)
 	start := 0
 	if len(lines) > 0 && lines[0] == "---" {
-		if at := indexOf(lines[1:], "---"); at >= 0 {
+		if at := slices.Index(lines[1:], "---"); at >= 0 {
 			start = at + 2
 		}
 	}
@@ -374,7 +344,7 @@ func proseLines(text string) map[int]string {
 // checkWords returns the failures and the review lines of one file. numbers limits the lines.
 func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []word) (problems, reviews []string, err error) {
 	words := english
-	if strings.HasSuffix(path, koSuffix) {
+	if strings.HasSuffix(path, sc.spec.Documents.TranslationSuffix) {
 		words = korean
 	}
 	data, err := sc.read(path)
@@ -382,18 +352,13 @@ func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []
 		return nil, nil, err
 	}
 	prose := proseLines(string(data))
-	numbersSorted := make([]int, 0, len(prose))
-	for number := range prose {
-		numbersSorted = append(numbersSorted, number)
-	}
-	sort.Ints(numbersSorted)
-	for _, number := range numbersSorted {
+	for _, number := range slices.Sorted(maps.Keys(prose)) {
 		if numbers != nil && !numbers[number] {
 			continue
 		}
 		line := prose[number]
 		for _, w := range words {
-			if w.pattern.MatchString(line) {
+			if w.match(line) {
 				message := fmt.Sprintf("%s:%d: %s -> %s: %s", path, number, w.text, w.replacement, strings.TrimSpace(line))
 				if w.advisory {
 					reviews = append(reviews, message)
@@ -428,12 +393,12 @@ func wordsTargets(sc *scope) (map[string]map[int]bool, error) {
 			}
 		}
 		for _, path := range sc.files {
-			if strings.HasSuffix(path, ".md") {
+			if strings.HasSuffix(path, sc.spec.Documents.Extension) {
 				targets[path] = nil
 			}
 		}
 	default:
-		all, err := sc.allMarkdown()
+		all, err := sc.allDocuments()
 		if err != nil {
 			return nil, err
 		}
@@ -445,7 +410,7 @@ func wordsTargets(sc *scope) (map[string]map[int]bool, error) {
 }
 
 func runWords(sc *scope, out *report) error {
-	english, korean, err := loadWords(sc.root)
+	english, korean, err := loadWords(filepath.Join(sc.root, sc.spec.Words.Registry))
 	if err != nil {
 		return err
 	}
@@ -460,7 +425,7 @@ func runWords(sc *scope, out *report) error {
 	sort.Strings(paths)
 	var problems, reviews []string
 	for _, path := range paths {
-		if isSkipped(path) {
+		if matchesAny(sc.spec.Words.SkippedPaths, path) {
 			continue
 		}
 		fileProblems, fileReviews, err := checkWords(sc, path, targets[path], english, korean)

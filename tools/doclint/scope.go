@@ -7,11 +7,14 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
 // scope is what a run checks: the documents changed since base or staged, the given files,
 // or everything. A staged run reads the documents from the index.
 type scope struct {
+	spec   *spec.Spec
 	root   string
 	base   string
 	staged bool
@@ -38,7 +41,11 @@ func newScope(root, base string, args []string) (*scope, error) {
 	if err != nil {
 		return nil, err
 	}
-	sc := &scope{root: root, base: base}
+	loaded, err := spec.Load(root)
+	if err != nil {
+		return nil, err
+	}
+	sc := &scope{spec: loaded, root: root, base: base}
 	for _, arg := range args {
 		path := arg
 		if filepath.IsAbs(path) {
@@ -130,10 +137,15 @@ func (s *scope) changedSet() (map[string]bool, error) {
 	return set, nil
 }
 
-// allMarkdown returns every tracked or untracked, not ignored, .md file; in a staged run,
-// every .md file of the index.
-func (s *scope) allMarkdown() ([]string, error) {
-	return s.listFiles("*.md")
+// pathspec is the git pathspec of the documents with the suffix.
+func (s *scope) pathspec(suffix string) string {
+	return "*" + suffix
+}
+
+// allDocuments returns every tracked or untracked, not ignored, document; in a staged run,
+// every document of the index.
+func (s *scope) allDocuments() ([]string, error) {
+	return s.listFiles(s.pathspec(s.spec.Documents.Extension))
 }
 
 func (s *scope) listFiles(pattern string) ([]string, error) {

@@ -1,0 +1,150 @@
+title:
+  en: {page: "Layers and components", link: "Layers and components", description: "components and code layers"}
+  ko: {page: "구조 계층, 구성 요소", link: "구조 계층, 구성 요소", description: "컴포넌트와 코드 계층"}
+terms:
+  - english: "accelerator plugin"
+    korean: "가속기 플러그인"
+    meaning: {en: "A plugin package that connects an accelerator to Backend.AI.", ko: "가속기를 Backend.AI 와 연결하는 plugin 패키지입니다."}
+  - english: "account manager"
+    korean: "account manager"
+    meaning: {en: "A separate daemon that handles unified user profiles and SSO.", ko: "통합 사용자 프로필과 SSO 를 맡는 별도 daemon 입니다."}
+    avoid: {en: ["AccountManager", "accountmgr"], ko: ["AccountManager", "accountmgr"]}
+  - english: "action"
+    korean: "Action"
+    meaning: {en: "A unit that wraps a service operation to structurally apply permission checks, auditing, and metrics.", ko: "service operation 을 감싸 권한 검사와 감사, 지표를 구조적으로 적용하는 단위입니다."}
+  - english: "adapter"
+    korean: "adapter"
+    meaning: {en: "A call layer shared with the GQL layer that a v2 handler calls instead of calling a processor directly.", ko: "v2 handler 가 processor 를 직접 호출하는 대신 사용하는, GQL 계층과 공유하는 호출 계층입니다."}
+  - english: "agent watcher"
+    korean: "Agent Watcher"
+    meaning: {en: "An add-on service that monitors and manages the Agent service.", ko: "Agent service 를 감시하고 관리하는 add-on 서비스입니다."}
+  - english: "app config fragment"
+    korean: "스코프별 앱 설정"
+    meaning: {en: "A row that stores, as a JSON document, the value a scope adds to an app config key.", ko: "한 스코프가 app config key 에 더하는 값을 JSON 문서로 담은 행입니다."}
+    avoid: {en: ["AppConfigFragment"], ko: ["AppConfigFragment", "앱 설정 프래그먼트", "앱 설정 조각"]}
+  - english: "app proxy"
+    korean: "App Proxy"
+    meaning: {en: "A component that dynamically routes and load-balances traffic coming to the service port of a session.", ko: "세션 의 service port 로 오는 트래픽을 동적으로 라우팅하고 로드밸런싱하는 컴포넌트입니다."}
+    avoid: {en: ["AppProxy", "wsproxy", "WSProxy", "WebSocket Proxy"], ko: ["AppProxy", "wsproxy", "WSProxy", "WebSocket Proxy"]}
+    note: {en: "wsproxy is the old name. Code identifiers are handled separately.", ko: "wsproxy 는 옛 이름입니다. 코드 식별자는 별도로 정리합니다"}
+  - english: "app proxy coordinator"
+    korean: "app proxy coordinator"
+    meaning: {en: "An app proxy component that creates routing circuits and places services.", ko: "routing circuit 을 만들고 서비스를 배치하는 app proxy 구성 요소입니다."}
+  - english: "app proxy worker"
+    korean: "app proxy worker"
+    meaning: {en: "An app proxy component that forwards traffic.", ko: "트래픽을 전달하는 app proxy 구성 요소입니다."}
+  - english: "broadcast event"
+    korean: "브로드캐스트 이벤트"
+    meaning: {en: "An event where every subscriber receives the same event.", ko: "모든 subscriber 가 같은 event 를 받는 이벤트입니다."}
+  - english: "client SDK"
+    korean: "클라이언트 SDK"
+    meaning: {en: "A Python client SDK for Backend.AI.", ko: "Backend.AI 용 Python 클라이언트 SDK 입니다."}
+  - english: "common"
+    korean: "common"
+    meaning: {en: "A common package that manager, agent, storage and client SDK all depend on.", ko: "manager, agent, storage, client SDK 가 모두 의존하는 공용 패키지입니다."}
+  - english: "console server"
+    korean: "console server"
+    meaning: {en: "A Backend.AI console server that provides cookie-based authentication.", ko: "cookie 기반 인증을 제공하는 Backend.AI console server 입니다."}
+  - english: "controller"
+    korean: "controller"
+    meaning: {en: "The sole entry point that can change the status of sessions, deployments and more.", ko: "session 과 deployment 등의 상태를 바꿀 수 있는 유일한 진입점입니다."}
+  - english: "DataLoader"
+    korean: "DataLoader"
+    meaning: {en: "A loader that batches multiple node references into one fetch to prevent N+1 queries.", ko: "N+1 질의를 막기 위해 여러 노드 참조를 묶어 가져오는 로더입니다."}
+    avoid: {en: ["data loader"], ko: ["data loader"]}
+  - english: "deployment history"
+    korean: "배포 이력"
+    meaning: {en: "A record that keeps the status changes and results of each run of the deployment handler.", ko: "deployment handler 의 한 번 실행마다 상태 변화와 결과를 남기는 기록입니다."}
+  - english: "deployment policy"
+    korean: "배포 정책"
+    meaning: {en: "A policy that holds how a deployment releases a new revision.", ko: "deployment 가 새 revision 을 배포하는 방식을 담는 정책입니다."}
+  - english: "deployment preset resource slot"
+    korean: "배포 프리셋 자원 슬롯"
+    meaning: {en: "The amount of resources per slot that a deployment preset declares.", ko: "deployment preset 이 선언하는 slot 별 자원량입니다."}
+    avoid: {ko: ["배포 프리셋 리소스 슬롯"]}
+  - english: "deployment revision"
+    korean: "배포 리비전"
+    meaning: {en: "A point-in-time snapshot of the deployment configuration, numbered within that deployment.", ko: "deployment 설정의 한 시점 snapshot 으로 그 deployment 안에서 번호가 매겨집니다."}
+  - english: "entity"
+    korean: "엔티티"
+    meaning: {en: "The data unit that code is divided into, contained within a scope, and pointed to by an action.", ko: "코드가 엔티티 단위로 나뉘고 scope 안에 담기며 action 이 가리키는 데이터 단위입니다."}
+  - english: "entity label"
+    korean: "레이블"
+    meaning: {en: "A key=value label that can be attached to any entity.", ko: "어느 엔티티에나 붙는 key=value 라벨입니다."}
+    avoid: {ko: ["라벨"]}
+  - english: "event bus"
+    korean: "이벤트 버스"
+    meaning: {en: "An internal service that uses Valkey to track real-time information and notify other components of system events.", ko: "Valkey 로 실시간 정보를 추적하고 시스템 이벤트를 다른 컴포넌트에 알리는 내부 서비스입니다."}
+  - english: "kernel runner"
+    korean: "kernel runner"
+    meaning: {en: "A small daemon that runs inside a kernel container and manages user code execution and service processes in the container.", ko: "kernel 컨테이너 안에서 실행되며 사용자 코드 실행과 컨테이너 안 서비스 프로세스를 관리하는 작은 daemon 입니다."}
+    avoid: {en: ["kernel runtime"], ko: ["kernel runtime"]}
+  - english: "kernel scheduling history"
+    korean: "커널 스케줄링 이력"
+    meaning: {en: "A history that records the stages a kernel goes through from image pull to termination and their results.", ko: "커널이 image pull 부터 종료까지 거친 단계와 그 결과를 기록하는 이력입니다."}
+  - english: "manager"
+    korean: "Manager"
+    meaning: {en: "A component that serves as a central API gateway and orchestrator, receiving user requests, creating sessions and routing code execution to agents.", ko: "사용자 요청을 받아 세션을 만들고 agent 에 코드 실행을 라우팅하는 중앙 API gateway 이자 orchestrator 인 컴포넌트입니다."}
+  - english: "model card resource requirement"
+    korean: "모델 카드 자원 요구 사항"
+    meaning: {en: "The minimum amount of resources that a model card requires per slot.", ko: "model card 가 slot 별로 요구하는 최소 자원량입니다."}
+  - english: "processor"
+    korean: "processor"
+    meaning: {en: "A layer that the handler calls, which receives an action and structurally executes permission checks, auditing, and metrics.", ko: "handler 가 processor 를 호출하는, action 을 받아 권한 검사와 감사, 지표를 구조적으로 실행하는 계층입니다."}
+  - english: "prometheus query preset category"
+    korean: "프로메테우스 쿼리 프리셋 카테고리"
+    meaning: {en: "A classification that groups prometheus query presets.", ko: "Prometheus query preset 을 묶는 분류입니다."}
+  - english: "relation"
+    korean: "relation"
+    meaning: {en: "A third object that connects or disconnects two entities and has its own table and its own operations.", ko: "두 entity 를 잇거나 끊는, 자기 테이블과 자기 연산을 갖는 세 번째 대상입니다."}
+    avoid: {ko: ["엔티티 관계", "관계"]}
+  - english: "replica group history"
+    korean: "복제본 그룹 이력"
+    meaning: {en: "A record that leaves the status changes and results of each run of the replica group handler.", ko: "replica group handler 의 한 번 실행마다 상태 변화와 결과를 남기는 기록입니다."}
+  - english: "repository"
+    korean: "repository"
+    meaning: {en: "A layer responsible for data access.", ko: "데이터 접근을 담당하는 계층입니다."}
+  - english: "resolver"
+    korean: "resolver"
+    meaning: {en: "A thin GraphQL operation wrapper layer that calls the fetcher.", ko: "fetcher 를 호출하는 얇은 GraphQL operation wrapper 계층입니다."}
+  - english: "route history"
+    korean: "라우트 이력"
+    meaning: {en: "A record that leaves the status changes and results of a single run of the route handler for one replica.", ko: "route handler 가 replica 하나에 대해 한 번 실행될 때의 상태 변화와 결과를 남기는 기록입니다."}
+  - english: "scheduler"
+    korean: "scheduler"
+    meaning: {en: "A sokovan engine that runs the actual scheduling algorithm, which queries waiting sessions and places them on agents.", ko: "대기 세션을 조회해 agent 에 배치하는 실제 스케줄링 알고리즘을 실행하는 sokovan 엔진입니다."}
+  - english: "service"
+    korean: "service"
+    meaning: {en: "A layer that holds domain validation and business logic.", ko: "도메인 검증과 business logic 을 두는 계층입니다."}
+    avoid: {ko: ["서비스"]}
+  - english: "session agent designation"
+    korean: "세션 에이전트 지정"
+    meaning: {en: "A feature to designate the agent on which a session is placed.", ko: "세션을 배치할 agent 를 지정하는 기능입니다."}
+    avoid: {en: ["session designated agent"], ko: ["session designated agent", "세션 지정 에이전트"]}
+  - english: "session lifecycle handler"
+    korean: "session lifecycle handler"
+    meaning: {en: "A handler that queries sessions in a target status, processes them, and transitions their status based on the result.", ko: "대상 상태의 세션을 조회해 처리하고 결과에 따라 상태를 전이하는 세션 수명 주기 처리기입니다."}
+    avoid: {en: ["lifecycle handler"], ko: ["lifecycle handler", "세션 처리기"]}
+  - english: "sokovan"
+    korean: "sokovan"
+    meaning: {en: "A layer within the manager that hosts the coordinator and scheduling.", ko: "manager 안에서 coordinator 와 scheduling 을 두는 층입니다."}
+  - english: "sokovan coordinator"
+    korean: "sokovan coordinator"
+    meaning: {en: "A sokovan component that centrally handles history-based decisions such as retry, timeout, and give_up, along with status transitions.", ko: "retry, timeout, give_up 같은 history 기반 판단과 상태 전이를 중앙에서 맡는 sokovan 구성 요소입니다."}
+    avoid: {en: ["coordinator"], ko: ["coordinator"]}
+  - english: "status transition"
+    korean: "상태 전이"
+    meaning: {en: "A flow in which the status moves according to results such as success, retry, expiration, and giving up.", ko: "성공, 재시도, 만료, 포기 같은 결과에 따라 상태가 옮겨 가는 흐름입니다."}
+  - english: "storage proxy"
+    korean: "Storage Proxy"
+    meaning: {en: "A proxy component that takes over large file transfers from the manager and abstracts storage vendor APIs.", ko: "manager 에서 큰 파일 전송을 분담하고 스토리지 벤더 API 를 추상화하는 proxy 컴포넌트입니다."}
+  - english: "user fair share"
+    korean: "사용자 fair share"
+    meaning: {en: "A scheduling priority determined within a resource group by the past usage and weight of a user.", ko: "resource group 안에서 user 의 과거 사용량과 weight 로 정해지는 스케줄링 우선순위입니다."}
+  - english: "virtual entity"
+    korean: "가상 엔티티"
+    meaning: {en: "A corresponding row on the permission graph side of an actual entity row. It resides in the virtual_entities table and serves as the basis of entity references and the parent of membership edges.", ko: "실제 entity row 의 권한 그래프 쪽 대응 행으로, virtual_entities 테이블에 있으며 entity 참조의 기준이자 membership edge 의 부모입니다."}
+  - english: "webserver"
+    korean: "webserver"
+    meaning: {en: "A gateway component that provides the web UI and proxies REST and GraphQL requests to the manager or Hive Gateway.", ko: "web UI 를 제공하고 REST와 GraphQL 요청을 Manager 나 Hive Gateway 로 프록시하는 gateway 컴포넌트입니다."}
+    note: {en: "A name planned to be changed to gateway in the future. It is kept until the build and service names change.", ko: "앞으로 gateway 로 바꾸려는 이름입니다. 빌드, 서비스 이름이 바뀔 때까지 유지합니다"}

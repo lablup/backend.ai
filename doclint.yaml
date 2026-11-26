@@ -1,0 +1,74 @@
+# The criteria of `go run ./tools/doclint` and `go run ./tools/knowledge`. The code holds no
+# values: edit them here. A path pattern is a regular expression over the path from the root.
+documents:
+  extension: .md
+  translation_suffix: .ko.md
+
+agents:
+  path: '(^|/)AGENTS\.md$'
+  max_lines: 200
+
+# BEP documents. The first group of the pattern is the BEP number.
+bep:
+  path: '^proposals/BEP-(\d{4})(-[^/]+|/[^/]*)\.md$'
+  first_number: 1080
+  max_lines: 300
+  max_items: 7
+  max_item_chars: {en: 120, ko: 80}
+  goal_sections: [Goals, 목표]
+  counted_sections: [Non-goals, 목표가 아닌 것, Impact, 영향, Implementation Order, 구현 순서]
+  design:
+    sections: [Design, 설계]
+    max_subsections: 4
+    max_tables: 2
+    max_table_rows: 7
+    max_sentences: 3
+    skipped_line_prefixes: ["Rejected:", "기각한 대안:"]
+    abbreviations: [e.g, i.e, etc, vs, cf]
+
+knowledge:
+  file_name: KNOWLEDGE.md
+  skipped_directory_prefixes: ["."]
+  skipped_directory_names: [node_modules, dist, build]
+  external_link_prefixes: ["http://", "https://", "mailto:", "#"]
+  signature:
+    actor: by
+    date: at
+    date_pattern: '^\d{4}-\d{2}-\d{2}$'
+    date_format: YYYY-MM-DD
+  # Kinds: string, strings, enum, signature, signatures. Problems are reported in this order.
+  # unique: no two documents share the value. path: the value names existing paths.
+  # not_before: the date is not older than the date of that field.
+  fields:
+    - {name: name, kind: string, required: true, unique: true, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', pattern_name: kebab-case}
+    - {name: type, kind: string, required: true}
+    - {name: description, kind: string, required: true}
+    - {name: scope, kind: string, required: true, path: true}
+    - {name: generated, kind: signature, required: true}
+    - {name: status, kind: enum, values: [draft, stable, deprecated], default: stable}
+    - {name: keywords, kind: strings}
+    - {name: sources, kind: strings, path: true}
+    - {name: updated, kind: signature, not_before: generated}
+    - {name: verified, kind: signatures}
+  # The latest date of `field` is not older than the first present field of `changed`.
+  sign_off:
+    field: verified
+    changed: [updated, generated]
+  search:
+    fields: [name, type, keywords, description]
+    title: name
+    tags: [type, status]
+    summary: description
+
+# .md and .ko.md pairs.
+pairs:
+  # The characters a document without the translation suffix must not add.
+  translation_characters: '[\x{1100}-\x{11ff}\x{3130}-\x{318f}\x{ac00}-\x{d7a3}]'
+  # A wording fix of the glossary can change one language.
+  one_side_change_allowed: ['^glossary/']
+
+words:
+  registry: glossary/registry
+  skipped_paths:
+    - '(^|/)(report|report\.ko|GLOSSARY|GLOSSARY\.ko|CHANGELOG)\.md$'
+    - '(^|/)(glossary|CHANGELOG)(/|$)'

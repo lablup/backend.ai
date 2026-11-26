@@ -1,3 +1,4 @@
+<!-- Generated file. Edit glossary/registry/ and run go generate ./... -->
 # Glossary: Infrastructure
 
 The style rules are in the [glossary](../GLOSSARY.md). Korean: [infrastructure.ko.md](infrastructure.ko.md)
