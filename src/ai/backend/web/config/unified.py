@@ -1752,23 +1752,19 @@ class RedisHelperConfig(BaseConfigSchema):
     ]
 
 
-class WebServerRedisConfig(BaseConfigSchema):
-    """Redis database configuration for the web server.
-
-    Specifies which Redis database number to use for web server data.
-    """
+class WebServerRedisConfig(RedisConfig):
+    """Redis configuration for the web server, with the database it stores the sessions in."""
 
     db: Annotated[
         int,
-        Field(default=0),
+        Field(default=0, ge=0),
         BackendAIConfigMeta(
             description=(
-                "Redis database number (0-15) to use for web server data. Different database "
-                "numbers provide logical separation of data within the same Redis instance. "
-                "Ensure this doesn't conflict with other Backend.AI components."
+                "Redis database number to store the sessions in. The manager reads and writes "
+                "the same keys, so this must equal its `auth.login-session-db`."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="0", prod="5"),
+            example=ConfigExample(local="0", prod="0"),
         ),
     ]
 
@@ -1780,8 +1776,8 @@ class SessionConfig(BaseConfigSchema):
     """
 
     redis: Annotated[
-        RedisConfig,
-        Field(default_factory=RedisConfig),
+        WebServerRedisConfig,
+        Field(default_factory=WebServerRedisConfig),
         BackendAIConfigMeta(
             description=(
                 "Redis configuration for session storage. Sessions are stored in Redis for "

@@ -51,7 +51,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -825,7 +825,7 @@ async def redis_ctx(
         # Create ValkeySessionClient for session management
         valkey_session_client = await ValkeySessionClient.create(
             valkey_target=valkey_target,
-            db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+            db_id=config.session.redis.db,
             human_readable_name="web.session",
             sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
         )
