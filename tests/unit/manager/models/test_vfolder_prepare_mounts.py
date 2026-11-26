@@ -96,6 +96,18 @@ class _SameNamedVFolders:
     vfolder_ids: dict[_VFolderOwner, UUID]
 
 
+@dataclass(frozen=True)
+class _UnmanagedMountPathCase:
+    requested_mount_path: str
+    expected_kernel_path: PurePosixPath
+
+
+@dataclass(frozen=True)
+class _UnmanagedVFolderOfUser:
+    user_scope: UserScope
+    vfolder_id: UUID
+
+
 def _password_info() -> PasswordInfo:
     return PasswordInfo(
         password="dummy",
@@ -616,3 +628,66 @@ class TestPrepareVFolderMountsSubpathFlow:
                         ),
                     ],
                 )
+
+    @pytest.fixture
+    async def unmanaged_vfolder_of_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+    ) -> _UnmanagedVFolderOfUser:
+        user_uuid, domain_name, group_id, vfolder_id = fixture_vfolder
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(VFolderRow)
+                .where(VFolderRow.id == vfolder_id)
+                .values(unmanaged_path="/mnt/unmanaged/data")
+            )
+        return _UnmanagedVFolderOfUser(
+            user_scope=UserScope(
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                user_role=UserRole.USER,
+            ),
+            vfolder_id=vfolder_id,
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UnmanagedMountPathCase(
+                requested_mount_path="data",
+                expected_kernel_path=PurePosixPath("/home/work/data"),
+            ),
+            _UnmanagedMountPathCase(
+                requested_mount_path="/opt/data",
+                expected_kernel_path=PurePosixPath("/opt/data"),
+            ),
+        ],
+        ids=lambda case: case.requested_mount_path,
+    )
+    async def test_an_unmanaged_vfolder_mounts_at_the_requested_path(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        mock_storage_manager: MagicMock,
+        unmanaged_vfolder_of_user: _UnmanagedVFolderOfUser,
+        case: _UnmanagedMountPathCase,
+    ) -> None:
+        async with db_with_cleanup.connect() as conn:
+            mounts = await prepare_vfolder_mounts(
+                conn=conn,
+                storage_manager=mock_storage_manager,
+                allowed_vfolder_types=["user"],
+                user_scope=unmanaged_vfolder_of_user.user_scope,
+                resource_policy={
+                    "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
+                },
+                mount_requests=[
+                    VFolderMountRequest(
+                        ref=unmanaged_vfolder_of_user.vfolder_id,
+                        dst_path=case.requested_mount_path,
+                    ),
+                ],
+            )
+
+        assert [mount.kernel_path for mount in mounts] == [case.expected_kernel_path]

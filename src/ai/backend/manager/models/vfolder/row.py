@@ -1153,6 +1153,8 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
+                if not kernel_path.is_absolute():
+                    kernel_path = PurePosixPath("/home/work", kernel_path_raw)
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
