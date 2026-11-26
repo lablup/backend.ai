@@ -14,13 +14,18 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
+<<<<<<< HEAD
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
+=======
+from ai.backend.manager.data.auth.types import AccessKeyOwner, UserData
+>>>>>>> cb0a9970 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
+from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -654,3 +659,20 @@ class TestAuthRepository:
         )
 
         assert result is None
+
+    async def test_access_key_owner_is_the_user_of_the_keypair(
+        self, auth_repository: AuthRepository, sample_user_data: UserTestData
+    ) -> None:
+        result = await auth_repository.get_access_key_owner(sample_user_data.access_key)
+
+        assert result == AccessKeyOwner(
+            user_id=UserID(sample_user_data.uuid),
+            domain_name=sample_user_data.domain_name,
+            role=UserRole.USER,
+        )
+
+    async def test_an_unknown_access_key_has_no_owner(
+        self, auth_repository: AuthRepository
+    ) -> None:
+        with pytest.raises(AccessKeyNotFound):
+            await auth_repository.get_access_key_owner("AKIAUNKNOWN0000000000")
