@@ -314,6 +314,9 @@ async def prepare_vfolder_mounts(
     _ms_result = await conn.execute(_ms_query)
     model_store_project_ids: set[uuid.UUID] = {row.id for row in _ms_result.fetchall()}
 
+    # The vfolders this session may mount: the auto-mounted ones, the project's ``.local`` and
+    # the requested ones, not deleted. ``query_reachable_vfolders`` narrows them to the ones
+    # the user can read.
     project_id = ProjectID(user_scope.group_id)
     local_folder_of_project = sa.and_(
         VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
