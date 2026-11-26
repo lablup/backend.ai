@@ -32,7 +32,7 @@ A script whose decision cannot be reproduced by running it by hand is in the wro
 - Put the jobs of one trigger and purpose in one workflow file: the checks of a pull request and a push to `v2` in `ci.yml`, a tag release in `release.yml`.
 - The required check is one status-collecting job, `ci-gate` (`if: always()`). Do not put a `paths` filter on a workflow that holds a required check.
 - When two workflows need the same job, move it to a reusable workflow (`workflow_call`). `test.yml` (the full test) is called by `ci.yml` on a push to `v2` and by `release.yml`.
-- `vuln.yml` (`go tool govulncheck ./...`) is a reusable workflow: it reports without blocking on a pull request and a push to `v2`, blocks the build on a release, and checks the head of `v2` on a weekly `schedule`, which GitHub starts only from the file on the default branch.
+- `vuln.yml` (`go tool govulncheck ./...`) is a reusable workflow: it reports without blocking on a pull request and a push to `v2`, and blocks the build on a release.
 - The Go setup is the composite action `go-setup`. The decision on the event and the branch stays in the workflow YAML.
 - The pull request gate is `fmt`, `lint` and `build`. `test-short`, `generate-diff` and `vuln` report on a pull request without being in the gate. The full test (`test`, with `-race` and Postgres) runs on a push to `v2` and on a release.
 - `release.yml` runs on a release tag push (the pattern is a placeholder until the transition). Its `build` job needs `test` and `vuln`, builds each `main` package under `cmd/` for linux amd64 and arm64 with `.github/scripts/build-release.sh`, and uploads them as the `binaries` artifact. It does not publish images, create a GitHub release or publish packages.

@@ -1,12 +1,10 @@
 name: vuln
 
 # The Go vulnerability check: `go tool govulncheck ./...`.
-# Called by `ci.yml` (pull requests into and pushes to `v2`) and `release.yml`, and run weekly on `v2`.
+# Called by `ci.yml` (pull requests into and pushes to `v2`) and `release.yml`.
 
 on:
   workflow_call:
-  schedule:
-    - cron: '37 3 * * 1'
 
 permissions:
   contents: read
@@ -18,8 +16,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           lfs: false
-          # A scheduled run starts from the default branch; it checks the head of `v2`.
-          ref: ${{ github.event_name == 'schedule' && 'v2' || '' }}
       - name: Set up Go
         id: go
         uses: ./.github/actions/go-setup
