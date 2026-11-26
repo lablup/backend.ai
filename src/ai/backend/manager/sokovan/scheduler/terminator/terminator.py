@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
+from typing import Final
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
@@ -33,6 +34,14 @@ class SessionTerminatorArgs:
     repository: SchedulerRepository
     agent_client_pool: AgentClientPool
     valkey_schedule: ValkeyScheduleClient
+
+
+# An agent of an earlier release cannot build its kernel events with the admin reasons,
+# so it is sent the reason it knows; the session events keep the admin reason.
+_AGENT_REASONS: Final[Mapping[KernelLifecycleEventReason, KernelLifecycleEventReason]] = {
+    KernelLifecycleEventReason.ADMIN_TERMINATED: KernelLifecycleEventReason.USER_REQUESTED,
+    KernelLifecycleEventReason.ADMIN_FORCE_TERMINATED: KernelLifecycleEventReason.FORCE_TERMINATED,
+}
 
 
 class SessionTerminator:
@@ -173,7 +182,10 @@ class SessionTerminator:
                 async with self._agent_client_pool.acquire(agent_id) as client:
                     # Call agent's destroy_kernel RPC method with correct parameters
                     await client.destroy_kernel(
-                        kernel_id, session_id, reason, suppress_events=False
+                        kernel_id,
+                        session_id,
+                        _AGENT_REASONS.get(reason, reason),
+                        suppress_events=False,
                     )
                 return KernelTerminationResult(
                     kernel_id=kernel_id,
