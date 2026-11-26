@@ -1,5 +1,14 @@
 version: 2
 updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      timezone: "Asia/Seoul"
+    labels:
+      - "skip:changelog"
+      - "area:infrastructure"
   - package-ecosystem: "github-actions"
     allow:
       - dependency-name: actions/*

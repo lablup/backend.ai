@@ -34,6 +34,7 @@ A script whose decision cannot be reproduced by running it by hand is in the wro
 - The Go setup is the composite action `go-setup`. The decision on the event and the branch stays in the workflow YAML.
 - The pull request gate is `fmt`, `lint` and `build`. `test-short` and `generate-diff` report on a pull request without being in the gate. The full test (`test`, with `-race` and Postgres) runs on a push to `v2` and on a release.
 - `release.yml` runs on a release tag push (the pattern is a placeholder until the transition). Its `build` job needs `test`, builds each `main` package under `cmd/` for linux amd64 and arm64 with `.github/scripts/build-release.sh`, and uploads them as the `binaries` artifact. It does not publish images, create a GitHub release or publish packages.
+- The `build` job runs `.github/scripts/check-removed-files.sh` with the file name patterns `ci.yml` passes: it fails when a matching file is in the repository.
 - The `build` job runs `go run ./tools/changelog check`. A release batches `changes/unreleased/` with `go run ./tools/changelog batch <version> --allow-empty` in the `changelog` job and uploads `changes/<version>.md` as the `changelog` artifact. Fragments: `changes/README.md`.
 - The `build` job runs `.github/scripts/check-build-tag.sh './tests/integration/...'`: it fails when a Go file under `tests/integration/` lacks the `integration` build tag.
 - The Go caches (`GOCACHE`, `GOMODCACHE`) are restored by `actions/go-setup` and saved by each job on a push only: key `<job>-<os>-<sha>`, restored by the prefix.
@@ -41,3 +42,4 @@ A script whose decision cannot be reproduced by running it by hand is in the wro
 - Read the Docs skips the docs build on `v2`: the root `.readthedocs.yaml` exits `183` in `build.commands`, which cancels the build (BAI-1162 restores it).
 - `nvd-cve-watch.yml` runs `go run ./tools/cvewatch find` and `notify`. The script rules above hold for that tool. Its run log is public: `notify` prints only the number of CVEs sent, and its errors do not carry the webhook URL.
 - The other workflows: `pr-prefix.yml`, `auto-author-assign.yml`, `cancel-superseded.yml` (cancels superseded `ci.yml` runs), `cleanup-pr-caches.yml`, `stale-pr.yml`, `devskim.yml`, `osv-scanner.yml`, `nvd-cve-watch.yml`.
+- `osv-scanner.yml` scans `go.mod` for vulnerabilities.

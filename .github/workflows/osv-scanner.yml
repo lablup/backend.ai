@@ -15,7 +15,7 @@ on:
   schedule:
     - cron: '43 20 * * 3'
   push:
-    branches: [ "main" ]
+    branches: [ "main", "v2" ]
 
 permissions:
   # Require writing security events to upload SARIF file to security tab
@@ -27,6 +27,9 @@ permissions:
 jobs:
   scan-scheduled:
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f" # v2.0.1
+    with:
+      scan-args: |-
+        --lockfile=./go.mod
 
   prepare-container-matrix:
     name: Discover Dockerfiles

@@ -77,6 +77,8 @@ jobs:
           cache-prefix: build
       - name: Build
         run: go build ./...
+      - name: Check that no removed file is back
+        run: .github/scripts/check-removed-files.sh '*.py' 'pants.toml' 'BUILD' 'pyproject.toml'
       - name: Check the changelog fragments
         run: go run ./tools/changelog check
       - name: Check the documents changed in the pull request

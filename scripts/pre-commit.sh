@@ -47,7 +47,7 @@ if git diff --cached --name-only | grep -q '^changes/unreleased/'; then
   fi
 fi
 
-if ! git diff --cached --quiet -- '*.md'; then
+if ! git diff --cached --quiet -- '*.md' 'glossary/registry/' 'doclint.yaml'; then
   echo "✓ Checking documents..."
   if ! go run ./tools/doclint check --staged; then
     echo "❌ Document check failed"

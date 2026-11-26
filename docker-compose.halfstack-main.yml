@@ -1,16 +1,12 @@
 configs:
   prometheus_config:
-    file: ./prometheus.yaml
+    file: ./configs/prometheus/prometheus.yaml
   otel_collector_config:
-    file: ./otel-collector-config.yaml
+    file: ./configs/otel/otel-collector-config.yaml
   loki_config:
-    file: ./loki-config.yaml
+    file: ./configs/loki/loki-config.yaml
   tempo_config:
-    file: ./tempo-config.yaml
-  supergraph_schema:
-    file: ./supergraph.graphql
-  gateway_config:
-    file: ./gateway.config.ts
+    file: ./configs/tempo/tempo-config.yaml
 
 services:
 
@@ -140,9 +136,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
       - half-grafana:/var/lib/grafana:rw
-      - "./grafana-dashboards:/var/lib/grafana/dashboards:ro"
-      - "./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
-      - "./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
+      - "./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+      - "./configs/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
+      - "./configs/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
 
   backendai-half-grafana-mcp:
     image: mcp/grafana
@@ -229,78 +225,6 @@ services:
       - "3200" # tempo
       - "4317" # otlp grpc
 
-  backendai-half-apollo-router:
-    image: ghcr.io/graphql-hive/gateway:2.1.12
-    restart: unless-stopped
-    networks:
-      - half
-    ports:
-      - "127.0.0.1:4000:4000"
-    command: ["supergraph", "--host", "0.0.0.0"]
-    environment:
-      - PORT=4000
-      - BACKENDAI_MANAGER_ENDPOINTS=${BACKENDAI_MANAGER_ENDPOINTS:-}
-      - BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL=${BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL:-}
-      - BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT=${BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT:-}
-      - BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD=${BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD:-}
-      - BACKENDAI_MANAGER_CONNECT_TIMEOUT=${BACKENDAI_MANAGER_CONNECT_TIMEOUT:-}
-      - BACKENDAI_MANAGER_REQUEST_TIMEOUT=${BACKENDAI_MANAGER_REQUEST_TIMEOUT:-}
-    configs:
-      - source: supergraph_schema
-        target: /gateway/supergraph.graphql
-      - source: gateway_config
-        target: /gateway/gateway.config.ts
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  backendai-half-minio:
-    image: minio/minio:latest
-    profiles: ["storage"]
-    restart: unless-stopped
-    networks:
-      - half
-    ports:
-      - "9000:9000"    # API port
-      - "9001:9001"    # Console port
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-    volumes:
-      - half-minio:/data:rw
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  backendai-half-traefik:
-    # Dataplane for the app-proxy "traefik" frontend mode; assets are
-    # prepared by the installer before `up`.
-    image: traefik:v3.7
-    restart: unless-stopped
-    profiles: ["traefik"]
-    networks:
-      - half
-    ports:
-      # portproxy_* entrypoints (port sub-mode); 10250 is split out because it
-      # doubles as the domainproxy entrypoint in the wildcard sub-mode.
-      - "8080:8080"                # traefik API entrypoint
-      - "10205-10249:10205-10249"
-      - "10250:10250"              # portproxy_10250 / domainproxy
-      - "10251-10300:10251-10300"
-    volumes:
-      - "./traefik.halfstack.current.yml:/etc/traefik/traefik.yml:ro"
-      - "./volumes/traefik/plugins-local:/plugins-local:ro"
-      # Must match the host path (the coordinator passes the worker's marker
-      # path verbatim); the installer substitutes the placeholder.
-      - "./volumes/traefik/marker:/__APPPROXY_MARKER_DIR__"
-    healthcheck:
-      test: ["CMD", "traefik", "healthcheck", "--ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
 networks:
   half:
 
@@ -308,4 +232,3 @@ volumes:
   half-grafana:
   half-pyroscope:
   half-tempo:
-  half-minio:
