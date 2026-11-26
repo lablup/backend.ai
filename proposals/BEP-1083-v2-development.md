@@ -16,17 +16,17 @@ Develop the Go replacements of the manager, agent and storage proxy on the long-
 | Goal | Current | Done when | Related issue |
 |---|---|---|---|
 | `v2` split and `main` freeze | No `v2` branch and no `main` freeze rule | `v2` exists, CI rejects new alembic migration files, and AGENTS.md rules stop Python feature development | BAI-1110 |
-| Directories | No `go.mod` or Go directory at the repository root | The replaced Python is removed, and `go.mod`, `cmd/`, `internal/`, `api/` and `migrations/` exist | BAI-1112 |
+| Directories | No `go.mod` or Go directory at the repository root | The Python is removed, and `go.mod`, `cmd/`, `internal/`, `api/` and `migrations/` exist | BAI-1112 |
 | Code generation, lint, tests and DB schema | No go tool commands and no goose migration | Code generation, lint and tests run with go tools, and the alembic head is the first goose migration | BAI-1113 |
-| `v2` Go CI | No Go CI job for PRs whose base is `v2` | Python CI jobs are skipped, only Go jobs run, and CI fails when a removed path reappears | BAI-1114 |
+| `v2` Go CI | No Go CI job for PRs whose base is `v2` | `v2` has only Go jobs, and CI fails when a removed file reappears | BAI-1114 |
 | Same-standard check | No language-independent API contract test | The same contract test passes on both the Python and Go versions | BAI-1115 |
 | Go working rules | AGENTS.md on `v2` is not the Go working rules | AGENTS.md on `v2` holds the Go working rules | BAI-1116 |
 | Transition and release | No `v2` → `main` transition procedure or preview release procedure | `v2` lands as one merge commit, and the stable version is released after the preview runs | - |
 
 ## Non-goals
 
-- Go replacement of the client, CLI, webserver and app proxy: they remain on `v2`.
-- Go replacement of the account manager, kernel runner and accelerator plugins: they remain on `v2`.
+- Go replacement of the client, CLI, webserver and app proxy: their Python is removed from `v2`.
+- Go replacement of the account manager, kernel runner and accelerator plugins: their Python is removed from `v2`.
 
 ## Design
 
@@ -43,14 +43,14 @@ Develop the Go replacements of the manager, agent and storage proxy on the long-
 
 ### `v2` scope, build and DB schema
 
-On `v2`, only the Python that Go replaces is removed: the manager (including sokovan), agent and storage proxy. Build, code generation, lint and tests use go tools, and the tool versions are pinned by the tool directive of `go.mod`. Pants does not handle Go code.
+`v2` holds no Python. Build, code generation, lint and tests use go tools, and the tool versions are pinned by the tool directive of `go.mod`.
 
 | Item | Content |
 |---|---|
-| Removed | The Python of `src/ai/backend/manager` (including sokovan), `src/ai/backend/agent` and `src/ai/backend/storage` |
-| Kept | Client, CLI, webserver, app proxy, account manager, kernel runner, accelerator plugins |
+| Removed | `src/`, the Python tests, scripts and tools, Pants and the Python build files, the Python service Docker images, the component configurations, `fixtures/`, `docs/` |
+| Kept | `seeds/`, `proposals/`, `glossary/`, the changelog history, the observability configurations, `docker-compose.halfstack-main.yml`, the API contracts in `api/legacy/` |
 | Repository root | `go.mod` (module `github.com/lablup/backend.ai`), `cmd/`, `internal/`, `api/`, `migrations/` |
-| CI | A PR whose base is `v2` skips the Python CI jobs and runs only the Go jobs. CI fails when a removed path reappears |
+| CI | `v2` has only Go jobs. CI fails when a `.py` file, `pants.toml`, `BUILD` or `pyproject.toml` reappears |
 | DB schema | The alembic head when `v2` is created is the first goose migration. Later schema changes are only `v2` goose migrations |
 
 ### Transition procedure
@@ -91,7 +91,7 @@ Contrast: Bun squash-merged and deleted the old code separately 6 weeks later. T
 - `main` contributors: CI rejects a new alembic migration file.
 - `main` contributors: AGENTS.md rules stop Python feature development.
 - `main` contributors: a bug fix that changes the manager, agent or storage proxy carries `require:v2-port`.
-- CI: a PR whose base is `v2` runs only Go jobs, and fails when a removed path reappears.
+- CI: a PR whose base is `v2` runs only Go jobs, and fails when a removed file reappears.
 - CI: a PR to `main` rejects a new alembic migration file.
 - DB schema: After the transition, schema changes use only goose migrations.
 - Release: The stable version is released after the preview. LTS stays with the Python release branches.
@@ -99,7 +99,7 @@ Contrast: Bun squash-merged and deleted the old code separately 6 weeks later. T
 ## Implementation Order
 
 1. `main` freeze rules and `v2` creation (BAI-1110): two labels, CI that rejects a new alembic migration file
-2. Removal of the replaced Python and the Go module skeleton (BAI-1112): `go.mod` and the top-level directories
+2. Removal of the Python and the Go module skeleton (BAI-1112): `go.mod` and the top-level directories
 3. Commands and DB test environment (BAI-1113), Go CI (BAI-1114): in parallel. First goose migration: BAI-1113
 4. API contract test frame (BAI-1115), Go working rules in `v2` AGENTS.md (BAI-1116): in parallel
 5. Transition: the `v2` → `main` merge commit by the transition procedure

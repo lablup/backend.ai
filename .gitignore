@@ -20,36 +20,18 @@
 /.neoconf.json
 /.zed
 
-# Local configurations
-/docker-compose.halfstack.current.yml
-/env-*.sh
-/grafana-dashboards
-/grafana-provisioning
-/prometheus.yaml
-/otel-collector-config.yaml
-/loki-config.yaml
-/tempo-config.yaml
-
-# Local temp and installer-generated directories
+# Local temp and runtime directories
 /.tmp/
 /tmp/
 /volumes/
-/vfroot
-/var
-/ipc/
-/scratches
 logs/
 /logs
 /*.pid
-/.postgres-volume-backup
 
 # macOS specific
 .DS_Store
 ._.DS_Store
 
-# Generated files
-backup.*.json
-/DIST-INFO
-/INSTALL-INFO
+# Tool-generated directories
 .serena/
 .claude/worktrees/

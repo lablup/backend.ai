@@ -47,7 +47,9 @@ if git diff --cached --name-only | grep -q '^changes/unreleased/'; then
   fi
 fi
 
-if ! git diff --cached --quiet -- '*.md'; then
+if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+  echo "Merge commit; skipping the document check."
+elif ! git diff --cached --quiet -- '*.md' 'glossary/registry/' 'doclint.yaml'; then
   echo "✓ Checking documents..."
   if ! go run ./tools/doclint check --staged; then
     echo "❌ Document check failed"
