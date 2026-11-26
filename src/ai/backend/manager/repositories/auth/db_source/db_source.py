@@ -18,26 +18,12 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-<<<<<<< HEAD
 from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import AccessKeyOwner, GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-=======
-from ai.backend.manager.data.auth.login_session_types import (
-    LoginAttemptResult,
-    LoginSessionStatus,
-)
-from ai.backend.manager.data.auth.types import (
-    AccessKeyOwner,
-    GroupMembershipData,
-    KeyPairSigningMaterial,
-    UserCreationData,
-)
-from ai.backend.manager.data.keypair.types import KeyPairData
->>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 from ai.backend.manager.errors.auth import (
     AccessKeyNotFound,
     AuthorizationFailed,
@@ -314,21 +300,8 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-<<<<<<< HEAD
-    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
-=======
-    async def lookup[TEntityID: EntityIdentifier](
-        self, lookup: DataLookup[Any, TEntityID]
-    ) -> TEntityID | None:
-        """The id a key names, or None when it names nothing."""
-        async with self._v2_ops.read_ops() as r:
-            return await r.lookup_entity_id(lookup)
-
-    @auth_db_source_resilience.apply()
     async def fetch_access_key_owner(self, access_key: str) -> AccessKeyOwner:
         """Join keypairs→users to get the owner of *access_key*.
->>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 
         Raises ``AccessKeyNotFound`` if the access key is unknown.
         """

@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.user import UserRole, UserStatus
 
 
@@ -41,45 +42,6 @@ class UserData:
 class GroupMembershipData:
     group_id: uuid.UUID
     user_id: uuid.UUID
-<<<<<<< HEAD
-=======
-
-
-@dataclass(frozen=True)
-class UserCreationData:
-    """A fully provisioned user and its default keypair.
-
-    The user is the manager-wide type: what creation answers with is what the row
-    holds, and the credentials this module's own :class:`UserData` carries beside it
-    are not part of that answer.
-    """
-
-    user: ManagerUserData
-    keypair: KeyPairData
-
-
-@dataclass(frozen=True)
-class AuthenticatedUser:
-    """The authenticated caller's user record, limited to what request handling reads."""
-
-    uuid: UserID
-    email: str
-    role: UserRole
-    domain_name: str
-    domain_id: DomainID
-    sudo_session_enabled: bool
-    allowed_client_ip: list[ReadableCIDR[IPv4Network | IPv6Network]] | None
-    # Read off the keypair the user marked default, since the rate limit window is per user.
-    rate_limit: int
-    resource_policy: UserResourcePolicyData
-
-
-@dataclass(frozen=True)
-class KeyPairSigningMaterial:
-    """The owner and decrypted secret key of a keypair, as a signature check needs them."""
-
-    user_id: UserID
-    secret_key: str
 
 
 @dataclass(frozen=True)
@@ -89,33 +51,3 @@ class AccessKeyOwner:
     user_id: UserID
     domain_name: str
     role: UserRole
-
-
-@dataclass(frozen=True)
-class AuthorizingUser:
-    """The user record the authorize flow reads, and hands to its POST_AUTHORIZE plugins.
-
-    Wider than what the flow itself checks: ``totp_activated``, ``totp_key`` and
-    ``username`` are read by the two-factor plugins the flow dispatches to.
-    """
-
-    uuid: UserID
-    username: str
-    email: str
-    status: UserStatus
-    role: UserRole
-    resource_policy: str
-    password_changed_at: datetime | None
-    totp_activated: bool
-    totp_key: str | None
-
-
-@dataclass(frozen=True)
-class AuthenticatedKeypair:
-    """The keypair the request authenticated with, limited to what request handling reads."""
-
-    access_key: AccessKey
-    secret_key: SecretKey
-    is_admin: bool
-    resource_policy: KeyPairResourcePolicyData
->>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))

@@ -13,12 +13,12 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-<<<<<<< HEAD
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.auth.types import UserData
+from ai.backend.manager.data.auth.types import AccessKeyOwner, UserData
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
@@ -38,22 +38,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
-=======
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.types import AccessKeyOwner, UserData
-from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
-from ai.backend.manager.errors.user import KeyPairNotFound
-from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
-    DeploymentAutoScalingPolicyRow,
->>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
@@ -569,29 +553,8 @@ class TestAuthRepository:
     async def test_get_user_id_by_access_key_not_found(
         self, auth_repository: AuthRepository
     ) -> None:
-<<<<<<< HEAD
         with pytest.raises(AccessKeyNotFound):
             await auth_repository.get_user_id_by_access_key(AccessKey("AKIANONEXISTENT"))
-=======
-        result = await auth_repository.get_keypair_signing_material(sample_user_data.access_key)
-
-        assert result.user_id == sample_user_data.uuid
-        assert result.secret_key == "test_secret_key"
-
-    async def test_keypair_signing_material_of_inactive_keypair_is_refused(
-        self, auth_repository: AuthRepository, inactive_keypair_user: UserTestData
-    ) -> None:
-        with pytest.raises(KeyPairNotFound):
-            await auth_repository.get_keypair_signing_material(inactive_keypair_user.access_key)
-
-    async def test_access_key_user_lookup_skips_inactive_keypair(
-        self, auth_repository: AuthRepository, inactive_keypair_user: UserTestData
-    ) -> None:
-        result = await auth_repository.lookup(
-            KeypairAccessKeyUserLookup(AccessKey(inactive_keypair_user.access_key))
-        )
-
-        assert result is None
 
     async def test_access_key_owner_is_the_user_of_the_keypair(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
@@ -609,4 +572,3 @@ class TestAuthRepository:
     ) -> None:
         with pytest.raises(AccessKeyNotFound):
             await auth_repository.get_access_key_owner("AKIAUNKNOWN0000000000")
->>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))

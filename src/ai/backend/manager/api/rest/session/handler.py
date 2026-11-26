@@ -924,7 +924,7 @@ class SessionHandler:
                 owner_access_key=params.owner_access_key,
             )
         )
-        owner_access_key = scope.owner_access_key
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
 
         log.info(
             "DESTROY (ak:{0}/{1}, s:{2}, forced:{3}, recursive: {4})",

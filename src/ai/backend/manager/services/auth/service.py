@@ -759,25 +759,19 @@ class AuthService:
         owner = await self._auth_repository.get_access_key_owner(
             action.owner_access_key,
         )
-        if owner.user_id == acting.user_id:
-            # Another keypair of the acting user is not a delegation.
-            return PublicResolveAccessKeyScopeResult(
+        requester_user_id = await self._auth_repository.get_user_id_by_access_key(requester_ak)
+        if owner.user_id == requester_user_id:
+            # Another keypair of the requester is not a delegation.
+            return ResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=owner_ak,
             )
         try:
             check_if_requester_is_eligible_to_act_as_target_user(
-<<<<<<< HEAD
                 action.requester_role,
                 action.requester_domain,
-                owner_role,
-                owner_domain,
-=======
-                acting.role,
-                acting.domain_name,
                 owner.role,
                 owner.domain_name,
->>>>>>> cb0a99705 (fix(BA-7477): let a user reach sessions of their own other keypairs (#17321))
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e

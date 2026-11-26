@@ -124,7 +124,7 @@ async def _add_keypair(db: ExtendedAsyncSAEngine, user_uuid: UUID) -> OtherKeypa
         sess.add(
             KeyPairRow(
                 access_key=access_key,
-                secret_key=SecretValue("secret"),
+                secret_key="secret",
                 user=user_uuid,
                 is_active=True,
                 resource_policy=policy_name,
@@ -152,7 +152,6 @@ async def another_user(db: ExtendedAsyncSAEngine, seed: SeedData) -> ExtraUserDa
                 domain_name=seed.domain_name,
                 role=UserRole.USER,
                 resource_policy=seed.user_policy_name,
-                domain_id=seed.domain_id,
             )
         )
         await sess.commit()
