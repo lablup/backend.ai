@@ -198,15 +198,16 @@ def _mountable_auto_mounts(
 ) -> list[_MountableAutoMount]:
     """The session project's ``.local`` folder, then ``auto_mounts``, without the folders the
     user cannot reach or whose mount policy is none. A read-only folder is mounted read-only."""
-    mountable_vfolders: dict[VFolderUUID, dict[str, Any]] = {
-        VFolderUUID(vfolder["id"]): vfolder
-        for vfolder in accessible_vfolders
-        if vfolder["permission"] != VFolderMountPolicy.NONE
+    accessible_vfolders_by_id: dict[VFolderUUID, dict[str, Any]] = {
+        VFolderUUID(vfolder["id"]): vfolder for vfolder in accessible_vfolders
     }
     registered_auto_mounts: list[_MountableAutoMount] = []
     for auto_mount in auto_mounts:
-        vfolder = mountable_vfolders.get(auto_mount.vfolder_id)
+        vfolder = accessible_vfolders_by_id.get(auto_mount.vfolder_id)
         if vfolder is None:
+            continue
+        if vfolder["permission"] == VFolderMountPolicy.NONE:
+            log.trace("auto-mount vfolder skipped, mount policy is none", vfolder_id=vfolder["id"])
             continue
         is_read_only = vfolder["permission"] == VFolderMountPolicy.READ_ONLY
         registered_auto_mounts.append(
@@ -224,12 +225,17 @@ def _mountable_auto_mounts(
     local_vfolder = next(
         (
             vfolder
-            for vfolder in mountable_vfolders.values()
+            for vfolder in accessible_vfolders
             if _is_local_folder_of_project(vfolder, project_id)
         ),
         None,
     )
     if local_vfolder is None:
+        return registered_auto_mounts
+    if local_vfolder["permission"] == VFolderMountPolicy.NONE:
+        log.trace(
+            "auto-mount vfolder skipped, mount policy is none", vfolder_id=local_vfolder["id"]
+        )
         return registered_auto_mounts
     local_vfolder_mount = _MountableAutoMount(
         vfolder=local_vfolder,
@@ -423,7 +429,10 @@ async def prepare_vfolder_mounts(
             )
         except InsufficientStoragePermission as e:
             if is_auto_mount:
-                log.trace("auto-mount skipped, host permission denied", vfolder_id=vfolder["id"])
+                log.trace(
+                    "auto-mount vfolder skipped, insufficient permission",
+                    vfolder_id=vfolder["id"],
+                )
                 continue
             raise InsufficientStoragePermission(
                 f"Permission denied to mount VFolder '{vfolder_name}' on host '{vfolder['host']}'. {e.extra_msg}",
