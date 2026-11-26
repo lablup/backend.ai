@@ -857,21 +857,21 @@ class AuthService:
                 owner_access_key=requester_ak,
             )
         owner_ak = AccessKey(action.owner_access_key)
-        try:
-            (
-                owner_domain,
-                owner_role,
-            ) = await self._auth_repository.get_delegation_target_by_access_key(
-                action.owner_access_key,
+        owner = await self._auth_repository.get_access_key_owner(
+            action.owner_access_key,
+        )
+        if owner.user_id == acting.user_id:
+            # Another keypair of the acting user is not a delegation.
+            return PublicResolveAccessKeyScopeResult(
+                requester_access_key=requester_ak,
+                owner_access_key=owner_ak,
             )
-        except ValueError as e:
-            raise InvalidAPIParameters(str(e)) from e
         try:
             check_if_requester_is_eligible_to_act_as_target_user(
                 acting.role,
                 acting.domain_name,
-                owner_role,
-                owner_domain,
+                owner.role,
+                owner.domain_name,
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
