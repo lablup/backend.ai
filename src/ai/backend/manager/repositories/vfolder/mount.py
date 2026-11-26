@@ -194,7 +194,7 @@ def _is_local_folder_of_project(vfolder: Mapping[str, Any], project_id: ProjectI
 def _mountable_auto_mounts(
     accessible_vfolders: Sequence[dict[str, Any]],
     auto_mounts: Sequence[VFolderAutoMountData],
-    session_project_id: ProjectID,
+    project_id: ProjectID,
 ) -> list[_MountableAutoMount]:
     """The session project's ``.local`` folder, then ``auto_mounts``, without the folders the
     user cannot reach or whose mount policy is none. A read-only folder is mounted read-only."""
@@ -225,7 +225,7 @@ def _mountable_auto_mounts(
         (
             vfolder
             for vfolder in mountable_vfolders.values()
-            if _is_local_folder_of_project(vfolder, session_project_id)
+            if _is_local_folder_of_project(vfolder, project_id)
         ),
         None,
     )
@@ -322,11 +322,11 @@ async def prepare_vfolder_mounts(
     _ms_result = await conn.execute(_ms_query)
     model_store_project_ids: set[uuid.UUID] = {row.id for row in _ms_result.fetchall()}
 
-    session_project_id = ProjectID(user_scope.group_id)
+    project_id = ProjectID(user_scope.group_id)
     local_folder_of_session_project = sa.and_(
         VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
         VFolderRow.ownership_type == VFolderOwnershipType.GROUP,
-        VFolderRow.group == session_project_id,
+        VFolderRow.group == project_id,
     )
     extra_vf_conds: sa.ColumnElement[bool] = sa.or_(
         VFolderRow.id.in_([auto_mount.vfolder_id for auto_mount in auto_mounts]),
@@ -385,7 +385,7 @@ async def prepare_vfolder_mounts(
 
     auto_mount_keys: set[int] = set()
     for index, auto_mount in enumerate(
-        _mountable_auto_mounts(accessible_vfolders, auto_mounts, session_project_id),
+        _mountable_auto_mounts(accessible_vfolders, auto_mounts, project_id),
         start=len(mount_requests),
     ):
         auto_mount_keys.add(index)
@@ -485,7 +485,7 @@ async def prepare_vfolder_mounts(
             mount_base_path = PurePosixPath(mount_path_result["path"])
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
-        if _is_local_folder_of_project(vfolder, session_project_id):
+        if _is_local_folder_of_project(vfolder, project_id):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
