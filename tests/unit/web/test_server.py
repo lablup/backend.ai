@@ -413,41 +413,6 @@ class TestConfigTomlHandler:
         assert config["general"]["hideAgents"] is False
         assert {"resources", "environments", "menu", "plugin", "wsproxy", "pipeline"} <= set(config)
         assert config["menu"]["blocklist"] == "agent"
-<<<<<<< HEAD
-=======
-
-
-_VERSION_JSON = '{ "package": "26.10.0", "buildNumber": "100" }'
-
-
-class TestVersionJsonHandler:
-    @pytest.fixture
-    def app_serving_version_json(self, tmp_path: Path) -> web.Application:
-        (tmp_path / "version.json").write_text(_VERSION_JSON)
-        app = web.Application()
-        setup_session(app, SimpleCookieStorage())
-        app["config"] = WebServerUnifiedConfig.model_validate({
-            "service": {"static-path": str(tmp_path)},
-        })
-        app.router.add_route("POST", "/login", _login)
-        app.router.add_route("GET", "/version.json", version_json_handler)
-        return app
-
-    async def test_before_login_is_unauthorized(
-        self, aiohttp_client: Any, app_serving_version_json: web.Application
-    ) -> None:
-        client = await aiohttp_client(app_serving_version_json)
-        resp = await client.get("/version.json")
-        assert resp.status == 401
-
-    async def test_after_login_is_served(
-        self, aiohttp_client: Any, app_serving_version_json: web.Application
-    ) -> None:
-        client = await aiohttp_client(app_serving_version_json)
-        await client.post("/login")
-        resp = await client.get("/version.json")
-        assert resp.status == 200
-        assert await resp.text() == _VERSION_JSON
 
 
 class TestCheckLoginSessionDatabase:
@@ -480,4 +445,3 @@ class TestCheckLoginSessionDatabase:
 
         valkey_client.get_login_session.assert_not_awaited()
         error_log.assert_not_called()
->>>>>>> 1544dae42 (fix(BAI-911): store web server sessions in the configured redis database (#17392))

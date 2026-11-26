@@ -48,11 +48,7 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-<<<<<<< HEAD
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
-=======
-from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
->>>>>>> 1544dae42 (fix(BAI-911): store web server sessions in the configured redis database (#17392))
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -842,7 +838,7 @@ async def redis_ctx(
     # Create ValkeySessionClient for session management
     valkey_session_client = await ValkeySessionClient.create(
         valkey_target=valkey_target,
-        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+        db_id=config.session.redis.db,
         human_readable_name="web.session",
     )
     # Keep app["redis"] key for compatibility
@@ -862,46 +858,7 @@ async def redis_ctx(
     )
     setup_session(app, redis_storage)
     try:
-<<<<<<< HEAD
         yield
-=======
-        # Create ValkeySessionClient for session management
-        valkey_session_client = await ValkeySessionClient.create(
-            valkey_target=valkey_target,
-            db_id=config.session.redis.db,
-            human_readable_name="web.session",
-            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
-        )
-        # Keep app["redis"] key for compatibility
-        app["redis"] = valkey_session_client
-
-        valkey_rate_limit_client = await ValkeyRateLimitClient.create(
-            valkey_target=rate_limit_valkey_target,
-            db_id=REDIS_RATE_LIMIT_DB,
-            human_readable_name="web.ratelimit",
-            sentinel_monitor=sentinel_monitors.monitor_for(rate_limit_valkey_target),
-        )
-        app["valkey_rate_limit"] = valkey_rate_limit_client
-
-        if pidx == 0 and config.session.flush_on_startup:
-            await valkey_session_client.flush_all_sessions()
-            log.info("session storage flushed")
-
-        if config.session.login_session_extension_sec is None:
-            config.session.login_session_extension_sec = config.session.max_age
-        redis_storage = RedisStorage(
-            valkey_session_client,
-            max_age=config.session.max_age,
-            secure=config.security.cookie_secure,
-            samesite=config.security.cookie_samesite.value,
-        )
-        setup_session(app, redis_storage)
-        try:
-            yield
-        finally:
-            await valkey_rate_limit_client.close()
-            await valkey_session_client.close()
->>>>>>> 1544dae42 (fix(BAI-911): store web server sessions in the configured redis database (#17392))
     finally:
         await valkey_session_client.close()
 

@@ -94,9 +94,7 @@ class TestRedisProviderDatabase:
         self,
         web_config: WebServerUnifiedConfig,
     ) -> None:
-        async with RedisProvider().provide(
-            RedisProviderInput(config=web_config, sentinel_monitors=SentinelMonitorSet([]))
-        ) as client:
+        async with RedisProvider().provide(web_config) as client:
             await client.set_session_data("BAI-911-web", b"data", ttl_seconds=60)
 
         configured_db = await self._client_on(web_config, 10)
