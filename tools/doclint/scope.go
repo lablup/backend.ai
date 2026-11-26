@@ -19,6 +19,8 @@ type scope struct {
 	base   string
 	staged bool
 	files  []string
+	// allowOneSide turns a change to one document of a pair into a review line.
+	allowOneSide bool
 }
 
 // report collects the output. A failure makes the run exit 1; a review line does not.
