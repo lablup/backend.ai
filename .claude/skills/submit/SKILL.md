@@ -37,6 +37,7 @@ pre-commit runs the following when you commit.
 | A staged file under `changes/unreleased/` | `go run ./tools/changelog check` |
 
 - To run them before the commit, use the same commands. The full lint is `go tool golangci-lint run`, the build is `go build ./...` and the unit tests are `go test -short ./...`. For tests that need a database, follow `/test-guide` and `/halfstack`.
+- The vulnerability check is `go tool govulncheck ./...`. A failure does not block a PR; it blocks a release.
 - When a hook fails, find the cause in its output, fix it and commit again. Do not bypass it with `--no-verify`.
 - There is no pre-push.
 
@@ -93,7 +94,7 @@ gh pr create --base v2 --draft --title "..." --body "..."   # draft
 
 A draft PR skips this step.
 
-1. The required check of a PR is `ci-gate` (fmt, lint, build). `test-short` and `generate-diff` only report. The full test (`-race`, Postgres) runs on a push to `v2` and on a release (`.github/AGENTS.md`).
+1. The required check of a PR is `ci-gate` (fmt, lint, build). `test-short`, `generate-diff` and `vuln` only report. The full test (`-race`, Postgres) runs on a push to `v2` and on a release (`.github/AGENTS.md`).
 2. Look at the result. To wait, do not repeat `gh pr checks <PR>`; wait with one `gh run watch <run id> -i 60`.
 
 ```bash

@@ -126,6 +126,10 @@ jobs:
     if: github.event_name == 'push'
     uses: ./.github/workflows/test.yml
 
+  # Not in `ci-gate`: it reports without blocking.
+  vuln:
+    uses: ./.github/workflows/vuln.yml
+
   # Not in `ci-gate` on a pull request: it reports without blocking. On a push
   # a difference opens a pull request with the regenerated code.
   generate-diff:
