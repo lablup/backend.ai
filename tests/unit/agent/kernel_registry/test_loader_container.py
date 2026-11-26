@@ -11,6 +11,7 @@ from ai.backend.agent.kernel_registry.exception import (
     KernelRegistryNotFound,
 )
 from ai.backend.agent.kernel_registry.loader.container import ContainerBasedKernelRegistryLoader
+from ai.backend.agent.types import EnumerateContainersResult
 from ai.backend.common.types import KernelId
 
 
@@ -22,7 +23,7 @@ def scratch_root(tmp_path: Path) -> Path:
 @pytest.fixture
 def mock_agent() -> MagicMock:
     agent = MagicMock()
-    agent.enumerate_containers = AsyncMock(return_value=[])
+    agent.enumerate_containers = AsyncMock(return_value=EnumerateContainersResult(containers=[]))
     return agent
 
 
@@ -141,7 +142,9 @@ class TestLoadKernelRegistry:
         kernel_id: KernelId,
     ) -> None:
         """Skip kernels whose scratch config directory does not exist."""
-        mock_agent.enumerate_containers = AsyncMock(return_value=[(kernel_id, MagicMock())])
+        mock_agent.enumerate_containers = AsyncMock(
+            return_value=EnumerateContainersResult(containers=[(kernel_id, MagicMock())])
+        )
         # scratch_root doesn't exist, so config_path.is_dir() is False
         result = await loader.load_kernel_registry()
         assert len(result) == 0
@@ -155,7 +158,9 @@ class TestLoadKernelRegistry:
     ) -> None:
         """Skip kernels that raise KernelRegistryNotFound."""
         _make_scratch_config_dir(scratch_root, kernel_id)
-        mock_agent.enumerate_containers = AsyncMock(return_value=[(kernel_id, MagicMock())])
+        mock_agent.enumerate_containers = AsyncMock(
+            return_value=EnumerateContainersResult(containers=[(kernel_id, MagicMock())])
+        )
 
         with patch.object(
             loader,
@@ -174,7 +179,9 @@ class TestLoadKernelRegistry:
     ) -> None:
         """Skip kernels that raise KernelRegistryLoadError."""
         _make_scratch_config_dir(scratch_root, kernel_id)
-        mock_agent.enumerate_containers = AsyncMock(return_value=[(kernel_id, MagicMock())])
+        mock_agent.enumerate_containers = AsyncMock(
+            return_value=EnumerateContainersResult(containers=[(kernel_id, MagicMock())])
+        )
 
         with patch.object(
             loader,
@@ -193,7 +200,9 @@ class TestLoadKernelRegistry:
     ) -> None:
         """Successfully load a kernel from valid scratch data."""
         _make_scratch_config_dir(scratch_root, kernel_id)
-        mock_agent.enumerate_containers = AsyncMock(return_value=[(kernel_id, MagicMock())])
+        mock_agent.enumerate_containers = AsyncMock(
+            return_value=EnumerateContainersResult(containers=[(kernel_id, MagicMock())])
+        )
         mock_recovery_data = MagicMock()
         mock_kernel = MagicMock()
         mock_recovery_data.to_docker_kernel.return_value = mock_kernel
