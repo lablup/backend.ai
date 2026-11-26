@@ -8,7 +8,7 @@
 - **Reserve a number first.** Add the entry to the number registry in `README.md` before creating the document.
 - **Refer to the upstream BEP.** An implementation BEP links the motivation or spec BEP and does not rewrite it.
 - **Follow the structure of `BEP-0000-template.md`.** Goals, Non-goals, Design, Impact, Implementation Order, References.
-- **The template comments set the length limits, and `scripts/knowledge/check_bep_length.py` checks them.** They apply from BEP-1080.
+- **Keep within the length limits of `bep` in `doclint.yaml`.** Change a limit or the first BEP it applies to there. `go run ./tools/doclint check --only bep-length` checks them.
 
 ## Goals section
 

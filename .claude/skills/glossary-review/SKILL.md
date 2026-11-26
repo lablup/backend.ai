@@ -1,6 +1,6 @@
 ---
 name: glossary-review
-description: Review a document people review (KNOWLEDGE.md, BEP, AGENTS.md, skill, README, PR description) against the glossary - the glossary of the document's language, check_words.py, and the items the script does not find
+description: Review a document people review (KNOWLEDGE.md, BEP, AGENTS.md, skill, README, PR description) for words and writing - the doclint words check and the items it does not find
 disable-model-invocation: false
 tags:
   - docs
@@ -12,33 +12,27 @@ tags:
 Every document people review: `KNOWLEDGE.md`, BEP, `AGENTS.md`, skill, `README.md`, PR description.
 Run it after writing or changing one, before requesting the review.
 
-## Glossary by document language
-
-| Document | Glossary | Term form |
-|---|---|---|
-| Korean (`.ko.md`, a Korean draft) | `GLOSSARY.ko.md`, `glossary/<topic>.ko.md` | The Korean column of the term files |
-| English (`.md`, an English-only document) | `GLOSSARY.md`, `glossary/<topic>.md` | The English column of the term files |
-
-After translating a Korean draft into English, review it again with the English glossary.
-
 ## Steps
 
-1. Read the style rules and expressions to avoid in the glossary of the document's language, and the term file for the topic.
-2. Run `python3 scripts/knowledge/check_words.py <file>`. Check the `review:` lines too.
-3. Read the document again for the items below.
-4. Fix, run step 2 again, and report the locations and words changed.
+1. Run `go run ./tools/doclint check <file>`. Fix what it prints. Check the `review:` lines too.
+2. Read the document again for the items below.
+3. Fix, run step 1 again, and report the locations and words changed.
+
+The rules are in `glossary/registry/`. After translating a Korean draft into English, run the
+check on the English file.
 
 ## Items to check
 
-`check_words.py` finds only registered words. Check these by hand.
+The `words` check finds only registered words. Check these by hand.
 
 | Item | Rule |
 |---|---|
-| Term form | Use the term form of the document's language. Code identifiers stay in English inside backticks |
-| Coined terms | Do not name a group that the glossary and the code do not name |
-| Notation | Arrows, dashes, parentheses and list separators follow the notation rules of the document's glossary |
+| Term form | Use the term the registry gives for the document's language. Code identifiers stay in English inside backticks |
+| Coined terms | Do not name a group that the registry and the code do not name |
 | Headings, table headers | Use concrete nouns, not a nominalized clause |
 
-Verbs to avoid are registered in the expressions-to-avoid table of each glossary, so `check_words.py` finds them. A match with a qualifier prints as `review:`: decide it by the qualifier.
+A `review:` line is a word with other valid meanings. Decide it by the reason it prints, or by
+the `qualifier` of its entry in `glossary/registry/rules.yaml`.
 
-Report a word the glossary lacks as a registration candidate when the document uses it repeatedly.
+Report a word the registry lacks as a registration candidate when the document uses it repeatedly.
+Register a word in `glossary/registry/`.

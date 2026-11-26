@@ -166,7 +166,7 @@ Each sub-document of a segmented BEP is a pair too, such as `BEP-1033/00-overvie
 - Both files keep the same headings in the same order.
 - Update both files in the same change.
 
-### Single-File BEP (up to 300 lines)
+### Single-File BEP (within `bep.max_lines` of `doclint.yaml`)
 
 For short proposals, use a single markdown file:
 
@@ -175,12 +175,12 @@ proposals/
 └── BEP-1018-simple-proposal.md         # All content in one file
 ```
 
-### Segmented BEP (over 300 lines)
+### Segmented BEP (over `bep.max_lines`)
 
-When a BEP exceeds 300 lines or covers 3+ distinct components, split into a **main document + sub-documents**. Each sub-document should represent one independent work unit.
+When a BEP exceeds `bep.max_lines` or covers 3+ distinct components, split into a **main document + sub-documents**. Each sub-document should represent one independent work unit.
 
 **Segmentation criteria** (any one triggers):
-- Total document exceeds 300 lines
+- Total document exceeds `bep.max_lines`
 - Design has 3+ distinct components
 - Implementation Order has 3+ independent steps
 - Document covers multiple subsystems
@@ -203,7 +203,7 @@ proposals/
 
 **Sub-document rules**:
 - Each sub-document = one work unit (implementable independently)
-- Keep each under ~300 lines
+- Keep each within `bep.max_lines`
 - Self-contained: include enough context to understand without reading others
 - Use descriptive file names: `data-model.md`, `config-schema.md`, `event-registration.md`
 - Cross-reference other sub-documents by relative link

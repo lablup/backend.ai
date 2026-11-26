@@ -47,4 +47,12 @@ if git diff --cached --name-only | grep -q '^changes/unreleased/'; then
   fi
 fi
 
+if ! git diff --cached --quiet -- '*.md'; then
+  echo "✓ Checking documents..."
+  if ! go run ./tools/doclint check --staged; then
+    echo "❌ Document check failed"
+    GO_EXIT=1
+  fi
+fi
+
 exit "$GO_EXIT"

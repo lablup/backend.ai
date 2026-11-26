@@ -1,0 +1,178 @@
+terms:
+  - english: "additive only"
+    korean: "additive only"
+    meaning:
+      en: "A v2 schema policy that only adds new fields and deprecates existing fields without changing field names or purposes."
+      ko: "field 이름과 용도를 바꾸지 않고 새 field 추가와 기존 field deprecate 만 하는 v2 schema 정책입니다."
+  - english: "agent heartbeat"
+    korean: "에이전트 heartbeat"
+    meaning:
+      en: "A signal by which an agent periodically notifies the manager of its availability."
+      ko: "agent 가 가용 상태를 manager 에 주기적으로 알리는 신호입니다."
+    avoid:
+      en: ["heartbeat"]
+      ko: ["heartbeat"]
+  - english: "AGENTS.md"
+    korean: "AGENTS.md"
+    meaning:
+      en: "A document that contains only rules for AI coding agents."
+      ko: "AI 코딩 에이전트용 규칙만 담는 문서입니다."
+  - english: "backfill"
+    korean: "백필"
+    meaning:
+      en: "The work of pre-filling existing data so that a new feature can use it."
+      ko: "기존 데이터를 새 기능이 쓸 수 있게 미리 채워 넣는 일입니다."
+  - english: "background task"
+    korean: "background task"
+    meaning:
+      en: "A long-running job that is processed asynchronously, issues a task id, and notifies completion via an event."
+      ko: "비동기로 처리하며 task id 를 발급하고 완료를 event 로 알리는 장시간 작업입니다."
+    avoid:
+      en: ["bgtask"]
+      ko: ["bgtask"]
+  - english: "backport"
+    korean: "백포트"
+    meaning:
+      en: "The process of moving changes merged into main to a release branch."
+      ko: "main 에 merge 된 변경을 release branch 로 옮기는 과정입니다."
+  - english: "blue-green deployment"
+    korean: "블루그린 배포"
+    meaning:
+      en: "A deployment method that keeps the existing deployment as Blue and switches traffic to a new deployment."
+      ko: "기존 배포를 Blue 로 두고 새 배포로 트래픽을 전환하는 배포 방식입니다."
+  - english: "changelog fragment"
+    korean: "변경 기록 항목"
+    meaning:
+      en: "A per-PR summary file placed under changes/ and included in release notes via towncrier."
+      ko: "changes/ 아래에 두고 towncrier 로 릴리스 노트에 포함하는 PR 단위 요약 파일입니다."
+    avoid:
+      en: ["news fragment"]
+      ko: ["news fragment", "뉴스 프래그먼트", "변경 기록 조각"]
+  - english: "CSV export"
+    korean: "CSV로 내보내기"
+    meaning:
+      en: "An operation that downloads data as a CSV by specifying fields and filters per domain."
+      ko: "domain 별로 field 와 filter 를 지정해 CSV 로 내려받는 동작입니다."
+    avoid:
+      ko: ["CSV 내보내기"]
+  - english: "delegation"
+    korean: "위임"
+    meaning:
+      en: "A feature that passes a scan or import request to another Reservoir so that it performs the cross operation on behalf of the requester."
+      ko: "다른 Reservoir 로 scan 이나 import 요청을 넘겨 cross 작업을 대신 수행하게 하는 기능입니다."
+    avoid:
+      en: ["Delegate Import", "Delegate Scan"]
+      ko: ["Delegate Import", "Delegate Scan"]
+  - english: "health check"
+    korean: "헬스 체크"
+    meaning:
+      en: "A check that verifies whether a model service is healthy."
+      ko: "model service 의 정상 여부를 확인하는 검사입니다."
+  - english: "KNOWLEDGE.md"
+    korean: "KNOWLEDGE.md"
+    meaning:
+      en: "A document that holds background knowledge and the rationale for decisions."
+      ko: "배경 지식과 결정 근거를 담는 문서입니다."
+  - english: "maintained version"
+    korean: "지원 중인 버전"
+    meaning:
+      en: "A release version listed in `.github/maintained-versions.yml` to which fix PRs are automatically backported."
+      ko: "`.github/maintained-versions.yml` 에 등재되어 fix PR 이 자동 backport 되는 release version 입니다."
+  - english: "major upgrade"
+    korean: "메이저 업그레이드"
+    meaning:
+      en: "A cluster upgrade that includes feature additions and structural changes."
+      ko: "기능 추가와 구조 변경을 포함하는 cluster 업그레이드입니다."
+  - english: "minor upgrade"
+    korean: "마이너 업그레이드"
+    meaning:
+      en: "A cluster upgrade that raises the version while keeping the major version."
+      ko: "major version 을 유지하면서 올리는 cluster 업그레이드입니다."
+  - english: "monorepo"
+    korean: "모노 레포"
+    meaning:
+      en: "A development repository layout that keeps the backend stack in a single repository."
+      ko: "backend 스택을 한 저장소에 담는 개발 저장소 구성입니다."
+    avoid:
+      en: ["mono-repo", "mono-repository", "semi-mono repository"]
+      ko: ["mono-repo", "mono-repository", "semi-mono repository"]
+  - english: "preemption"
+    korean: "선점"
+    meaning:
+      en: "A feature that displaces a running session of lower priority to place other sessions when resources are insufficient."
+      ko: "자원이 부족할 때 낮은 우선순위의 실행 중 session 을 밀어내 다른 session 을 배치하는 기능입니다."
+  - english: "release branch"
+    korean: "릴리스 브랜치"
+    meaning:
+      en: "A branch name in the x.y form created every 6 months for each major release."
+      ko: "major release 마다 6개월 주기로 만드는 x.y 형태의 branch 이름입니다."
+  - english: "release tag"
+    korean: "릴리스 태그"
+    meaning:
+      en: "A tag name in the x.y.z format created for each patch release."
+      ko: "patch release 마다 만드는 x.y.z 형태의 tag 이름입니다."
+  - english: "retention policy"
+    korean: "보존 정책"
+    meaning:
+      en: "A rule that purges records past the retention period, one per category."
+      ko: "retention 기간이 지난 기록을 purge 하는 규칙으로 카테고리마다 하나입니다."
+  - english: "revision merge chain"
+    korean: "리비전 병합 체인"
+    meaning:
+      en: "A merge chain that fills model definition fields left empty by the request in order from the lowest priority: the model_mount_destination default, the runtime variant baseline, the revision preset, deployment-config.yaml, model-definition.yaml, and override."
+      ko: "요청이 비워 둔 model definition 필드를 낮은 우선순위부터 model_mount_destination 기본값, runtime variant baseline, revision preset, deployment-config.yaml, model-definition.yaml, override 순으로 채우는 병합 체인입니다."
+    avoid:
+      en: ["merge chain"]
+      ko: ["merge chain"]
+  - english: "scenario"
+    korean: "시나리오"
+    meaning:
+      en: "A test unit that runs one adapter against a real database and Valkey to verify what a single request returns."
+      ko: "어댑터 하나를 실제 database 와 Valkey 로 돌려 요청 하나가 무엇을 답하는지 확인하는 테스트 단위입니다."
+  - english: "scheduling history"
+    korean: "스케줄링 이력"
+    meaning:
+      en: "A record that stores the phase, status changes, result, and attempt count for each scheduling attempt of a session."
+      ko: "session 의 scheduling 시도마다 phase 와 상태 변화, 결과, 시도 횟수를 남기는 기록입니다."
+  - english: "seed"
+    korean: "seed"
+    meaning:
+      en: "A feature where the mgr seed command fills initial rows with YAML files under seeds/."
+      ko: "mgr seed 명령이 seeds/ 아래 YAML 로 초기 row 를 채우는 기능입니다."
+    note:
+      en: "In test code, `TestSeeder` and `seed.within` are code names for storing test data in advance."
+      ko: "테스트 코드의 `TestSeeder`, `seed.within` 은 테스트 데이터를 미리 저장하는 코드 이름입니다"
+  - english: "service catalog heartbeat"
+    korean: "서비스 카탈로그 heartbeat"
+    meaning:
+      en: "A signal that renews the liveness of a service catalog entry."
+      ko: "service catalog entry 가 살아 있음을 갱신하는 신호입니다."
+    avoid:
+      en: ["heartbeat"]
+      ko: ["heartbeat"]
+  - english: "service discovery"
+    korean: "서비스 디스커버리"
+    meaning:
+      en: "A feature where an agent registers itself with the cluster via etcd and announces service instance registration as an event."
+      ko: "agent 가 etcd 로 cluster 에 등록하고 service instance 등록을 event 로 알리는 기능입니다."
+    avoid:
+      en: ["SD"]
+      ko: ["SD", "서비스 복구"]
+  - english: "skill"
+    korean: "스킬"
+    meaning:
+      en: "A guidance document that Claude Code calls for development tasks."
+      ko: "Claude Code 가 개발 작업에 호출하는 안내 문서입니다."
+  - english: "sweep"
+    korean: "스윕"
+    meaning:
+      en: "An operation in which a retention policy cleans up its own category."
+      ko: "retention policy 가 자기 category 를 정리하는 동작입니다."
+    avoid:
+      en: ["swept"]
+      ko: ["swept"]
+  - english: "usage bucket"
+    korean: "사용량 버킷"
+    meaning:
+      en: "A record of resource usage that one scope consumed in one resource group over one period."
+      ko: "한 scope 가 한 resource group 에서 한 기간 동안 사용한 자원 사용량 기록입니다."

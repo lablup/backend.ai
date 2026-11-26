@@ -5,11 +5,12 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 ## Document structure (AGENTS.md / KNOWLEDGE.md)
 
 - **`AGENTS.md`**: Guardrails (rules) only. Concise and imperative. Always auto-loaded (`CLAUDE.md` is a symlink to this file).
-- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `python3 scripts/knowledge/search.py <term>`; the schema and authoring rules live in the `/knowledge` skill. `knowledge-check.yml` validates conformance on PRs.
+- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `go run ./tools/knowledge search <term>`; the schema and authoring rules live in the `/knowledge` skill. `ci.yml` validates conformance on PRs.
 - A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
 - **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
-- **`GLOSSARY.md`, `glossary/`**: The words and writing style for documents. `GLOSSARY.md` holds the style rules and expressions to avoid, `glossary/<topic>.md` the terms by topic.
-- **Bilingual documents**: `KNOWLEDGE.md`, `report.md`, BEPs and the glossary come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `scripts/knowledge/check_bilingual.py` checks the pairs, `scripts/knowledge/check_words.py` the words.
+- **`glossary/registry/`**: The rules of the words check: expressions to avoid and terms by topic.
+- **`doclint.yaml`**: The criteria of the document checks (`go run ./tools/doclint check`): limits, paths and the frontmatter schema. Change a value there, not in the code.
+- **Bilingual documents**: `KNOWLEDGE.md`, `report.md` and BEPs come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `go run ./tools/doclint check --only bilingual` checks the pairs, `--only words` the words.
 - **`report.md`, `report.ko.md`**: Output of the scenario tests (`scripts/scenario-report.py`). Do not edit them by hand.
 - **Korean goes only in `.ko.md`**: Do not add Korean to a `.md` file.
 - Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.
@@ -18,7 +19,7 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 
 Applies to every generated artifact — docs, code comments, BEPs, PR descriptions.
 
-- Before writing, read the glossary of the document's language (`GLOSSARY.md` and `glossary/<topic>.md`, or their `.ko.md` pairs), and use the words they set.
+- After writing, run `go run ./tools/doclint check <file>` on the changed documents and fix what it prints. The rules are in `glossary/registry/`.
 - Review a document people review (`KNOWLEDGE.md`, BEP, `AGENTS.md`, skill, `README.md`, PR description) with `/glossary-review` before requesting the review.
 - Do not write a fact the body does not refer to. Measurement conditions and the investigation go in the report or the PR.
 - Lead with the conclusion; keep background short.
@@ -65,7 +66,7 @@ When to use:
 - Submitting PR (backport targeting) → `/submit`
 - Preparing release → `/release`
 - Searching or writing background knowledge (`KNOWLEDGE.md`) → `/knowledge`
-- Reviewing a document people review against the glossary → `/glossary-review`
+- Reviewing a document people review for words and writing → `/glossary-review`
 
 Skills source: `.claude/skills/{name}/SKILL.md`
 

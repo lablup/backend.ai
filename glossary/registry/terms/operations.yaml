@@ -1,0 +1,141 @@
+terms:
+  - english: "activate revision"
+    korean: "리비전 활성화"
+    meaning:
+      en: "An operation that changes the revision of a deployment to the current revision."
+      ko: "deployment 의 revision 을 현재 revision 으로 바꾸는 동작입니다."
+    avoid:
+      ko: ["리비전 적용", "리비전 배포"]
+  - english: "approve"
+    korean: "승인"
+    meaning:
+      en: "An operation that approves an artifact revision."
+      ko: "artifact revision 을 승인하는 동작입니다."
+  - english: "assign users to project"
+    korean: "프로젝트 사용자 배정"
+    meaning:
+      en: "An operation that assigns a user to a project together with a project role."
+      ko: "project 에 사용자를 project role 과 함께 배정하는 동작입니다."
+  - english: "batch"
+    korean: "batch"
+    meaning:
+      en: "A prefix for operations that process multiple rows atomically in a single SQL statement."
+      ko: "한 SQL 문으로 여러 row 를 원자적으로 처리하는 연산 접두사입니다."
+  - english: "bulk"
+    korean: "bulk"
+    meaning:
+      en: "A prefix for operations that handle multiple entities in a single operation. Whether partial success is possible is distinguished by the partial_bulk and atomic_bulk notations."
+      ko: "여러 entity 를 한 연산으로 다루는 접두사입니다. 일부만 성공할 수 있는지는 partial_bulk, atomic_bulk 표기로 구분합니다."
+  - english: "clone"
+    korean: "클론"
+    meaning:
+      en: "An operation that clones a vfolder."
+      ko: "vfolder 를 복제하는 동작입니다."
+    avoid:
+      ko: ["복제"]
+  - english: "delete"
+    korean: "삭제"
+    meaning:
+      en: "An operation that marks a row as deleted while keeping it. Permanent deletion is purge."
+      ko: "row 를 남기고 삭제로 표시하는 동작입니다. 영구 삭제는 purge 입니다."
+    avoid:
+      en: ["soft delete", "soft-delete"]
+      ko: ["soft delete", "soft-delete", "소프트 삭제"]
+  - english: "deregister"
+    korean: "등록 해제"
+    meaning:
+      en: "An operation that removes a registered service instance from the registration list."
+      ko: "등록된 service instance 를 등록 목록에서 빼는 동작입니다."
+  - english: "destroy"
+    korean: "종료"
+    meaning:
+      en: "An operation value that terminates a session."
+      ko: "세션을 종료하는 operation 값입니다."
+  - english: "enqueue session"
+    korean: "대기열 추가"
+    meaning:
+      en: "Enqueues a new session into the queue."
+      ko: "새 세션 을 대기열에 넣는 동작입니다."
+  - english: "execute"
+    korean: "실행"
+    meaning:
+      en: "The core call of the user API that runs user code in an isolated session."
+      ko: "사용자 코드를 격리된 세션 에서 실행하는 user API 의 핵심 호출입니다."
+  - english: "force purge"
+    korean: "force purge"
+    meaning:
+      en: "An escape hatch that deletes rows immediately without waiting for cleanup."
+      ko: "정리를 기다리지 않고 row 를 바로 삭제하는 탈출구입니다."
+  - english: "grant"
+    korean: "권한 부여"
+    meaning:
+      en: "An operation that grants a role to a user. The former permission bit grant:* is abolished, and entity share now handles transferring entities."
+      ko: "사용자에게 role 을 부여하는 동작입니다. 권한 비트였던 grant:* 는 폐기됐고, entity 를 넘기는 일은 entity share 가 맡습니다."
+  - english: "purge"
+    korean: "영구 삭제"
+    meaning:
+      en: "An operation that completely removes an entity so that it cannot be restored."
+      ko: "엔티티를 되살릴 수 없이 완전히 제거하는 동작입니다."
+    avoid:
+      en: ["hard delete"]
+      ko: ["hard delete", "퍼지"]
+  - english: "rescan"
+    korean: "재스캔"
+    meaning:
+      en: "An operation that re-reads the metadata of an external registry to update the DB."
+      ko: "외부 레지스트리의 메타데이터를 다시 훑어 DB 를 갱신하는 동작입니다."
+  - english: "restore"
+    korean: "복원"
+    meaning:
+      en: "An operation that reverses delete to bring something back."
+      ko: "delete 를 되돌려 되살리는 동작입니다."
+  - english: "revocation"
+    korean: "해지"
+    meaning:
+      en: "An operation that takes back permission."
+      ko: "권한을 거두는 동작입니다."
+    avoid:
+      ko: ["회수"]
+  - english: "revoke"
+    korean: "해지"
+    meaning:
+      en: "An operation that takes back a granted credential, used for keypair, login session, role, and sharing."
+      ko: "부여한 자격을 거두는 동작으로 keypair, login session, role, 공유에 씁니다."
+  - english: "scan"
+    korean: "스캔"
+    meaning:
+      en: "An operation that reads images and artifacts from a registry to register and update them."
+      ko: "레지스트리에서 이미지와 아티팩트를 읽어 등록하고 갱신하는 동작입니다."
+  - english: "scoped search"
+    korean: "scoped search"
+    meaning:
+      en: "A query method that takes a scope identifier as a required argument and searches within that scope."
+      ko: "범위 식별자를 필수 인자로 받아 그 범위 안에서 검색하는 조회 방식입니다."
+  - english: "session commit"
+    korean: "세션 커밋"
+    meaning:
+      en: "An operation that saves the container state of a session as a new image."
+      ko: "session 의 container 상태를 새 image 로 남기는 동작입니다."
+    avoid:
+      en: ["container commit", "imagify"]
+      ko: ["container commit", "imagify", "컨테이너 커밋"]
+  - english: "upsert"
+    korean: "upsert"
+    meaning:
+      en: "A write operation that creates a new row or updates an existing row."
+      ko: "새 row 를 만들거나 기존 row 를 바꾸는 쓰기 동작입니다."
+  - english: "vfolder invitation"
+    korean: "vfolder 초대"
+    meaning:
+      en: "A sharing mechanism that invites other users to collaborate on a vfolder."
+      ko: "다른 사용자를 vfolder 협업에 초대하는 공유 장치입니다."
+    avoid:
+      ko: ["초대된 폴더", "가상 폴더 초대"]
+  - english: "vfolder leave"
+    korean: "vfolder 공유 취소"
+    meaning:
+      en: "An operation to leave a vfolder that has been shared with the user."
+      ko: "공유받은 vfolder 에서 나가는 동작입니다."
+    avoid:
+      en: ["leave"]
+      ko: ["나가기", "leave"]

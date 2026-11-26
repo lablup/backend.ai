@@ -15,13 +15,13 @@ Implemented-Version:
 
 # <Title>
 
-<!-- 300 lines per document. List items are one level and at most 120 characters. -->
+<!-- The length limits are the `bep` values of doclint.yaml. List items are one level. -->
 
 ## Goals
 
 <One or two lines on what this BEP achieves. Do not write the problem or the background>
 
-<!-- At most 7 rows. One line per cell. -->
+<!-- Rows within `max_items`. One line per cell. -->
 
 | Goal | Current | Done when | Related issue |
 |---|---|---|---|
@@ -29,19 +29,19 @@ Implemented-Version:
 
 ## Non-goals
 
-<!-- At most 7 items. -->
+<!-- Items within `max_items`. -->
 
 - <Item not covered, and where it is covered>
 
 ## Design
 
-<!-- At most 4 subsections. Each has one SVG, at most 2 tables (7 rows each, one line per cell) and at most 3 sentences. The rejected alternative line is counted separately. Do not list every component. -->
+<!-- Subsections, tables, table rows and sentences within `design`. Each subsection has one SVG, one line per cell. The rejected alternative line is counted separately. Do not list every component. -->
 
 ### <Component that resolves a goal>
 
 ![<Diagram description>](BEP-XXXX/<diagram-name>.svg)
 
-<At most 3 sentences>
+<Short explanation>
 
 | <Contract item: type, API, state transition> | <Meaning> |
 |---|---|
@@ -51,13 +51,13 @@ Rejected: <Alternative and the reason in one line. Only when the review disputes
 
 ## Impact
 
-<!-- Only when it applies. At most 7 items: compatibility, permission, performance, metrics. -->
+<!-- Only when it applies. Items within `max_items`: compatibility, permission, performance, metrics. -->
 
 - <Affected target>: <Change and response>
 
 ## Implementation Order
 
-<!-- At most 7 items. One step is one issue. Write the goal or result a step resolves, not a task list. -->
+<!-- Items within `max_items`. One step is one issue. Write the goal or result a step resolves, not a task list. -->
 
 1. <Step name>: <Goal or result it resolves>
 
