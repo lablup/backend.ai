@@ -7,10 +7,18 @@ resource options, and mount option types.
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import AliasChoices, ConfigDict, Field, GetCoreSchemaHandler, GetJsonSchemaHandler
+from pydantic import (
+    AliasChoices,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
+    field_validator,
+)
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
@@ -170,6 +178,13 @@ class MountOption(BaseFieldModel):
         ),
     )
     model_config = ConfigDict(extra="allow")
+
+    @field_validator("mount_destination")
+    @classmethod
+    def mount_destination_must_not_contain_parent_segment(cls, v: str | None) -> str | None:
+        if v is not None and ".." in PurePosixPath(v).parts:
+            raise ValueError("mount_destination must not contain a '..' segment")
+        return v
 
 
 # ---------------------------------------------------------------------------

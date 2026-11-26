@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID
 
@@ -336,6 +337,13 @@ class ModelMountConfigInput(BaseRequestModel):
         ),
     )
 
+    @field_validator("mount_destination")
+    @classmethod
+    def mount_destination_must_not_contain_parent_segment(cls, v: str) -> str:
+        if ".." in PurePosixPath(v).parts:
+            raise ValueError("mount_destination must not contain a '..' segment")
+        return v
+
 
 class ExtraVFolderMountInput(BaseRequestModel):
     """Input for an extra vfolder mount."""
@@ -358,6 +366,13 @@ class ExtraVFolderMountInput(BaseRequestModel):
             " Empty string is rejected; omit the field to mount the root."
         ),
     )
+
+    @field_validator("mount_destination")
+    @classmethod
+    def mount_destination_must_not_contain_parent_segment(cls, v: str | None) -> str | None:
+        if v is not None and ".." in PurePosixPath(v).parts:
+            raise ValueError("mount_destination must not contain a '..' segment")
+        return v
 
 
 class CreateRevisionInput(BaseRequestModel):
