@@ -628,6 +628,10 @@
     # certificates or development environments.
     # Added in 25.13.0
     tls_skip_verify = false
+    # Redis database number to store the sessions in. The manager reads and
+    # writes the same keys, so this must equal its `auth.login-session-db`.
+    # Added in 25.12.0
+    db = 0
 
     # Configuration for the Redis helper library. Controls timeouts and
     # reconnection behavior. Adjust based on network conditions and reliability
