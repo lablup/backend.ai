@@ -40,16 +40,22 @@ func runFrontmatter(sc *scope, out *report) error {
 	}
 	names := map[string]string{}
 	for _, path := range relative {
-		for _, problem := range checkKnowledge(sc.root, path, names, inScope[path]) {
+		for _, problem := range checkKnowledge(sc, path, names, inScope[path]) {
 			out.fail(problem)
 		}
 	}
 	return nil
 }
 
-func checkKnowledge(root, relPath string, names map[string]string, report bool) []string {
+func checkKnowledge(sc *scope, relPath string, names map[string]string, report bool) []string {
+	root := sc.root
 	full := filepath.Join(root, relPath)
-	raw, body, err := kdoc.Load(full)
+	var raw kdoc.Raw
+	var body []string
+	data, err := sc.read(relPath)
+	if err == nil {
+		raw, body, err = kdoc.Parse(data)
+	}
 	if err != nil {
 		if report {
 			return []string{fmt.Sprintf("%s: %v", relPath, err)}

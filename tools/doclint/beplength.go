@@ -128,13 +128,9 @@ func topItems(body []numberedLine) int {
 	return count
 }
 
-func checkBEPLength(path, display string) ([]string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+func checkBEPLength(data []byte, display string) []string {
 	lang := "en"
-	if strings.HasSuffix(filepath.Base(path), koSuffix) {
+	if strings.HasSuffix(display, koSuffix) {
 		lang = "ko"
 	}
 	lines := contentLines(string(data))
@@ -170,7 +166,7 @@ func checkBEPLength(path, display string) ([]string, error) {
 			problems = append(problems, checkDesign(sec, display)...)
 		}
 	}
-	return problems, nil
+	return problems
 }
 
 func checkDesign(sec section, display string) []string {
@@ -283,11 +279,11 @@ func runBEPLength(sc *scope, out *report) error {
 		return err
 	}
 	for _, path := range paths {
-		problems, err := checkBEPLength(resolve(sc.root, path), path)
+		data, err := sc.read(path)
 		if err != nil {
 			return err
 		}
-		for _, problem := range problems {
+		for _, problem := range checkBEPLength(data, path) {
 			out.fail(problem)
 		}
 	}

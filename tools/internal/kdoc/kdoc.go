@@ -91,6 +91,11 @@ func Load(path string) (Raw, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	return Parse(data)
+}
+
+// Parse returns the raw frontmatter and the body lines of the content of a KNOWLEDGE.md.
+func Parse(data []byte) (Raw, []string, error) {
 	front, body, ok := splitDocument(string(data))
 	if !ok {
 		return nil, nil, &ParseError{Line: 1, Message: "missing or unclosed '---' frontmatter fence"}

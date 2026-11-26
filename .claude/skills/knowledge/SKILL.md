@@ -100,7 +100,7 @@ Actor convention: `<producer>/<version>` for agents (for example `claude-code/fa
 ## Check before pushing
 
 ```bash
-go run ./tools/doclint check --base origin/main
+go run ./tools/doclint check --base origin/v2
 ```
 
 Validates the schema, scope and sources path existence, body links, name

@@ -372,12 +372,12 @@ func proseLines(text string) map[int]string {
 }
 
 // checkWords returns the failures and the review lines of one file. numbers limits the lines.
-func checkWords(root, path string, numbers map[int]bool, english, korean []word) (problems, reviews []string, err error) {
+func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []word) (problems, reviews []string, err error) {
 	words := english
 	if strings.HasSuffix(path, koSuffix) {
 		words = korean
 	}
-	data, err := os.ReadFile(resolve(root, path))
+	data, err := sc.read(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -417,9 +417,9 @@ func resolve(root, path string) string {
 func wordsTargets(sc *scope) (map[string]map[int]bool, error) {
 	targets := map[string]map[int]bool{}
 	switch {
-	case sc.base != "" || len(sc.files) > 0:
-		if sc.base != "" {
-			added, err := addedLines(sc.root, sc.base)
+	case sc.restricted():
+		if sc.diffing() {
+			added, err := addedLines(sc)
 			if err != nil {
 				return nil, err
 			}
@@ -463,7 +463,7 @@ func runWords(sc *scope, out *report) error {
 		if isSkipped(path) {
 			continue
 		}
-		fileProblems, fileReviews, err := checkWords(sc.root, path, targets[path], english, korean)
+		fileProblems, fileReviews, err := checkWords(sc, path, targets[path], english, korean)
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -22,8 +21,8 @@ func englishPath(koPath string) string {
 	return strings.TrimSuffix(koPath, koSuffix) + ".md"
 }
 
-func headingCounts(path string) (map[int]int, error) {
-	data, err := os.ReadFile(path)
+func headingCounts(sc *scope, path string) (map[int]int, error) {
+	data, err := sc.read(path)
 	if err != nil {
 		return nil, err
 	}
@@ -85,15 +84,15 @@ func checkPairs(sc *scope, changed map[string]bool) ([]string, error) {
 		if sc.restricted() && !changed[koPath] && !changed[enPath] {
 			continue
 		}
-		if !exists(resolve(sc.root, enPath)) {
+		if !sc.has(enPath) {
 			problems = append(problems, fmt.Sprintf("%s: %s is missing", koPath, enPath))
 			continue
 		}
-		koCounts, err := headingCounts(resolve(sc.root, koPath))
+		koCounts, err := headingCounts(sc, koPath)
 		if err != nil {
 			return nil, err
 		}
-		enCounts, err := headingCounts(resolve(sc.root, enPath))
+		enCounts, err := headingCounts(sc, enPath)
 		if err != nil {
 			return nil, err
 		}
@@ -105,9 +104,9 @@ func checkPairs(sc *scope, changed map[string]bool) ([]string, error) {
 	return problems, nil
 }
 
-// checkAddedKorean rejects Korean added to a .md file since base.
-func checkAddedKorean(root, base string) ([]string, error) {
-	diff, err := git(root, "diff", "--unified=0", "--no-color", base+"...HEAD", "--", "*.md")
+// checkAddedKorean rejects Korean added to a .md file.
+func checkAddedKorean(sc *scope) ([]string, error) {
+	diff, err := git(sc.root, "diff", "--unified=0", "--no-color", sc.diffRange(), "--", "*.md")
 	if err != nil {
 		return nil, err
 	}
@@ -127,12 +126,12 @@ func checkAddedKorean(root, base string) ([]string, error) {
 
 // checkPairUpdates requires both files of a pair to change together. A newly added .ko.md is
 // exempt, since it translates an English file that does not change.
-func checkPairUpdates(root, base string) ([]string, error) {
-	changedList, err := gitLines(root, "diff", "--name-only", base+"...HEAD", "--", "*.md")
+func checkPairUpdates(sc *scope) ([]string, error) {
+	changedList, err := gitLines(sc.root, "diff", "--name-only", sc.diffRange(), "--", "*.md")
 	if err != nil {
 		return nil, err
 	}
-	addedList, err := gitLines(root, "diff", "--name-only", "--diff-filter=A", base+"...HEAD", "--", "*.md")
+	addedList, err := gitLines(sc.root, "diff", "--name-only", "--diff-filter=A", sc.diffRange(), "--", "*.md")
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +157,7 @@ func checkPairUpdates(root, base string) ([]string, error) {
 			partner = englishPath(path)
 		} else {
 			partner = strings.TrimSuffix(path, ".md") + koSuffix
-			if !exists(resolve(root, partner)) {
+			if !sc.has(partner) {
 				continue
 			}
 		}
@@ -178,12 +177,12 @@ func runBilingual(sc *scope, out *report) error {
 	if err != nil {
 		return err
 	}
-	if sc.base != "" {
-		added, err := checkAddedKorean(sc.root, sc.base)
+	if sc.diffing() {
+		added, err := checkAddedKorean(sc)
 		if err != nil {
 			return err
 		}
-		updates, err := checkPairUpdates(sc.root, sc.base)
+		updates, err := checkPairUpdates(sc)
 		if err != nil {
 			return err
 		}

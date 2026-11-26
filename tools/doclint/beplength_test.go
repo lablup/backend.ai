@@ -34,12 +34,7 @@ func TestCheckBEPLength(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
-			writeFile(t, root, tt.path, tt.doc)
-			got, err := checkBEPLength(resolve(root, tt.path), tt.path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			got := checkBEPLength([]byte(tt.doc), tt.path)
 			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}

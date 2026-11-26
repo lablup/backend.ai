@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path"
 
 	"github.com/lablup/backend.ai/tools/internal/kdoc"
@@ -13,8 +12,8 @@ const (
 	maxAgentsLines = 200
 )
 
-func checkAgentsLines(root, rel string) (string, error) {
-	data, err := os.ReadFile(resolve(root, rel))
+func checkAgentsLines(sc *scope, rel string) (string, error) {
+	data, err := sc.read(rel)
 	if err != nil {
 		return "", err
 	}
@@ -40,7 +39,7 @@ func runAgentsLines(sc *scope, out *report) error {
 		return err
 	}
 	for _, rel := range selected {
-		problem, err := checkAgentsLines(sc.root, rel)
+		problem, err := checkAgentsLines(sc, rel)
 		if err != nil {
 			return err
 		}

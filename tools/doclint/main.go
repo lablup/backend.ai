@@ -2,14 +2,15 @@
 //
 // Usage, from the repository root:
 //
-//	go run ./tools/doclint check [--only <check>[,<check>...]] [--base <ref>] [--root <dir>] [file ...]
+//	go run ./tools/doclint check [--only <check>[,<check>...]] [--base <ref> | --staged] [--root <dir>] [file ...]
 //
 // The checks are frontmatter (KNOWLEDGE.md schema, names, paths, links), bilingual (.md and
 // .ko.md pairs), words (words the glossary rejects), bep-length (BEP-1080 and later limits)
 // and agents-lines (AGENTS.md of at most 200 lines).
 //
 // With --base, a check covers the documents changed since the ref, and the words check the
-// lines added since it. With files, a check covers those files. With neither, it covers all.
+// lines added since it. --staged does the same for the staged changes. With files, a check
+// covers those files. With none of these, it covers all.
 // A failure exits 1. A line starting with "review:" is printed and does not fail.
 package main
 
@@ -47,11 +48,12 @@ func main() {
 
 func run(args []string, stdout io.Writer) (failed bool, err error) {
 	if len(args) == 0 || args[0] != "check" {
-		return false, fmt.Errorf("usage: doclint check [--only <check>] [--base <ref>] [file ...]")
+		return false, fmt.Errorf("usage: doclint check [--only <check>] [--base <ref> | --staged] [file ...]")
 	}
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	root := fs.String("root", ".", "repository root")
 	base := fs.String("base", "", "check the documents changed since this git ref")
+	staged := fs.Bool("staged", false, "check the staged changes")
 	only := fs.String("only", "", "comma-separated checks to run: "+checkNames())
 	if err := fs.Parse(args[1:]); err != nil {
 		return false, err
@@ -60,10 +62,14 @@ func run(args []string, stdout io.Writer) (failed bool, err error) {
 	if err != nil {
 		return false, err
 	}
+	if *staged && (*base != "" || fs.NArg() > 0) {
+		return false, fmt.Errorf("--staged takes neither --base nor files")
+	}
 	sc, err := newScope(*root, *base, fs.Args())
 	if err != nil {
 		return false, err
 	}
+	sc.staged = *staged
 	out := &report{w: stdout}
 	for _, c := range selected {
 		if err := c.run(sc, out); err != nil {

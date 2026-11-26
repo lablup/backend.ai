@@ -5,7 +5,7 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 ## Document structure (AGENTS.md / KNOWLEDGE.md)
 
 - **`AGENTS.md`**: Guardrails (rules) only. Concise and imperative. Always auto-loaded (`CLAUDE.md` is a symlink to this file).
-- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `go run ./tools/knowledge search <term>`; the schema and authoring rules live in the `/knowledge` skill. `knowledge-check.yml` validates conformance on PRs.
+- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `go run ./tools/knowledge search <term>`; the schema and authoring rules live in the `/knowledge` skill. `ci.yml` validates conformance on PRs.
 - A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
 - **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
 - **`GLOSSARY.md`, `glossary/`**: The words and writing style for documents. `GLOSSARY.md` holds the style rules and expressions to avoid, `glossary/<topic>.md` the terms by topic.

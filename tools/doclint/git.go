@@ -39,14 +39,14 @@ func gitLines(root string, args ...string) ([]string, error) {
 	return lines, nil
 }
 
-// changedFiles returns the .md files changed since base, without the deleted ones.
-func changedFiles(root, base string) ([]string, error) {
-	return gitLines(root, "diff", "--name-only", "--diff-filter=d", base+"...HEAD", "--", "*.md")
+// changedFiles returns the changed .md files, without the deleted ones.
+func changedFiles(sc *scope) ([]string, error) {
+	return gitLines(sc.root, "diff", "--name-only", "--diff-filter=d", sc.diffRange(), "--", "*.md")
 }
 
-// addedLines returns the line numbers added to each .md file since base.
-func addedLines(root, base string) (map[string]map[int]bool, error) {
-	diff, err := git(root, "diff", "--unified=0", "--no-color", "--diff-filter=d", base+"...HEAD", "--", "*.md")
+// addedLines returns the line numbers added to each changed .md file.
+func addedLines(sc *scope) (map[string]map[int]bool, error) {
+	diff, err := git(sc.root, "diff", "--unified=0", "--no-color", "--diff-filter=d", sc.diffRange(), "--", "*.md")
 	if err != nil {
 		return nil, err
 	}

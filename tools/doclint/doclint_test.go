@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -297,5 +298,68 @@ func TestSelectChecks(t *testing.T) {
 	got, err := selectChecks("words,bilingual")
 	if err != nil || len(got) != 2 || got[0].name != "words" {
 		t.Fatalf("got %v, %v", got, err)
+	}
+}
+
+func gitIn(t *testing.T, root string, args ...string) {
+	t.Helper()
+	full := append([]string{"-C", root, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)
+	if out, err := exec.Command("git", full...).CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v: %s", args, err, out)
+	}
+}
+
+func TestCheckStaged(t *testing.T) {
+	const old = "# Old\n\nWe refuse it.\n"
+	tests := []struct {
+		name     string
+		staged   map[string]string
+		unstaged map[string]string
+		want     string
+	}{
+		{"old violation is not reported", map[string]string{"old.md": old + "\nFine.\n"}, nil, ""},
+		{"added line", map[string]string{"old.md": old + "\nWe refused.\n"}, nil,
+			"old.md:5: refuse -> reject: We refused.\n"},
+		{"unstaged change is ignored", map[string]string{"old.md": old + "\nFine.\n"},
+			map[string]string{"old.md": "We refuse.\n" + old, "new.md": "We refuse.\n"}, ""},
+		{"staged content is read", map[string]string{"new.md": "# New\n\nWe refuse.\n"},
+			map[string]string{"new.md": "# New\n"}, "new.md:3: refuse -> reject: We refuse.\n"},
+		{"one side of a pair", map[string]string{"doc.md": "# A\n\nMore.\n"}, nil,
+			"doc.md: changed without doc.ko.md\n"},
+		{"unstaged partner does not count", map[string]string{"doc.md": "# A\n\n## B\n"},
+			map[string]string{"doc.ko.md": "# 가\n\n## 나\n"},
+			"doc.ko.md: headings differ from doc.md: [(1, 1)] and [(1, 1), (2, 1)]\ndoc.md: changed without doc.ko.md\n"},
+		{"long AGENTS.md", map[string]string{"AGENTS.md": strings.Repeat("rule\n", 201)},
+			map[string]string{"AGENTS.md": "rule\n"}, "AGENTS.md:1: 201 lines, limit 200\n"},
+		{"nothing staged", nil, map[string]string{"old.md": "We refuse.\n"}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newRepo(t)
+			writeFile(t, root, "old.md", old)
+			writeFile(t, root, "doc.md", "# A\n")
+			writeFile(t, root, "doc.ko.md", "# 가\n")
+			gitIn(t, root, "add", ".")
+			gitIn(t, root, "commit", "-q", "-m", "base")
+			for path, content := range tt.staged {
+				writeFile(t, root, path, content)
+				gitIn(t, root, "add", path)
+			}
+			for path, content := range tt.unstaged {
+				writeFile(t, root, path, content)
+			}
+			out, failed := runCheck(t, root, "--staged")
+			if out != tt.want || failed != (tt.want != "") {
+				t.Fatalf("failed=%v out=%q, want %q", failed, out, tt.want)
+			}
+		})
+	}
+}
+
+func TestStagedTakesNoBaseOrFiles(t *testing.T) {
+	for _, args := range [][]string{{"check", "--staged", "--base", "x"}, {"check", "--staged", "a.md"}} {
+		if _, err := run(args, io.Discard); err == nil {
+			t.Errorf("run(%v): want an error", args)
+		}
 	}
 }

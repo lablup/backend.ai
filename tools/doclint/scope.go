@@ -9,11 +9,13 @@ import (
 	"strings"
 )
 
-// scope is what a run checks: the changed documents (base), the given files, or everything.
+// scope is what a run checks: the documents changed since base or staged, the given files,
+// or everything. A staged run reads the documents from the index.
 type scope struct {
-	root  string
-	base  string
-	files []string
+	root   string
+	base   string
+	staged bool
+	files  []string
 }
 
 // report collects the output. A failure makes the run exit 1; a review line does not.
@@ -51,29 +53,55 @@ func newScope(root, base string, args []string) (*scope, error) {
 	return sc, nil
 }
 
-// restricted reports whether the run is limited to some documents.
-func (s *scope) restricted() bool {
-	return s.base != "" || len(s.files) > 0
+// diffing reports whether the run compares two versions: base with HEAD, or HEAD with the index.
+func (s *scope) diffing() bool {
+	return s.staged || s.base != ""
 }
 
-// selected returns the documents of the run among candidates: those changed since base or
-// given as files; every candidate when the run is not restricted.
+// diffRange is the git diff argument naming the two versions.
+func (s *scope) diffRange() string {
+	if s.staged {
+		return "--cached"
+	}
+	return s.base + "...HEAD"
+}
+
+// read returns a document: the staged content in a staged run when the index has it.
+func (s *scope) read(rel string) ([]byte, error) {
+	if s.staged && s.inIndex(rel) {
+		out, err := git(s.root, "show", ":./"+rel)
+		return []byte(out), err
+	}
+	return os.ReadFile(resolve(s.root, rel))
+}
+
+// has reports whether the checked version holds the file.
+func (s *scope) has(rel string) bool {
+	if s.staged {
+		return s.inIndex(rel)
+	}
+	return exists(resolve(s.root, rel))
+}
+
+func (s *scope) inIndex(rel string) bool {
+	_, err := git(s.root, "cat-file", "-e", ":./"+rel)
+	return err == nil
+}
+
+// restricted reports whether the run is limited to some documents.
+func (s *scope) restricted() bool {
+	return s.diffing() || len(s.files) > 0
+}
+
+// selected returns the documents of the run among candidates: those changed or given as
+// files; every candidate when the run is not restricted.
 func (s *scope) selected(candidates []string) ([]string, error) {
 	if !s.restricted() {
 		return candidates, nil
 	}
-	chosen := map[string]bool{}
-	if s.base != "" {
-		changed, err := changedFiles(s.root, s.base)
-		if err != nil {
-			return nil, err
-		}
-		for _, path := range changed {
-			chosen[path] = true
-		}
-	}
-	for _, path := range s.files {
-		chosen[path] = true
+	chosen, err := s.changedSet()
+	if err != nil {
+		return nil, err
 	}
 	var result []string
 	for _, path := range candidates {
@@ -84,11 +112,11 @@ func (s *scope) selected(candidates []string) ([]string, error) {
 	return result, nil
 }
 
-// changedSet returns the documents changed since base and the given files.
+// changedSet returns the changed documents and the given files.
 func (s *scope) changedSet() (map[string]bool, error) {
 	set := map[string]bool{}
-	if s.base != "" {
-		changed, err := changedFiles(s.root, s.base)
+	if s.diffing() {
+		changed, err := changedFiles(s)
 		if err != nil {
 			return nil, err
 		}
@@ -102,12 +130,16 @@ func (s *scope) changedSet() (map[string]bool, error) {
 	return set, nil
 }
 
-// allMarkdown returns every tracked or untracked, not ignored, .md file.
+// allMarkdown returns every tracked or untracked, not ignored, .md file; in a staged run,
+// every .md file of the index.
 func (s *scope) allMarkdown() ([]string, error) {
 	return s.listFiles("*.md")
 }
 
 func (s *scope) listFiles(pattern string) ([]string, error) {
+	if s.staged {
+		return s.listIndex(pattern)
+	}
 	paths, err := gitLines(s.root, "ls-files", "--cached", "--others", "--exclude-standard", pattern)
 	if err != nil {
 		return nil, err
@@ -120,4 +152,21 @@ func (s *scope) listFiles(pattern string) ([]string, error) {
 	}
 	sort.Strings(existing)
 	return existing, nil
+}
+
+// listIndex returns the regular files of the index matching pattern.
+func (s *scope) listIndex(pattern string) ([]string, error) {
+	entries, err := gitLines(s.root, "ls-files", "--stage", pattern)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range entries {
+		meta, path, ok := strings.Cut(entry, "\t")
+		if ok && strings.HasPrefix(meta, "100") {
+			paths = append(paths, path)
+		}
+	}
+	sort.Strings(paths)
+	return paths, nil
 }
