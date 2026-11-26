@@ -128,7 +128,7 @@ session record, with nothing learned from the wire.
 | Addresses | Central IPAM: the manager cuts the session's block out of `10.128.0.0/12` and assigns every endpoint its IP before the container starts; no DHCP, no host-local IPAM |
 | Peers | FDB and ARP are programmed from the session's endpoints table, per remote endpoint, idempotently. No multicast, no flood-and-learn |
 | Peer exchange | The etcd endpoints table is the record. Nodes also announce endpoints to each other over UDP (`7947`, HMAC, whole state) so a peer converges before etcd is re-read; a node that understands a field acts on it, a node that does not ignores it — there is no version gate |
-| MTU | The manager states the overlay MTU; the node measures what its uplink actually carries and refuses the session when the two disagree, rather than let a full-size frame vanish |
+| MTU | The manager states the overlay MTU; the node measures what its uplink actually carries and rejects the session when the two disagree, rather than let a full-size frame vanish |
 | Single-node sessions | Never touch VXLAN: a node-local bridge backend cuts a block from the node's own pool (default `172.30.0.0/16`, /26 per session) |
 
 The node is a member of a session from `setup_session_network` until its own teardown
@@ -142,8 +142,8 @@ acknowledgement lands; the manager reuses a VNI or a block only after every memb
 | Scope | Cluster-wide key: ESP policies select on the outer packet, which carries no session identifier |
 | Keyring | Three slots, so a rotation can overlap: the previous key still decrypts while the new one encrypts |
 | Selection | Only VXLAN traffic between member VTEPs is marked and encrypted; the plaintext path is dropped, not allowed through, when a session is encrypted |
-| Policy | Session-level `required` refuses a member that lacks the profile; `prefer` runs that session in the clear and says so |
-| Rotation | `rotate-overlay-key --confirm-drained`: refused unless no encrypted session exists, so no session ever publishes the previous key |
+| Policy | Session-level `required` rejects a member that lacks the profile; `prefer` runs that session in the clear and says so |
+| Rotation | `rotate-overlay-key --confirm-drained`: rejected unless no encrypted session exists, so no session ever publishes the previous key |
 
 #### 2.4.2 Keeping the data plane true
 
@@ -200,7 +200,7 @@ that publish no identity remain compatible with the Swarm path, but fail closed 
 - `backend.ai mgr network rotate-overlay-key --confirm-drained` rotates only after the manager
   verifies that no encrypted session exists and older managers have been stopped.
 
-The agent distribution includes `backendai-privnet.service`. Startup refuses symlinks, foreign
+The agent distribution includes `backendai-privnet.service`. Startup rejects symlinks, foreign
 sockets, non-socket paths, and an already-live daemon; it removes only a stale owned socket.
 
 Prometheus rules alert on allocation exhaustion, invalid records, reconciliation failure, and a

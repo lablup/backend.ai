@@ -112,7 +112,8 @@ The criteria are in `doclint.yaml`. `go run ./tools/doclint check` runs five che
 `.md` and `.ko.md` pairs, no Korean added to a `.md` file), `words` (the words the
 registry rejects, in added lines), `bep-length` and `agents-lines`. `--only <check>`
 picks one, and file arguments check whole files. The `build` job of `ci.yml` runs
-it on pull requests.
+it on pull requests. For a wording fix to one document of a pair, label the pull request
+`allow:one-side-doc`: CI then passes `--allow-one-side`.
 
 ## What goes where
 

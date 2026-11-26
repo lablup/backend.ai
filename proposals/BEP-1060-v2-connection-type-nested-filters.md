@@ -136,7 +136,7 @@ surprises users, so the field description must state it. If you need "has a chil
 combine `exists: true` with `every: {…}`.
 
 **Empty-condition rule (revised 2026-09-21, BA-8063).** A matching mode carrying no condition is
-refused with `EmptyMatchConditionError` (400). `some: {}` asked whether a child exists rather than
+rejected with `EmptyMatchConditionError` (400). `some: {}` asked whether a child exists rather than
 constraining one, and a row filter whose every field is unset reduces to the same thing, so a
 request that meant to filter was answered as "has any child". Existence is now asked for by name:
 

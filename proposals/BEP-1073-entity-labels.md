@@ -81,7 +81,7 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 ### 1. Label identity
 
 A label is a **map entry**: a key holds one value on a target, as Kubernetes labels do. Writing a key
-the target already carries replaces the value rather than adding a second row, which is why the write
+the target already carries replaces the value rather than adding a second row, so the write
 is a put and not an add.
 
 `UNIQUE (entity_type, entity_id, key)` is what enforces it. A caller wanting several values under one

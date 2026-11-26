@@ -71,6 +71,17 @@ const testTerms = `terms:
       ko: "신호입니다."
     avoid:
       en: ["heartbeat", "bgtask"]
+  - english: "app proxy"
+    korean: "앱 프록시"
+    meaning:
+      en: "A proxy."
+      ko: "프록시입니다."
+    avoid:
+      en: ["wsproxy"]
+      ko: ["wsproxy"]
+    note:
+      en: "wsproxy is the old name."
+      ko: "wsproxy 는 옛 이름입니다"
   - english: "Agent"
     korean: "컬럼"
     meaning:
@@ -251,6 +262,10 @@ func TestWordsOutput(t *testing.T) {
 			`doc.ko.md:1: "지우다" -> "삭제하다"`},
 		{"korean term variant takes the korean meaning", "doc.ko.md", "칼럼을 둔다",
 			`review: doc.ko.md:1: "칼럼" -> "컬럼": 열입니다.`},
+		{"term variant takes the meaning and the note", "doc.md", "The wsproxy ends.",
+			`review: doc.md:1: "wsproxy" -> "app proxy": A proxy. wsproxy is the old name.`},
+		{"korean term variant takes the korean note", "doc.ko.md", "wsproxy 를 둔다",
+			`review: doc.ko.md:1: "wsproxy" -> "앱 프록시": 프록시입니다. wsproxy 는 옛 이름입니다`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -327,6 +342,29 @@ func TestCheckBilingualBase(t *testing.T) {
 	gitRun("commit", "-qam", "change")
 	out, failed := runCheck(t, root, "--only", "bilingual", "--base", "base")
 	want := "doc.md: Korean added, move it to the .ko.md file: New 한글 line.\ndoc.md: changed without doc.ko.md\n"
+	if !failed || out != want {
+		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
+	}
+
+	// --allow-one-side leaves the other failures.
+	out, failed = runCheck(t, root, "--only", "bilingual", "--base", "base", "--allow-one-side")
+	want = "review: doc.md: changed without doc.ko.md\ndoc.md: Korean added, move it to the .ko.md file: New 한글 line.\n"
+	if !failed || out != want {
+		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
+	}
+
+	writeFile(t, root, "doc.md", "# A\n\nNew line.\n")
+	gitRun("commit", "-qam", "english only")
+	out, failed = runCheck(t, root, "--only", "bilingual", "--base", "base", "--allow-one-side")
+	want = "review: doc.md: changed without doc.ko.md\n"
+	if failed || out != want {
+		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
+	}
+
+	writeFile(t, root, "doc.md", "# A\n\n## B\n")
+	gitRun("commit", "-qam", "new section")
+	out, failed = runCheck(t, root, "--only", "bilingual", "--base", "base", "--allow-one-side")
+	want = "review: doc.md: changed without doc.ko.md\ndoc.ko.md: headings differ from doc.md: [(1, 1)] and [(1, 1), (2, 1)]\n"
 	if !failed || out != want {
 		t.Fatalf("failed=%v out=%q, want %q", failed, out, want)
 	}

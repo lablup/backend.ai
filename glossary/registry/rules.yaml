@@ -8,6 +8,7 @@ expressions:
   - lang: en
     word: "refuse"
     instead: "reject"
+    except: ["refuse to start", "refuses to start", "is refused a"]
   - lang: en
     word: "discard"
     qualifier: "an alternative"
@@ -21,6 +22,7 @@ expressions:
   - lang: en
     word: "is answered for by"
     instead: "active voice: the owning entity answers for it"
+    reason: "Prefer active voice."
   - lang: en
     word: "outgoing pattern, parent-fixed variants are the outgoing pattern"
     instead: "legacy pattern, marked as deprecated"
@@ -40,9 +42,11 @@ expressions:
   - lang: ko
     word: "id 여럿을 집다"
     instead: "id 여럿을 조회하다"
+    reason: "동작은 한자어 동사를 주로 씁니다"
   - lang: ko
     word: "is answered for by"
     instead: "능동형: the owning entity answers for it"
+    reason: "능동형을 우선합니다"
   - lang: ko
     word: "outgoing pattern / parent-fixed variants are the outgoing pattern"
     instead: "legacy pattern (deprecate 로 표기)"
@@ -61,9 +65,11 @@ expressions:
   - lang: ko
     word: "~는 것이다 / ~는 것입니다"
     instead: "능동형 문장"
+    reason: "명사화한 군더더기 표현 대신 능동형을 씁니다"
   - lang: ko
     word: "~되어 있다"
     instead: "능동형 문장"
+    reason: "되어 있다 는 능동형으로 씁니다"
   - lang: ko
     word: "~을 답한다"
     instead: "반환한다"
@@ -73,6 +79,7 @@ expressions:
   - lang: ko
     word: "~할지"
     instead: "~에 대한 결정이 필요합니다"
+    except: ["로 변경할지"]
   - lang: ko
     word: "가리키다"
     instead: "참조하다"
@@ -85,13 +92,16 @@ expressions:
   - lang: ko
     word: "검색을 걸다 / 걸러 조회하다"
     instead: "필터 기반으로 조회하다"
+    reason: "동작은 한자어 동사를 주로 씁니다"
   - lang: ko
     word: "겹"
     qualifier: "계층을 가리키는 은어"
     instead: "계층 / 기본값 묶음"
+    reason: "계층을 가리키는 은어입니다"
   - lang: ko
     word: "고치다"
     instead: "수정하다"
+    reason: "동작은 한자어 동사를 주로 씁니다. 수정은 잘못을 바로잡을 때 씁니다"
   - lang: ko
     word: "권한을 묻다"
     instead: "권한을 요구하다"
@@ -102,6 +112,7 @@ expressions:
     word: "그룹을 건다 / 뗀다"
     qualifier: "관계를"
     instead: "추가하다 / 제거하다"
+    reason: "추가는 기존 묶음에 넣을 때, 제거는 묶음에서 뺄 때 씁니다"
   - lang: ko
     word: "내놓다"
     instead: "제공하다"
@@ -116,13 +127,16 @@ expressions:
     word: "답 / 답하다"
     qualifier: "응답을 가리키는 은어"
     instead: "응답 / 응답하다"
+    reason: "응답을 가리키는 은어입니다"
   - lang: ko
     word: "닿다"
     instead: "접근하다"
+    except: ["에 닿지 않"]
   - lang: ko
     word: "대역"
     qualifier: "mock 을 가리키는 은어"
     instead: "mock"
+    reason: "mock 을 가리키는 은어입니다"
   - lang: ko
     word: "대주다"
     instead: "제공하다"
@@ -130,6 +144,7 @@ expressions:
     word: "더하다"
     qualifier: "추가할 때"
     instead: "추가하다"
+    reason: "동작은 한자어 동사를 주로 씁니다. 추가는 기존 묶음에 넣을 때 씁니다"
   - lang: ko
     word: "덮다"
     qualifier: "우선 적용될 때"
@@ -138,6 +153,7 @@ expressions:
     word: "돌다 / 돌리다"
     qualifier: "실행을 가리키는 은어"
     instead: "실행하다"
+    reason: "실행을 가리키는 은어입니다. 동작은 한자어 동사를 주로 씁니다"
   - lang: ko
     word: "들고 있다 / 들고"
     instead: "가지다 / 보유하다"
@@ -150,6 +166,7 @@ expressions:
   - lang: ko
     word: "만들 때 / 만들기"
     instead: "생성할 때 / 생성"
+    reason: "동작은 한자어 동사를 주로 씁니다. 생성은 새 항목에 씁니다"
   - lang: ko
     word: "명부"
     instead: "멤버 목록"
@@ -163,12 +180,14 @@ expressions:
     word: "문"
     qualifier: "동작을 가리키는 은어"
     instead: "동작"
+    reason: "동작을 가리키는 은어입니다"
   - lang: ko
     word: "물려받다 / 물려주다"
     instead: "상속하다"
   - lang: ko
     word: "바꾸다"
     instead: "변경하다"
+    reason: "동작은 한자어 동사를 주로 씁니다. 변경은 값이 바뀔 때 씁니다"
   - lang: ko
     word: "배선된 / 배선되지 않은"
     instead: "연결 및 호출 경로로 처리되는 / 처리되지 않는"
@@ -179,6 +198,7 @@ expressions:
   - lang: ko
     word: "부르다"
     instead: "호출하다"
+    reason: "동작은 한자어 동사를 주로 씁니다"
   - lang: ko
     word: "소유하다"
     qualifier: "scope 와 entity 의 own 관계"
@@ -203,6 +223,7 @@ expressions:
   - lang: ko
     word: "얹다 / 얹히다"
     instead: "추가하다"
+    reason: "동작은 한자어 동사를 주로 씁니다. 추가는 기존 묶음에 넣을 때 씁니다"
   - lang: ko
     word: "역할을 앉히다"
     instead: "역할을 부여하다"
@@ -218,6 +239,7 @@ expressions:
     word: "이름 짓다"
     qualifier: "id 지정 은어"
     instead: "지정하다"
+    reason: "id 지정 은어입니다"
   - lang: ko
     word: "이름을 대다 / 권한을 대다"
     instead: "지정하다"
@@ -225,6 +247,7 @@ expressions:
     word: "자리"
     qualifier: "항목을 가리키는 은어"
     instead: "항목"
+    reason: "항목을 가리키는 은어입니다"
   - lang: ko
     word: "적다"
     qualifier: "작성할 때"
@@ -236,13 +259,16 @@ expressions:
     word: "줄"
     qualifier: "시나리오를 가리키는 은어"
     instead: "시나리오 / row"
+    reason: "시나리오를 가리키는 은어입니다"
   - lang: ko
     word: "지우다"
     instead: "삭제하다"
+    reason: "동작은 한자어 동사를 주로 씁니다"
   - lang: ko
     word: "지키다"
     qualifier: "권한 검사를 가리키는 은어"
     instead: "검사하다 / 차단하다"
+    reason: "권한 검사를 가리키는 은어입니다"
   - lang: ko
     word: "짝짓다 / 짝지어"
     instead: "결합하다 / 결합해"
@@ -261,6 +287,7 @@ expressions:
   - lang: ko
     word: "항목을 넣다 / 빼다"
     instead: "추가하다 / 제거하다"
+    reason: "추가는 기존 묶음에 넣을 때, 제거는 묶음에서 뺄 때 씁니다"
   - lang: ko
     word: "행"
     qualifier: "테이블"

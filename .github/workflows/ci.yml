@@ -9,6 +9,8 @@ on:
   pull_request:
     branches:
       - 'v2'
+    # A label change reruns the checks, for `allow:one-side-doc`.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 concurrency:
   # A pull request run is superseded by the next push to it; a push run to `v2`
@@ -83,7 +85,9 @@ jobs:
         run: go run ./tools/changelog check
       - name: Check the documents changed in the pull request
         if: github.event_name == 'pull_request'
-        run: go run ./tools/doclint check --base HEAD^1
+        env:
+          ALLOW_ONE_SIDE: ${{ contains(github.event.pull_request.labels.*.name, 'allow:one-side-doc') }}
+        run: go run ./tools/doclint check --base HEAD^1 --allow-one-side="$ALLOW_ONE_SIDE"
       - name: Check that the integration tests carry the build tag
         run: .github/scripts/check-build-tag.sh './tests/integration/...'
       - name: Tidy the module
