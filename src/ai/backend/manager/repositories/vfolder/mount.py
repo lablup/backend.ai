@@ -222,7 +222,7 @@ def _mountable_auto_mounts(
                 ),
             )
         )
-    local_vfolder = next(
+    local_project_vfolder = next(
         (
             vfolder
             for vfolder in accessible_vfolders
@@ -230,20 +230,21 @@ def _mountable_auto_mounts(
         ),
         None,
     )
-    if local_vfolder is None:
+    if local_project_vfolder is None:
         return registered_auto_mounts
-    if local_vfolder["permission"] == VFolderMountPolicy.NONE:
+    if local_project_vfolder["permission"] == VFolderMountPolicy.NONE:
         log.trace(
-            "auto-mount vfolder skipped, mount policy is none", vfolder_id=local_vfolder["id"]
+            "auto-mount vfolder skipped, mount policy is none",
+            vfolder_id=local_project_vfolder["id"],
         )
         return registered_auto_mounts
-    local_vfolder_mount = _MountableAutoMount(
-        vfolder=local_vfolder,
+    local_project_vfolder_mount = _MountableAutoMount(
+        vfolder=local_project_vfolder,
         destination=PurePosixPath("/home/work", _PROJECT_LOCAL_FOLDER_NAME),
         subpath=".",
-        permission=MountPermission(local_vfolder["permission"].value),
+        permission=MountPermission(local_project_vfolder["permission"].value),
     )
-    return [local_vfolder_mount, *registered_auto_mounts]
+    return [local_project_vfolder_mount, *registered_auto_mounts]
 
 
 async def prepare_vfolder_mounts(
