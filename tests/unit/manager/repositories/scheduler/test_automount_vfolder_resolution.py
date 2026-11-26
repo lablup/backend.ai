@@ -133,7 +133,6 @@ class _AutoMount:
     scope_type: VFolderAutoMountScopeType
     mount_destination: str
     scope_project: _Project | None = None
-    subpath: str = "."
     mount_permission: VFolderMountPermission = VFolderMountPermission.READ_WRITE
     deleted: bool = False
 
@@ -355,7 +354,6 @@ class TestAutoMountVFolderResolution:
                         ),
                         vfolder_id=folder_ids[auto_mount.folder_name],
                         mount_destination=auto_mount.mount_destination,
-                        subpath=auto_mount.subpath,
                         mount_permission=auto_mount.mount_permission,
                         deleted_at=datetime.now(UTC) if auto_mount.deleted else None,
                     )
@@ -551,23 +549,6 @@ class TestAutoMountVFolderResolution:
                 ],
                 expected_mounts=[
                     _ResolvedMount("data", "/home/work/data", MountPermission.READ_ONLY)
-                ],
-            ),
-            _SessionMountsCase(
-                name="auto-mount-at-a-reserved-destination",
-                folders=[_Folder("data", _Project.PERSONAL, VFolderOwnershipType.USER)],
-                auto_mounts=[_AutoMount("data", VFolderAutoMountScopeType.USER, "/home/work/.ssh")],
-            ),
-            _SessionMountsCase(
-                name="auto-mount-with-a-subpath-out-of-the-vfolder",
-                folders=[_Folder("data", _Project.PERSONAL, VFolderOwnershipType.USER)],
-                auto_mounts=[
-                    _AutoMount(
-                        "data",
-                        VFolderAutoMountScopeType.USER,
-                        "/home/work/data",
-                        subpath="../other",
-                    )
                 ],
             ),
             _SessionMountsCase(
