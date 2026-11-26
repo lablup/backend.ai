@@ -386,11 +386,9 @@ async def prepare_vfolder_mounts(
             + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
         )
 
+    mountable_auto_mounts = _mountable_auto_mounts(accessible_vfolders, auto_mounts, project_id)
     auto_mount_keys: set[int] = set()
-    for index, auto_mount in enumerate(
-        _mountable_auto_mounts(accessible_vfolders, auto_mounts, project_id),
-        start=len(mount_requests),
-    ):
+    for index, auto_mount in enumerate(mountable_auto_mounts, start=len(mount_requests)):
         auto_mount_keys.add(index)
         vfolders_by_id_key[index] = auto_mount.vfolder
         requested_vfolder_names[index] = auto_mount.vfolder["name"]
