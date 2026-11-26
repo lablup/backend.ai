@@ -20,6 +20,7 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.web.config.unified import SecurityConfig, WebServerUnifiedConfig
 from ai.backend.web.errors import UnauthenticatedError
 from ai.backend.web.server import (
+    _check_login_session_database,
     build_cors_options,
     config_toml_handler,
     extend_login_session,
@@ -412,3 +413,35 @@ class TestVersionJsonHandler:
         resp = await client.get("/version.json")
         assert resp.status == 200
         assert await resp.text() == _VERSION_JSON
+
+
+class TestCheckLoginSessionDatabase:
+    @pytest.fixture
+    def error_log(self, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+        error = MagicMock()
+        monkeypatch.setattr("ai.backend.web.server.log.error", error)
+        return error
+
+    @pytest.mark.parametrize(
+        ("stored", "expected_errors"),
+        [(b"login session", 0), (None, 1)],
+        ids=["same_database", "different_database"],
+    )
+    async def test_logs_an_error_when_the_login_session_is_not_in_the_session_database(
+        self, error_log: MagicMock, stored: bytes | None, expected_errors: int
+    ) -> None:
+        valkey_client = MagicMock()
+        valkey_client.get_login_session = AsyncMock(return_value=stored)
+
+        await _check_login_session_database(valkey_client, 10, "token")
+
+        assert error_log.call_count == expected_errors
+
+    async def test_skips_the_check_without_a_session_token(self, error_log: MagicMock) -> None:
+        valkey_client = MagicMock()
+        valkey_client.get_login_session = AsyncMock()
+
+        await _check_login_session_database(valkey_client, 10, None)
+
+        valkey_client.get_login_session.assert_not_awaited()
+        error_log.assert_not_called()
