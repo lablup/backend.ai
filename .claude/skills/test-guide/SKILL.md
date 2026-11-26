@@ -1,114 +1,161 @@
 ---
 name: test-guide
-description: Test-writing guide for Backend.AI: propose success/exception/edge scenarios first, refine them with the user, then implement while reporting per-scenario verification status. Covers fixtures, with_tables, mock repositories, pants test, optional TDD cadence.
+description: Guide for writing Go tests. Agree the scenarios first, then follow the criteria for choosing between a unit test, -short, dbtest.New and an integration test, how to write them and the commands to run them. Use when writing or running tests.
 tags:
   - testing
   - test-scenarios
-  - pytest
-  - fixtures
-  - tdd
 ---
 
-# Test Guide
+> Steps 3 and 4 of the workflow (the "Workflow" table in AGENTS.md).
 
-Write tests by agreeing on scenarios first, then verifying each one as you implement. The center of gravity is the **scenario list and its verification status**, not a fixed Red-Green-Refactor cadence (that is one valid way to write the tests; see Writing tests).
+# Test guide
 
-## 1. Propose scenarios first
+Agree the scenarios first, then report the verification status of each scenario as you implement. The center is the scenario list and its verification status. Writing the test first (TDD) is optional.
 
-Before writing code or tests, draft the scenarios and get the user's input:
+## 1. Propose the scenarios first
 
-1. **Draft** success, exception and edge scenarios from the requirement.
-2. **Present them to the user** for review; they add missing cases and correct expectations.
-3. **Confirm** the merged list. It is the contract for what "done" means.
+Before writing code or tests, draft the scenarios and get the user's input.
+
+1. Draft the success, error and boundary scenarios from the requirement.
+2. Show them to the user and take the missing cases and the expected results.
+3. Fix the merged list. This list is the criterion for "done".
 
 ```markdown
-## Test Target: {Feature}
+## Test target: <feature>
 
 ### Success
-1. {primary case} → {expected}
-2. {edge case that should succeed} → {expected}
+1. <primary case> → <expected result>
 
-### Exception
-1. {invalid input} → raises {ErrorType}
-2. {not found} → raises {ErrorType}
-3. {boundary} → {empty/default behavior}
+### Error
+1. <invalid input> → <returned error>
+2. <missing target> → <returned error>
+
+### Boundary
+1. <empty value, zero, maximum, last page> → <expected result>
 ```
 
-### How to derive scenarios
+The axes that derive scenarios:
 
-Walk these axes; every one that applies to the feature becomes one or more scenarios:
+| Axis | Question | Example |
+|---|---|---|
+| Primary path | What is the primary success? | Valid input → created |
+| Variation | Is there another valid input or state? | Optional field omitted → default applied |
+| Missing | Is a referenced target missing? | Unknown id → `ErrNotFound` |
+| Validation | Is there an invalid input? | Negative quantity → validation error |
+| Conflict, state | Is it a duplicate, or does the current state not fit? | Create with an existing name → conflict error |
+| Boundary | Is there an empty value, zero or a maximum? | Offset past the total count → empty list |
+| Idempotency, concurrency | Is the call repeated or parallel? | Run again → no duplicate effect |
 
-| Axis | Ask | Example scenario |
-|------|-----|------------------|
-| Happy path | What is the primary success? | valid input → entity created |
-| Variations | Other valid inputs or states? | optional field omitted → default applied |
-| Not found | A referenced entity is missing? | unknown id → raises `XxxNotFound` |
-| Validation | Invalid or malformed input? | negative quantity → raises `InvalidArgument` |
-| Conflict or state | Duplicate, or wrong current state? | create existing name → raises `XxxConflict` |
-| Permission | Caller lacks rights? | non-admin → 403 or raises `Forbidden` |
-| Boundary | Empty, zero, max, end of page? | offset past total → empty list |
-| Idempotency or concurrency | Repeated or parallel calls? | re-run → no duplicate side effect |
+Take the error scenarios from the errors the code returns (the values told apart with `errors.Is` and `errors.As`). Give every scenario a concrete expected result or error. "Should fail" is not a criterion.
 
-Pull exception scenarios straight from the domain rules and the `BackendAIError` subclasses the code can raise (see `manager/errors/AGENTS.md`). Every scenario must name a concrete expected outcome or error type; "should fail" is not specific enough to test.
-
-Propose first because the user catches missing cases far faster than reverse-engineering them from code, and the agreed list prevents scope drift.
-
-## 2. Verify scenarios collaboratively
-
-As you implement, report each scenario's status back to the user and keep it visible:
+## 2. Report the verification status per scenario
 
 | Scenario | Test | Status |
-|----------|------|--------|
-| returns record when present | `test_returns_record` | ✅ pass |
-| raises NotFound when missing | `test_missing_raises` | ✅ pass |
-| pagination past end | none | ⬜ not covered yet |
+|---|---|---|
+| Returns the record when present | `TestGet_Found` | pass |
+| Returns `ErrNotFound` when missing | `TestGet_NotFound` | pass |
+| Offset past the end | none | not covered yet |
 
-- Surface gaps (`not covered`) explicitly; do not silently skip a scenario.
-- When the user adds a scenario mid-work, append it to the list and the table.
+- Do not hide a missing scenario (`not covered yet`).
+- When the user adds a scenario during the work, add it to the list and the table.
 - A scenario is done only when its test exists and passes.
 
-## 3. Writing tests
+## 3. Choose the kind of test
 
-One scenario is one test. Arrange (fixtures) → Act (call) → Assert.
+| Kind | Criterion | Location | `go test -short` |
+|---|---|---|---|
+| Unit test | No external dependency. Pure logic, conversion, validation | `_test.go` in the target package | Runs |
+| Test skipped by `-short` | Waits for an external service or real time | `_test.go` in the target package | Skipped |
+| `dbtest.New` test | Checks the behavior of a real PostgreSQL: queries, constraints, transactions | `_test.go` in the target package | Skipped |
+| Integration test | Sends requests to a running server | `tests/integration/` | Not built |
 
-```python
-class TestFeature:
-    @pytest.fixture
-    async def scenario_data(
-        self, database_engine: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[DataRow, None]:
-        # setup with with_tables: see tests/AGENTS.md
-        yield data
+- A unit test does not mock the database. Check the database behavior with `dbtest.New`.
+- Do not wait with `time.Sleep` under `-short`.
+- Skip a test that waits for an external service or time under `-short`, as `dbtest.New` does.
 
-    async def test_returns_record_when_present(
-        self, repository: FeatureRepository, scenario_data: DataRow
-    ) -> None:
-        result = await repository.method(scenario_data.id)
-        assert result.field == expected
+## 4. Write
+
+One scenario is one test: prepare, run, check. Write several inputs table-driven.
+
+### Unit test
+
+```go
+func TestNormalizeName(t *testing.T) {
+	const in, want = "  Default ", "default"
+	if got := example.NormalizeName(in); got != want {
+		t.Errorf("NormalizeName(%q) = %q, want %q", in, got, want)
+	}
+}
 ```
 
-- **Fixtures**: name by scenario (`domain_with_record`), return complete data, type as `AsyncGenerator[T, None]`.
-- **Repositories and models**: real DB via `with_tables`; include FK deps, clean up child → parent. See `tests/AGENTS.md`.
-- **Services and handlers**: unit tests with mocked repositories; isolate business logic.
-- **Types**: annotate everything; test functions return `-> None`.
-- **TDD (optional cadence)**: write the failing test first (confirm it fails for the right reason: `ImportError`/`AttributeError`), implement the minimum, then refactor while green.
+### Test skipped by `-short`
 
-## 4. Run and verify
-
-Verify against the tests you added or changed, not a transitive sweep.
-
-```bash
-pants test tests/manager/repositories/test_feature.py
-pants test tests/.../test_feature.py::TestFeature::test_case
+```go
+func TestSlowThing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped by -short")
+	}
+	// ...
+}
 ```
 
-- Running them locally is not recommended while working in several worktrees at once. CI runs lint, check and the remaining tests (root `AGENTS.md` "Before committing").
+### `dbtest.New`
 
-- Add a BUILD file with `python_tests()` to new test directories.
-- Fix all lint, type and test errors; do not use `# noqa`, `# type: ignore` or skip. See `BUILDING.md`.
+`dbtest.New(t)` returns the `*pgxpool.Pool` of a new PostgreSQL database with the migrations applied.
+
+- It skips the test under `-short` or without `TEST_DATABASE_URL`. It fails when `CI` is set and `TEST_DATABASE_URL` is missing.
+- When the test ends, it closes the pool and deletes the database. It can be called from a `t.Parallel` test.
+
+```go
+func TestCountDomains(t *testing.T) {
+	pool := dbtest.New(t)
+
+	got, err := example.CountDomains(t.Context(), pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := 0; got != want {
+		t.Errorf("CountDomains() = %d, want %d", got, want)
+	}
+}
+```
+
+### Integration test
+
+- Put it in `tests/integration/` and add `//go:build integration` at the top of every Go file. `ci-gate` rejects a file without the tag.
+- The test file is `package integration` and gets the server address with `Endpoint(t)`. It skips the test without `INTEGRATION_ENDPOINT`.
+- CI does not run it.
+
+```go
+//go:build integration
+
+package integration
+
+func TestSomething(t *testing.T) {
+	endpoint := Endpoint(t)
+	// send requests to endpoint
+}
+```
+
+## 5. Run
+
+Run only the tests you changed or added.
+
+| Do | Command |
+|---|---|
+| All unit tests | `go test -short ./...` |
+| One package, one test | `go test -short -run <test name> ./<package>/` |
+| With the database | `TEST_DATABASE_URL=<postgres URL> go test -race ./<package>/` |
+| Integration | `INTEGRATION_ENDPOINT=<server address> go test -tags integration -count=1 -v ./tests/integration/...` |
+
+- Start the local database with `/halfstack` and use the `TEST_DATABASE_URL` written there.
+- The PR checks of CI are fmt, lint and build, and `go test -short ./...` only reports. The full test runs on a push to `v2` and on a release.
+- Fix a warning and an error; do not suppress or skip it. Do not use `//nolint`.
 
 ## Related documents
 
-- `tests/AGENTS.md` - testing guidelines, `with_tables`, strategies
-- `/repository-guide`, `/service-guide`, `/api-guide` - layer patterns under test
-- `BUILDING.md` - quality enforcement
+- `/halfstack`: the PostgreSQL for local database tests
+- `/submit`: the commit and the PR after the tests
+- `internal/dbtest/dbtest.go`: the behavior of `dbtest.New`
+
+Next: `/writing`

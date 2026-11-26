@@ -1,193 +1,79 @@
 # AI Coding Agent Guidelines
 
-This file contains the core rules for AI coding agents. For detailed patterns and workflows, use the skills and documents below.
+This file holds the AI coding agent rules, the workflow and the skill index of the `v2` branch. `v2` is the branch that rewrites the manager, the agent and the storage proxy in Go, and it is Go only.
 
-## Document structure (AGENTS.md / KNOWLEDGE.md)
+## Workflow
 
-- **`AGENTS.md`**: Guardrails (rules) only. Concise and imperative. Always auto-loaded (`CLAUDE.md` is a symlink to this file).
-- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `go run ./tools/knowledge search <term>`; the schema and authoring rules live in the `/knowledge` skill. `ci.yml` validates conformance on PRs.
-- A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
-- **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
-- **`glossary/registry/`**: The rules of the words check: expressions to avoid and terms by topic.
-- **`doclint.yaml`**: The criteria of the document checks (`go run ./tools/doclint check`): limits, paths and the frontmatter schema. Change a value there, not in the code.
-- **Bilingual documents**: `KNOWLEDGE.md`, `report.md` and BEPs come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `go run ./tools/doclint check --only bilingual` checks the pairs, `--only words` the words.
-- **`report.md`, `report.ko.md`**: Output of the scenario tests (`scripts/scenario-report.py`). Do not edit them by hand.
-- **Korean goes only in `.ko.md`**: Do not add Korean to a `.md` file.
-- Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.
+Work in the order below. Move to the next step once the step's exit condition holds.
 
-## Writing style
+| Step | Do | Skill | Exit condition |
+|---|---|---|---|
+| 1. Context | Read the `AGENTS.md` of the directory you work in and find the related `KNOWLEDGE.md` | `/knowledge` | The rules and the background that apply are known |
+| 2. Design | Write and agree a BEP for a large feature. Skip it for a small change | `/bep-guide` | The BEP is agreed |
+| 3. Test scenario agreement | Propose the success, error and boundary scenarios and fix them with the user | `/test-guide` | The scenario list is fixed |
+| 4. Implementation | Implement in a worktree on a branch based on `v2` and write a test for each scenario. A test that needs a database uses a local PostgreSQL | `/test-guide`, `/halfstack` | The test of each scenario passes |
+| 5. Documents | Reflect the changed rules and background in the documents | `/writing` | The document lint passes |
+| 6. Review | Get a review from another session and check each finding. Always do this before the PR | `/local-review` | The findings are checked and handled |
+| 7. Submission | Commit, create the changelog fragment and the PR, and check the CI result | `/submit` | `ci-gate` passes |
 
-Applies to every generated artifact — docs, code comments, BEPs, PR descriptions.
+## Repository layout
 
-- After writing, run `go run ./tools/doclint check <file>` on the changed documents and fix what it prints. The rules are in `glossary/registry/`.
-- Review a document people review (`KNOWLEDGE.md`, BEP, `AGENTS.md`, skill, `README.md`, PR description) with `/glossary-review` before requesting the review.
-- Do not write a fact the body does not refer to. Measurement conditions and the investigation go in the report or the PR.
-- Lead with the conclusion; keep background short.
-- Implementation details live in the code and the PR — docs describe interfaces and contracts, not line-by-line steps.
-- Prefer tables and lists over prose.
-- Code examples show the interface/contract only, not internal implementation.
-- State a rule once at its highest scope (see above); link instead of repeating.
-- No asides. Write the rule and the fact, nothing around them.
-- Never restate the previous sentence in different words.
-- Leave out how an individual value is composed and why a choice reads as natural.
-- Do not coin a term to group things. Name what is there and say how many. A term
-  invented for one document spreads before anyone agrees it is the right one.
-- Refer to a layer or value by its name in the code: REST handler, GQL resolver,
-  GQL DataLoader, adapter, processor, service, Action, repository, validator, `current_user()`,
-  user id and so on. Do not replace it with a descriptive word.
-- A comment or docstring stops at three lines. Anything longer is background: put it
-  in `KNOWLEDGE.md` and point at it.
-
-## Document index
-
-**Core Documents (Read directly):**
-- `tests/AGENTS.md` — Testing guidelines and strategies
-- `.github/AGENTS.md` — CI workflows and the helper scripts they call, in `.github/scripts/` and `scripts/`
-- `BUILDING.md` — Build system, quality enforcement, BUILD policies
-- `src/ai/backend/manager/models/alembic/README.md` — Alembic migration backport strategy
-- `README.md` — Project overview and architecture
-- `proposals/README.md` — BEP (Backend.AI Enhancement Proposals)
-- `scripts/README.md` — Index of `scripts/` by when each one runs and who calls it
-
-**Skills (Invoke with `/skill-name`):**
-
-When to use:
-- Finding where a feature lives / tracing it across layers (REST, GraphQL, Service, Repository, DB) → `/code-trace`
-- Designing features → `/bep-guide`
-- Implementing repo/service/API layers → `/repository-guide`, `/service-guide`, `/api-guide`
-- Implementing SDK/CLI code → `/cli-sdk-guide`
-- Writing tests → `/test-guide`
-- Restarting services after code changes → `/local-dev`
-- **Running any `./bai` command → `/bai-cli` (MUST load before executing)**
-- Checking logs/metrics/traces during development → `/observability` (Grafana MCP)
-- Docker/halfstack issues → `/halfstack`
-- Checking/applying DB migrations → `/db-migrate`
-- Running component servers directly → `/local-dev`
-- Submitting PR (backport targeting) → `/submit`
-- Preparing release → `/release`
-- Searching or writing background knowledge (`KNOWLEDGE.md`) → `/knowledge`
-- Reviewing a document people review for words and writing → `/glossary-review`
-
-Skills source: `.claude/skills/{name}/SKILL.md`
-
-## Absolute rules (global)
-
-**Do NOT bypass quality enforcement:**
-- Do NOT suppress linter warnings with `# noqa`.
-- Do NOT suppress type errors with `# type: ignore`.
-- Fix quality issues immediately, even if unrelated to your change.
-
-**Python critical rules:**
-- **Async-first**: Use async/await for all I/O.
-- **Exceptions**: Inherit from `BackendAIError` everywhere possible — do NOT raise built-in exceptions directly in business logic.
-- **Imports**: Do NOT use parent relative imports (`from ..module`) — use absolute imports.
-- **re-export**: Where possible, do NOT use `__init__.py` re-exports; import modules directly.
-- **Class fields**: Declare the instance fields a class uses at the top of the class body with their types (assign them in `__init__`).
-
-**Version metadata:**
-- A new GQL type/field, config field, or DTO field records its version as `NEXT_RELEASE_VERSION`
-  (`ai.backend.common.meta.meta`): `added_version=NEXT_RELEASE_VERSION`, or `f"Added in {NEXT_RELEASE_VERSION}."`
-  in a description. Do NOT write the version literal; `scripts/release.sh` freezes it at release.
-- Do not change a literal version that is already released.
-- On a version branch (`YY.S`), write the literal version the branch will ship instead — CI rejects new
-  `NEXT_RELEASE_VERSION` references there.
-
-**BUILD files:**
-- ❌ Do NOT add BUILD files to the `src/` directory.
-- ✅ MUST add BUILD files to new test directories.
-- Use `python_tests()` for test modules, `python_testutils()` for utilities.
-
-## Before committing
-
-- The git hooks (pre-commit, pre-push) run the low-cost checks. When a hook fails, find the cause in its output, fix it and commit or push again. Do not bypass it with `--no-verify` (except `/submit --draft`).
-- CI runs the pants-based checks (lint, check, test). After a push, check the results with `gh pr checks <PR>`; for a failed job, find the cause with `gh run view --job <job-id> --log-failed` (the job id is the last segment of the check's `link` in `gh pr checks <PR> --json name,bucket,link`), fix it and push again.
-- A local `pants test` is scoped to the changed tests. While working in several worktrees at once, local pants runs are not recommended because their pantsd loads add up; confirm with the CI results.
-
-**Fix all lint, type, and test errors — never suppress or skip.**
-
-**After API/CLI changes, verify with the live server using the `./bai` CLI, and check runtime logs/metrics via the Grafana MCP (`/observability`).**
-**MUST load the `/bai-cli` skill before running any `./bai` command.** This skill contains the entity-command reference — without it, you will guess commands wrong.
-For service restarts, see `/local-dev`; for docker service changes, see the `/halfstack` skill.
-
-## Python freeze on `main`
-
-The manager, agent and storage proxy are being rewritten in Go on the `v2` branch. `main` takes bug fixes only: no feature development and no new alembic migration (`src/ai/backend/manager/models/alembic/AGENTS.md`).
-A bug-fix PR that changes `src/ai/backend/manager`, `src/ai/backend/agent` or `src/ai/backend/storage` carries the label `require:v2-port`.
-
-## Alembic migration backport
-
-When backporting migrations to release branches, both the backport and main branch migrations must be idempotent.
-For the full strategy and examples, see `src/ai/backend/manager/models/alembic/README.md`.
-
-## Layer architecture
-
-API Handler → Processor → Service → Repository → DB
-
-- API handlers call Processors — they do NOT call Services directly.
-- Services accept Actions (frozen dataclasses) and return ActionResults.
-- Repositories handle all DB access (transactions and sessions are the repository's responsibility).
-- Do NOT import from a lower layer into a higher layer.
-- For detailed patterns, see the skills: `/repository-guide`, `/service-guide`, `/api-guide`.
-
-## API development rules
-
-**All new features MUST use v2 patterns across the full stack:**
-- REST API: `api/rest/v2/{entity}/` (do NOT add new endpoints to REST v1)
-- DTO: `common/dto/manager/v2/{entity}/` (shared across GQL and REST v2)
-- GraphQL: Strawberry-based `api/gql/{entity}/` (do NOT add to `gql_legacy/`)
-- Adapter: `api/adapters/{entity}.py` (shared between GQL and REST v2)
-- Client SDK: `client/v2/domains_v2/{entity}.py` (typed Pydantic request/response)
-- CLI: `client/cli/v2/{entity}/` (calls SDK v2)
-
-**Standard 6 operations per entity:** create, get, search, update, delete, purge
-- For detailed API patterns: `/api-guide`
-- For SDK/CLI patterns: `/cli-sdk-guide`
-
-**After implementing new API endpoints, verify with the live server** — check both admin and non-admin. For the server restart, `./bai`
-test, and log-checking procedures, see the `/local-dev`, `/bai-cli`, and `/observability` skills.
-
-## Logging
-
-Levels:
-
-| Level | Use for |
+| Path | Content |
 |---|---|
-| error | A server fault. Logged once, where it happens. Where an exception is caught, log it with `exception()` so the traceback is kept |
-| warning | A transient server-side failure, a retry, degradation |
-| info | Server lifecycle events an operator needs (start, stop, config applied, leader change) |
-| debug | Per-cycle summaries of periodic work, progress steps |
-| trace | Outcomes of user and admin requests (scheduling failure, resource exhaustion, quota exceeded, 4xx, bulk-operation results). History, the audit log and the API are the record |
+| `go.mod` | The single root Go module `github.com/lablup/backend.ai`. The development tools are pinned by the `tool` directive |
+| `cmd/<name>/` | One `main` package per deployed binary. No development tool |
+| `tools/<name>/` | A development tool. A `main` package of the root module, run with `go run ./tools/<name>` |
+| `internal/` | Packages used only inside the module |
+| `api/` | API definitions. The existing API contract files are in `api/legacy/{graphql,rest,appproxy}/` |
+| `migrations/` | SQL migration files |
+| `tests/integration/` | Integration tests |
+| `changes/unreleased/` | Changelog fragments (`changes/README.md`) |
 
-Use `info` only when all three hold:
+- The module is one at the root, so `./...` at the root targets all packages.
 
-1. An operator needs to know it without looking for it
-2. It does not occur in proportion to requests or time
-3. No other record holds it (history, the audit log, the API)
+## Directory AGENTS.md
 
-| `info` target | Examples |
+Read the `AGENTS.md` of a directory before you work in it.
+
+| Directory | Content |
 |---|---|
-| Process lifecycle | Startup finished and the listen address, shutdown |
-| Config applied | Config loaded, an etcd config change applied, a plugin loaded |
-| Role change | Leader election won or lost, service discovery registered or deregistered |
-| Membership change | A new agent's first registration, a volume mounted |
-| State changed by the system without a request | Rows removed by a retention purge, stuck sessions cleaned up. A cycle that changed nothing is `debug` |
+| `.github/AGENTS.md` | CI workflow and called script rules |
+| `migrations/AGENTS.md` | Migration file rules |
+| `proposals/AGENTS.md` | BEP writing rules |
+| `scripts/AGENTS.md` | Rules for the scripts in `scripts/` |
 
-Writing rules:
+Where documents go:
 
-- New code and touched log lines use `StructuredLogger` (`ai.backend.logging.structured`).
-- At `info` and above, the message is a constant and values are keyword fields. Field names follow BEP-1066 section 4.
-- A layer that re-raises does not log.
-- Unit-of-work identifiers are set once at the entry point with `with_log_context`, not repeated on every line.
+- How to work on a component and its layers goes in the checklist of the component's top-level `AGENTS.md`. Name the test or lint that enforces each step.
+- A package contract goes in `doc.go`.
+- A layer boundary goes in the component `AGENTS.md` and in golangci-lint `depguard`.
+- An architecture overview goes in `KNOWLEDGE.md`.
 
-## Development guidelines
+## Rules
 
-**Document-first:** Before making changes, read the `AGENTS.md` in the relevant directory, and if you need more context, search the `KNOWLEDGE.md` documents (`/knowledge`).
+- `go test -short ./...` runs only tests with no external dependency. A test that waits for a database, an external service or real time is skipped under `-short`.
+- Do not wait with `time.Sleep` in a `-short` test.
+- Put an integration test in `tests/integration/` and add `//go:build integration` at the top of every Go file. CI does not run it. `ci-gate` rejects a file without the tag.
+- Do not use `SELECT *`, an `INSERT` without a column list or `COPY` in SQL.
+- Do not add an alembic migration to main.
+- Do not bypass a hook with `--no-verify`.
+- Fix a lint warning and a type error; do not suppress it. Do not use `//nolint`. This holds even when the change is unrelated to yours.
 
-**BEP-first:** For significant features, use the `/bep-guide` skill. Check `proposals/README.md` for an existing BEP or create a new one.
+## Relation to `main`
 
-**Testing:** Agree on test scenarios first (success/exception/edge), then implement and verify each. See the `/test-guide` skill; for strategies, see `tests/AGENTS.md`.
+- `main` takes only bug fixes. A bug-fix PR on `main` that changes the manager, the agent or the storage proxy carries the label `require:v2-port`, and the same fix is applied to the Go code on `v2`.
+- `v2` is not synchronized with `main`.
 
-**Implementation patterns:** For details, use the skills:
-- Repository layer → `/repository-guide`
-- Service layer → `/service-guide`
-- API/GraphQL → `/api-guide`
+## Skill index
+
+| Skill | Use when |
+|---|---|
+| `/knowledge` | Finding or writing background knowledge (`KNOWLEDGE.md`) |
+| `/bep-guide` | Designing a feature or writing a BEP |
+| `/test-guide` | Agreeing test scenarios and writing or running unit, `-short`, `dbtest.New` and integration tests |
+| `/halfstack` | Starting the PostgreSQL for local database tests |
+| `/writing` | Writing or changing a document (`AGENTS.md`, `KNOWLEDGE.md`, BEP, skill, README, PR description, long code comment) |
+| `/local-review` | A review from another session is needed before opening a PR |
+| `/submit` | Committing, creating the changelog fragment and the PR, and checking the CI result |
+
+Skill source: `.claude/skills/{name}/SKILL.md`

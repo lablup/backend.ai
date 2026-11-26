@@ -6,6 +6,8 @@ tags:
   - local
 ---
 
+> Step 6 of the workflow (the "Workflow" table in AGENTS.md). Always do this before the PR.
+
 # Local Review
 
 Review the work.
@@ -148,3 +150,5 @@ If there is no problem, say so briefly. Do not write praise, background or gener
 - The working session checks each finding in the code: run the reproducing input, or read the flagged code and its callers
 - Report confirmed findings and findings that did not reproduce to the user separately. For the ones that did not reproduce, give the reason
 - Do not pass on a finding without checking it
+
+Next: `/submit`
