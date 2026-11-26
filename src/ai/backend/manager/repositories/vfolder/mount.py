@@ -181,6 +181,9 @@ class _MountableAutoMount:
 
 
 def _is_local_folder_of_project(vfolder: Mapping[str, Any], project_id: ProjectID) -> bool:
+    """Whether ``vfolder`` is the project-owned ``.local`` folder of ``project_id``. It is mounted
+    into every session of the project without an auto-mount: each user gets their own
+    ``<user uuid hex>`` directory of it at ``/home/work/.local``, for user-installed packages."""
     return bool(
         vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME
         and vfolder["ownership_type"] == VFolderOwnershipType.GROUP
