@@ -931,12 +931,7 @@ class SessionHandler:
                 owner_access_key=params.owner_access_key,
             )
         )
-        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-        if requester_access_key != owner_access_key and user_role not in (
-            UserRole.ADMIN,
-            UserRole.SUPERADMIN,
-        ):
-            raise InsufficientPrivilege("You are not allowed to force-terminate others's sessions")
+        owner_access_key = scope.owner_access_key
 
         result = await self._session.destroy_session.run(
             DestroySessionAction(
