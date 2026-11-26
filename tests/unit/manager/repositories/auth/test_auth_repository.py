@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.types import DelegationTarget, UserData
+from ai.backend.manager.data.auth.types import AccessKeyOwner, UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
@@ -613,21 +613,19 @@ class TestAuthRepository:
 
         assert result is None
 
-    async def test_delegation_target_is_the_owner_of_the_access_key(
+    async def test_access_key_owner_is_the_user_of_the_keypair(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
     ) -> None:
-        result = await auth_repository.get_delegation_target_by_access_key(
-            sample_user_data.access_key
-        )
+        result = await auth_repository.get_access_key_owner(sample_user_data.access_key)
 
-        assert result == DelegationTarget(
+        assert result == AccessKeyOwner(
             user_id=UserID(sample_user_data.uuid),
             domain_name=sample_user_data.domain_name,
             role=UserRole.USER,
         )
 
-    async def test_delegation_target_of_an_unknown_access_key_is_not_found(
+    async def test_an_unknown_access_key_has_no_owner(
         self, auth_repository: AuthRepository
     ) -> None:
         with pytest.raises(AccessKeyNotFound):
-            await auth_repository.get_delegation_target_by_access_key("AKIAUNKNOWN0000000000")
+            await auth_repository.get_access_key_owner("AKIAUNKNOWN0000000000")

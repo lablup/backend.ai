@@ -92,8 +92,8 @@ class KeyPairSigningMaterial:
 
 
 @dataclass(frozen=True)
-class DelegationTarget:
-    """The owner of an access key a request names, as the delegation check reads it."""
+class AccessKeyOwner:
+    """The user who owns an access key."""
 
     user_id: UserID
     domain_name: str

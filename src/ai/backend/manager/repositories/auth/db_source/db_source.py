@@ -30,7 +30,7 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginSessionStatus,
 )
 from ai.backend.manager.data.auth.types import (
-    DelegationTarget,
+    AccessKeyOwner,
     GroupMembershipData,
     KeyPairSigningMaterial,
     UserCreationData,
@@ -303,7 +303,7 @@ class AuthDBSource:
             return await r.lookup_entity_id(lookup)
 
     @auth_db_source_resilience.apply()
-    async def fetch_delegation_target_by_access_key(self, access_key: str) -> DelegationTarget:
+    async def fetch_access_key_owner(self, access_key: str) -> AccessKeyOwner:
         """Join keypairs→users to get the owner of *access_key*.
 
         Raises ``AccessKeyNotFound`` if the access key is unknown.
@@ -318,7 +318,7 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise AccessKeyNotFound("Unknown owner access key")
-            return DelegationTarget(
+            return AccessKeyOwner(
                 user_id=UserID(row.uuid),
                 domain_name=row.domain_name,
                 role=row.role,

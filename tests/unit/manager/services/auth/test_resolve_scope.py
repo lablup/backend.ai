@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.types import DelegationTarget
+from ai.backend.manager.data.auth.types import AccessKeyOwner
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AccessKeyNotFound
 from ai.backend.manager.errors.common import GenericForbidden
@@ -107,7 +107,7 @@ class TestResolveAccessKeyScope:
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
             user_id=UserID(REQUESTER_UUID),
             domain_name="default",
             role=UserRole.USER,
@@ -124,7 +124,7 @@ class TestResolveAccessKeyScope:
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
             user_id=UserID(OTHER_USER_UUID),
             domain_name="default",
             role=UserRole.ADMIN,
@@ -140,7 +140,7 @@ class TestResolveAccessKeyScope:
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.side_effect = AccessKeyNotFound(
+        mock_auth_repository.get_access_key_owner.side_effect = AccessKeyNotFound(
             "Unknown owner access key"
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key="NONEXISTENT_KEY")
@@ -154,7 +154,7 @@ class TestResolveAccessKeyScope:
         mock_auth_repository: AsyncMock,
         default_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
             user_id=UserID(OTHER_USER_UUID),
             domain_name="other-domain",
             role=UserRole.USER,
@@ -171,7 +171,7 @@ class TestResolveAccessKeyScope:
         default_keypair: None,
     ) -> None:
         """A super admin acting as a regular user (BEP-1058) may not delegate."""
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = DelegationTarget(
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
             user_id=UserID(OTHER_USER_UUID),
             domain_name="default",
             role=UserRole.USER,

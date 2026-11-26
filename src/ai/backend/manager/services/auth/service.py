@@ -857,7 +857,7 @@ class AuthService:
                 owner_access_key=requester_ak,
             )
         owner_ak = AccessKey(action.owner_access_key)
-        owner = await self._auth_repository.get_delegation_target_by_access_key(
+        owner = await self._auth_repository.get_access_key_owner(
             action.owner_access_key,
         )
         if owner.user_id == acting.user_id:
