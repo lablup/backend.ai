@@ -52,7 +52,18 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
+<<<<<<< HEAD
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+=======
+from ai.backend.agent.scratch.utils import RestartStateStore
+from ai.backend.agent.types import (
+    Container,
+    EnumerateContainersResult,
+    KernelOwnershipData,
+    MountInfo,
+    Port,
+)
+>>>>>>> 34afcfb9 (fix(BAI-1024): keep a kernel whose container failed to be inspected (#17365))
 from ai.backend.agent.utils import SECRET_MASK
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import CgroupController
@@ -1054,7 +1065,7 @@ class KubernetesAgent(
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> EnumerateContainersResult:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
@@ -1089,7 +1100,7 @@ class KubernetesAgent(
             fetch_tasks.append(_fetch_container_info(deployment))
 
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        return result
+        return EnumerateContainersResult(containers=result)
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
