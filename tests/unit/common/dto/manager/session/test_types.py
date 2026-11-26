@@ -56,6 +56,17 @@ class TestMountOption:
         assert opt.model_extra is not None
         assert opt.model_extra["extra"] is True
 
+    def test_null_mount_destination_accepted(self) -> None:
+        opt = MountOption.model_validate({"mount_destination": None})
+        assert opt.mount_destination is None
+
+    def test_mount_destination_with_parent_segment_rejected(self) -> None:
+        with pytest.raises(
+            (BackendAISchemaValidationFailed, ValidationError),
+            match=r"mount_destination must not contain a '\.\.' segment",
+        ):
+            MountOption.model_validate({"mount_destination": "/home/work/../data"})
+
 
 class TestCreationConfigV1:
     def test_defaults(self) -> None:

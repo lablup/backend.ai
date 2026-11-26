@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 from typing import Self
 
 from pydantic import (
@@ -15,6 +16,7 @@ from pydantic import (
     ConfigDict,
     Field,
     NonNegativeFloat,
+    field_validator,
     model_validator,
 )
 
@@ -121,6 +123,13 @@ class ServiceConfigModel(BaseRequestModel):
     resource_opts: dict[str, str | int | bool] | None = Field(
         examples=[{"shmem": "2g"}], default=None
     )
+
+    @field_validator("model_mount_destination")
+    @classmethod
+    def model_mount_destination_must_not_contain_parent_segment(cls, v: str) -> str:
+        if ".." in PurePosixPath(v).parts:
+            raise ValueError("model_mount_destination must not contain a '..' segment")
+        return v
 
 
 class NewServiceRequestModel(BaseRequestModel):
