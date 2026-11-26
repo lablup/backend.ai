@@ -7,6 +7,8 @@ tags:
   - knowledge
 ---
 
+> Step 1 of the workflow (the "Workflow" table in AGENTS.md).
+
 ## Purpose
 
 `KNOWLEDGE.md` files hold background knowledge (rationale, decision tables, constraints) with a fixed frontmatter schema so they can be **found without being read**. This skill covers finding them and writing them.
@@ -126,3 +128,5 @@ it on pull requests.
 | Criteria of the document checks | `doclint.yaml` |
 | Scenario test results, generated and not edited by hand | `report.md`, `report.ko.md` |
 | Issue-scoped working notes | outside the repo |
+
+Next: `/bep-guide` (a large feature) or `/test-guide`

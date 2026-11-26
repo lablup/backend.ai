@@ -9,9 +9,10 @@
 - **A script reads no `GITHUB_*` variable.** `$GITHUB_ENV`, `$GITHUB_OUTPUT` and `::notice::` are the workflow's business: the script prints the value, the workflow turns it into whatever CI wants.
 - **Keep the deciding half free of effects.** Decide from the arguments, print the decision, and only then act. Anything with side effects takes `--dry-run`, and no script leaves the caller's HEAD, index or worktree moved.
 - **A workflow translates its event into arguments: nothing more.** Triggers, permissions, concurrency and wiring belong in the YAML. Once a `run:` grows past a line or two, it belongs in `scripts/<verb>-<object>.sh`.
+- **Write a script with decision logic, HTTP calls or JSON processing in Go as `tools/<name>`.** A script that only chains a few commands is `scripts/<verb>-<object>.sh`. Move a shell script to Go once it grows long or takes on a decision.
 - **One job per outcome.** Split into separate jobs only where the runner, the permissions or a matrix genuinely differ.
 - **Do not re-implement a rule that a script already owns.** Call it.
-- **Do not interpolate `${{ }}` into a shell command.** `env:` carries the value safely as far as the shell: from there hand it to the script as a quoted argument (`env: TAG: ${{ github.ref_name }}` → `run: scripts/foo.py "$TAG"`), so the script never learns the variable's name. A tag name, a branch name and a comment body are all written by someone else.
+- **Do not interpolate `${{ }}` into a shell command.** `env:` carries the value safely as far as the shell: from there hand it to the script as a quoted argument (`env: TAG: ${{ github.ref_name }}` → `run: scripts/foo.sh "$TAG"`), so the script never learns the variable's name. A tag name, a branch name and a comment body are all written by someone else.
 - **Pin a third-party action to a commit SHA with a `# vN` comment beside it.** `actions/*` may use a major tag.
 
 ## Where a decision goes

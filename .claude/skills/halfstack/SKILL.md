@@ -1,377 +1,54 @@
 ---
 name: halfstack
-description: Diagnose and fix Docker Compose halfstack issues: config mapping, service health, DB/Valkey/etcd inspection, supergraph regeneration
-invoke_method: user
-auto_execute: false
-enabled: true
+description: Start the PostgreSQL for local database tests from docker-compose.halfstack-main.yml and connect to it with TEST_DATABASE_URL. Use when running Go tests that need a database locally.
 tags:
   - dev
   - docker
   - halfstack
-  - troubleshooting
 ---
 
-# Halfstack Troubleshooting and Fix
+> Step 4 of the workflow (the "Workflow" table in AGENTS.md).
 
-Diagnose and directly fix issues with the Docker Compose halfstack development environment.
+# halfstack
 
-## When to Use
+Run the Go tests that need a database (`dbtest.New`) locally against the PostgreSQL of `docker-compose.halfstack-main.yml` (repository root).
 
-- Docker Compose services fail to start or keep restarting
-- Config files are missing, stale, or have wrong port or secret values
-- Supergraph schema needs regeneration after GQL changes
-- Need to inspect DB, Valkey or etcd state directly
-- Halfstack needs to be started after a fresh clone or branch switch
+## Use when
 
-## Compose File
+- Running `go test -race ./...` against a local database through `TEST_DATABASE_URL`
+- Looking at the state of the local PostgreSQL directly
 
-The runtime compose file is always `docker-compose.halfstack.current.yml` (project root).
-It is generated from `docker-compose.halfstack-main.yml` (or `halfstack-ha.yml` for HA mode).
+## Start only PostgreSQL
 
-## Quick Reference Commands
+Run from the repository root. Always name the service `backendai-half-db`.
 
 ```bash
-# Check all halfstack services
-docker compose -f docker-compose.halfstack.current.yml ps
-
-# Check a specific service's logs
-docker compose -f docker-compose.halfstack.current.yml logs <service-name>
-
-# Restart a specific service
-docker compose -f docker-compose.halfstack.current.yml restart <service-name>
-
-# Start everything
-docker compose -f docker-compose.halfstack.current.yml up -d --wait
+docker compose -f docker-compose.halfstack-main.yml up -d --wait backendai-half-db
 ```
 
-### Service Names and Profiles
+- `up` without a service name also starts Valkey, etcd and Prometheus.
+- `backendai-half-db` is `postgres:16.3-alpine` and opens host port `8100`. It is created with database `backend`, user `postgres` and password `develove`.
+- The data stays in `volumes/postgres-data` (relative to the compose file: `./volumes/${DATADIR_PREFIX:-.}/postgres-data`).
 
-Optional services start only with a Docker Compose profile. By default (`docker compose up -d`)
-only the **required** services start. To include optional ones, pass `--profile <name>`.
-
-| Service | Image | Purpose | Profile |
-|---------|-------|---------|---------|
-| `backendai-half-db` | postgres:16.3-alpine | Main database | (required) |
-| `backendai-half-redis` | valkey/valkey:9.1.1-alpine | Cache and pub-sub | (required) |
-| `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
-| `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
-| `backendai-half-prometheus` | Prometheus | Metrics (manager queries it for deployment autoscale rule evaluation) | (required) |
-| `backendai-half-otel-collector` | OTel Collector | Trace and metric export | `telemetry`, `observability` |
-| `backendai-half-loki` | Loki | Log aggregation | `telemetry`, `observability` |
-| `backendai-half-grafana` | Grafana | Dashboards | `observability` |
-| `backendai-half-grafana-mcp` | mcp/grafana | Grafana MCP server (streamable-http on :3001/mcp); Claude queries logs and metrics through it | `observability` |
-| `backendai-half-tempo` | Tempo | Tracing | `observability` |
-| `backendai-half-pyroscope` | Pyroscope | Profiling | `observability` |
-| `backendai-half-db-exporter` | postgres-exporter | Postgres metrics | `observability` |
-| `backendai-half-redis-exporter` | redis_exporter | Valkey metrics | `observability` |
-| `backendai-half-minio` | MinIO | Object storage | `storage` |
-
-**Profile semantics:**
-- `telemetry`: service-level export only (`otel-collector` and `loki`). Visualisation
-  (Grafana) and supporting backends (Tempo, Pyroscope, exporters) are typically managed
-  centrally; this profile is a good default for dev installs that just want their logs
-  and traces forwarded.
-- `observability`: superset of `telemetry`. Starts the full local stack including
-  Grafana, Tempo, Pyroscope and exporters.
-- `storage`: MinIO only.
-
-### Enabling optional profiles
+## Run the tests
 
 ```bash
-# Required only (default)
-docker compose -f docker-compose.halfstack.current.yml up -d --wait
-
-# + telemetry export (OTel collector + Loki forwarding logs/traces to a central monitor)
-docker compose -f docker-compose.halfstack.current.yml --profile telemetry up -d --wait
-
-# + full observability stack (Grafana / Tempo / Pyroscope / exporters in addition to telemetry)
-docker compose -f docker-compose.halfstack.current.yml --profile observability up -d --wait
-
-# + object storage (MinIO)
-docker compose -f docker-compose.halfstack.current.yml --profile storage up -d --wait
-
-# Everything
-docker compose -f docker-compose.halfstack.current.yml --profile observability --profile storage up -d --wait
+TEST_DATABASE_URL='postgres://postgres:develove@localhost:8100/postgres?sslmode=disable' go test -race ./...
 ```
 
-When stopping or removing, profile flags must also be passed for those containers to be torn down:
+- `dbtest.New(t)` connects to this address, creates a temporary database for each test and deletes it when the test ends. The connected user must be able to create a database (the `postgres` user can).
+- The template database with the migrations applied (named `tmpl_<hash>`) stays on the server and is built again when a migration file changes.
+- The conditions under which a test skips the database follow `/test-guide`.
+
+## Check the state and clean up
 
 ```bash
-docker compose -f docker-compose.halfstack.current.yml --profile observability --profile storage down
+docker compose -f docker-compose.halfstack-main.yml ps
+docker compose -f docker-compose.halfstack-main.yml logs backendai-half-db
+docker compose -f docker-compose.halfstack-main.yml exec backendai-half-db psql -U postgres
+docker compose -f docker-compose.halfstack-main.yml stop backendai-half-db
 ```
 
-`scripts/delete-dev.sh` already passes both profiles so a clean wipe works regardless of what was enabled.
+## Other services
 
-## Docker Configs: Files That Must Exist in Project Root
-
-The compose file declares a `configs:` section. Docker Compose reads these as **files**.
-If a file is missing when `docker compose up` runs, Docker creates a **directory** at that path instead.
-Once a directory exists where a file should be, even copying the correct file will not help; the directory must be removed first.
-
-### Fix Procedure for Missing Config Files
-
-**Step 1:** Stop affected services (or all services):
-
-```bash
-docker compose -f docker-compose.halfstack.current.yml down
-```
-
-**Step 2:** Check and remove any directories that should be files:
-
-```bash
-# These MUST be regular files, not directories
-for f in prometheus.yaml otel-collector-config.yaml loki-config.yaml \
-         tempo-config.yaml supergraph.graphql gateway.config.ts; do
-  [ -d "$f" ] && rm -rf "$f" && echo "Removed directory: $f"
-done
-
-# These MUST be directories
-for d in grafana-dashboards grafana-provisioning; do
-  [ -f "$d" ] && rm -f "$d" && echo "Removed file: $d"
-done
-```
-
-**Step 3:** Copy config files from source (same as `scripts/install-dev.sh`):
-
-```bash
-# Docker Compose configs (plain copy, no transformation)
-cp configs/prometheus/prometheus.yaml ./prometheus.yaml
-cp configs/otel/otel-collector-config.yaml ./otel-collector-config.yaml
-cp configs/loki/loki-config.yaml ./loki-config.yaml
-cp configs/tempo/tempo-config.yaml ./tempo-config.yaml
-cp configs/graphql/gateway.config.ts ./gateway.config.ts
-
-# Supergraph: generated, but can be copied from last known-good
-cp docs/manager/graphql-reference/supergraph.graphql ./supergraph.graphql
-
-# Grafana (recursive directory copy)
-cp -r configs/grafana/dashboards ./grafana-dashboards
-cp -r configs/grafana/provisioning ./grafana-provisioning
-```
-
-**Step 4:** Ensure volume directories exist:
-
-```bash
-mkdir -p volumes/postgres-data
-mkdir -p volumes/etcd-data
-mkdir -p volumes/redis-data
-```
-
-**Step 5:** Start services again:
-
-```bash
-docker compose -f docker-compose.halfstack.current.yml up -d --wait
-```
-
-### Config Source Mapping Reference
-
-| File in project root | Source path | Used by service |
-|---------------------|------------|-----------------|
-| `prometheus.yaml` | `configs/prometheus/prometheus.yaml` | backendai-half-prometheus |
-| `otel-collector-config.yaml` | `configs/otel/otel-collector-config.yaml` | backendai-half-otel-collector |
-| `loki-config.yaml` | `configs/loki/loki-config.yaml` | backendai-half-loki |
-| `tempo-config.yaml` | `configs/tempo/tempo-config.yaml` | backendai-half-tempo |
-| `supergraph.graphql` | `docs/manager/graphql-reference/supergraph.graphql` | backendai-half-apollo-router |
-| `gateway.config.ts` | `configs/graphql/gateway.config.ts` | backendai-half-apollo-router |
-| `grafana-dashboards/` | `configs/grafana/dashboards/` | backendai-half-grafana (volume mount) |
-| `grafana-provisioning/` | `configs/grafana/provisioning/` | backendai-half-grafana (volume mount) |
-
-## Missing or Stale Compose File
-
-If `docker-compose.halfstack.current.yml` does not exist or is outdated:
-
-```bash
-cp docker-compose.halfstack-main.yml docker-compose.halfstack.current.yml
-```
-
-Then apply port substitutions. Read existing component toml files to determine current ports,
-or use defaults from `scripts/install-dev.sh`:
-
-| Setting | Default | sed pattern |
-|---------|---------|-------------|
-| POSTGRES_PORT | 8101 | `s/8100:5432/${POSTGRES_PORT}:5432/` |
-| REDIS_PORT | 8111 | `s/8110:6379/${REDIS_PORT}:6379/` |
-| ETCD_PORT | 8121 | `s/8120:2379/${ETCD_PORT}:2379/` |
-
-**Note:** The source template has 8100/8110/8120 but `install-dev.sh` defaults are 8101/8111/8121.
-Always check existing config files first to determine the correct port.
-
-## Supergraph / Hive Gateway
-
-The Hive Gateway serves the federated GraphQL schema. Regenerate when:
-- GQL schema types or fields change
-- New GQL modules are added
-- v2 schema is modified
-
-```bash
-# 1. Generate new schemas and supergraph
-./scripts/generate-graphql-schema.sh
-
-# 2. Copy to project root (where compose expects it)
-cp docs/manager/graphql-reference/supergraph.graphql ./supergraph.graphql
-cp configs/graphql/gateway.config.ts ./gateway.config.ts
-
-# 3. Recreate the gateway (docker configs are baked in at container creation,
-#    so `restart` would keep serving the old schema)
-docker compose -f docker-compose.halfstack.current.yml up -d --force-recreate --wait backendai-half-apollo-router
-```
-
-Steps 1-3 in one command: `./scripts/refresh-graphql-gateway.sh --recreate`
-(without `--recreate` it only restarts the container, which keeps the old schema).
-
-If manager code is broken and `generate-graphql-schema.sh` fails,
-copy the last known-good supergraph from git:
-
-```bash
-git show main:docs/manager/graphql-reference/supergraph.graphql > ./supergraph.graphql
-```
-
-## Direct Service Inspection
-
-### PostgreSQL
-
-```bash
-PGCONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-db)
-
-# Interactive psql
-docker exec -it -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d backend
-
-# Non-interactive query
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d backend -c "SELECT version();"
-
-# Check databases
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -tc "SELECT datname FROM pg_database;"
-
-# Check alembic migration version (manager)
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d backend -c "SELECT * FROM alembic_version;"
-
-# Check alembic migration version (appproxy)
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d appproxy -c "SELECT * FROM alembic_version;"
-
-# List tables
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d backend -c "\dt"
-```
-
-**Common fix: appproxy DB missing:**
-
-```bash
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -c "CREATE DATABASE appproxy;"
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -c "CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove';"
-docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d appproxy -c "GRANT ALL ON SCHEMA public TO appproxy;"
-./py -m alembic -c alembic-appproxy.ini upgrade head
-```
-
-### Valkey
-
-```bash
-REDIS_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-redis)
-
-# Ping
-docker exec $REDIS_CONTAINER valkey-cli ping
-
-# Info
-docker exec $REDIS_CONTAINER valkey-cli info server
-docker exec $REDIS_CONTAINER valkey-cli dbsize
-
-# List keys (dev only)
-docker exec $REDIS_CONTAINER valkey-cli keys '*'
-
-# Get or check specific key
-docker exec $REDIS_CONTAINER valkey-cli get <key>
-docker exec $REDIS_CONTAINER valkey-cli type <key>
-
-# Flush all (destructive)
-docker exec $REDIS_CONTAINER valkey-cli flushall
-```
-
-### etcd
-
-```bash
-ETCD_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-etcd)
-
-# Key reads need the root user once auth is enabled: add
-# --user=root:<password> (the [etcd] password in manager.toml) to each `get`.
-
-# List all keys
-docker exec $ETCD_CONTAINER etcdctl get --prefix "" --keys-only
-
-# Get specific key
-docker exec $ETCD_CONTAINER etcdctl get <key>
-
-# Common key prefixes
-docker exec $ETCD_CONTAINER etcdctl get --prefix "volumes"
-
-# Health check (needs no credentials; `endpoint health` fails once auth is enabled)
-docker exec $ETCD_CONTAINER etcdctl endpoint status
-```
-
-Or via Backend.AI CLI:
-
-```bash
-./backend.ai mgr etcd get --prefix ''
-./backend.ai mgr etcd get --prefix volumes
-```
-
-The Valkey config is not in etcd: each component reads it from the `[redis]` table of its own TOML file (`manager.toml`, `agent.toml`, `storage-proxy.toml`).
-
-### MinIO
-
-```bash
-MINIO_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-minio)
-
-# Health check
-docker exec $MINIO_CONTAINER curl -sf http://localhost:9000/minio/health/live
-
-# List buckets (set alias first)
-docker exec $MINIO_CONTAINER mc alias set local http://localhost:9000 minioadmin minioadmin
-docker exec $MINIO_CONTAINER mc ls local/
-
-# Web console: http://127.0.0.1:9001 (minioadmin / minioadmin)
-```
-
-## Component Config Files: Port and Secret Consistency
-
-These config files live in the project root and are generated from `configs/` templates.
-
-| Config file | Source template | Key transformations |
-|-------------|----------------|---------------------|
-| `manager.toml` | `configs/manager/halfstack.toml` | etcd, PG and manager port, ipc-base-path |
-| `alembic.ini` | `configs/manager/halfstack.alembic.ini` | PG connection string |
-| `account-manager.toml` | `configs/account-manager/halfstack.toml` | etcd, PG and service port, ipc-base-path |
-| `alembic-accountmgr.ini` | `configs/account-manager/halfstack.alembic.ini` | PG connection string |
-| `agent.toml` | `configs/agent/halfstack.toml` | etcd, RPC and watcher port, ipc, var and mount paths, accelerator plugins |
-| `storage-proxy.toml` | `configs/storage-proxy/halfstack.toml` | etcd port, 2 secrets, volume config, MinIO creds |
-| `app-proxy-coordinator.toml` | `configs/app-proxy-coordinator/halfstack.toml` | PG and Valkey port, service port, 3 generated secrets |
-| `alembic-appproxy.ini` | `configs/app-proxy-coordinator/halfstack.alembic.ini` | PG connection string |
-| `app-proxy-worker.toml` | `configs/app-proxy-worker/halfstack.toml` | Valkey port, service port, **same 3 secrets as coordinator** |
-| `webserver.conf` | `configs/webserver/halfstack.conf` | Manager endpoint URL, Valkey addr |
-
-### Cross-Config Consistency Rules
-
-- **PG port** in compose must match `manager.toml`, `alembic.ini`, `account-manager.toml`, `app-proxy-coordinator.toml`, `alembic-appproxy.ini`
-- **Valkey port** in compose must match `app-proxy-coordinator.toml`, `app-proxy-worker.toml`, `webserver.conf`
-- **etcd port** in compose must match `manager.toml`, `agent.toml`, `storage-proxy.toml`
-- **App proxy secrets**: `app-proxy-coordinator.toml` and `app-proxy-worker.toml` must share identical `api_secret`, `jwt_secret`, `permit_hash.secret`
-- **Manager and storage proxy**: the volume auth secret in etcd (set via `dev.etcd.volumes.json`) must match `storage-proxy.toml`'s `[api.manager] secret`
-
-### Regenerating a Component Config
-
-When regenerating, **read existing secret values** from the current config file and reuse them.
-Only generate new secrets (`python -c 'import secrets; print(secrets.token_urlsafe(32))'`) when the config file does not exist at all.
-
-Reference `scripts/install-dev.sh` lines 1016-1142 for the exact sed substitution patterns per component.
-
-## Diagnostic Workflow
-
-When halfstack issues are reported, follow this order:
-
-1. **Check compose file exists:** `ls -la docker-compose.halfstack.current.yml`
-2. **Check service status:** `docker compose -f docker-compose.halfstack.current.yml ps`
-3. **For exited or unhealthy services:** read logs with `docker compose ... logs <service>`
-4. **For config-dependent services** (prometheus, otel, loki, tempo, gateway):
-   - Check referenced files exist in project root **and are files, not directories**
-   - If a directory exists where a file should be: stop service → `rm -rf <dir>` → copy correct file → restart
-5. **For Backend.AI components** (manager, agent and so on): check `.toml`/`.conf` exists and ports match compose
-6. **For DB issues:** connect to PostgreSQL directly and check schema and data
-7. **For Valkey or etcd issues:** connect directly and inspect state
-8. **Fix the root cause directly.** Do not just report the problem.
+Besides PostgreSQL, `docker-compose.halfstack-main.yml` has Valkey (`backendai-half-redis`), etcd (`backendai-half-etcd`), Prometheus and the services the profiles `observability` and `telemetry` turn on. The only service the Go tests need now is `backendai-half-db`.

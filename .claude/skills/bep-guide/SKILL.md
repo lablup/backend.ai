@@ -9,6 +9,8 @@ tags:
   - design
 ---
 
+> Step 2 of the workflow (the "Workflow" table in AGENTS.md).
+
 # BEP Writing Guide
 
 Guide for creating and managing Backend.AI Enhancement Proposals (BEPs).
@@ -82,7 +84,7 @@ Write in the template order: Goals, Non-goals, Design, Impact, Implementation Or
 
 - The `bep` values of `doclint.yaml` set the length limits and the first BEP they apply to. `go run ./tools/doclint check --only bep-length` checks them.
 - Settle open questions in the review and write the result into the design. The BEP keeps no decision log.
-- Before requesting the review, run `/glossary-review`.
+- Before requesting the review, run `/writing`.
 
 ### Step 6: Submit PR and Iterate
 
@@ -215,5 +217,7 @@ See `proposals/README.md` for the status lifecycle, transition rules and version
 - `proposals/AGENTS.md`: content rules
 - `proposals/README.md`: process, number registry, file structure
 - `proposals/BEP-0000-template.md`: template with placeholders and length limits
-- `/glossary-review`: glossary review before the review request
+- `/writing`: writing rules and the document lint before the review request
 - `/test-guide`: test scenarios for the implementation step
+
+Next: `/test-guide`
