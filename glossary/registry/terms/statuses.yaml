@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Status sets"
-    link: "Status sets"
-    description: "sets of status values"
-  ko:
-    page: "상태 묶음"
-    link: "상태 묶음"
-    description: "상태 값 묶음"
 terms:
   - english: "activeness status"
     korean: "활성 상태"

@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Layers and components"
-    link: "Layers and components"
-    description: "components and code layers"
-  ko:
-    page: "구조 계층, 구성 요소"
-    link: "구조 계층, 구성 요소"
-    description: "컴포넌트와 코드 계층"
 terms:
   - english: "accelerator plugin"
     korean: "가속기 플러그인"

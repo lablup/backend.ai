@@ -15,51 +15,18 @@ const (
 	rulesFile     = "rules.yaml"
 	termsDir      = "terms"
 	yamlExtension = ".yaml"
-	// topicPlaceholder stands for the topic in a path or a text of the registry.
-	topicPlaceholder = "{topic}"
 )
 
-// registry is the source of the glossary documents.
+// registry is the rules of the words check.
 type registry struct {
 	rules  rulesDocument
 	topics map[string]topicDocument
 }
 
 type rulesDocument struct {
-	Topics      []string                  `yaml:"topics"`
-	Documents   map[string]glossaryPage   `yaml:"documents"`
-	Style       map[string][]styleSection `yaml:"style"`
-	Expressions []expression              `yaml:"expressions"`
-	Korean      koreanRules               `yaml:"korean"`
-	English     englishRules              `yaml:"english"`
-}
-
-// glossaryPage is the fixed text of the glossary documents of one language.
-type glossaryPage struct {
-	Path          string     `yaml:"path"`
-	TermPath      string     `yaml:"term_path"`
-	GeneratedNote string     `yaml:"generated_note"`
-	Title         string     `yaml:"title"`
-	Intro         [][]string `yaml:"intro"`
-	Index         struct {
-		Heading string `yaml:"heading"`
-		Lead    string `yaml:"lead"`
-	} `yaml:"index"`
-	Expressions struct {
-		Heading string   `yaml:"heading"`
-		Lead    string   `yaml:"lead"`
-		Columns []string `yaml:"columns"`
-	} `yaml:"expressions"`
-	Terms struct {
-		TitlePrefix string   `yaml:"title_prefix"`
-		Lead        string   `yaml:"lead"`
-		Columns     []string `yaml:"columns"`
-	} `yaml:"terms"`
-}
-
-type styleSection struct {
-	Heading string   `yaml:"heading"`
-	Rules   []string `yaml:"rules"`
+	Expressions []expression `yaml:"expressions"`
+	Korean      koreanRules  `yaml:"korean"`
+	English     englishRules `yaml:"english"`
 }
 
 // expression is a rejected expression. A qualifier names the sense that is rejected; except
@@ -69,6 +36,7 @@ type expression struct {
 	Word      string   `yaml:"word"`
 	Qualifier string   `yaml:"qualifier,omitempty" spec:"optional"`
 	Instead   string   `yaml:"instead"`
+	Reason    string   `yaml:"reason,omitempty" spec:"optional"`
 	Except    []string `yaml:"except,omitempty" spec:"optional"`
 }
 
@@ -104,14 +72,7 @@ type englishRules struct {
 
 // topicDocument is one term file.
 type topicDocument struct {
-	Title map[string]topicTitle `yaml:"title"`
-	Terms []term                `yaml:"terms"`
-}
-
-type topicTitle struct {
-	Page        string `yaml:"page"`
-	Link        string `yaml:"link"`
-	Description string `yaml:"description"`
+	Terms []term `yaml:"terms"`
 }
 
 type term struct {
@@ -164,41 +125,15 @@ func loadRegistry(directory string) (*registry, error) {
 }
 
 func (r *registry) validate() error {
-	for _, lang := range languages {
-		if _, ok := r.rules.Documents[lang]; !ok {
-			return fmt.Errorf("missing value documents.%s", lang)
-		}
-		if len(r.rules.Style[lang]) == 0 {
-			return fmt.Errorf("missing value style.%s", lang)
-		}
-	}
-	if len(r.rules.Documents) != len(languages) || len(r.rules.Style) != len(languages) {
-		return fmt.Errorf("documents and style take the languages %s", strings.Join(languages, ", "))
-	}
 	for i, entry := range r.rules.Expressions {
 		if !slices.Contains(languages, entry.Lang) {
 			return fmt.Errorf("expressions[%d]: unknown lang %q", i, entry.Lang)
 		}
 	}
-	if len(r.rules.Topics) != len(r.topics) {
-		return fmt.Errorf("topics lists %d topics, %s/ has %d files", len(r.rules.Topics), termsDir, len(r.topics))
-	}
-	seen := map[string]bool{}
-	for _, name := range r.rules.Topics {
-		if _, ok := r.topics[name]; !ok || seen[name] {
-			return fmt.Errorf("topics: %q is repeated or has no term file", name)
-		}
-		seen[name] = true
-	}
 	return nil
 }
 
 func (t topicDocument) validate() error {
-	for _, lang := range languages {
-		if _, ok := t.Title[lang]; !ok {
-			return fmt.Errorf("missing value title.%s", lang)
-		}
-	}
 	for i, entry := range t.Terms {
 		for _, lang := range languages {
 			if entry.Meaning[lang] == "" {

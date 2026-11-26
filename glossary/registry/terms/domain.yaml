@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Product and domain concepts"
-    link: "Product and domain concepts"
-    description: "concepts the product handles, such as sessions, deployments, vfolders and resources"
-  ko:
-    page: "제품, 도메인 개념"
-    link: "제품, 도메인 개념"
-    description: "세션, 배포, vfolder, 자원처럼 제품이 다루는 개념"
 terms:
   - english: "accelerator"
     korean: "가속기"

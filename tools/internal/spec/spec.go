@@ -145,8 +145,7 @@ type Search struct {
 
 // Pairs is the criteria of the document pairs.
 type Pairs struct {
-	TranslationCharacters Pattern   `yaml:"translation_characters"`
-	OneSideChangeAllowed  []Pattern `yaml:"one_side_change_allowed"`
+	TranslationCharacters Pattern `yaml:"translation_characters"`
 }
 
 // Words is the criteria of the words check.

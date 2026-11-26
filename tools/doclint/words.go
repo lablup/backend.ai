@@ -50,10 +50,20 @@ var (
 type word struct {
 	text        string
 	replacement string
+	reason      string
 	pattern     *regexp.Regexp
 	advisory    bool
 	// allowed are longer expressions in which the word is not reported.
 	allowed []string
+}
+
+// message reports the word found at the line.
+func (w word) message(path string, line int) string {
+	message := fmt.Sprintf(`%s:%d: "%s" -> "%s"`, path, line, w.text, w.replacement)
+	if w.reason != "" {
+		message += ": " + w.reason
+	}
+	return message
 }
 
 // match reports whether the line uses the word outside the allowed expressions.
@@ -234,7 +244,9 @@ func (m *matcher) englishPattern(text string) string {
 	return wordBoundaryBefore + strings.Join(fields, space+"+") + alternation(m.inflections) + "?" + wordBoundaryAfter
 }
 
-func (m *matcher) newWord(text, replacement string, advisory bool, allowed []string) (word, error) {
+// build sets the pattern of the word.
+func (m *matcher) build(w word) (word, error) {
+	text := w.text
 	var source string
 	if hangulText.MatchString(text) {
 		var err error
@@ -248,7 +260,8 @@ func (m *matcher) newWord(text, replacement string, advisory bool, allowed []str
 	if err != nil {
 		return word{}, fmt.Errorf("word %q: %w", text, err)
 	}
-	return word{text: text, replacement: replacement, pattern: pattern, advisory: advisory, allowed: allowed}, nil
+	w.pattern = pattern
+	return w, nil
 }
 
 // alternatives splits an expression, carrying a shared leading word into the verbs after it.
@@ -287,8 +300,8 @@ func loadWords(directory string) (english, korean []word, err error) {
 		return nil, nil, fmt.Errorf("%s: %w", directory, err)
 	}
 	words := map[string][]word{}
-	add := func(lang, text, replacement string, advisory bool, allowed []string) error {
-		built, err := m.newWord(text, replacement, advisory, allowed)
+	add := func(lang string, w word) error {
+		built, err := m.build(w)
 		words[lang] = append(words[lang], built)
 		return err
 	}
@@ -297,7 +310,13 @@ func loadWords(directory string) (english, korean []word, err error) {
 			if strings.Contains(strings.ToLower(entry.Instead), strings.ToLower(text)) {
 				continue
 			}
-			if err := add(entry.Lang, text, entry.Instead, entry.Qualifier != "", entry.Except); err != nil {
+			if err := add(entry.Lang, word{
+				text:        text,
+				replacement: entry.Instead,
+				reason:      entry.Reason,
+				advisory:    entry.Qualifier != "",
+				allowed:     entry.Except,
+			}); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -310,7 +329,8 @@ func loadWords(directory string) (english, korean []word, err error) {
 					if strings.EqualFold(text, own) {
 						continue
 					}
-					if err := add(lang, text, own, true, nil); err != nil {
+					variant := word{text: text, replacement: own, reason: term.Meaning[lang], advisory: true}
+					if err := add(lang, variant); err != nil {
 						return nil, nil, err
 					}
 				}
@@ -359,7 +379,7 @@ func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []
 		line := prose[number]
 		for _, w := range words {
 			if w.match(line) {
-				message := fmt.Sprintf("%s:%d: %s -> %s: %s", path, number, w.text, w.replacement, strings.TrimSpace(line))
+				message := w.message(path, number)
 				if w.advisory {
 					reviews = append(reviews, message)
 				} else {
@@ -369,6 +389,10 @@ func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []
 		}
 	}
 	return problems, reviews, nil
+}
+
+func matchesAny(patterns []spec.Pattern, text string) bool {
+	return slices.ContainsFunc(patterns, func(p spec.Pattern) bool { return p.MatchString(text) })
 }
 
 func resolve(root, path string) string {

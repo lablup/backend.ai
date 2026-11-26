@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Operations"
-    link: "Operations"
-    description: "operations such as delete, create and get"
-  ko:
-    page: "동작"
-    link: "동작"
-    description: "삭제, 생성, 조회 같은 동작"
 terms:
   - english: "activate revision"
     korean: "리비전 활성화"

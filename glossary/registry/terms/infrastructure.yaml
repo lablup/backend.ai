@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Infrastructure"
-    link: "Infrastructure"
-    description: "installation and operating environment"
-  ko:
-    page: "인프라"
-    link: "인프라"
-    description: "설치와 운영 환경"
 terms:
   - english: "AppProxy tunnel"
     korean: "AppProxy tunnel"

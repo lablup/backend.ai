@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,53 +13,11 @@ import (
 	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
-const testRules = `topics: [process]
-documents:
-  en:
-    path: GLOSSARY.md
-    term_path: "glossary/{topic}.md"
-    generated_note: "Generated."
-    title: "Glossary"
-    intro: [["Intro."]]
-    index:
-      heading: "Term files"
-      lead: "Read."
-    expressions:
-      heading: "Avoid"
-      lead: "Verbs."
-      columns: ["Do not write", "Write"]
-    terms:
-      title_prefix: "Glossary: "
-      lead: "See {topic}."
-      columns: ["English", "Meaning", "Do not write", "Note"]
-  ko:
-    path: GLOSSARY.ko.md
-    term_path: "glossary/{topic}.ko.md"
-    generated_note: "생성."
-    title: "용어집"
-    intro: [["소개."]]
-    index:
-      heading: "용어 파일"
-      lead: "읽습니다."
-    expressions:
-      heading: "표현"
-      lead: "서술어."
-      columns: ["사용하지 않는 표현", "대신"]
-    terms:
-      title_prefix: "용어집: "
-      lead: "{topic} 참고."
-      columns: ["한글", "English", "뜻", "사용하지 않는 어휘", "메모"]
-style:
-  en:
-    - heading: "Style"
-      rules: ["One rule"]
-  ko:
-    - heading: "문체"
-      rules: ["규칙"]
-expressions:
+const testRules = `expressions:
   - lang: en
     word: "refuse"
     instead: "reject"
+    reason: "One verb per operation."
   - lang: en
     word: "leave out"
     qualifier: "a flag"
@@ -104,16 +63,7 @@ english:
   inflections: [s, es, d, ed, ing]
 `
 
-const testTerms = `title:
-  en:
-    page: "Process"
-    link: "Process"
-    description: "process"
-  ko:
-    page: "절차"
-    link: "절차"
-    description: "절차"
-terms:
+const testTerms = `terms:
   - english: "agent heartbeat"
     korean: "에이전트 heartbeat"
     meaning:
@@ -236,7 +186,7 @@ func TestSkippedPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, want := range map[string]bool{
-		"glossary/process.md": true, "GLOSSARY.md": true, "a/report.ko.md": true,
+		"a/report.md": true, "a/report.ko.md": true,
 		"CHANGELOG/26.9.md": true, "proposals/BEP-1.md": false, "AGENTS.md": false,
 	} {
 		if got := matchesAny(loaded.Words.SkippedPaths, path); got != want {
@@ -265,8 +215,8 @@ func TestCheckWordsFiles(t *testing.T) {
 		wantFailed bool
 		wantOut    string
 	}{
-		{"bad.md", true, "bad.md:3: refuse -> reject: We refuse it.\n"},
-		{"review.md", false, "review: review.md:3: heartbeat -> agent heartbeat: The heartbeat arrives.\n"},
+		{"bad.md", true, `bad.md:3: "refuse" -> "reject": One verb per operation.` + "\n"},
+		{"review.md", false, `review: review.md:3: "heartbeat" -> "agent heartbeat": A signal.` + "\n"},
 		{"good.md", false, ""},
 	}
 	for _, tt := range tests {
@@ -274,6 +224,41 @@ func TestCheckWordsFiles(t *testing.T) {
 			out, failed := runCheck(t, root, "--only", "words", tt.file)
 			if failed != tt.wantFailed || out != tt.wantOut {
 				t.Fatalf("failed=%v out=%q, want failed=%v out=%q", failed, out, tt.wantFailed, tt.wantOut)
+			}
+		})
+	}
+}
+
+// refused is the output for the expression "refuse" of testRules.
+func refused(path string, line int) string {
+	return fmt.Sprintf(`%s:%d: "refuse" -> "reject": One verb per operation.`+"\n", path, line)
+}
+
+func TestWordsOutput(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		line string
+		want string
+	}{
+		{"expression with a reason", "doc.md", "We refuse it.",
+			`doc.md:1: "refuse" -> "reject": One verb per operation.`},
+		{"expression without a reason", "doc.md", "They stand for it.",
+			`doc.md:1: "stand for" -> "represent"`},
+		{"term variant takes the meaning", "doc.md", "The bgtask ends.",
+			`review: doc.md:1: "bgtask" -> "agent heartbeat": A signal.`},
+		{"korean expression without a reason", "doc.ko.md", "파일을 지운다",
+			`doc.ko.md:1: "지우다" -> "삭제하다"`},
+		{"korean term variant takes the korean meaning", "doc.ko.md", "칼럼을 둔다",
+			`review: doc.ko.md:1: "칼럼" -> "컬럼": 열입니다.`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newRepo(t)
+			writeFile(t, root, tt.file, tt.line+"\n")
+			out, _ := runCheck(t, root, "--only", "words", tt.file)
+			if out != tt.want+"\n" {
+				t.Fatalf("out=%q, want %q", out, tt.want+"\n")
 			}
 		})
 	}
@@ -418,11 +403,11 @@ func TestCheckStaged(t *testing.T) {
 	}{
 		{"old violation is not reported", map[string]string{"old.md": old + "\nFine.\n"}, nil, ""},
 		{"added line", map[string]string{"old.md": old + "\nWe refused.\n"}, nil,
-			"old.md:5: refuse -> reject: We refused.\n"},
+			refused("old.md", 5)},
 		{"unstaged change is ignored", map[string]string{"old.md": old + "\nFine.\n"},
 			map[string]string{"old.md": "We refuse.\n" + old, "new.md": "We refuse.\n"}, ""},
 		{"staged content is read", map[string]string{"new.md": "# New\n\nWe refuse.\n"},
-			map[string]string{"new.md": "# New\n"}, "new.md:3: refuse -> reject: We refuse.\n"},
+			map[string]string{"new.md": "# New\n"}, refused("new.md", 3)},
 		{"one side of a pair", map[string]string{"doc.md": "# A\n\nMore.\n"}, nil,
 			"doc.md: changed without doc.ko.md\n"},
 		{"unstaged partner does not count", map[string]string{"doc.md": "# A\n\n## B\n"},
@@ -481,8 +466,8 @@ func TestSpecChangesTheCheck(t *testing.T) {
 		{"bep first number", "bep-length", "proposals/BEP-1090-x.md", long,
 			"first_number: 1080", "first_number: 1091", "proposals/BEP-1090-x.md:1: list item of 121 chars, limit 120\n", ""},
 		{"skipped words path", "words", "notes.md", "We refuse.\n",
-			"- '(^|/)(glossary|CHANGELOG)(/|$)'", "- '(^|/)(glossary|CHANGELOG)(/|$)'\n    - '^notes'",
-			"notes.md:1: refuse -> reject: We refuse.\n", ""},
+			"- '(^|/)CHANGELOG(/|$)'", "- '(^|/)CHANGELOG(/|$)'\n    - '^notes'",
+			refused("notes.md", 1), ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -533,9 +518,8 @@ func TestInvalidSpecIsRejected(t *testing.T) {
 		{"unknown language", rulesPath, "lang: en\n    word: \"refuse\"", "lang: fr\n    word: \"refuse\"", "unknown lang"},
 		{"flow mapping in the rules", rulesPath, "    contracted_syllables:\n      하: 해\n", "    contracted_syllables: {하: 해}\n", "mapping in flow style"},
 		{"not a jamo", rulesPath, "past_final: ㅆ", "past_final: x", "is not a jamo"},
-		{"unlisted topic", rulesPath, "topics: [process]", "topics: [other]", "has no term file"},
 		{"missing meaning", termsPath, "      ko: \"신호입니다.\"\n", "", "terms[0]: missing value meaning.ko"},
-		{"flow mapping in a term file", termsPath, "    meaning:\n      en: \"A signal.\"\n      ko: \"신호입니다.\"\n", "    meaning: {en: \"A signal.\", ko: \"신호입니다.\"}\n", "process.yaml:13: mapping in flow style"},
+		{"flow mapping in a term file", termsPath, "    meaning:\n      en: \"A signal.\"\n      ko: \"신호입니다.\"\n", "    meaning: {en: \"A signal.\", ko: \"신호입니다.\"}\n", "process.yaml:4: mapping in flow style"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -557,41 +541,12 @@ func TestInvalidSpecIsRejected(t *testing.T) {
 	}
 }
 
-func TestGeneratedGlossaryIsCurrent(t *testing.T) {
+func TestRepositoryRegistryLoads(t *testing.T) {
 	loaded, err := spec.Load("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	reg, err := loadRegistry(filepath.Join("../..", loaded.Words.Registry))
-	if err != nil {
+	if _, _, err := loadWords(filepath.Join("../..", loaded.Words.Registry)); err != nil {
 		t.Fatal(err)
-	}
-	for path, want := range reg.render() {
-		got, err := os.ReadFile(filepath.Join("../..", path))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(got) != want {
-			t.Errorf("%s differs from the registry: run go generate ./...", path)
-		}
-	}
-}
-
-func TestGenerate(t *testing.T) {
-	root := newRepo(t)
-	if err := os.MkdirAll(filepath.Join(root, "glossary"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := run([]string{"generate", "--root", root}, io.Discard); err != nil {
-		t.Fatal(err)
-	}
-	got, err := os.ReadFile(filepath.Join(root, "glossary/process.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "<!-- Generated. -->\n# Glossary: Process\n\nSee process.\n\n| English | Meaning | Do not write | Note |\n|---|---|---|---|\n" +
-		"| agent heartbeat | A signal. | heartbeat, bgtask |   |\n| Agent | The agent. | agent |   |\n"
-	if string(got) != want {
-		t.Fatalf("got %q, want %q", got, want)
 	}
 }

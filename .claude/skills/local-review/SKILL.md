@@ -35,9 +35,11 @@ Review the work.
 - Root `AGENTS.md`
 - Every `AGENTS.md` from the directory of a changed file up to the root
 - Related `KNOWLEDGE.md` when a judgment needs background (find with `go run ./tools/knowledge search <term>`)
-- For a change to docs or comments, `GLOSSARY.md` and the topic's `glossary/<topic>.md`
 
 These documents set the rules. Report a place that breaks a rule as a finding on its axis, with the location of the rule in the document as evidence.
+
+For a change to docs, run `go run ./tools/doclint check` on the changed files and report what it
+prints. The rules are in `glossary/registry/`.
 
 ### Review axes
 

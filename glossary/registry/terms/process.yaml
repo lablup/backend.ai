@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Process and documents"
-    link: "Process and documents"
-    description: "development process and document kinds"
-  ko:
-    page: "절차, 문서"
-    link: "절차, 문서"
-    description: "개발 절차와 문서 종류"
 terms:
   - english: "additive only"
     korean: "additive only"

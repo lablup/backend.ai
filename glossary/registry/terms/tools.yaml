@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Technology and tool names"
-    link: "Technology and tool names"
-    description: "external technology and tool names"
-  ko:
-    page: "기술, 도구 이름"
-    link: "기술, 도구 이름"
-    description: "외부 기술과 도구 이름"
 terms:
   - english: "Alembic"
     korean: "Alembic"

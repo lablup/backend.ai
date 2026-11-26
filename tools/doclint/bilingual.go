@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/lablup/backend.ai/tools/internal/kdoc"
-	"github.com/lablup/backend.ai/tools/internal/spec"
 )
 
 var headingStart = regexp.MustCompile(`^(#{1,6}) `)
@@ -145,9 +144,6 @@ func checkPairUpdates(sc *scope) ([]string, error) {
 	sort.Strings(changedList)
 	var problems []string
 	for _, path := range changedList {
-		if matchesAny(sc.spec.Pairs.OneSideChangeAllowed, path) {
-			continue
-		}
 		var partner string
 		if strings.HasSuffix(path, sc.spec.Documents.TranslationSuffix) {
 			if added[path] {
@@ -165,10 +161,6 @@ func checkPairUpdates(sc *scope) ([]string, error) {
 		}
 	}
 	return problems, nil
-}
-
-func matchesAny(patterns []spec.Pattern, text string) bool {
-	return slices.ContainsFunc(patterns, func(p spec.Pattern) bool { return p.MatchString(text) })
 }
 
 func runBilingual(sc *scope, out *report) error {

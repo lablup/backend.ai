@@ -1,12 +1,3 @@
-title:
-  en:
-    page: "Permissions"
-    link: "Permissions"
-    description: "RBAC, scopes, roles and operation prefixes"
-  ko:
-    page: "권한"
-    link: "권한"
-    description: "RBAC, scope, 역할, 연산 접두사"
 terms:
   - english: "2FA"
     korean: "이중 인증"

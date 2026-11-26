@@ -89,11 +89,9 @@ knowledge:
 pairs:
   # The characters a document without the translation suffix must not add.
   translation_characters: '[\x{1100}-\x{11ff}\x{3130}-\x{318f}\x{ac00}-\x{d7a3}]'
-  # A wording fix of the glossary can change one language.
-  one_side_change_allowed: ['^glossary/']
 
 words:
   registry: glossary/registry
   skipped_paths:
-    - '(^|/)(report|report\.ko|GLOSSARY|GLOSSARY\.ko|CHANGELOG)\.md$'
-    - '(^|/)(glossary|CHANGELOG)(/|$)'
+    - '(^|/)(report|report\.ko|CHANGELOG)\.md$'
+    - '(^|/)CHANGELOG(/|$)'
