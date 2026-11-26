@@ -18,6 +18,8 @@ from ai.backend.common.types import (
 
 
 class KernelLifecycleEventReason(enum.StrEnum):
+    ADMIN_FORCE_TERMINATED = "admin-force-terminated"
+    ADMIN_TERMINATED = "admin-terminated"
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
     ANOMALY_DETECTED = "anomaly-detected"
