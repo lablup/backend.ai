@@ -15,9 +15,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.auth.types import UserData
+from ai.backend.manager.data.auth.types import AccessKeyOwner, UserData
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
@@ -554,3 +555,20 @@ class TestAuthRepository:
     ) -> None:
         with pytest.raises(AccessKeyNotFound):
             await auth_repository.get_user_id_by_access_key(AccessKey("AKIANONEXISTENT"))
+
+    async def test_access_key_owner_is_the_user_of_the_keypair(
+        self, auth_repository: AuthRepository, sample_user_data: UserTestData
+    ) -> None:
+        result = await auth_repository.get_access_key_owner(sample_user_data.access_key)
+
+        assert result == AccessKeyOwner(
+            user_id=UserID(sample_user_data.uuid),
+            domain_name=sample_user_data.domain_name,
+            role=UserRole.USER,
+        )
+
+    async def test_an_unknown_access_key_has_no_owner(
+        self, auth_repository: AuthRepository
+    ) -> None:
+        with pytest.raises(AccessKeyNotFound):
+            await auth_repository.get_access_key_owner("AKIAUNKNOWN0000000000")

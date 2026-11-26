@@ -10,7 +10,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import AccessKeyOwner, GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
@@ -85,8 +85,8 @@ class AuthRepository:
         await self._db_source.modify_ssh_public_key(access_key, public_key)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        return await self._db_source.fetch_user_info_by_access_key(access_key)
+    async def get_access_key_owner(self, access_key: str) -> AccessKeyOwner:
+        return await self._db_source.fetch_access_key_owner(access_key)
 
     @auth_repository_resilience.apply()
     async def get_user_id_by_access_key(self, access_key: AccessKey) -> UserID:

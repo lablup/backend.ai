@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.user import UserRole, UserStatus
 
 
@@ -41,3 +42,12 @@ class UserData:
 class GroupMembershipData:
     group_id: uuid.UUID
     user_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class AccessKeyOwner:
+    """The user who owns an access key."""
+
+    user_id: UserID
+    domain_name: str
+    role: UserRole

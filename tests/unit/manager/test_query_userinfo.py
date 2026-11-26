@@ -100,6 +100,65 @@ class ExtraUserData:
     access_key: AccessKey
 
 
+@dataclass
+class OtherKeypairData:
+    access_key: AccessKey
+    resource_policy_name: str
+
+
+async def _add_keypair(db: ExtendedAsyncSAEngine, user_uuid: UUID) -> OtherKeypairData:
+    """Give the user another keypair, under a resource policy of its own."""
+    access_key = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
+    policy_name = f"kp-policy-{uuid.uuid4().hex[:8]}"
+    async with db.begin_session() as sess:
+        sess.add(
+            KeyPairResourcePolicyRow(
+                name=policy_name,
+                max_concurrent_sessions=5,
+                max_concurrent_sftp_sessions=1,
+                max_containers_per_session=5,
+                idle_timeout=600,
+            )
+        )
+        await sess.flush()
+        sess.add(
+            KeyPairRow(
+                access_key=access_key,
+                secret_key="secret",
+                user=user_uuid,
+                is_active=True,
+                resource_policy=policy_name,
+            )
+        )
+        await sess.commit()
+    return OtherKeypairData(access_key=access_key, resource_policy_name=policy_name)
+
+
+@pytest.fixture
+async def seed_user_other_keypair(db: ExtendedAsyncSAEngine, seed: SeedData) -> OtherKeypairData:
+    return await _add_keypair(db, seed.user_uuid)
+
+
+@pytest.fixture
+async def another_user(db: ExtendedAsyncSAEngine, seed: SeedData) -> ExtraUserData:
+    """A regular user in the same domain as seed."""
+    other_uuid = uuid.uuid4()
+    async with db.begin_session() as sess:
+        sess.add(
+            UserRow(
+                uuid=other_uuid,
+                username=f"other-{uuid.uuid4().hex[:8]}",
+                email=f"other-{uuid.uuid4().hex[:8]}@test.io",
+                domain_name=seed.domain_name,
+                role=UserRole.USER,
+                resource_policy=seed.user_policy_name,
+            )
+        )
+        await sess.commit()
+    keypair = await _add_keypair(db, other_uuid)
+    return ExtraUserData(user_uuid=other_uuid, access_key=keypair.access_key)
+
+
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
@@ -391,6 +450,72 @@ class TestQueryUserinfo:
         assert result.owner_uuid == seed.user_uuid
         assert result.group_id == seed.group_id
 
+    async def test_own_other_keypair_resolves_as_own_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        seed: SeedData,
+        seed_user_other_keypair: OtherKeypairData,
+    ) -> None:
+        """A regular user naming their own other keypair is not a delegation."""
+        async with db.begin() as conn:
+            result = await query_userinfo(
+                conn,
+                seed.user_uuid,
+                seed.access_key,
+                UserRole.USER,
+                seed.domain_name,
+                {"some": "policy"},
+                seed.domain_name,
+                seed.group_name,
+                query_on_behalf_of=seed_user_other_keypair.access_key,
+            )
+        assert result.owner_uuid == seed.user_uuid
+        assert result.group_id == seed.group_id
+        assert result.owner_role == UserRole.USER
+        assert result.resource_policy["name"] == seed_user_other_keypair.resource_policy_name
+
+    async def test_superadmin_own_other_keypair_requires_membership(
+        self,
+        db: ExtendedAsyncSAEngine,
+        seed: SeedData,
+        superadmin: ExtraUserData,
+    ) -> None:
+        """An own keypair takes the membership check of an own session, whatever the role."""
+        admin_other_keypair = await _add_keypair(db, superadmin.user_uuid)
+        with pytest.raises(InvalidAPIParameters, match="Invalid group"):
+            async with db.begin() as conn:
+                await query_userinfo(
+                    conn,
+                    superadmin.user_uuid,
+                    superadmin.access_key,
+                    UserRole.SUPERADMIN,
+                    seed.domain_name,
+                    {"some": "policy"},
+                    seed.domain_name,
+                    seed.group_name,
+                    query_on_behalf_of=admin_other_keypair.access_key,
+                )
+
+    async def test_regular_user_naming_another_users_keypair_is_rejected(
+        self,
+        db: ExtendedAsyncSAEngine,
+        seed: SeedData,
+        another_user: ExtraUserData,
+    ) -> None:
+        with pytest.raises(RuntimeError, match="Only admins"):
+            async with db.begin() as conn:
+                await query_userinfo(
+                    conn,
+                    seed.user_uuid,
+                    seed.access_key,
+                    UserRole.USER,
+                    seed.domain_name,
+                    {"some": "policy"},
+                    seed.domain_name,
+                    seed.group_name,
+                    query_on_behalf_of=another_user.access_key,
+                )
+
     # -- error cases --
 
     async def test_invalid_group_raises_bad_request(
@@ -617,6 +742,49 @@ class TestQueryUserinfoFromSession:
             )
         assert result.owner_uuid == seed.user_uuid
         assert result.group_id == seed.group_id
+
+    async def test_own_other_keypair_resolves_as_own_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        seed: SeedData,
+        seed_user_other_keypair: OtherKeypairData,
+    ) -> None:
+        """A regular user naming their own other keypair is not a delegation."""
+        async with db.begin_session() as sess:
+            result = await query_userinfo_from_session(
+                sess,
+                seed.user_uuid,
+                seed.access_key,
+                UserRole.USER,
+                seed.domain_name,
+                {"some": "policy"},
+                seed.domain_name,
+                seed.group_name,
+                query_on_behalf_of=seed_user_other_keypair.access_key,
+            )
+        assert result.owner_uuid == seed.user_uuid
+        assert result.group_id == seed.group_id
+        assert result.resource_policy["name"] == seed_user_other_keypair.resource_policy_name
+
+    async def test_regular_user_naming_another_users_keypair_is_rejected(
+        self,
+        db: ExtendedAsyncSAEngine,
+        seed: SeedData,
+        another_user: ExtraUserData,
+    ) -> None:
+        with pytest.raises(RuntimeError, match="Only admins"):
+            async with db.begin_session() as sess:
+                await query_userinfo_from_session(
+                    sess,
+                    seed.user_uuid,
+                    seed.access_key,
+                    UserRole.USER,
+                    seed.domain_name,
+                    {"some": "policy"},
+                    seed.domain_name,
+                    seed.group_name,
+                    query_on_behalf_of=another_user.access_key,
+                )
 
     async def test_invalid_group_raises_bad_request(
         self,

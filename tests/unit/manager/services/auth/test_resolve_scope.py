@@ -4,7 +4,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.auth.types import AccessKeyOwner
+from ai.backend.manager.errors.auth import AccessKeyNotFound
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -51,6 +54,11 @@ REQUESTER_UUID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 OWNER_UUID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
 
+@pytest.fixture
+def requester_keypair(mock_auth_repository: AsyncMock) -> None:
+    mock_auth_repository.get_user_id_by_access_key.return_value = UserID(REQUESTER_UUID)
+
+
 class TestResolveAccessKeyScope:
     async def test_owner_none_returns_requester_key(
         self,
@@ -79,14 +87,37 @@ class TestResolveAccessKeyScope:
         result = await auth_service.resolve_access_key_scope(action)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
 
+    async def test_regular_user_reaches_another_keypair_of_their_own(
+        self,
+        auth_service: AuthService,
+        mock_auth_repository: AsyncMock,
+        requester_keypair: None,
+    ) -> None:
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
+            user_id=UserID(REQUESTER_UUID),
+            domain_name="default",
+            role=UserRole.USER,
+        )
+        action = ResolveAccessKeyScopeAction(
+            requester_access_key=REQUESTER_AK,
+            requester_role=UserRole.USER,
+            requester_domain="default",
+            owner_access_key=OWNER_AK,
+        )
+        result = await auth_service.resolve_access_key_scope(action)
+        assert result.requester_access_key == AccessKey(REQUESTER_AK)
+        assert result.owner_access_key == AccessKey(OWNER_AK)
+
     async def test_regular_user_delegation_raises_forbidden(
         self,
         auth_service: AuthService,
         mock_auth_repository: AsyncMock,
+        requester_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "default",
-            UserRole.ADMIN,
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
+            user_id=UserID(OWNER_UUID),
+            domain_name="default",
+            role=UserRole.ADMIN,
         )
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
@@ -97,12 +128,12 @@ class TestResolveAccessKeyScope:
         with pytest.raises(GenericForbidden):
             await auth_service.resolve_access_key_scope(action)
 
-    async def test_nonexistent_owner_access_key_raises_invalid_params(
+    async def test_nonexistent_owner_access_key_raises_not_found(
         self,
         auth_service: AuthService,
         mock_auth_repository: AsyncMock,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.side_effect = ValueError(
+        mock_auth_repository.get_access_key_owner.side_effect = AccessKeyNotFound(
             "Unknown owner access key"
         )
         action = ResolveAccessKeyScopeAction(
@@ -111,17 +142,19 @@ class TestResolveAccessKeyScope:
             requester_domain="default",
             owner_access_key="NONEXISTENT_KEY",
         )
-        with pytest.raises(InvalidAPIParameters):
+        with pytest.raises(AccessKeyNotFound):
             await auth_service.resolve_access_key_scope(action)
 
     async def test_cross_domain_admin_raises_forbidden(
         self,
         auth_service: AuthService,
         mock_auth_repository: AsyncMock,
+        requester_keypair: None,
     ) -> None:
-        mock_auth_repository.get_delegation_target_by_access_key.return_value = (
-            "other-domain",
-            UserRole.USER,
+        mock_auth_repository.get_access_key_owner.return_value = AccessKeyOwner(
+            user_id=UserID(OWNER_UUID),
+            domain_name="other-domain",
+            role=UserRole.USER,
         )
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,

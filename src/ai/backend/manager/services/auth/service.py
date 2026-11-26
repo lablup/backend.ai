@@ -632,10 +632,9 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        log_fmt = "AUTH.UPDATE_PASSWORD(d:{}, email:{})"
         log_args = (domain_name, email)
         if action.new_password != action.new_password_confirm:
-            log.info(log_fmt + ": new password mismtach", *log_args)
+            log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{}): new password mismtach", *log_args)
             return UpdatePasswordActionResult(
                 success=False,
                 message="new password mismatch",
@@ -647,7 +646,7 @@ class AuthService:
                 action.old_password,
             )
         except AuthorizationFailed as e:
-            log.info(log_fmt + ": old password mismatch", *log_args)
+            log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{}): old password mismatch", *log_args)
             raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
@@ -756,21 +755,22 @@ class AuthService:
                 owner_access_key=requester_ak,
             )
         owner_ak = AccessKey(action.owner_access_key)
-        try:
-            (
-                owner_domain,
-                owner_role,
-            ) = await self._auth_repository.get_delegation_target_by_access_key(
-                action.owner_access_key,
+        owner = await self._auth_repository.get_access_key_owner(
+            action.owner_access_key,
+        )
+        requester_user_id = await self._auth_repository.get_user_id_by_access_key(requester_ak)
+        if owner.user_id == requester_user_id:
+            # Another keypair of the requester is not a delegation.
+            return ResolveAccessKeyScopeResult(
+                requester_access_key=requester_ak,
+                owner_access_key=owner_ak,
             )
-        except ValueError as e:
-            raise InvalidAPIParameters(str(e)) from e
         try:
             check_if_requester_is_eligible_to_act_as_target_user(
                 action.requester_role,
                 action.requester_domain,
-                owner_role,
-                owner_domain,
+                owner.role,
+                owner.domain_name,
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
