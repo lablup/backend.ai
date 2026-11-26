@@ -180,7 +180,7 @@ class _MountableAutoMount:
     permission: MountPermission
 
 
-def _is_local_folder_of_project(vfolder: Mapping[str, Any], project_id: uuid.UUID) -> bool:
+def _is_local_folder_of_project(vfolder: Mapping[str, Any], project_id: ProjectID) -> bool:
     return bool(
         vfolder["name"] == _PROJECT_LOCAL_FOLDER_NAME
         and vfolder["ownership_type"] == VFolderOwnershipType.GROUP
@@ -191,12 +191,12 @@ def _is_local_folder_of_project(vfolder: Mapping[str, Any], project_id: uuid.UUI
 def _mountable_auto_mounts(
     accessible_vfolders: Sequence[dict[str, Any]],
     auto_mounts: Sequence[VFolderAutoMountData],
-    session_project_id: uuid.UUID,
+    session_project_id: ProjectID,
 ) -> list[_MountableAutoMount]:
     """The session project's ``.local`` folder, then ``auto_mounts``, without the folders the
     user cannot reach or whose mount policy is none. A read-only folder is mounted read-only."""
-    mountable_vfolders = {
-        vfolder["id"]: vfolder
+    mountable_vfolders: dict[VFolderUUID, dict[str, Any]] = {
+        VFolderUUID(vfolder["id"]): vfolder
         for vfolder in accessible_vfolders
         if vfolder["permission"] != VFolderMountPolicy.NONE
     }
@@ -319,10 +319,11 @@ async def prepare_vfolder_mounts(
     _ms_result = await conn.execute(_ms_query)
     model_store_project_ids: set[uuid.UUID] = {row.id for row in _ms_result.fetchall()}
 
+    session_project_id = ProjectID(user_scope.group_id)
     local_folder_of_session_project = sa.and_(
         VFolderRow.name == _PROJECT_LOCAL_FOLDER_NAME,
         VFolderRow.ownership_type == VFolderOwnershipType.GROUP,
-        VFolderRow.group == user_scope.group_id,
+        VFolderRow.group == session_project_id,
     )
     extra_vf_conds: sa.ColumnElement[bool] = sa.or_(
         VFolderRow.id.in_([auto_mount.vfolder_id for auto_mount in auto_mounts]),
@@ -379,9 +380,9 @@ async def prepare_vfolder_mounts(
             + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
         )
 
-    auto_mount_keys: set[str | uuid.UUID | int] = set()
+    auto_mount_keys: set[int] = set()
     for index, auto_mount in enumerate(
-        _mountable_auto_mounts(accessible_vfolders, auto_mounts, user_scope.group_id),
+        _mountable_auto_mounts(accessible_vfolders, auto_mounts, session_project_id),
         start=len(mount_requests),
     ):
         auto_mount_keys.add(index)
@@ -481,7 +482,7 @@ async def prepare_vfolder_mounts(
             mount_base_path = PurePosixPath(mount_path_result["path"])
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
-        if _is_local_folder_of_project(vfolder, user_scope.group_id):
+        if _is_local_folder_of_project(vfolder, session_project_id):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):

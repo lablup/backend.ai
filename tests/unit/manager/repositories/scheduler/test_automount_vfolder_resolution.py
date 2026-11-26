@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -170,7 +170,7 @@ class _ResolvingSessionMounts:
     repository: SchedulerRepository
     draft: SessionSpecDraft
     owner_id: UserID
-    folder_names_by_id: dict[UUID, str]
+    folder_names_by_id: dict[VFolderUUID, str]
 
 
 class TestAutoMountVFolderResolution:
@@ -702,7 +702,7 @@ class TestAutoMountVFolderResolution:
 
         assert [
             _ResolvedMount(
-                resolving.folder_names_by_id[mount.vfid.folder_id],
+                resolving.folder_names_by_id[VFolderUUID(mount.vfid.folder_id)],
                 str(mount.kernel_path),
                 mount.mount_perm,
             )
