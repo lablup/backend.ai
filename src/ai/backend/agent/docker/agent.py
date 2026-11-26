@@ -1939,6 +1939,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             return
                         if listed_kernel_id is not None:
                             failed_kernel_ids.add(listed_kernel_id)
+                        log.exception(
+                            "container info fetch failed",
+                            container_id=container._id,
+                            kernel_id=kernel_id_str,
+                        )
                         raise
                     except asyncio.CancelledError:
                         pass
