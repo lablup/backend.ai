@@ -1,6 +1,7 @@
 name: release
 
-# Release of `v2`: the changelog batch, the full test, then the binaries of `cmd/` as artifacts.
+# Release of `v2`: the changelog batch, the full test and the vulnerability check, then the binaries of
+# `cmd/` as artifacts.
 # The tag pattern is a placeholder; it is decided at the transition.
 
 on:
@@ -35,8 +36,11 @@ jobs:
   test:
     uses: ./.github/workflows/test.yml
 
+  vuln:
+    uses: ./.github/workflows/vuln.yml
+
   build:
-    needs: test
+    needs: [test, vuln]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

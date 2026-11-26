@@ -49,6 +49,7 @@ The PostgreSQL password is `develove`, and so is the Grafana password of the use
 | `go tool golangci-lint fmt` | Formats |
 | `go tool golangci-lint run` | Lints |
 | `go test -short ./...` | Runs the tests that need no database |
+| `go tool govulncheck ./...` | Checks for known vulnerabilities. A failure does not block a pull request; it blocks a release |
 | `TEST_DATABASE_URL=postgres://postgres:develove@127.0.0.1:8100/backend?sslmode=disable go test ./...` | Runs all tests |
 | `INTEGRATION_ENDPOINT=<address> go test -tags integration -count=1 ./tests/integration/...` | Runs the integration tests against a live server |
 | `go run ./tools/changelog check` | Checks the [changelog fragments](changes/README.md) |
