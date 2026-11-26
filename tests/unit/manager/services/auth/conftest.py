@@ -37,6 +37,7 @@ def mock_config_provider() -> MagicMock:
         password_hash_rounds=100_000,
         password_hash_salt_size=32,
         login_session_max_age=604800,
+        login_session_db=0,
     )
     return mock_provider
 

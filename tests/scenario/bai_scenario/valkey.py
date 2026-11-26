@@ -40,7 +40,7 @@ class ScenarioValkey:
             ),
             session=await ValkeySessionClient.create(
                 target.profile_target(RedisRole.STATISTICS),
-                db_id=REDIS_STATISTICS_DB,
+                db_id=config.config.auth.login_session_db,
                 human_readable_name="scenario-session",
             ),
         )

@@ -1341,7 +1341,7 @@ async def valkey_clients(
         ),
         session=await ValkeySessionClient.create(
             valkey_profile_target.profile_target(RedisRole.STATISTICS),
-            db_id=REDIS_STATISTICS_DB,
+            db_id=config_provider.config.auth.login_session_db,
             human_readable_name="test_session",
         ),
     )
