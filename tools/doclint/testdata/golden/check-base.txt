@@ -1,0 +1,8 @@
+pair.ko.md: headings differ from pair.md: [(1, 1)] and [(1, 1), (2, 1)]
+pair.md: Korean added, move it to the .ko.md file: 한글을 더한다.
+pair.md: changed without pair.ko.md
+words-bad.md: changed without words-bad.ko.md
+pair.md:6: "refuse" -> "reject": One verb per operation.
+words-bad.md:9: "refuse" -> "reject": One verb per operation.
+words-good.md:5: "refuse" -> "reject": One verb per operation.
+exit status: 1

@@ -1,0 +1,75 @@
+documents:
+  extension: .md
+  translation_suffix: .ko.md
+
+agents:
+  path: '(^|/)AGENTS\.md$'
+  max_lines: 10
+
+bep:
+  path: '^proposals/BEP-(\d{4})(-[^/]+|/[^/]*)\.md$'
+  first_number: 1080
+  max_lines: 300
+  max_items: 7
+  max_item_chars:
+    en: 120
+    ko: 80
+  goal_sections: [Goals]
+  counted_sections: [Non-goals]
+  design:
+    sections: [Design]
+    max_subsections: 4
+    max_tables: 2
+    max_table_rows: 7
+    max_sentences: 3
+    skipped_line_prefixes: ["Rejected:"]
+    abbreviations: [e.g]
+
+knowledge:
+  file_name: KNOWLEDGE.md
+  skipped_directory_prefixes: ["."]
+  skipped_directory_names: [node_modules]
+  external_link_prefixes: ["https://", "#"]
+  signature:
+    actor: by
+    date: at
+    date_pattern: '^\d{4}-\d{2}-\d{2}$'
+    date_format: YYYY-MM-DD
+  fields:
+    - name: name
+      kind: string
+      required: true
+      unique: true
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      pattern_name: kebab-case
+    - name: type
+      kind: string
+      required: true
+    - name: description
+      kind: string
+      required: true
+    - name: scope
+      kind: string
+      required: true
+      path: true
+    - name: generated
+      kind: signature
+      required: true
+    - name: verified
+      kind: signatures
+  sign_off:
+    field: verified
+    changed: [generated]
+  search:
+    fields: [name, description]
+    title: name
+    tags: [type]
+    summary: description
+
+pairs:
+  translation_characters: '[\x{ac00}-\x{d7a3}]'
+
+words:
+  registry: glossary/registry
+  skipped_paths:
+    - '(^|/)report\.md$'

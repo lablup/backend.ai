@@ -1,0 +1,8 @@
+review: words-bad.ko.md:4: "풀다" -> "차단하다"
+review: words-bad.md:7: "heartbeat" -> "agent heartbeat": A signal.
+review: words-bad.md:8: "leave out" -> "omit"
+words-bad.ko.md:3: "지우다" -> "삭제하다"
+words-bad.md:3: "refuse" -> "reject": One verb per operation.
+words-bad.md:4: "brought up" -> "start"
+words-bad.md:5: "stand for" -> "represent"
+exit status: 1

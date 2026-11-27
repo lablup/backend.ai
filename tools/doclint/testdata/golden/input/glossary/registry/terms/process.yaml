@@ -1,0 +1,27 @@
+terms:
+  - english: "agent heartbeat"
+    korean: "에이전트 heartbeat"
+    meaning:
+      en: "A signal."
+      ko: "신호입니다."
+    avoid:
+      en: ["heartbeat", "bgtask"]
+  - english: "app proxy"
+    korean: "앱 프록시"
+    meaning:
+      en: "A proxy."
+      ko: "프록시입니다."
+    avoid:
+      en: ["wsproxy"]
+      ko: ["wsproxy"]
+    note:
+      en: "wsproxy is the old name."
+      ko: "wsproxy 는 옛 이름입니다"
+  - english: "Agent"
+    korean: "컬럼"
+    meaning:
+      en: "The agent."
+      ko: "열입니다."
+    avoid:
+      en: ["agent"]
+      ko: ["컬럼", "칼럼"]

@@ -1,0 +1,48 @@
+expressions:
+  - lang: en
+    word: "refuse"
+    instead: "reject"
+    reason: "One verb per operation."
+  - lang: en
+    word: "leave out"
+    qualifier: "a flag"
+    instead: "omit"
+  - lang: en
+    word: "bring up, brought up"
+    instead: "start"
+  - lang: en
+    word: "stand for"
+    instead: "represent"
+    except: ["stand for election"]
+  - lang: ko
+    word: "지우다"
+    instead: "삭제하다"
+  - lang: ko
+    word: "막다 / 풀다"
+    qualifier: "조건"
+    instead: "차단하다"
+korean:
+  particles: [은, 는, 이, 가, 을, 를, 의, 에, 도, 로, 와, 과, 만, 으로, 이다, 입니다]
+  verb:
+    dictionary_ending: 다
+    consonant_endings: [다, 고, 지, 는, 면, 며, 기, 게, 던, 니, 시, 겠]
+    vowel_endings: [아, 어, 았, 었, 은, 을, 습]
+    open_stem_finals: [ㄴ, ㄹ, ㅂ]
+    past_final: ㅆ
+    dropped_final:
+      final: ㄹ
+      endings: [는, 니]
+      added: ㄴ
+    contracted_syllables:
+      하: 해
+    contracted_vowels:
+      ㅡ: ㅓ
+      ㅣ: ㅕ
+      ㅜ: ㅝ
+      ㅗ: ㅘ
+    irregular:
+      syllable: 르
+      added_final: ㄹ
+      endings: [러, 라, 렀, 랐]
+english:
+  inflections: [s, es, d, ed, ing]

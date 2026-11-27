@@ -1,0 +1,2 @@
+proposals/BEP-1090-long.md:5: list item of 131 chars, limit 120
+exit status: 1

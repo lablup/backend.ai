@@ -1,0 +1,14 @@
+---
+name: sample
+type: guide
+description: A sample.
+scope: src
+generated:
+  by: human:x
+  at: 2026-01-02
+keywords: [a, b]
+---
+
+# Body
+
+[ok](../words-good.md) [bad](missing.md)
