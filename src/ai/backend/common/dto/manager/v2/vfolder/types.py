@@ -26,7 +26,9 @@ __all__ = (
     "FileEntryType",
     "OrderDirection",
     "VFolderInvitationState",
+    "UserVFolderMountScope",
     "VFolderMetadataInfo",
+    "VFolderMountPermissionFilter",
     "VFolderOperationStatusField",
     "VFolderOrderField",
     "VFolderOwnershipInfo",
@@ -75,6 +77,10 @@ class VFolderStatusFilter(EnumFilter[VFolderOperationStatusField]):
 
 class VFolderUsageModeFilter(EnumFilter[VFolderUsageMode]):
     """Filter for vfolder usage mode values."""
+
+
+class VFolderMountPermissionFilter(EnumFilter[VFolderPermissionField]):
+    """Filter for the mount policy of a user on a vfolder."""
 
 
 class VFolderMetadataInfo(BaseResponseModel):
@@ -172,3 +178,22 @@ class VFolderScope(BaseRequestModel):
                 "VFolderScope requires a non-empty value for 'domain', 'project' or 'user'"
             )
         return self
+
+
+class UserVFolderMountScope(BaseRequestModel):
+    """Scope for the scoped user vfolder mount query: one user, and the vfolders paired with them.
+
+    The vfolders of the user, the domains and the projects are combined with OR.
+    """
+
+    user: list[UUIDScope] = Field(
+        min_length=1,
+        max_length=1,
+        description="The user paired with each vfolder, exactly one. Their vfolders are read too.",
+    )
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose vfolders are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose vfolders are being read"
+    )

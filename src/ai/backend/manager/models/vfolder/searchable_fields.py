@@ -11,6 +11,8 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
 from ai.backend.manager.data.vfolder.types import (
@@ -19,6 +21,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.models.base import StrEnumType
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.entity_label.searchable_fields import (
     EntityLabelCorrelation,
@@ -39,11 +42,14 @@ from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.specs.search.usage import UsedByConditions
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
     VFolderAutoMountSearchableFields,
 )
+from ai.backend.manager.models.virtual_entity.permission_reach import user_permission_reaches
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 
 class _VFolderOwnFields(RowDataConverter[VFolderRow, VFolderData]):
@@ -272,7 +278,64 @@ class _VFolderLinkedEntities:
     usage = _VFolderUsage
 
 
+class _UserVFolderMountPermission:
+    """The level the joined user mounts the vfolder at.
+
+    ``resolve_mount_policy`` applies the same rule to loaded rows; change both together.
+    """
+
+    def conditions(self) -> EnumConditions[VFolderMountPolicy]:
+        return EnumConditions(self._level(), VFolderMountPolicy)
+
+    def _level(self) -> sa.ColumnElement[VFolderMountPolicy]:
+        policy_type = StrEnumType(VFolderMountPolicy)
+        policy_set_for_user = (
+            sa.select(VFolderUserMountPolicyRow.permission)
+            .where(
+                VFolderUserMountPolicyRow.vfolder_id == VFolderRow.id,
+                VFolderUserMountPolicyRow.user_id == UserRow.uuid,
+            )
+            .correlate(VFolderRow, UserRow)
+            .scalar_subquery()
+        )
+        return sa.case(
+            (
+                sa.not_(self._readable()),
+                sa.literal(VFolderMountPolicy.NONE, policy_type),
+            ),
+            (
+                VFolderRow.user == UserRow.uuid,
+                sa.literal(VFolderMountPolicy.READ_WRITE, policy_type),
+            ),
+            else_=sa.func.coalesce(policy_set_for_user, VFolderRow.default_mount_permission),
+        )
+
+    def _readable(self) -> sa.ColumnElement[bool]:
+        """``user_permission_reaches`` leaves out superadmins, who read every vfolder
+        that has a node."""
+        has_node = sa.exists(
+            sa.select(sa.literal(1))
+            .where(
+                VirtualEntityRow.entity_type == VFolderEntityType(),
+                VirtualEntityRow.entity_id == VFolderRow.id,
+            )
+            .correlate(VFolderRow)
+        )
+        return sa.or_(
+            user_permission_reaches(
+                UserRow.uuid, Permission.READ, VFolderEntityType(), VFolderRow.id
+            ),
+            sa.and_(UserRow.role == UserRole.SUPERADMIN, has_node),
+        )
+
+
 class VFolderSearchableFields:
     own = _VFolderOwnFields()
     nested = _VFolderNestedFields
     linked = _VFolderLinkedEntities
+
+
+class UserVFolderMountSearchableFields:
+    """Filters over pairs of a user and a vfolder; the query joins ``users`` to ``vfolders``."""
+
+    mount_permission = _UserVFolderMountPermission().conditions()

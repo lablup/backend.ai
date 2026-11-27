@@ -10,6 +10,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 
 from .types import (
     FileEntryType,
@@ -324,6 +326,26 @@ class SearchVFoldersPayload(BaseResponseModel):
     """Payload for vfolder search (shared by admin and scoped searches)."""
 
     items: list[VFolderNode] = Field(description="List of vfolder nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class UserVFolderMountNode(BaseResponseModel):
+    """Node model representing the mount policy of one user on one vfolder."""
+
+    id: str = Field(description="Node ID (format: '{user_id}:{vfolder_id}').")
+    user_id: UserID = Field(description="ID of the user.")
+    vfolder_id: VFolderUUID = Field(description="ID of the vfolder.")
+    mount_permission: VFolderPermissionField = Field(
+        description="Mount policy of the user on the vfolder."
+    )
+
+
+class SearchUserVFolderMountsPayload(BaseResponseModel):
+    """Payload for user vfolder mount search."""
+
+    items: list[UserVFolderMountNode] = Field(description="List of user vfolder mount nodes.")
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")

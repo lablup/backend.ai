@@ -2,14 +2,14 @@
 
 [배경](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-시나리오: 미완성 5 / 30
+시나리오: 미완성 5 / 31
 
 - ops 구성 (4)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - project_search: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
-- 직접 구현 (26)
+- 직접 구현 (27)
   - batch_load_mount_permissions: 성공 있음 1 · 거부 있음 1 (partial_bulk)
   - batch_load_permissions: 성공 있음 1 · 거부 있음 1 (partial_bulk)
   - bulk_delete: 성공 없음 · 거부 없음 (partial_bulk): SCENARIO-GAP
@@ -33,6 +33,7 @@
   - partial_bulk_update: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - purge: 성공 있음 1 · 거부 있음 2 (single_entity)
   - restore: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - scoped_search_user_vfolder_mounts: 성공 있음 1 · 거부 있음 1 (scope)
   - set_mount_policy: 성공 있음 1 · 거부 있음 2 (single_entity)
   - unset_mount_policy: 성공 있음 1 · 거부 있음 1 (single_entity)
   - update: 성공 있음 1 · 거부 있음 2 (single_entity)
@@ -224,6 +225,13 @@
 |---|---|
 | [자기 개인 프로젝트에서 vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 자기 vfolder 를 되살리면, 그 vfolder 의 id 가 응답으로 옵니다](#restoring-a-user-granted-soft-delete-restores-their-trashed-folder) | 성공 |
 | [아무 권한도 받지 않은 사용자가 휴지통에 있는 자기 vfolder 를 되살리려 하면 권한 부족으로 거부됩니다](#restoring-a-user-granted-nothing-may-not-restore-their-folder) | 거부 |
+
+**scoped_search_user_vfolder_mounts**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘과의 쌍만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#user_vfolder_mounts-a-user-searches-the-folders-they-mount-read-write) | 성공 |
+| [아무 권한도 받지 않은 사용자가 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#user_vfolder_mounts-a-user-granted-nothing-may-not-search-the-folders-they-mount) | 거부 |
 
 **set_mount_policy**
 
@@ -2690,6 +2698,102 @@ Given
 When
 
 - VFolderAdapter.restore: user-1이 folder-1 vfolder 를 휴지통에서 되살립니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### scoped_search_user_vfolder_mounts
+
+<a id="user_vfolder_mounts-a-user-searches-the-folders-they-mount-read-write"></a>
+
+#### [a-user-searches-the-folders-they-mount-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolder_mounts.py): pass
+
+자기 스코프와 다른 사용자의 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기가 rw 로 마운트하는 vfolder 를 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 남에게는 ro 로 마운트되는 자기 vfolder 둘과의 쌍만 이름 순서로 실린 한 페이지가 응답으로 옵니다
+
+Given
+
+- 자기 스코프와 자기, 다른 사용자 한 명의 개인 프로젝트에서 vfolder 를 읽을 수 있는 사용자 한 명. 모든 vfolder 는 남에게 ro 로 마운트되며, 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 match 가 든 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 개인 vfolder match-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder other-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 자기 스코프에서 vfolder READ 권한을 받은 사용자 준비
+    - 역할 folder-holder-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-holder-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-holder-1 보유
+  - vfolder 읽기 권한 부여
+    - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 역할 folder-reader-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-reader-2: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-2 보유
+
+When
+
+- VFolderAdapter.scoped_search_user_vfolder_mounts: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
+
+Then
+
+- 자기가 rw 로 마운트하는 vfolder 둘과의 쌍만 이름 순서로 실린 한 페이지가 응답으로 옵니다
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items.length = 2
+  - items[0].id: 사용자 id 와 vfolder id 와 같다
+  - items[0].user_id: 조회한 사용자와 같다
+  - items[0].vfolder_id: 미리 저장한 vfolder 와 같다
+  - items[0].mount_permission = 'rw'
+  - items[1].id: 사용자 id 와 vfolder id 와 같다
+  - items[1].user_id: 조회한 사용자와 같다
+  - items[1].vfolder_id: 미리 저장한 vfolder 와 같다
+  - items[1].mount_permission = 'rw'
+
+<a id="user_vfolder_mounts-a-user-granted-nothing-may-not-search-the-folders-they-mount"></a>
+
+#### [a-user-granted-nothing-may-not-search-the-folders-they-mount](/tests/scenario/bai_scenario/manager/vfolder/test_user_vfolder_mounts.py): pass
+
+아무 권한도 받지 않은 사용자가 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하는 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 아무 권한도 받지 않은 사용자 한 명. 모든 vfolder 는 남에게 ro 로 마운트되며, 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 match 가 든 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder 하나
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 개인 vfolder match-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder other-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+  - 개인 vfolder match-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다, 남에게는 ro 로 마운트됩니다
+
+When
+
+- VFolderAdapter.scoped_search_user_vfolder_mounts: user-1이 자기 범위와 다른 사용자의 개인 프로젝트에서 자기가 rw 로 마운트하고 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 

@@ -38,6 +38,7 @@ A slot is emptied for one of three reasons. Do not empty one for a reason that i
 | `DecimalType` (stored as VARCHAR) | Numeric cast | Numeric cast |
 | To-many child (order) | Filter with some / every / none | None |
 
+- A value SQL computes for a pair of entities is not a derived field. See `Values of a pair of entities`.
 - Leave the filter empty when no shared condition class takes the column's type. Today that is interval (`retention_policies.retention_period`, `audit_logs.duration`).
 - Adding a shared condition class adds that type's scenarios to the shared declaration DB test in the same change.
 
@@ -150,6 +151,14 @@ Depth follows the permission axis, not the foreign keys.
 - Do not add nested filters on another entity's fields (`How deep a declaration nests`). Express a relation to another entity as a scope.
 - Filter by another entity only through the identifier stored in the entity's own column (`creator_id`, `domain_name`, ...). To filter by its name or status, look the other entity up first and use its id.
 - Rows that carry their own permission type (entity share, ...) do not go in `nested`. They are handled as a scope in that entity's search.
+
+## Values of a pair of entities
+
+A value that SQL computes for two entities together, such as the mount policy of a user on a vfolder.
+
+- Declare its filter on an entry of the pair (`UserVFolderMountSearchableFields`), not on the entry of either entity. Declare no order.
+- Expose it through a type of the pair with its own query, filter DTO and scope (`scopedUserVFolderMounts`). Do not put it in the filter DTO of either entity.
+- The scope names the entity the value is computed for. The searcher joins its row (`UserVFolderMountSearcher`), so the filter conversion takes the filter only.
 
 ## Usage between entities
 

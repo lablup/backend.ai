@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, override
 from uuid import UUID
@@ -26,6 +26,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
@@ -1113,5 +1114,89 @@ class SomeoneWithFoldersToSearch(Given[Any, AReaderAndFoldersToSearch]):
             second=seeding.made(second),
             excluded=seeding.made(excluded),
             outside=seeding.made(outside),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class AReaderAndFoldersToMount:
+    """마운트 레벨로 검색하는 사람과, 걸러질 폴더들."""
+
+    first: VFolderData
+    second: VFolderData
+    excluded_by_name: VFolderData
+    excluded_by_mount_policy: VFolderData
+    outside: VFolderData
+    other_project_id: ProjectID
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class SomeoneWithFoldersToMount(Given[Any, AReaderAndFoldersToMount]):
+    """자기 스코프와 다른 사용자의 개인 프로젝트에서 검색하는 사용자와, 필터가 가려낼 폴더들.
+
+    모든 폴더가 남에게 ``ro``로 마운트되므로, 그 사용자는 자기 폴더만 ``rw``로 마운트한다."""
+
+    granted: bool
+    fragment: str = "match"
+
+    @override
+    def describe(self) -> str:
+        grant_ko = (
+            "자기 스코프와 자기, 다른 사용자 한 명의 개인 프로젝트에서 vfolder 를 읽을 수 있는"
+            if self.granted
+            else "아무 권한도 받지 않은"
+        )
+        grant_en = (
+            "who can read vfolders in their own scope, their own personal project and one other "
+            "user's personal project"
+            if self.granted
+            else "holding no permission"
+        )
+        return Says(
+            f"{grant_ko} 사용자 한 명. 모든 vfolder 는 남에게 ro로 마운트되며, 이름에 "
+            f"{self.fragment}가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 이름에 "
+            f"{self.fragment}가 든 다른 사용자의 개인 vfolder 하나와 세 번째 사용자의 개인 vfolder "
+            "하나",
+            english=(
+                f"one user {grant_en}. Every vfolder is mounted for others as ro: two personal "
+                f"vfolders of the user whose names hold {self.fragment}, one whose name does not, "
+                f"one of another user and one of a third user whose names hold {self.fragment}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AReaderAndFoldersToMount:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        third = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        matching = TestSeedPersonalVFolder(
+            host=STORAGE_HOST,
+            name_hint=self.fragment,
+            default_mount_permission=VFolderMountPolicy.READ_ONLY,
+        )
+        first = await seeding.creating_from(matching, caller)
+        second = await seeding.creating_from(matching, caller)
+        excluded_by_name = await seeding.creating_from(replace(matching, name_hint="other"), caller)
+        excluded_by_mount_policy = await seeding.creating_from(matching, other)
+        outside = await seeding.creating_from(matching, third)
+        own_project = await seeding.personal_project_of(caller)
+        other_project = await seeding.personal_project_of(other)
+        if self.granted:
+            await seeding.within(SomeoneHoldingFolderPermissions(caller, (Permission.READ,)))
+            for project in (own_project, other_project):
+                await seeding.within(
+                    SomeoneReadingFoldersIn(project, lambda p: ProjectID(p.id), caller)
+                )
+        return AReaderAndFoldersToMount(
+            first=seeding.made(first),
+            second=seeding.made(second),
+            excluded_by_name=seeding.made(excluded_by_name),
+            excluded_by_mount_policy=seeding.made(excluded_by_mount_policy),
+            outside=seeding.made(outside),
+            other_project_id=ProjectID(seeding.made(other_project).id),
             caller=seeding.made(caller),
         )

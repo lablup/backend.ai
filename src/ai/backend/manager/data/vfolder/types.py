@@ -9,6 +9,7 @@ from pathlib import PurePosixPath
 from typing import Any, Final, override
 
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
@@ -367,6 +368,15 @@ class VFolderMountPolicyData(FieldData):
     permission: VFolderMountPolicy
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class UserVFolderMountData:
+    """One user paired with one vfolder, and the level the user mounts it at."""
+
+    user_id: UserID
+    vfolder_id: VFolderUUID
+    mount_permission: VFolderMountPolicy
 
 
 @dataclass

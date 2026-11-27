@@ -11,11 +11,13 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    ScopedSearchUserVFolderMountsInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -31,6 +33,14 @@ from ai.backend.manager.api.gql.vfolder_v2.types.node import (
     VFolderGQL,
 )
 from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL, VFolderUsageGQL
+from ai.backend.manager.api.gql.vfolder_v2.types.user_vfolder_mount import (
+    UserVFolderMountConnectionGQL,
+    UserVFolderMountEdgeGQL,
+    UserVFolderMountFilterGQL,
+    UserVFolderMountGQL,
+    UserVFolderMountOrderByGQL,
+    UserVFolderMountScopeGQL,
+)
 
 
 @gql_root_field(
@@ -270,6 +280,60 @@ async def my_vfolders(
     nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
     edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return VFolderConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the virtual folders the named scopes reach, each paired with the scope "
+            "user. Every scope is authorized before the read runs."
+        ),
+    ),
+    name="scopedUserVFolderMounts",
+)
+async def scoped_user_vfolder_mounts(
+    info: Info[StrawberryGQLContext],
+    scope: UserVFolderMountScopeGQL,
+    filter: UserVFolderMountFilterGQL | None = None,
+    order_by: list[UserVFolderMountOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> UserVFolderMountConnectionGQL | None:
+    """Page through the pairs of the scope user and the virtual folders the scopes reach."""
+    result = await info.context.adapters.vfolder.scoped_search_user_vfolder_mounts(
+        ScopedSearchUserVFolderMountsInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    edges = [
+        UserVFolderMountEdgeGQL(
+            node=UserVFolderMountGQL.from_pydantic(item), cursor=encode_cursor(item.vfolder_id)
+        )
+        for item in result.items
+    ]
+    return UserVFolderMountConnectionGQL(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=result.has_next_page,

@@ -42108,6 +42108,217 @@
         "title": "ScopedSearchVFoldersInput",
         "type": "object"
       },
+      "UserVFolderMountFilter": {
+        "description": "Filter criteria for searching pairs of a user and a vfolder.",
+        "properties": {
+          "mount_permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderMountPermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the mount policy of the user on the vfolder. wd matches rw."
+          },
+          "vfolder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the vfolder of the pair."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserVFolderMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND logical combinator.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserVFolderMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR logical combinator.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserVFolderMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT logical combinator.",
+            "title": "Not"
+          }
+        },
+        "title": "UserVFolderMountFilter",
+        "type": "object"
+      },
+      "UserVFolderMountOrder": {
+        "description": "Order specification for user vfolder mount search results, by the vfolder of the pair.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/VFolderOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection"
+          }
+        },
+        "required": [
+          "field",
+          "direction"
+        ],
+        "title": "UserVFolderMountOrder",
+        "type": "object"
+      },
+      "UserVFolderMountScope": {
+        "description": "Scope for the scoped user vfolder mount query: one user, and the vfolders paired with them.\n\nThe vfolders of the user, the domains and the projects are combined with OR.",
+        "properties": {
+          "user": {
+            "description": "The user paired with each vfolder, exactly one. Their vfolders are read too.",
+            "items": {
+              "$ref": "#/components/schemas/UUIDScope"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "User",
+            "type": "array"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose vfolders are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose vfolders are being read",
+            "title": "Project"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "UserVFolderMountScope",
+        "type": "object"
+      },
+      "VFolderMountPermissionFilter": {
+        "description": "Filter for the mount policy of a user on a vfolder.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderPermissionField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderMountPermissionFilter",
+        "type": "object"
+      },
       "VFolderPermissionField": {
         "enum": [
           "none",
@@ -42118,6 +42329,126 @@
         ],
         "title": "VFolderPermissionField",
         "type": "string"
+      },
+      "ScopedSearchUserVFolderMountsInput": {
+        "description": "Input for searching the pairs of one user and the vfolders the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/UserVFolderMountScope",
+            "description": "The user and the scopes of the vfolders."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserVFolderMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserVFolderMountOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchUserVFolderMountsInput",
+        "type": "object"
       },
       "CreateVFolderInput": {
         "description": "Input for creating a virtual folder.",
@@ -69505,6 +69836,35 @@
         },
         "parameters": [],
         "description": "Search the vfolders the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/user-vfolder-mounts/scoped/search": {
+      "post": {
+        "operationId": "v2/vfolders.scoped_search_user_vfolder_mounts",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchUserVFolderMountsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the pairs of one user and the vfolders the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolders/projects/{project_id}/search": {

@@ -22966,6 +22966,11 @@ type Query
   ): VFolderConnection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Page through the virtual folders the named scopes reach, each paired with the scope user. Every scope is authorized before the read runs.
+  """
+  scopedUserVFolderMounts(scope: UserVFolderMountScope!, filter: UserVFolderMountFilter = null, orderBy: [UserVFolderMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserVFolderMountConnection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
   """
   vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload @join__field(graph: STRAWBERRY)
@@ -32404,6 +32409,101 @@ type UserV2StatusInfo
   needPasswordChange: Boolean
 }
 
+"""Added in 26.10.0. The mount policy of one user on one virtual folder."""
+type UserVFolderMount implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the user."""
+  userId: UUID!
+
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """
+  Mount policy of the user on the virtual folder: NONE without read access, READ_WRITE on a personal folder they own, otherwise their own mount policy or the folder's default.
+  """
+  mountPermission: VFolderMountPermission!
+
+  """The user."""
+  user: UserV2
+
+  """The virtual folder."""
+  vfolder: VFolder
+}
+
+"""
+Added in 26.10.0. Paginated connection for pairs of a user and a virtual folder.
+"""
+type UserVFolderMountConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [UserVFolderMountEdge!]!
+
+  """Total number of pairs matching the query criteria."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One mount policy of a user within a connection."""
+type UserVFolderMountEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: UserVFolderMount!
+}
+
+"""Added in 26.10.0. Filter for pairs of a user and a virtual folder."""
+input UserVFolderMountFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by the mount policy of the user on the folder."""
+  mountPermission: VFolderMountPermissionFilter = null
+
+  """Filter by the folder of the pair."""
+  vfolder: VFolderFilter = null
+  AND: [UserVFolderMountFilter!] = null
+  OR: [UserVFolderMountFilter!] = null
+  NOT: [UserVFolderMountFilter!] = null
+}
+
+"""
+Added in 26.10.0. Ordering for pairs of a user and a virtual folder, by the folder of the pair.
+"""
+input UserVFolderMountOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: VFolderOrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.10.0. Scope for the scoped user virtual folder mount query: one user, and the virtual folders paired with them. The folders of the user, the domains and the projects are OR'd, and every scope named is authorized before the read runs.
+"""
+input UserVFolderMountScope
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The user paired with each folder, exactly one. Their folders are read too.
+  """
+  user: [UUIDScope!]!
+
+  """Domains whose vfolders are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose vfolders are being read."""
+  project: [UUIDScope!] = null
+}
+
 """
 Added in 26.1.0. Input item for a single user weight in bulk upsert. Represents one user's weight configuration within a project.
 """
@@ -33040,6 +33140,25 @@ enum VFolderMountPermission
   READ_ONLY @join__enumValue(graph: STRAWBERRY)
   READ_WRITE @join__enumValue(graph: STRAWBERRY)
   RW_DELETE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for the mount policy of a user on a virtual folder. RW_DELETE matches READ_WRITE.
+"""
+input VFolderMountPermissionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: VFolderMountPermission = null
+
+  """Match any of the given levels."""
+  in: [VFolderMountPermission!] = null
+
+  """Exclude an exact match."""
+  notEquals: VFolderMountPermission = null
+
+  """Exclude any of the given levels."""
+  notIn: [VFolderMountPermission!] = null
 }
 
 """

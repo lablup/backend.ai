@@ -15,7 +15,11 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UU
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    UserVFolderMountScope,
+    VFolderScope,
+    VFolderUsage,
+)
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     VFolderAutoMountNestedFilter,
 )
@@ -25,6 +29,7 @@ from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 
 from .types import (
     OrderDirection,
+    VFolderMountPermissionFilter,
     VFolderOrderField,
     VFolderPermissionField,
     VFolderStatusFilter,
@@ -483,6 +488,50 @@ class ScopedSearchVFoldersInput(SearchVFoldersInput):
     """Input for searching the vfolders the named scopes reach."""
 
     scope: VFolderScope = Field(description="Scope (OR across all items).")
+
+
+class UserVFolderMountFilter(BaseRequestModel):
+    """Filter criteria for searching pairs of a user and a vfolder."""
+
+    mount_permission: VFolderMountPermissionFilter | None = Field(
+        default=None,
+        description="Filter by the mount policy of the user on the vfolder. wd matches rw.",
+    )
+    vfolder: VFolderFilter | None = Field(
+        default=None, description="Filter by the vfolder of the pair."
+    )
+    AND: list[UserVFolderMountFilter] | None = Field(
+        default=None, description="AND logical combinator."
+    )
+    OR: list[UserVFolderMountFilter] | None = Field(
+        default=None, description="OR logical combinator."
+    )
+    NOT: list[UserVFolderMountFilter] | None = Field(
+        default=None, description="NOT logical combinator."
+    )
+
+
+UserVFolderMountFilter.model_rebuild()
+
+
+class UserVFolderMountOrder(VFolderOrder):
+    """Order specification for user vfolder mount search results, by the vfolder of the pair."""
+
+
+class ScopedSearchUserVFolderMountsInput(BaseRequestModel):
+    """Input for searching the pairs of one user and the vfolders the named scopes reach."""
+
+    scope: UserVFolderMountScope = Field(description="The user and the scopes of the vfolders.")
+    filter: UserVFolderMountFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[UserVFolderMountOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
 # ============================================================

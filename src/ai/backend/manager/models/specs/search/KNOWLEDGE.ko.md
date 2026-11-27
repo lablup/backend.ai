@@ -100,6 +100,12 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 - 진입점이 하나이므로 sweep test 와 권한 검사가 한 곳에서 시작한다. 뒤의 class 는 이름으로 참조하지
   않으므로 private 이다.
 
+## 두 엔티티가 함께 정하는 값은 그 쌍에서 search 한다
+
+- 사용자의 vfolder 마운트 정책은 어느 한 엔티티의 값이 아니다. SQL 이 그 사용자의 역할과 정책 row, vfolder 의 column 으로 계산한다. resource group 과 사용자의 fair share 값도 같은 방식으로 search 한다.
+- vfolder 의 filter DTO 는 사용자를 지정하지 않는 global search 도 받는다. 이 값을 그 DTO 에 두면 결과가 호출한 superadmin 에 따라 달라진다.
+- 스코프가 사용자를 지정하고, validator 가 읽기 전에 그 스코프에 대한 호출자의 권한을 검사한다.
+
 ## 다른 테이블의 field 는 펼치지 않고 nested 로 둔다
 
 | | 펼친 경우(`label_key`, `label_value`) | nested(`labels.key`) |
