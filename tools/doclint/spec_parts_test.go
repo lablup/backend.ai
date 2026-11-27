@@ -427,3 +427,13 @@ func TestStdinSkipsNoPath(t *testing.T) {
 		t.Fatalf("out=%q err=%v", out, err)
 	}
 }
+
+func TestWordsSkippedPathsAreOptional(t *testing.T) {
+	root := newRegistryRepo(t, docsSpec+"words:\n  registry: glossary/registry\n")
+	writeFile(t, root, "doc.md", "We refuse it.\n")
+	writeFile(t, root, "skip/doc.md", "We refuse it.\n")
+	out, failed := runCheck(t, root)
+	if !failed || out != refused("doc.md", 1)+refused("skip/doc.md", 1) {
+		t.Fatalf("failed=%v out=%q", failed, out)
+	}
+}

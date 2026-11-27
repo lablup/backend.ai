@@ -168,7 +168,7 @@ type Words struct {
 	Rules        []string  `yaml:"rules,omitempty" spec:"optional"`
 	Terms        string    `yaml:"terms,omitempty" spec:"optional"`
 	Sets         []string  `yaml:"sets,omitempty" spec:"optional"`
-	SkippedPaths []Pattern `yaml:"skipped_paths"`
+	SkippedPaths []Pattern `yaml:"skipped_paths,omitempty" spec:"optional"`
 }
 
 // RulePaths returns the rule files and the term directory, relative to the spec file.

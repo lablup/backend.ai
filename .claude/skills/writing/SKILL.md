@@ -99,6 +99,7 @@ go run ./tools/doclint check --base origin/v2    # the lines the branch adds
 | `words.registry` | Stands for `rules: [<registry>/rules.yaml]` and `terms: <registry>/terms`. Do not use it with `rules` or `terms` |
 | `words.rules`, `words.terms` | The rule files, read in path order, and the directory of the term files. The same expression in two files is an error; `korean` and `english` are in exactly one file |
 | `sets` in a rule file | `[{name, description, skipped_paths}]`: the rule sets. An expression names its sets with `sets`; without it the expression applies everywhere |
+| `words.skipped_paths` | Optional. Path patterns the words check does not cover; without it no path is skipped |
 | `words.sets` | The sets to use. Without it every rule applies. A path matching `skipped_paths` of a set is not checked with that set's rules |
 | `pattern` in an expression | A Go regular expression matched against the line as it is, instead of `word`. Write exactly one of `word` and `pattern` |
 
