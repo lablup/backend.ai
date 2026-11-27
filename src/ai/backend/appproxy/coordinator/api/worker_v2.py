@@ -311,8 +311,11 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
         return result, prev_status
 
     async with root_ctx.db.connect() as db_conn:
+        # Under SERIALIZABLE, a heartbeat of another worker whose commit waits on a slow
+        # WAL flush makes this one fail on every retry.
+        read_committed_conn = await db_conn.execution_options(isolation_level="READ COMMITTED")
         result, prev_status = await execute_with_txn_retry(
-            _update, root_ctx.db.begin_session, db_conn
+            _update, root_ctx.db.begin_session, read_committed_conn
         )
     if prev_status != WorkerStatus.ALIVE:
         log.info(
