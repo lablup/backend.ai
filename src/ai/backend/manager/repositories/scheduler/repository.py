@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
     KernelLifecycleEventReason,
@@ -54,13 +55,25 @@ from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.specs.orders.condition import ConditionOrder
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder_auto_mount.scopes import (
+    ProjectVFolderAutoMountTarget,
+    UserVFolderAutoMountTarget,
+)
+from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
+    VFolderAutoMountSearchableFields,
+)
+from ai.backend.manager.models.vfolder_auto_mount.searchers import VFolderAutoMountSearcher
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
@@ -422,6 +435,12 @@ class SchedulerRepository:
             user_uuid=user_uuid,
             user_role="user",
         )
+        auto_mount_scopes: list[OperationScope] = [
+            UserVFolderAutoMountTarget(user_id=UserID(user_uuid))
+        ]
+        if project_id is not None:
+            auto_mount_scopes.append(ProjectVFolderAutoMountTarget(project_id=project_id))
+        auto_mounts = await self._search_live_auto_mounts(auto_mount_scopes)
         async with self._db.begin_readonly_read_committed() as conn:
             for group in kernel_specs:
                 per_group_requests: list[VFolderMountRequest] = []
@@ -437,8 +456,8 @@ class SchedulerRepository:
                         )
                     )
                 # Always resolve mounts even when the request list is empty:
-                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
-                # vfolders regardless of explicit requests, so skipping here
+                # ``prepare_vfolder_mounts`` injects auto-mount vfolders
+                # regardless of explicit requests, so skipping here
                 # would silently drop them.
                 vfolder_mounts_by_role[group.role] = tuple(
                     await prepare_vfolder_mounts(
@@ -449,9 +468,32 @@ class SchedulerRepository:
                         resource_policy_dict,
                         per_group_requests,
                         partial(self._permission_check.held_permissions, UserID(user_uuid)),
+                        auto_mounts,
                     )
                 )
         return vfolder_mounts_by_role
+
+    async def _search_live_auto_mounts(
+        self, scopes: Sequence[OperationScope]
+    ) -> list[VFolderAutoMountData]:
+        """The auto-mounts in ``scopes`` that are not soft-deleted, a project's first."""
+        fields = VFolderAutoMountSearchableFields.own
+        return await self._db_source.search_vfolder_auto_mounts(
+            scopes,
+            VFolderAutoMountSearcher(
+                pagination=NoPagination(),
+                conditions=[fields.deleted_at.filter.is_null()],
+                # Of auto-mounts at one destination, the first is mounted: the project's before
+                # the user's, then the one set earlier. Migrated rows share created_at.
+                orders=[
+                    ConditionOrder(
+                        fields.scope_type.filter.equals(VFolderAutoMountScopeType.PROJECT)
+                    ).first(),
+                    fields.created_at.order.apply(ascending=True),
+                    fields.id.order.apply(ascending=True),
+                ],
+            ),
+        )
 
     @scheduler_repository_resilience.apply()
     async def pick_default_resource_group(

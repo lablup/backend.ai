@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
@@ -80,7 +79,7 @@ class TestVFolderCreateViaSDK:
         user_registry: BackendAIClientRegistry,
         vfolder_host_permission_fixture: None,
     ) -> None:
-        """S-5: Regular user creates '.local' — the allowed dot-prefix exception."""
+        """S-5: Regular user creates '.local'."""
         await user_registry.vfolder.create(
             VFolderCreateReq(name=".local", folder_host="local"),
         )
@@ -179,22 +178,6 @@ class TestVFolderCreateErrors:
             )
         # Forbidden propagates with its own 403 status (no longer masked as 500)
         assert exc_info.value.status == 403
-
-    async def test_dot_prefix_name_for_group_vfolder_raises_error(
-        self,
-        group_fixture: uuid.UUID,
-    ) -> None:
-        """F-BIZ-4: a dot-prefixed name (except '.local') is not a project folder's.
-
-        The request itself cannot say it: the rule reads off the body alone, so it is
-        answered where the body is read rather than by the server.
-        """
-        with pytest.raises(ValidationError):
-            VFolderCreateReq(
-                name=".hidden-data",
-                folder_host="local",
-                group_id=group_fixture,
-            )
 
     async def test_non_admin_cannot_create_group_vfolder_in_regular_project(
         self,

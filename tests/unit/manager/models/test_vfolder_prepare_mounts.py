@@ -577,27 +577,6 @@ class TestPrepareVFolderMountsSubpathFlow:
                     _MountOfOwner(_VFolderOwner.SESSION_PROJECT, "/home/work/in2"),
                 ],
             ),
-            _SameNamedVFoldersCase(
-                name="neither-requested",
-                vfolder_name=".local",
-                requested_mounts=[],
-                expected_mounts=[_MountOfOwner(_VFolderOwner.SESSION_PROJECT, "/home/work/.local")],
-            ),
-            _SameNamedVFoldersCase(
-                name="requested-where-the-other-is-auto-mounted",
-                vfolder_name=".local",
-                requested_mounts=[_MountOfOwner(_VFolderOwner.USER, None)],
-                expected_mounts=[_MountOfOwner(_VFolderOwner.USER, "/home/work/.local")],
-            ),
-            _SameNamedVFoldersCase(
-                name="requested-away-from-where-the-other-is-auto-mounted",
-                vfolder_name=".local",
-                requested_mounts=[_MountOfOwner(_VFolderOwner.USER, "/home/work/in1")],
-                expected_mounts=[
-                    _MountOfOwner(_VFolderOwner.USER, "/home/work/in1"),
-                    _MountOfOwner(_VFolderOwner.SESSION_PROJECT, "/home/work/.local"),
-                ],
-            ),
         ],
         ids=lambda case: case.name,
     )

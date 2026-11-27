@@ -91,6 +91,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
@@ -152,6 +153,7 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
 from ai.backend.manager.models.session.row import (
     SessionDependencyRow,
@@ -174,6 +176,7 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.models.vfolder_auto_mount.searchers import VFolderAutoMountSearcher
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.write import BatchReconcileTransition
 from ai.backend.manager.repositories.resource_slot.types import (
@@ -2521,6 +2524,16 @@ class ScheduleDBSource:
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
         return result.items
+
+    async def search_vfolder_auto_mounts(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: VFolderAutoMountSearcher,
+    ) -> list[VFolderAutoMountData]:
+        """Search the vfolder auto-mounts whose rows match any of ``scopes`` (OR)."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(scopes, searcher)
+        return list(result.items)
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:

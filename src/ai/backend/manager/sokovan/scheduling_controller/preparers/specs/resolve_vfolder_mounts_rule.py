@@ -3,7 +3,7 @@
 Copies the controller-resolved :class:`VFolderMount` tuple from the
 preparation context onto each kernel group in the draft, narrowed to the
 ``MountInfoEntry`` fields session creation consumes. Resolution itself
-(accessibility check, dot-prefix auto-mount, host path materialization,
+(accessibility check, auto-mounts, host path materialization,
 frozen permissions) is performed by the controller inside its readonly
 batch-fetch transaction — a pure preparer rule would need to issue DB
 reads otherwise, breaking the ``prepare`` signature's "no IO"

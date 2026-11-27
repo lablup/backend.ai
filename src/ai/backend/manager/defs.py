@@ -49,12 +49,6 @@ DEFAULT_ROLE: Final = "main"
 PASSWORD_PLACEHOLDER: Final = "*****"
 
 
-# Mapping between vfolder names and their in-container paths.
-VFOLDER_DSTPATHS_MAP = {
-    ".linuxbrew": "/home/linuxbrew/.linuxbrew",
-}
-
-
 # The unique identifiers for distributed locks.
 # To be used with PostgreSQL advisory locks, the values are defined as integers.
 class LockID(enum.IntEnum):

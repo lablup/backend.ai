@@ -16,7 +16,7 @@ If you are a macOS user and a researcher or developer who occasionally installs 
 Creating a user linuxbrew directory
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Directories that begin with a dot are automatically mounted when the session starts. Create a linuxbrew directory that will be automatically mounted so that programs you install with linuxbrew can be used in all sessions.
+Vfolders set as auto-mounts are mounted when the session starts. Create a linuxbrew directory and set it as an auto-mount so that programs you install with linuxbrew can be used in all sessions.
 
 Create .linuxbrew in the Storage section.
 
@@ -33,6 +33,21 @@ Let’s check if they are created correctly.
    $ backend.ai vfolder list
 
 Also, you can create a directory using GUI console with same name.
+
+Then set it as an auto-mount of your user with the ``createVfolderAutoMount`` GraphQL mutation.
+``backend.ai vfolder info .linuxbrew`` shows the vfolder ID and your user ID.
+
+.. code-block:: console
+
+   $ backend.ai vfolder info .linuxbrew
+   $ backend.ai v2 gql --v2 'mutation {
+       createVfolderAutoMount(input: {
+         scope: {scopeType: USER, scopeId: "<user ID>"}
+         vfolderId: "<vfolder ID>"
+         mountDestination: "/home/work/.linuxbrew"
+         mountPermission: READ_WRITE
+       }) { vfolderAutoMount { id } }
+     }'
 
 
 Installing linuxbrew
@@ -107,7 +122,7 @@ Some environments support miniconda. In this case, you can use `miniconda <https
 Creating a user miniconda-required directory
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Directories that begin with a dot are automatically mounted when the session starts. Create a ``.conda``, ``.continuum`` directory that will be automatically mounted so that programs you install with miniconda can be used in all sessions.
+Vfolders set as auto-mounts are mounted when the session starts. Create a ``.conda``, ``.continuum`` directory and set them as auto-mounts so that programs you install with miniconda can be used in all sessions.
 
 Create ``.conda``, ``.continuum`` in the Storage section.
 
@@ -126,6 +141,21 @@ Let’s check if they are created correctly.
    $ backend.ai vfolder list
 
 Also, you can create a directory using GUI console with same name.
+
+Then set each of them as an auto-mount of your user with the ``createVfolderAutoMount`` GraphQL mutation.
+``backend.ai vfolder info .conda`` shows the vfolder ID and your user ID. Run the same for ``.continuum`` at ``/home/work/.continuum``.
+
+.. code-block:: console
+
+   $ backend.ai vfolder info .conda
+   $ backend.ai v2 gql --v2 'mutation {
+       createVfolderAutoMount(input: {
+         scope: {scopeType: USER, scopeId: "<user ID>"}
+         vfolderId: "<vfolder ID>"
+         mountDestination: "/home/work/.conda"
+         mountPermission: READ_WRITE
+       }) { vfolderAutoMount { id } }
+     }'
 
 
 miniconda test
