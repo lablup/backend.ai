@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pg
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
@@ -33,6 +34,19 @@ def _replaced_config(config: dict[str, Any]) -> dict[str, Any]:
     """Only ``config`` is replaced; ``updated_at`` is bumped explicitly because the raw
     upsert statement bypasses the ORM ``onupdate`` hook."""
     return {"config": config, "updated_at": sa.func.now()}
+
+
+def _patched_config(set_values: dict[str, Any], unset_keys: Sequence[str]) -> dict[str, Any]:
+    """Top-level key patch in one statement: ``(config || set) - unset``, evaluated against
+    the row as it stands once the conflicting row is locked, so concurrent patches of
+    different keys both survive."""
+    config_column = AppConfigFragmentRow.__table__.c.config
+    expression: Any = config_column
+    if set_values:
+        expression = expression.op("||")(sa.literal(set_values, type_=pg.JSONB))
+    if unset_keys:
+        expression = expression.op("-")(sa.cast(sa.literal(list(unset_keys)), pg.ARRAY(sa.Text)))
+    return {"config": expression, "updated_at": sa.func.now()}
 
 
 @dataclass
@@ -132,3 +146,28 @@ class PublicAppConfigFragmentUpserter(
     @override
     def to_data(self, row: AppConfigFragmentRow) -> AppConfigFragmentData:
         return row.to_data()
+
+
+@dataclass
+class AppConfigFragmentPatchUpserter(AppConfigFragmentUpserter):
+    """Patches the top-level keys of a fragment owned by a domain or a user.
+
+    ``config`` holds the keys to set; a missing row is inserted with just those keys.
+    """
+
+    unset: Sequence[str] = ()
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return _patched_config(self.config, self.unset)
+
+
+@dataclass
+class PublicAppConfigFragmentPatchUpserter(PublicAppConfigFragmentUpserter):
+    """Patches the top-level keys of a ``public`` fragment."""
+
+    unset: Sequence[str] = ()
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return _patched_config(self.config, self.unset)

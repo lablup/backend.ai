@@ -1028,13 +1028,18 @@ type AppConfig
   @join__type(graph: PUBLIC)
   @join__type(graph: STRAWBERRY)
 {
-  """Config name this view is for."""
-  configName: String!
-
   """
   Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
   """
-  config: JSON!
+  config(
+    """
+    Added in 26.10.0. Only these top-level keys of the merge are returned; a key no visible fragment holds is left out. All keys when null.
+    """
+    keys: [String!] = null
+  ): JSON!
+
+  """Config name this view is for."""
+  configName: String!
 }
 
 """
@@ -1307,6 +1312,19 @@ type AppConfigFragmentEdge
   node: AppConfigFragment!
 }
 
+"""
+Added in 26.10.0. One top-level key of a fragment document and the value it is set to.
+"""
+input AppConfigFragmentEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Top-level key; never read as a path."""
+  key: String!
+
+  """The value the key is set to, as a whole."""
+  value: JSON!
+}
+
 """Added in 26.8.0. Filter input for querying app config fragments."""
 input AppConfigFragmentFilter
   @join__type(graph: STRAWBERRY)
@@ -1357,6 +1375,22 @@ enum AppConfigFragmentOrderField
   SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Set and unset top-level keys of one fragment, leaving its other keys as they are. A patch names at least one key; a key appears once across `set` and `unset`.
+"""
+input AppConfigFragmentPatch
+  @join__type(graph: STRAWBERRY)
+{
+  """Registered config name."""
+  configName: String!
+
+  """Keys to set, each replacing its whole value."""
+  set: [AppConfigFragmentEntry!] = null
+
+  """Keys to remove."""
+  unset: [String!] = null
 }
 
 """Added in 26.8.0. Filter input for the fragment scope_type enum field."""
@@ -15269,6 +15303,16 @@ type Mutation
   """
   myAtomicBulkUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.10.0. Set and unset top-level keys of many app config fragments at one scope, leaving their other keys as they are, all or none. A fragment that does not exist yet is created with the keys set.
+  """
+  scopedAtomicBulkPatchAppConfigFragments(input: ScopedPatchAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Set and unset top-level keys of many app config fragments at the current user's own user scope, leaving their other keys as they are, all or none.
+  """
+  myAtomicBulkPatchAppConfigFragments(input: MyPatchAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 26.10.0. Purge an app config fragment by id."""
   purgeAppConfigFragment(id: UUID!): PurgeAppConfigFragmentPayload! @join__field(graph: STRAWBERRY)
 
@@ -16865,6 +16909,16 @@ type MyClientIp
 {
   """The client's IP address as seen by the server."""
   clientIp: String!
+}
+
+"""
+Added in 26.10.0. Patch many fragments at the current user's own user scope.
+"""
+input MyPatchAppConfigFragmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The fragment patches, one per config name."""
+  items: [AppConfigFragmentPatch!]!
 }
 
 """
@@ -26929,6 +26983,19 @@ enum SchedulingStatus
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   CANCELLED @join__enumValue(graph: STRAWBERRY)
   ERROR @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Patch many fragments at one scope; the scope is named once for all items.
+"""
+input ScopedPatchAppConfigFragmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Scope the fragments are written at."""
+  scope: AppConfigScopeRef!
+
+  """The fragment patches, one per config name."""
+  items: [AppConfigFragmentPatch!]!
 }
 
 """

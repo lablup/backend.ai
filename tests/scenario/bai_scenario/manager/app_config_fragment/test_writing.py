@@ -19,9 +19,13 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentEntry,
+    AppConfigFragmentPatch,
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
+    MyPatchAppConfigFragmentsInput,
     MyUpsertAppConfigFragmentsInput,
+    ScopedPatchAppConfigFragmentsInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -67,6 +71,15 @@ type ScopedStep = Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragm
 FIRST: Mapping[str, Any] = MappingProxyType({"theme": "light", "menu": {"home": True}})
 SECOND: Mapping[str, Any] = MappingProxyType({"editor": {"wrap": True}})
 REPLACED: Mapping[str, Any] = MappingProxyType({"menu": {"docs": True}})
+PATCH_SET: Mapping[str, Any] = MappingProxyType({"theme": "dark"})
+PATCHED: Mapping[str, Any] = MappingProxyType({"theme": "dark", "menu": {"home": True}})
+
+
+def _patch(config_name: str) -> AppConfigFragmentPatch:
+    return AppConfigFragmentPatch(
+        config_name=config_name,
+        set=[AppConfigFragmentEntry(key=key, value=value) for key, value in PATCH_SET.items()],
+    )
 
 
 @dataclass(frozen=True)
@@ -132,6 +145,63 @@ class WritingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
                         AppConfigFragmentUpsertItem(config_name=laid.name, config=dict(self.config))
                     ],
                 )
+            )
+
+
+@dataclass(frozen=True)
+class PatchingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
+    """자기 스코프의 조각에서 최상위 키 하나를 설정한다."""
+
+    @override
+    def operation(self) -> str:
+        return "my_atomic_bulk_patch"
+
+    @override
+    def describe(self, laid: AWritingPlace) -> str:
+        return Says(
+            f"{laid.caller.username} 이 {laid.names[0]} 의 자기 조각에서 키 하나를 설정합니다",
+            english=(
+                f"{laid.caller.username} sets one key of their own fragment for {laid.names[0]}"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: AppConfigFragmentAdapter, laid: AWritingPlace) -> Written:
+        with ActingAs(laid.caller):
+            return await adapter.my_atomic_bulk_patch(
+                MyPatchAppConfigFragmentsInput(items=[_patch(laid.names[0])])
+            )
+
+
+@dataclass(frozen=True)
+class PatchingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
+    """지정한 스코프의 조각에서 최상위 키 하나를 설정한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_atomic_bulk_patch"
+
+    @override
+    def describe(self, laid: ATargetAndACaller) -> str:
+        scope = SCOPE_NAMES[laid.scope_type]
+        return Says(
+            f"{laid.caller.username} 이 {scope} 스코프를 지정해 {laid.name} 조각에서 키 하나를 "
+            "설정합니다",
+            english=(
+                f"{laid.caller.username} sets one key of the fragment {laid.name} in the "
+                f"{in_language(scope, Language.ENGLISH)} scope"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: AppConfigFragmentAdapter, laid: ATargetAndACaller) -> Written:
+        scope = AppConfigScopeRef(
+            scope_type=laid.scope_type,
+            scope_id=AppConfigScopeID(laid.scope_id) if laid.scope_id is not None else None,
+        )
+        with ActingAs(laid.caller):
+            return await adapter.scoped_atomic_bulk_patch(
+                ScopedPatchAppConfigFragmentsInput(scope=scope, items=[_patch(laid.name)])
             )
 
 
@@ -637,6 +707,171 @@ class AnOwnerNothingAnswersToIsRefused(
         return TheCallIsRefused(VirtualEntityNotFound)
 
 
+@dataclass(frozen=True)
+class PatchingOneKeyKeepsTheOtherKeys(
+    Scenario[TestSeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "patching-one-key-of-the-own-fragment-keeps-its-other-keys"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "이미 자기 조각이 있는 이름에서 키 하나만 설정하면, id 는 그대로이고 그 키만 바뀌며 "
+            "다른 키는 그대로 남습니다",
+            english=(
+                "when one key is set on a name that already holds the user's own fragment, "
+                "the id stays the same and only that key changes while the other keys remain"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AWritingPlace]:
+        return MyWritingPlace(granted=WRITING, existing=FIRST)
+
+    @override
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
+        return PatchingMine()
+
+    @override
+    def then(self) -> Then[AWritingPlace, Written]:
+        return TheWrittenFragments(started=self.started, configs=(PATCHED,), replacing=True)
+
+
+@dataclass(frozen=True)
+class PatchingAnUnregisteredNameIsRefused(
+    Scenario[TestSeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+):
+    @override
+    def summary(self) -> str:
+        return "patching-a-name-nothing-registers-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "등록되지 않은 이름에 쓰기 권한을 받은 사용자가 키를 설정하면, 쓰기 허용 안 됨으로 "
+            "거부됩니다. 전체 쓰기와 같은 검사입니다",
+            english=(
+                "when a user granted write permission sets a key on an unregistered name, it "
+                "is rejected as write not allowed. It is the same check as a whole write"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AWritingPlace]:
+        return MyWritingPlace(granted=WRITING, defined=False)
+
+    @override
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
+        return PatchingMine()
+
+    @override
+    def then(self) -> Then[AWritingPlace, Written]:
+        return TheCallIsRefused(AppConfigFragmentWriteNotAllowed)
+
+
+@dataclass(frozen=True)
+class PatchingWithoutPermissionIsRefused(
+    Scenario[TestSeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-patch-their-own-fragment"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 키를 설정하면, 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "when a user with no permission sets a key on a name opened to the user kind, "
+                "it is rejected for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AWritingPlace]:
+        return MyWritingPlace(existing=FIRST)
+
+    @override
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
+        return PatchingMine()
+
+    @override
+    def then(self) -> Then[AWritingPlace, Written]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class PatchingADomainFragmentKeepsItsOtherKeys(
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 키 하나를 설정하면, "
+            "그 키만 바뀌고 다른 키는 그대로 남습니다",
+            english=(
+                "when a user granted write permission on their own domain scope sets one key "
+                "by naming the domain, only that key changes and the other keys remain"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
+        return SomewhereToTarget(target=Target.HOME_DOMAIN, laid=FIRST, granted=WRITING)
+
+    @override
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+        return PatchingAt()
+
+    @override
+    def then(self) -> Then[ATargetAndACaller, Written]:
+        return TheWrittenFragments(started=self.started, configs=(PATCHED,), replacing=True)
+
+
+@dataclass(frozen=True)
+class APlainUserMayNotPatchPublic(
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자기 도메인 스코프에 쓰기 권한을 받았어도 superadmin 이 아닌 사용자가 공개 스코프를 "
+            "지정해 키를 설정하면, 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin, even with write permission on their "
+                "own domain scope, sets a key by naming the public scope, it is rejected for "
+                "lack of role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
+        return SomewhereToTarget(target=Target.PUBLIC, granted=WRITING)
+
+    @override
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+        return PatchingAt()
+
+    @override
+    def then(self) -> Then[ATargetAndACaller, Written]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
 MINE_SCENARIOS: list[MineStep] = [
     TheGrantedUserWritesTheirFirstFragment(started=datetime.now(UTC)),
     WritingAgainReplacesTheValueWhole(started=datetime.now(UTC)),
@@ -647,6 +882,9 @@ MINE_SCENARIOS: list[MineStep] = [
     CreateAloneIsNotEnough(),
     AUserGrantedNothingMayNotWrite(),
     EnforcementOffLetsAnyoneWrite(started=datetime.now(UTC)),
+    PatchingOneKeyKeepsTheOtherKeys(started=datetime.now(UTC)),
+    PatchingAnUnregisteredNameIsRefused(),
+    PatchingWithoutPermissionIsRefused(),
 ]
 
 SCOPED_SCENARIOS: list[ScopedStep] = [
@@ -656,6 +894,8 @@ SCOPED_SCENARIOS: list[ScopedStep] = [
     EnforcementOffDoesNotOpenPublic(),
     AnotherUsersScopeIsRefused(),
     AnOwnerNothingAnswersToIsRefused(),
+    PatchingADomainFragmentKeepsItsOtherKeys(started=datetime.now(UTC)),
+    APlainUserMayNotPatchPublic(),
 ]
 
 

@@ -17,6 +17,7 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentPatch,
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
 )
@@ -129,6 +130,54 @@ def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
         try:
             result = await registry.app_config_fragment.scoped_bulk_upsert_app_config_fragments(
                 ScopedUpsertAppConfigFragmentsInput(scope=scope, items=parsed_items)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
+
+
+@app_config_fragment.command()
+@click.option(
+    "--scope-type",
+    required=True,
+    type=click.Choice([scope_type.value for scope_type in AppConfigScopeType]),
+    help="Scope the fragments are written at (public | domain | user).",
+)
+@click.option(
+    "--scope-id",
+    default=None,
+    type=click.UUID,
+    help="Domain id or user id; omit for the public scope.",
+)
+@click.option(
+    "--items",
+    required=True,
+    help=(
+        'JSON array of {"config_name": ..., "set": [{"key": ..., "value": ...}], '
+        '"unset": ["key"]} objects, or @path to a file holding it.'
+    ),
+)
+def patch(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
+    """Set and unset top-level keys of fragments at one scope, all-or-nothing.
+
+    Each item changes only the keys it names; the rest of the fragment stays as it is.
+    """
+    from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+        ScopedPatchAppConfigFragmentsInput,
+    )
+
+    scope = _resolve_scope(scope_type, scope_id)
+    parsed_items = load_model(items, list[AppConfigFragmentPatch])
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = (
+                await registry.app_config_fragment.scoped_atomic_bulk_patch_app_config_fragments(
+                    ScopedPatchAppConfigFragmentsInput(scope=scope, items=parsed_items)
+                )
             )
             print_result(result)
         finally:

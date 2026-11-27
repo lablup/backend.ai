@@ -1480,6 +1480,119 @@
         "title": "MyUpsertAppConfigFragmentsInput",
         "type": "object"
       },
+      "AppConfigFragmentEntry": {
+        "description": "One top-level key of a fragment document and the value it is set to.",
+        "properties": {
+          "key": {
+            "description": "Added in 26.10.0. Top-level key; never read as a path.",
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "description": "Added in 26.10.0. The value the key is set to, as a whole. Never null; remove a key with `unset`.",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "AppConfigFragmentEntry",
+        "type": "object"
+      },
+      "AppConfigFragmentPatch": {
+        "description": "Set and unset top-level keys of one fragment, leaving its other keys as they are.",
+        "properties": {
+          "config_name": {
+            "description": "Added in 26.10.0. Registered config name.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Name",
+            "type": "string"
+          },
+          "set": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentEntry"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Keys to set, each replacing its whole value.",
+            "title": "Set"
+          },
+          "unset": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Keys to remove.",
+            "title": "Unset"
+          }
+        },
+        "required": [
+          "config_name"
+        ],
+        "title": "AppConfigFragmentPatch",
+        "type": "object"
+      },
+      "ScopedPatchAppConfigFragmentsInput": {
+        "description": "Patch many fragments at one scope; the scope is named once for all items.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigScopeRef",
+            "description": "Scope the fragments are written at."
+          },
+          "items": {
+            "description": "The fragment patches, one per config name.",
+            "items": {
+              "$ref": "#/components/schemas/AppConfigFragmentPatch"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "items"
+        ],
+        "title": "ScopedPatchAppConfigFragmentsInput",
+        "type": "object"
+      },
+      "MyPatchAppConfigFragmentsInput": {
+        "description": "Patch many fragments at the current user's own user scope.",
+        "properties": {
+          "items": {
+            "description": "The fragment patches, one per config name.",
+            "items": {
+              "$ref": "#/components/schemas/AppConfigFragmentPatch"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyPatchAppConfigFragmentsInput",
+        "type": "object"
+      },
       "BulkPurgeAppConfigFragmentInput": {
         "description": "Input for purging many fragments (per-item partial success).",
         "properties": {
@@ -54018,6 +54131,64 @@
         },
         "parameters": [],
         "description": "Upsert many fragments at the caller's own user scope, all or none (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped/atomic-bulk-patch": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_atomic_bulk_patch",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedPatchAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Set and unset top-level keys of many fragments at one scope, all or none (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/atomic-bulk-patch": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_atomic_bulk_patch",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyPatchAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Patch many fragments at the caller's own user scope, all or none (auth).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {

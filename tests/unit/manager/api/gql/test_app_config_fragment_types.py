@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
+from strawberry.scalars import JSON
+
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
@@ -18,11 +20,16 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
 )
 from ai.backend.manager.api.gql.app_config_fragment.types import (
+    AppConfigFragmentEntryGQL,
     AppConfigFragmentFilterGQL,
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
+    AppConfigFragmentPatchGQL,
+    AppConfigScopeRefGQL,
     AppConfigScopeTypeFilterGQL,
+    MyPatchAppConfigFragmentsInputGQL,
+    ScopedPatchAppConfigFragmentsInputGQL,
     UpsertAppConfigFragmentsPayloadGQL,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
@@ -148,3 +155,44 @@ class TestAppConfigFragmentInputs:
 
         assert dto.field == AppConfigFragmentOrderField.SCOPE_TYPE
         assert dto.direction.value == OrderDirection.DESC.value
+
+
+class TestPatchAppConfigFragmentsInputGQL:
+    def test_to_pydantic_carries_the_set_entries_and_unset_keys(self) -> None:
+        scope_id = uuid.uuid4()
+        gql = ScopedPatchAppConfigFragmentsInputGQL(
+            scope=AppConfigScopeRefGQL(scope_type=AppConfigScopeType.USER, scope_id=scope_id),
+            items=[
+                AppConfigFragmentPatchGQL(
+                    config_name="theme",
+                    set=[
+                        AppConfigFragmentEntryGQL(key="themeFamily", value=cast(JSON, {"a": [1]}))
+                    ],
+                    unset=["banner"],
+                )
+            ],
+        )
+
+        dto = gql.to_pydantic()
+
+        assert dto.scope.scope_id == scope_id
+        [item] = dto.items
+        assert item.config_name == "theme"
+        assert [(entry.key, entry.value) for entry in item.set or []] == [
+            ("themeFamily", {"a": [1]})
+        ]
+        assert item.unset == ["banner"]
+
+    def test_to_pydantic_leaves_an_omitted_unset_empty(self) -> None:
+        gql = MyPatchAppConfigFragmentsInputGQL(
+            items=[
+                AppConfigFragmentPatchGQL(
+                    config_name="theme",
+                    set=[AppConfigFragmentEntryGQL(key="themeFamily", value=cast(JSON, "dark"))],
+                )
+            ]
+        )
+
+        [item] = gql.to_pydantic().items
+
+        assert item.unset is None

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
@@ -21,16 +21,20 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchAppConfigFragmentInput",
+    "AppConfigFragmentEntry",
     "AppConfigFragmentFilter",
     "AppConfigFragmentOrder",
+    "AppConfigFragmentPatch",
     "AppConfigFragmentScope",
     "AppConfigFragmentUpsertItem",
     "AppConfigScopeRef",
     "BulkPurgeAppConfigFragmentInput",
     "MyAppConfigFragmentsByNamesInput",
+    "MyPatchAppConfigFragmentsInput",
     "MyUpsertAppConfigFragmentsInput",
     "PartialBulkPurgeAppConfigFragmentsInput",
     "ScopedAppConfigFragmentsByNamesInput",
+    "ScopedPatchAppConfigFragmentsInput",
     "ScopedSearchAppConfigFragmentInput",
     "ScopedUpsertAppConfigFragmentsInput",
 )
@@ -106,6 +110,77 @@ class MyUpsertAppConfigFragmentsInput(BaseRequestModel):
 
     items: list[AppConfigFragmentUpsertItem] = Field(
         min_length=1, description="The (config_name, config) pairs to upsert."
+    )
+
+
+class AppConfigFragmentEntry(BaseRequestModel):
+    """One top-level key of a fragment document and the value it is set to."""
+
+    key: str = Field(
+        min_length=1,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Top-level key; never read as a path.",
+    )
+    value: Any = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. The value the key is set to, as a whole. "
+            "Never null; remove a key with `unset`."
+        ),
+    )
+
+    @field_validator("value")
+    @classmethod
+    def _reject_null(cls, value: Any) -> Any:
+        if value is None:
+            raise ValueError("A value must not be null; use 'unset' to remove the key.")
+        return value
+
+
+class AppConfigFragmentPatch(BaseRequestModel):
+    """Set and unset top-level keys of one fragment, leaving its other keys as they are."""
+
+    config_name: str = Field(
+        min_length=1,
+        max_length=128,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Registered config name.",
+    )
+    set: list[AppConfigFragmentEntry] | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Keys to set, each replacing its whole value.",
+    )
+    unset: list[str] | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Keys to remove.",
+    )
+
+    @model_validator(mode="after")
+    def _check_keys(self) -> Self:
+        set_keys = [entry.key for entry in self.set or []]
+        unset_keys = self.unset or []
+        if not set_keys and not unset_keys:
+            raise ValueError("A patch needs at least one key in 'set' or 'unset'.")
+        if len(set(set_keys)) != len(set_keys):
+            raise ValueError("A key appears more than once in 'set'.")
+        if len(set(unset_keys)) != len(unset_keys):
+            raise ValueError("A key appears more than once in 'unset'.")
+        if overlap := set(set_keys) & set(unset_keys):
+            raise ValueError(f"Keys in both 'set' and 'unset': {sorted(overlap)}.")
+        return self
+
+
+class ScopedPatchAppConfigFragmentsInput(BaseRequestModel):
+    """Patch many fragments at one scope; the scope is named once for all items."""
+
+    scope: AppConfigScopeRef = Field(description="Scope the fragments are written at.")
+    items: list[AppConfigFragmentPatch] = Field(
+        min_length=1, description="The fragment patches, one per config name."
+    )
+
+
+class MyPatchAppConfigFragmentsInput(BaseRequestModel):
+    """Patch many fragments at the current user's own user scope."""
+
+    items: list[AppConfigFragmentPatch] = Field(
+        min_length=1, description="The fragment patches, one per config name."
     )
 
 

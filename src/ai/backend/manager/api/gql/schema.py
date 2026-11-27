@@ -39,11 +39,13 @@ from ai.backend.manager.api.gql.app_config_fragment.resolver import (
     admin_app_config_fragments,
     app_config_fragment,
     my_app_config_fragments_by_names,
+    my_atomic_bulk_patch_app_config_fragments,
     my_atomic_bulk_upsert_app_config_fragments,
     my_upsert_app_config_fragments,
     partial_bulk_purge_app_config_fragments,
     purge_app_config_fragment,
     scoped_app_config_fragments_by_names,
+    scoped_atomic_bulk_patch_app_config_fragments,
     scoped_atomic_bulk_upsert_app_config_fragments,
     scoped_upsert_app_config_fragments,
 )
@@ -1160,6 +1162,8 @@ class Mutation:
     partial_bulk_purge_app_config_allow_lists = partial_bulk_purge_app_config_allow_lists
     scoped_atomic_bulk_upsert_app_config_fragments = scoped_atomic_bulk_upsert_app_config_fragments
     my_atomic_bulk_upsert_app_config_fragments = my_atomic_bulk_upsert_app_config_fragments
+    scoped_atomic_bulk_patch_app_config_fragments = scoped_atomic_bulk_patch_app_config_fragments
+    my_atomic_bulk_patch_app_config_fragments = my_atomic_bulk_patch_app_config_fragments
     purge_app_config_fragment = purge_app_config_fragment
     partial_bulk_purge_app_config_fragments = partial_bulk_purge_app_config_fragments
     scan_artifacts = scan_artifacts

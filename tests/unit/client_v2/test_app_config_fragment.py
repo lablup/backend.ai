@@ -15,17 +15,22 @@ from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
+    AppConfigFragmentEntry,
+    AppConfigFragmentPatch,
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
+    MyPatchAppConfigFragmentsInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
+    ScopedPatchAppConfigFragmentsInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
     AppConfigFragmentsByNamesPayload,
+    AtomicBulkUpsertAppConfigFragmentsPayload,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -147,6 +152,68 @@ class TestScopedBulkUpsert:
         assert [(error.config_name, error.message) for error in result.failed] == [
             ("menu", "not allowed")
         ]
+
+
+class TestScopedBulkPatch:
+    async def test_happy_path(
+        self,
+        client: V2AppConfigFragmentClient,
+        mock_session: MagicMock,
+        mock_response: AsyncMock,
+        node_payload: dict[str, Any],
+    ) -> None:
+        mock_response.json = AsyncMock(return_value={"items": [node_payload]})
+
+        result = await client.scoped_atomic_bulk_patch_app_config_fragments(
+            ScopedPatchAppConfigFragmentsInput(
+                scope=AppConfigScopeRef(
+                    scope_type=AppConfigScopeType.USER,
+                    scope_id=AppConfigScopeID(_USER_SCOPE_ID),
+                ),
+                items=[
+                    AppConfigFragmentPatch(
+                        config_name="theme",
+                        set=[AppConfigFragmentEntry(key="mode", value="dark")],
+                        unset=["banner"],
+                    )
+                ],
+            )
+        )
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "POST"
+        assert str(call_args[0][1]).endswith("/v2/app-config-fragments/scoped/atomic-bulk-patch")
+        assert call_args[1]["json"]["items"] == [
+            {
+                "config_name": "theme",
+                "set": [{"key": "mode", "value": "dark"}],
+                "unset": ["banner"],
+            }
+        ]
+        assert isinstance(result, AtomicBulkUpsertAppConfigFragmentsPayload)
+        assert [item.config_name for item in result.items] == ["theme"]
+
+
+class TestMyBulkPatch:
+    async def test_happy_path(
+        self,
+        client: V2AppConfigFragmentClient,
+        mock_session: MagicMock,
+        mock_response: AsyncMock,
+        node_payload: dict[str, Any],
+    ) -> None:
+        mock_response.json = AsyncMock(return_value={"items": [node_payload]})
+
+        result = await client.my_atomic_bulk_patch_app_config_fragments(
+            MyPatchAppConfigFragmentsInput(
+                items=[AppConfigFragmentPatch(config_name="theme", unset=["banner"])]
+            )
+        )
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "POST"
+        assert str(call_args[0][1]).endswith("/v2/app-config-fragments/my/atomic-bulk-patch")
+        assert isinstance(result, AtomicBulkUpsertAppConfigFragmentsPayload)
 
 
 class TestMyByNames:

@@ -2,17 +2,19 @@
 
 [배경](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
-시나리오: 미완성 1 / 10
+시나리오: 미완성 1 / 12
 
-- ops 구성 (10)
+- ops 구성 (12)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - my_app_config_fragments_by_names: 대표 성공 ✓ · 대표 거부 ✓
+  - my_atomic_bulk_patch: 대표 성공 ✓ · 대표 거부 ✓
   - my_atomic_bulk_upsert: 대표 성공 ✓ · 대표 거부 ✓
   - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_app_config_fragments_by_names: 대표 성공 ✓ · 대표 거부 ✓
+  - scoped_atomic_bulk_patch: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_atomic_bulk_upsert: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
 
@@ -48,6 +50,14 @@
 | [같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환됩니다. 이 조회는 사용자 스코프 하나만 봅니다](#reading_by_names-the-domains-fragment-under-the-same-name-is-not-answered) | 성공 |
 | [사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있습니다](#reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order) | 성공 |
 | [자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부됩니다](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | 거부 |
+
+**my_atomic_bulk_patch**
+
+| 시나리오 | 판정 |
+|---|---|
+| [이미 자기 조각이 있는 이름에서 키 하나만 설정하면, id 는 그대로이고 그 키만 바뀌며 다른 키는 그대로 남습니다](#writing-patching-one-key-of-the-own-fragment-keeps-its-other-keys) | 성공 |
+| [사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 키를 설정하면, 권한 부족으로 거부됩니다](#writing-a-user-granted-nothing-may-not-patch-their-own-fragment) | 거부 |
+| [등록되지 않은 이름에 쓰기 권한을 받은 사용자가 키를 설정하면, 쓰기 허용 안 됨으로 거부됩니다. 전체 쓰기와 같은 검사입니다](#writing-patching-a-name-nothing-registers-is-refused) | 거부 |
 
 **my_atomic_bulk_upsert**
 
@@ -88,6 +98,13 @@
 | [superadmin 이 어느 도메인도 아닌 id 를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. 권한 검사를 통과하는 사용자만 이 응답을 봅니다](#reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 | [자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id 를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부됩니다](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
 | [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부됩니다](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | 거부 |
+
+**scoped_atomic_bulk_patch**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 키 하나를 설정하면, 그 키만 바뀌고 다른 키는 그대로 남습니다](#writing-a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment) | 성공 |
+| [자기 도메인 스코프에 쓰기 권한을 받았어도 superadmin 이 아닌 사용자가 공개 스코프를 지정해 키를 설정하면, 역할 부족으로 거부됩니다](#writing-a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment) | 거부 |
 
 **scoped_atomic_bulk_upsert**
 
@@ -603,6 +620,109 @@ Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+### my_atomic_bulk_patch
+
+<a id="writing-patching-one-key-of-the-own-fragment-keeps-its-other-keys"></a>
+
+#### [patching-one-key-of-the-own-fragment-keeps-its-other-keys](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+이미 자기 조각이 있는 이름에서 키 하나만 설정하면, id 는 그대로이고 그 키만 바뀌며 다른 키는 그대로 남습니다
+
+Given
+
+- 사용자 스코프에 허용된 설정 이름 하나에 이미 있는 자기 조각와, 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 own-scope-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 own-scope-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 own-scope-1 보유
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
+
+When
+
+- AppConfigFragmentAdapter.my_atomic_bulk_patch: user-1 이 config-1 의 자기 조각에서 키 하나를 설정합니다
+
+Then
+
+- 쓴 설정 조각 전체가 요청 순서대로 반환됩니다
+  - items = 1
+  - items[0].id: 이미 있던 조각와 같다
+  - items[0].config_name: 요청한 이름와 같다
+  - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
+  - items[0].scope_id: 지정한 소유자와 같다
+  - items[0].config = {'theme': 'dark', 'menu': {'home': True}}
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+
+<a id="writing-a-user-granted-nothing-may-not-patch-their-own-fragment"></a>
+
+#### [a-user-granted-nothing-may-not-patch-their-own-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 키를 설정하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 사용자 스코프에 허용된 설정 이름 하나에 이미 있는 자기 조각와, 설정 조각 권한이 하나도 없는 사용자 한 명
+  - 도메인 home-1
+  - 설정 조각 권한이 하나도 없는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
+
+When
+
+- AppConfigFragmentAdapter.my_atomic_bulk_patch: user-1 이 config-1 의 자기 조각에서 키 하나를 설정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="writing-patching-a-name-nothing-registers-is-refused"></a>
+
+#### [patching-a-name-nothing-registers-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+등록되지 않은 이름에 쓰기 권한을 받은 사용자가 키를 설정하면, 쓰기 허용 안 됨으로 거부됩니다. 전체 쓰기와 같은 검사입니다
+
+Given
+
+- 등록되지 않은 설정 이름과, 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 own-scope-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 own-scope-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 own-scope-1 보유
+
+When
+
+- AppConfigFragmentAdapter.my_atomic_bulk_patch: user-1 이 unregistered 의 자기 조각에서 키 하나를 설정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: AppConfigFragmentWriteNotAllowed
 
 ### my_atomic_bulk_upsert
 
@@ -1323,6 +1443,82 @@ Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+### scoped_atomic_bulk_patch
+
+<a id="writing-a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment"></a>
+
+#### [a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 키 하나를 설정하면, 그 키만 바뀌고 다른 키는 그대로 남습니다
+
+Given
+
+- 자기 도메인에 허용된 설정 이름 하나와 거기 있는 설정 조각 하나, 그리고 자기 도메인에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 도메인 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 도메인 home-1에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 seated-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 seated-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 seated-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 seated-1 보유
+  - 스코프별 앱 설정 fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_patch: user-1 이 도메인 스코프를 지정해 config-1 조각에서 키 하나를 설정합니다
+
+Then
+
+- 쓴 설정 조각 전체가 요청 순서대로 반환됩니다
+  - items = 1
+  - items[0].id: 이미 있던 조각와 같다
+  - items[0].config_name: 요청한 이름와 같다
+  - items[0].scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
+  - items[0].scope_id: 지정한 소유자와 같다
+  - items[0].config = {'theme': 'dark', 'menu': {'home': True}}
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+
+<a id="writing-a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+자기 도메인 스코프에 쓰기 권한을 받았어도 superadmin 이 아닌 사용자가 공개 스코프를 지정해 키를 설정하면, 역할 부족으로 거부됩니다
+
+Given
+
+- 공개 스코프에 허용된 설정 이름 하나, 그리고 자기 도메인에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 공개 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 도메인 home-1에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 seated-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 seated-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 seated-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 seated-1 보유
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_patch: user-1 이 공개 스코프를 지정해 config-1 조각에서 키 하나를 설정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
 
 ### scoped_atomic_bulk_upsert
 
