@@ -10,8 +10,8 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     resolve_container_metric_unit_hint,
 )
 
-# Metric-name classification used only while adapting Prometheus samples back
-# into the legacy live_stat dict that Graphene/WebUI still expects.
+# Metric-name classification used while adapting Prometheus samples back
+# into the live_stat values the legacy and v2 kernel queries answer.
 _RATE_STAT_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
 _DIFF_STAT_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 

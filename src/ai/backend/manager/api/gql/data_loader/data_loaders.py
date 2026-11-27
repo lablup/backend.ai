@@ -178,6 +178,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
         KernelV2GQL,
+        KernelV2LiveStatGQL,
         ResourceAllocationGQL,
     )
     from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
@@ -1137,6 +1138,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_resource_allocation_by_kernel(kernel_ids)
             return [RA.from_pydantic(dto) for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_live_stat_loader(
+        self,
+    ) -> DataLoader[KernelID, KernelV2LiveStatGQL | None]:
+        adapter = self._adapters.metric
+
+        async def load_fn(kernel_ids: list[KernelID]) -> list[KernelV2LiveStatGQL | None]:
+            from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
+                KernelV2LiveStatGQL as LS,
+            )
+
+            dtos = await adapter.batch_get_kernel_live_stats(kernel_ids)
+            return [None if dto is None else LS.from_pydantic(dto) for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

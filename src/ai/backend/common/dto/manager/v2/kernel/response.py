@@ -17,6 +17,8 @@ __all__ = (
     "KernelClusterInfoGQLDTO",
     "KernelLifecycleInfo",
     "KernelLifecycleInfoGQLDTO",
+    "KernelLiveStatInfo",
+    "KernelLiveStatMetricInfo",
     "KernelNetworkInfoGQLDTO",
     "KernelNode",
     "KernelResourceInfo",
@@ -133,6 +135,26 @@ class KernelLifecycleInfo(BaseResponseModel):
     status_info: str | None = Field(
         default=None, description="Additional status information or error message."
     )
+
+
+class KernelLiveStatMetricInfo(BaseResponseModel):
+    """The latest value and the window statistics of one metric of a kernel."""
+
+    metric_name: str = Field(description="The metric name (e.g., 'cpu_util', 'mem').")
+    current: str = Field(description="The latest value.")
+    capacity: str | None = Field(description="The upper bound of the value.")
+    pct: str = Field(description="The latest value as a percentage of the capacity.")
+    unit_hint: str = Field(description="The unit of the value (e.g., 'bytes', 'percent').")
+    stats_max: str = Field(description="The maximum over the statistics window.")
+    stats_avg: str = Field(description="The average over the statistics window.")
+    stats_rate: str = Field(description="The rate per second, for the network metrics.")
+    stats_diff: str = Field(description="The change of the value, for the CPU utilization.")
+
+
+class KernelLiveStatInfo(BaseResponseModel):
+    """The live statistics of a kernel, one entry per metric."""
+
+    metrics: list[KernelLiveStatMetricInfo] = Field(description="The metrics of the kernel.")
 
 
 # ---------------------------------------------------------------------------

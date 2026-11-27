@@ -27,7 +27,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
 )
-from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConverter
+from ai.backend.manager.clients.prometheus.live_stat_converter import LegacyLiveStatConverter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.defs import DEFAULT_ROLE
