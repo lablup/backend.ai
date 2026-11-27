@@ -16,7 +16,7 @@ var linkPattern = regexp.MustCompile(`\[[^\]]*\]\(([^)\s]+)\)`)
 // existing paths and resolvable body links. Values are unique over every document even when
 // the run covers a few.
 func runFrontmatter(sc *scope, out *report) error {
-	paths, err := kdoc.IterFiles(sc.root, &sc.spec.Knowledge)
+	paths, err := kdoc.IterFiles(sc.root, sc.spec.Knowledge)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func checkKnowledge(sc *scope, relPath string, used map[string]string, report bo
 		}
 		return nil
 	}
-	document, violations := kdoc.Build(&sc.spec.Knowledge, raw)
+	document, violations := kdoc.Build(sc.spec.Knowledge, raw)
 	var problems []string
 	for _, problem := range violations {
 		problems = append(problems, fmt.Sprintf("%s: %s", relPath, problem))

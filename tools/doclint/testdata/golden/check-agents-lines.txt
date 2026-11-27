@@ -1,0 +1,2 @@
+AGENTS.md:1: 12 lines, limit 10
+exit status: 1

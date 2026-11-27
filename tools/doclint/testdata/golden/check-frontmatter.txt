@@ -1,0 +1,4 @@
+a/KNOWLEDGE.md: broken body link: missing.md
+b/KNOWLEDGE.md: name 'sample' is already used by a/KNOWLEDGE.md
+b/KNOWLEDGE.md: scope path does not exist: nowhere
+exit status: 1

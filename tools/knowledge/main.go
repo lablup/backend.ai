@@ -39,7 +39,10 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	schema := &loaded.Knowledge
+	schema := loaded.Knowledge
+	if schema == nil {
+		return fmt.Errorf("%s has no knowledge part", filepath.Join(*root, spec.FileName))
+	}
 	paths, err := kdoc.IterFiles(*root, schema)
 	if err != nil {
 		return err

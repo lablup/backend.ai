@@ -92,7 +92,7 @@ func TestBuild(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			raw := full()
 			tt.change(raw)
-			_, problems := Build(&loaded.Knowledge, raw)
+			_, problems := Build(loaded.Knowledge, raw)
 			if strings.Join(problems, "|") != strings.Join(tt.want, "|") {
 				t.Fatalf("got %q, want %q", problems, tt.want)
 			}

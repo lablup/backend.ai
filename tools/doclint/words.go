@@ -57,6 +57,8 @@ type word struct {
 	advisory    bool
 	// allowed are longer expressions in which the word is not reported.
 	allowed []string
+	// sets are the rule sets of the word that the spec selects; none means every path.
+	sets []string
 }
 
 // message reports the word found at the line.
@@ -246,8 +248,11 @@ func (m *matcher) englishPattern(text string) string {
 	return wordBoundaryBefore + strings.Join(fields, space+"+") + alternation(m.inflections) + "?" + wordBoundaryAfter
 }
 
-// build sets the pattern of the word.
+// build sets the pattern of the word. A word with a pattern keeps it as it is.
 func (m *matcher) build(w word) (word, error) {
+	if w.pattern != nil {
+		return w, nil
+	}
 	text := w.text
 	var source string
 	if hangulText.MatchString(text) {
@@ -289,37 +294,106 @@ func (m *matcher) alternatives(expression string) []string {
 	return result
 }
 
-// loadWords returns the rejected words of the English documents and of the Korean documents:
-// the expressions, then the term variants by topic file. A term variant, and an expression
-// with a qualifier, have other valid meanings, so they are advisory.
-func loadWords(directory string) (english, korean []word, err error) {
-	reg, err := loadRegistry(directory)
-	if err != nil {
-		return nil, nil, err
+// wordRules are the rejected words of the English documents and of the Korean documents, and
+// the paths each rule set skips.
+type wordRules struct {
+	english, korean []word
+	skipped         map[string][]spec.Pattern
+}
+
+// appliesTo reports whether the word is checked in the path: it belongs to no set, or to a set
+// that does not skip the path. A run that skips no path (standard input) checks every word.
+func (r *wordRules) appliesTo(w word, path string, skipPaths bool) bool {
+	if len(w.sets) == 0 || !skipPaths {
+		return true
 	}
-	m, err := newMatcher(reg.rules.Korean, reg.rules.English)
-	if err != nil {
-		return nil, nil, fmt.Errorf("%s: %w", directory, err)
+	return slices.ContainsFunc(w.sets, func(name string) bool { return !matchesAny(r.skipped[name], path) })
+}
+
+// loadWords reads the rules the spec names, relative to its directory, and returns the
+// rejected words: the expressions, then the term variants by topic file. A term variant, and an
+// expression with a qualifier, have other valid meanings, so they are advisory.
+func loadWords(words *spec.Words, directory string) (*wordRules, error) {
+	listed, termsDirectory := words.RulePaths()
+	rulePaths := slices.Clone(listed)
+	for i, path := range rulePaths {
+		rulePaths[i] = resolve(directory, path)
 	}
-	words := map[string][]word{}
+	if termsDirectory != "" {
+		termsDirectory = resolve(directory, termsDirectory)
+	}
+	reg, err := loadRegistry(rulePaths, termsDirectory)
+	if err != nil {
+		return nil, err
+	}
+	declared := map[string][]spec.Pattern{}
+	for _, file := range reg.rules {
+		for _, set := range file.Sets {
+			declared[set.Name] = set.SkippedPaths
+		}
+	}
+	for _, name := range words.Sets {
+		if _, ok := declared[name]; !ok {
+			return nil, fmt.Errorf("words.sets: unknown set %q", name)
+		}
+	}
+	var korean koreanRules
+	var english englishRules
+	for _, file := range reg.rules {
+		if file.Korean != nil {
+			korean = *file.Korean
+		}
+		if file.English != nil {
+			english = *file.English
+		}
+	}
+	m, err := newMatcher(korean, english)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", strings.Join(rulePaths, ", "), err)
+	}
+	rules := &wordRules{skipped: declared}
 	add := func(lang string, w word) error {
 		built, err := m.build(w)
-		words[lang] = append(words[lang], built)
+		if lang == spec.Korean {
+			rules.korean = append(rules.korean, built)
+		} else {
+			rules.english = append(rules.english, built)
+		}
 		return err
 	}
-	for _, entry := range reg.rules.Expressions {
-		for _, text := range m.alternatives(entry.Word) {
-			if strings.Contains(strings.ToLower(entry.Instead), strings.ToLower(text)) {
-				continue
+	for _, file := range reg.rules {
+		for _, entry := range file.Expressions {
+			sets := entry.Sets
+			if len(words.Sets) > 0 && len(sets) > 0 {
+				sets = slices.DeleteFunc(slices.Clone(sets), func(name string) bool { return !slices.Contains(words.Sets, name) })
+				if len(sets) == 0 {
+					continue
+				}
 			}
-			if err := add(entry.Lang, word{
-				text:        text,
+			base := word{
+				text:        entry.text(),
 				replacement: entry.Instead,
 				reason:      entry.Reason,
 				advisory:    entry.Qualifier != "",
 				allowed:     entry.Except,
-			}); err != nil {
-				return nil, nil, err
+				sets:        sets,
+			}
+			if entry.Pattern != nil {
+				base.pattern = entry.Pattern.Regexp
+				if err := add(entry.Lang, base); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			for _, text := range m.alternatives(entry.Word) {
+				if strings.Contains(strings.ToLower(entry.Instead), strings.ToLower(text)) {
+					continue
+				}
+				alternative := base
+				alternative.text = text
+				if err := add(entry.Lang, alternative); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -334,13 +408,13 @@ func loadWords(directory string) (english, korean []word, err error) {
 					reason := strings.TrimSpace(term.Meaning[lang] + " " + term.Note[lang])
 					variant := word{text: text, replacement: own, reason: reason, advisory: true}
 					if err := add(lang, variant); err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				}
 			}
 		}
 	}
-	return words[spec.English], words[spec.Korean], nil
+	return rules, nil
 }
 
 // proseLines returns line number to text, without frontmatter, fenced blocks, quote blocks,
@@ -365,12 +439,28 @@ func proseLines(text string) map[int]string {
 	return prose
 }
 
-// checkWords returns the failures and the review lines of one file. numbers limits the lines.
-func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []word) (problems, reviews []string, err error) {
-	words := english
-	if strings.HasSuffix(path, sc.spec.Documents.TranslationSuffix) {
-		words = korean
+// languageOf returns the rules of a document: the Korean ones for a translation, else by the
+// language of the spec. hangul chooses by line, so it returns "".
+func languageOf(sc *scope, path string) string {
+	documents := sc.spec.Documents
+	if documents == nil {
+		return spec.English
 	}
+	if documents.TranslationSuffix != "" && strings.HasSuffix(path, documents.TranslationSuffix) {
+		return spec.Korean
+	}
+	switch documents.Language {
+	case spec.Korean:
+		return spec.Korean
+	case spec.Hangul:
+		return ""
+	}
+	return spec.English
+}
+
+// checkWords returns the failures and the review lines of one file. numbers limits the lines.
+func checkWords(sc *scope, path string, numbers map[int]bool, rules *wordRules) (problems, reviews []string, err error) {
+	language := languageOf(sc, path)
 	data, err := sc.read(path)
 	if err != nil {
 		return nil, nil, err
@@ -381,14 +471,26 @@ func checkWords(sc *scope, path string, numbers map[int]bool, english, korean []
 			continue
 		}
 		line := prose[number]
+		lineLanguage := language
+		if lineLanguage == "" {
+			lineLanguage = spec.English
+			if hangulText.MatchString(line) {
+				lineLanguage = spec.Korean
+			}
+		}
+		words := rules.english
+		if lineLanguage == spec.Korean {
+			words = rules.korean
+		}
 		for _, w := range words {
-			if w.match(line) {
-				message := w.message(path, number)
-				if w.advisory {
-					reviews = append(reviews, message)
-				} else {
-					problems = append(problems, message)
-				}
+			if !rules.appliesTo(w, path, sc.stdin == nil) || !w.match(line) {
+				continue
+			}
+			message := w.message(path, number)
+			if w.advisory {
+				reviews = append(reviews, message)
+			} else {
+				problems = append(problems, message)
 			}
 		}
 	}
@@ -410,6 +512,8 @@ func resolve(root, path string) string {
 func wordsTargets(sc *scope) (map[string]map[int]bool, error) {
 	targets := map[string]map[int]bool{}
 	switch {
+	case sc.stdin != nil:
+		targets[stdinName] = nil
 	case sc.restricted():
 		if sc.diffing() {
 			added, err := addedLines(sc)
@@ -438,7 +542,7 @@ func wordsTargets(sc *scope) (map[string]map[int]bool, error) {
 }
 
 func runWords(sc *scope, out *report) error {
-	english, korean, err := loadWords(filepath.Join(sc.root, sc.spec.Words.Registry))
+	rules, err := loadWords(sc.spec.Words, sc.spec.Dir)
 	if err != nil {
 		return err
 	}
@@ -453,10 +557,10 @@ func runWords(sc *scope, out *report) error {
 	sort.Strings(paths)
 	var problems, reviews []string
 	for _, path := range paths {
-		if matchesAny(sc.spec.Words.SkippedPaths, path) {
+		if sc.stdin == nil && matchesAny(sc.spec.Words.SkippedPaths, path) {
 			continue
 		}
-		fileProblems, fileReviews, err := checkWords(sc, path, targets[path], english, korean)
+		fileProblems, fileReviews, err := checkWords(sc, path, targets[path], rules)
 		if err != nil {
 			return err
 		}

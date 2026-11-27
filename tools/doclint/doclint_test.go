@@ -127,10 +127,11 @@ func newRepo(t *testing.T) string {
 
 func TestMatchWords(t *testing.T) {
 	root := newRepo(t)
-	english, korean, err := loadWords(filepath.Join(root, "glossary/registry"))
+	rules, err := loadWords(&spec.Words{Registry: "glossary/registry"}, root)
 	if err != nil {
 		t.Fatal(err)
 	}
+	english, korean := rules.english, rules.korean
 	tests := []struct {
 		name     string
 		words    []word
@@ -255,7 +256,7 @@ func TestSkippedPaths(t *testing.T) {
 func runCheck(t *testing.T, root string, args ...string) (string, bool) {
 	t.Helper()
 	var out bytes.Buffer
-	failed, err := run(append([]string{"check", "--root", root}, args...), &out)
+	failed, err := run(append([]string{"check", "--root", root}, args...), strings.NewReader(""), &out)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
@@ -460,10 +461,14 @@ func TestCheckFrontmatter(t *testing.T) {
 }
 
 func TestSelectChecks(t *testing.T) {
-	if _, err := selectChecks("words,nope"); err == nil {
+	loaded, err := spec.Load("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := selectChecks("words,nope", loaded); err == nil {
 		t.Fatal("want an error for an unknown check")
 	}
-	got, err := selectChecks("words,bilingual")
+	got, err := selectChecks("words,bilingual", loaded)
 	if err != nil || len(got) != 2 || got[0].name != "words" {
 		t.Fatalf("got %v, %v", got, err)
 	}
@@ -526,7 +531,7 @@ func TestCheckStaged(t *testing.T) {
 
 func TestStagedTakesNoBaseOrFiles(t *testing.T) {
 	for _, args := range [][]string{{"check", "--staged", "--base", "x"}, {"check", "--staged", "a.md"}} {
-		if _, err := run(args, io.Discard); err == nil {
+		if _, err := run(args, strings.NewReader(""), io.Discard); err == nil {
 			t.Errorf("run(%v): want an error", args)
 		}
 	}
@@ -617,7 +622,7 @@ func TestInvalidSpecIsRejected(t *testing.T) {
 				t.Fatalf("%s has no %q", tt.file, tt.old)
 			}
 			writeFile(t, root, tt.file, changed)
-			_, err = run([]string{"check", "--root", root, "--only", "words"}, io.Discard)
+			_, err = run([]string{"check", "--root", root, "--only", "words"}, strings.NewReader(""), io.Discard)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want %q", err, tt.want)
 			}
@@ -630,7 +635,7 @@ func TestRepositoryRegistryLoads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := loadWords(filepath.Join("../..", loaded.Words.Registry)); err != nil {
+	if _, err := loadWords(loaded.Words, "../.."); err != nil {
 		t.Fatal(err)
 	}
 }
