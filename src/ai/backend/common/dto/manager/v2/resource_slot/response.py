@@ -68,6 +68,9 @@ class ResourceSlotTypeNode(BaseResponseModel):
         description="Number formatting rules (binary vs decimal prefix, rounding)."
     )
     rank: int = Field(description="Display ordering rank. Lower values appear first.")
+    sealed_launch: bool = Field(
+        description="Whether a kernel holding this slot must be launched sealed or fail."
+    )
 
 
 class AdminSearchResourceSlotTypesPayload(BaseResponseModel):

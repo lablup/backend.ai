@@ -116,6 +116,13 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
+    sealed_launch: Mapped[bool] = mapped_column(
+        "sealed_launch",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
 
 
 class AgentResourceRow(LifecycleTimestampsMixin, Base):

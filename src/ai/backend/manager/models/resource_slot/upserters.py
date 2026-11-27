@@ -101,6 +101,7 @@ class ResourceSlotTypeUpserter(
     display_icon: str
     number_format: NumberFormat
     rank: int
+    sealed_launch: bool
 
     @override
     def entity_id(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeUUID:
@@ -139,6 +140,7 @@ class ResourceSlotTypeUpserter(
             "display_icon": self.display_icon,
             "number_format": self.number_format,
             "rank": self.rank,
+            "sealed_launch": self.sealed_launch,
         }
 
     @override
