@@ -24,6 +24,10 @@ const (
 	Korean  = "ko"
 )
 
+// Hangul is a value of documents.language: a line with a Hangul syllable is Korean, the other
+// lines are English.
+const Hangul = "hangul"
+
 // The kinds of a frontmatter field.
 const (
 	KindString     = "string"
@@ -50,20 +54,27 @@ func (p *Pattern) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// Spec is doclint.yaml. A field without the `optional` tag must have a value.
+// Spec is doclint.yaml. A field without a `spec` tag must have a value. A field tagged `optional`
+// may be absent, and its content is not checked. A field tagged `part` may be absent, and when
+// present its content is checked.
 type Spec struct {
-	Documents Documents `yaml:"documents"`
-	Agents    Agents    `yaml:"agents"`
-	BEP       BEP       `yaml:"bep"`
-	Knowledge Knowledge `yaml:"knowledge"`
-	Pairs     Pairs     `yaml:"pairs"`
-	Words     Words     `yaml:"words"`
+	Documents *Documents `yaml:"documents,omitempty" spec:"part"`
+	Agents    *Agents    `yaml:"agents,omitempty" spec:"part"`
+	BEP       *BEP       `yaml:"bep,omitempty" spec:"part"`
+	Knowledge *Knowledge `yaml:"knowledge,omitempty" spec:"part"`
+	Pairs     *Pairs     `yaml:"pairs,omitempty" spec:"part"`
+	Words     *Words     `yaml:"words,omitempty" spec:"part"`
+
+	// Dir is the directory of the spec file, the base of the file paths in it.
+	Dir string `yaml:"-" spec:"optional"`
 }
 
-// Documents names the document files.
+// Documents names the document files. Language is the language of a document without the
+// translation suffix: en (default), ko or hangul.
 type Documents struct {
 	Extension         string `yaml:"extension"`
 	TranslationSuffix string `yaml:"translation_suffix"`
+	Language          string `yaml:"language,omitempty" spec:"optional"`
 }
 
 // Agents is the criteria of the rule documents.
@@ -148,19 +159,38 @@ type Pairs struct {
 	TranslationCharacters Pattern `yaml:"translation_characters"`
 }
 
-// Words is the criteria of the words check.
+// Words is the criteria of the words check. Registry stands for `rules: [<registry>/rules.yaml]`
+// and `terms: <registry>/terms`, so it excludes both. Rules lists the rule files and Terms is
+// the directory of the term files; the paths are relative to the spec file. Sets selects the
+// rule sets to use; without it every rule applies.
 type Words struct {
-	Registry     string    `yaml:"registry"`
+	Registry     string    `yaml:"registry,omitempty" spec:"optional"`
+	Rules        []string  `yaml:"rules,omitempty" spec:"optional"`
+	Terms        string    `yaml:"terms,omitempty" spec:"optional"`
+	Sets         []string  `yaml:"sets,omitempty" spec:"optional"`
 	SkippedPaths []Pattern `yaml:"skipped_paths"`
+}
+
+// RulePaths returns the rule files and the term directory, relative to the spec file.
+func (w *Words) RulePaths() (rules []string, terms string) {
+	if w.Registry != "" {
+		return []string{filepath.Join(w.Registry, "rules.yaml")}, filepath.Join(w.Registry, "terms")
+	}
+	return w.Rules, w.Terms
 }
 
 // Load reads and validates the spec at the root.
 func Load(root string) (*Spec, error) {
-	path := filepath.Join(root, FileName)
+	return LoadFile(filepath.Join(root, FileName))
+}
+
+// LoadFile reads and validates the spec file.
+func LoadFile(path string) (*Spec, error) {
 	var loaded Spec
 	if err := Decode(path, &loaded); err != nil {
 		return nil, err
 	}
+	loaded.Dir = filepath.Dir(path)
 	if err := loaded.validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
@@ -227,7 +257,7 @@ func required(value reflect.Value, at string) error {
 			field := value.Type().Field(i)
 			name, _, _ := strings.Cut(field.Tag.Get("yaml"), ",")
 			path := strings.TrimPrefix(at+"."+name, ".")
-			if field.Tag.Get("spec") == "optional" {
+			if tag := field.Tag.Get("spec"); tag == "optional" || tag == "part" && value.Field(i).IsZero() {
 				continue
 			}
 			if err := required(value.Field(i), path); err != nil {
@@ -269,15 +299,38 @@ func (k *Knowledge) Field(name string) (Field, bool) {
 }
 
 func (s *Spec) validate() error {
-	for _, lang := range []string{English, Korean} {
-		if s.BEP.MaxItemChars[lang] <= 0 {
-			return fmt.Errorf("missing value bep.max_item_chars.%s", lang)
+	if d := s.Documents; d != nil && !slices.Contains([]string{"", English, Korean, Hangul}, d.Language) {
+		return fmt.Errorf("documents.language: unknown language %q, want %s, %s or %s", d.Language, English, Korean, Hangul)
+	}
+	if s.BEP != nil {
+		for _, lang := range []string{English, Korean} {
+			if s.BEP.MaxItemChars[lang] <= 0 {
+				return fmt.Errorf("missing value bep.max_item_chars.%s", lang)
+			}
+		}
+		if s.BEP.Path.NumSubexp() < 1 {
+			return fmt.Errorf("bep.path needs a group for the number")
 		}
 	}
-	if s.BEP.Path.NumSubexp() < 1 {
-		return fmt.Errorf("bep.path needs a group for the number")
+	if s.Words != nil {
+		if err := s.Words.validate(); err != nil {
+			return err
+		}
 	}
-	return s.Knowledge.validate()
+	if s.Knowledge != nil {
+		return s.Knowledge.validate()
+	}
+	return nil
+}
+
+func (w *Words) validate() error {
+	switch {
+	case w.Registry != "" && (len(w.Rules) > 0 || w.Terms != ""):
+		return fmt.Errorf("words.registry cannot be used with words.rules or words.terms")
+	case w.Registry == "" && len(w.Rules) == 0:
+		return fmt.Errorf("words needs registry, or rules")
+	}
+	return nil
 }
 
 func (k *Knowledge) validate() error {

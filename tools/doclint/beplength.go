@@ -119,7 +119,7 @@ func newBEPChecker(loaded *spec.Spec) bepChecker {
 		quoted[i] = regexp.QuoteMeta(word)
 	}
 	return bepChecker{
-		limits:       loaded.BEP,
+		limits:       *loaded.BEP,
 		translation:  loaded.Documents.TranslationSuffix,
 		abbreviation: regexp.MustCompile(`(?i)\b(?:` + strings.Join(quoted, "|") + `)\.`),
 	}

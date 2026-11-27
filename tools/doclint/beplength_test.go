@@ -57,7 +57,7 @@ func TestBEPPaths(t *testing.T) {
 	} {
 		writeFile(t, root, rel, "x\n")
 	}
-	sc, err := newScope(root, "", nil)
+	sc, err := newScope(root, "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

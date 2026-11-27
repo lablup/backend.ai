@@ -21,7 +21,14 @@ type scope struct {
 	files  []string
 	// allowOneSide turns a change to one document of a pair into a review line.
 	allowOneSide bool
+	// specFile is the spec file, for the messages.
+	specFile string
+	// stdin is the text of the standard input: the only document of a --stdin run.
+	stdin *string
 }
+
+// stdinName is the path of the standard input in a result.
+const stdinName = "<stdin>"
 
 // report collects the output. A failure makes the run exit 1; a review line does not.
 type report struct {
@@ -38,16 +45,20 @@ func (r *report) review(line string) {
 	_, _ = fmt.Fprintln(r.w, "review: "+line)
 }
 
-func newScope(root, base string, args []string) (*scope, error) {
+// newScope reads the spec: the file named by specPath, else doclint.yaml at the root.
+func newScope(root, specPath, base string, args []string) (*scope, error) {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
-	loaded, err := spec.Load(root)
+	if specPath == "" {
+		specPath = filepath.Join(root, spec.FileName)
+	}
+	loaded, err := spec.LoadFile(specPath)
 	if err != nil {
 		return nil, err
 	}
-	sc := &scope{spec: loaded, root: root, base: base}
+	sc := &scope{spec: loaded, root: root, base: base, specFile: specPath}
 	for _, arg := range args {
 		path := arg
 		if filepath.IsAbs(path) {
@@ -77,6 +88,9 @@ func (s *scope) diffRange() string {
 
 // read returns a document: the staged content in a staged run when the index has it.
 func (s *scope) read(rel string) ([]byte, error) {
+	if s.stdin != nil && rel == stdinName {
+		return []byte(*s.stdin), nil
+	}
 	if s.staged && s.inIndex(rel) {
 		out, err := git(s.root, "show", ":./"+rel)
 		return []byte(out), err

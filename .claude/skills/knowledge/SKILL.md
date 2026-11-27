@@ -115,7 +115,8 @@ The criteria are in `doclint.yaml`. `go run ./tools/doclint check` runs five che
 registry rejects, in added lines), `bep-length` and `agents-lines`. `--only <check>`
 picks one, and file arguments check whole files. The `build` job of `ci.yml` runs
 it on pull requests. For a wording fix to one document of a pair, label the pull request
-`allow:one-side-doc`: CI then passes `--allow-one-side`.
+`allow:one-side-doc`: CI then passes `--allow-one-side`. `--spec <file>` reads another spec; the
+`writing` skill lists its keys. `go run ./tools/knowledge` needs the `knowledge` part in the spec.
 
 ## What goes where
 

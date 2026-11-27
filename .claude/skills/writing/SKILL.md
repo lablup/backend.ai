@@ -87,6 +87,20 @@ go run ./tools/doclint check --base origin/v2    # the lines the branch adds
 - The `build` job of `ci.yml` and pre-commit (`--staged`) run the same check.
 - A `review:` line is not a failure. The word has other valid meanings, so decide by context.
 - The criteria (line counts, BEP limits, frontmatter) are in `doclint.yaml`, the words to avoid in `glossary/registry/`. Add an entry there to reject a new word.
+- To check against another spec, pass `--spec <file>`. The file paths in it (`words.registry`, `rules`, `terms`) are relative to the spec file; the path patterns are matched against the path from `--root`.
+- To check a text that is not a file, pipe it: `echo "<text>" | go run ./tools/doclint check --spec <file> --stdin`. It runs the `words` check only, names the text `<stdin>` and takes no files, `--base` or `--staged`.
+
+#### The spec
+
+| Key | Meaning |
+|---|---|
+| `documents`, `agents`, `bep`, `knowledge`, `pairs`, `words` | Each part is optional. A check runs when its part is present; `--only` for a missing part is an error. `documents` is required by every check except `--stdin` |
+| `documents.language` | The language of a document without the translation suffix: `en` (default), `ko`, or `hangul` (a line with a Hangul syllable follows the Korean rules) |
+| `words.registry` | Stands for `rules: [<registry>/rules.yaml]` and `terms: <registry>/terms`. Do not use it with `rules` or `terms` |
+| `words.rules`, `words.terms` | The rule files, read in path order, and the directory of the term files. The same expression in two files is an error; `korean` and `english` are in exactly one file |
+| `sets` in a rule file | `[{name, description, skipped_paths}]`: the rule sets. An expression names its sets with `sets`; without it the expression applies everywhere |
+| `words.sets` | The sets to use. Without it every rule applies. A path matching `skipped_paths` of a set is not checked with that set's rules |
+| `pattern` in an expression | A Go regular expression matched against the line as it is, instead of `word`. Write exactly one of `word` and `pattern` |
 
 ### 3. Items a person checks
 
