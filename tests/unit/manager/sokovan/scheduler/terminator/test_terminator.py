@@ -9,8 +9,12 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
@@ -163,6 +167,40 @@ class TestSessionTerminatorTermination:
         assert call_args[0][0] == kernel.kernel_id
         assert call_args[0][1] == terminating_session_single_kernel.session_id
         assert call_args[0][2] == terminating_session_single_kernel.status_info
+
+    @pytest.mark.parametrize(
+        ("status_info", "agent_reason"),
+        [
+            (
+                KernelLifecycleEventReason.ADMIN_TERMINATED,
+                KernelLifecycleEventReason.USER_REQUESTED,
+            ),
+            (
+                KernelLifecycleEventReason.ADMIN_FORCE_TERMINATED,
+                KernelLifecycleEventReason.FORCE_TERMINATED,
+            ),
+        ],
+        ids=["admin", "admin_forced"],
+    )
+    async def test_the_agent_is_sent_the_reason_it_knows_for_an_admin_termination(
+        self,
+        terminator: SessionTerminator,
+        mock_agent_client_pool: MagicMock,
+        terminating_session_single_kernel: TerminatingSessionData,
+        status_info: KernelLifecycleEventReason,
+        agent_reason: KernelLifecycleEventReason,
+    ) -> None:
+        """SC-TE-015: An admin termination reaches the agent as the reason it knows.
+
+        Given: Session terminated with an admin reason
+        When: Terminate session
+        Then: destroy_kernel called with the matching user or forced reason
+        """
+        session = replace(terminating_session_single_kernel, status_info=status_info)
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await terminator.terminate_sessions_for_handler([session])
+
+        assert mock_agent_client_pool._mock_client.destroy_kernel.call_args[0][2] == agent_reason
 
     async def test_mixed_agent_assignment_handles_both(
         self,

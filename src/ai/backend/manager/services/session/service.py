@@ -20,6 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.contexts.user import triggered_user
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -255,6 +256,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -805,18 +807,7 @@ class SessionService:
             recursive=recursive,
         )
 
-        # Determine termination reason based on forced flag
-        if forced:
-            reason = KernelLifecycleEventReason.FORCE_TERMINATED
-        else:
-            reason = KernelLifecycleEventReason.USER_REQUESTED
-
-        # Mark sessions for termination
-        mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-            session_ids,
-            reason=reason,
-            forced=forced,
-        )
+        mark_result = await self._mark_sessions_for_termination(session_ids, forced=forced)
 
         # Build stats for response - prioritize cancelled over terminating/force-terminated
         if mark_result.cancelled_sessions:
@@ -834,13 +825,8 @@ class SessionService:
         self, action: TerminateSessionsAction
     ) -> PartialBulkResult[SessionTerminationStatus]:
         """Terminate multiple sessions by their IDs."""
-        reason = (
-            KernelLifecycleEventReason.FORCE_TERMINATED
-            if action.forced
-            else KernelLifecycleEventReason.USER_REQUESTED
-        )
-        mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-            action.session_ids, reason=reason, forced=action.forced
+        mark_result = await self._mark_sessions_for_termination(
+            action.session_ids, forced=action.forced
         )
         # The controller answers in four buckets; the bulk shape answers per session,
         # so the state each one ended in becomes that session's value.
@@ -862,6 +848,53 @@ class SessionService:
                 for entity_id in action.entity_ids()
                 if (state := states.get(entity_id)) is not None
             ]
+        )
+
+    async def _mark_sessions_for_termination(
+        self,
+        session_ids: list[SessionId],
+        *,
+        forced: bool,
+    ) -> MarkTerminatingResult:
+        # The caller decides, not the impersonated user: a session the caller does not own
+        # gets the admin reason.
+        caller = triggered_user()
+        owner_ids = await self._session_repository.batch_get_owner_id_by_session(session_ids)
+        not_owned = {
+            session_id
+            for session_id, owner_id in owner_ids.items()
+            if caller is not None and owner_id != caller.user_id
+        }
+        owner_targets = [sid for sid in session_ids if sid not in not_owned]
+        admin_targets = [sid for sid in session_ids if sid in not_owned]
+
+        # Determine termination reasons based on forced flag
+        if forced:
+            owner_reason = KernelLifecycleEventReason.FORCE_TERMINATED
+            admin_reason = KernelLifecycleEventReason.ADMIN_FORCE_TERMINATED
+        else:
+            owner_reason = KernelLifecycleEventReason.USER_REQUESTED
+            admin_reason = KernelLifecycleEventReason.ADMIN_TERMINATED
+
+        results: list[MarkTerminatingResult] = []
+        for target_ids, reason in (
+            (owner_targets, owner_reason),
+            (admin_targets, admin_reason),
+        ):
+            if target_ids:
+                results.append(
+                    await self._scheduling_controller.mark_sessions_for_termination(
+                        target_ids,
+                        reason=reason,
+                        forced=forced,
+                    )
+                )
+        return MarkTerminatingResult(
+            cancelled_sessions=[sid for r in results for sid in r.cancelled_sessions],
+            terminating_sessions=[sid for r in results for sid in r.terminating_sessions],
+            force_terminated_sessions=[sid for r in results for sid in r.force_terminated_sessions],
+            skipped_sessions=[sid for r in results for sid in r.skipped_sessions],
+            transitions=[t for r in results for t in r.transitions],
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:

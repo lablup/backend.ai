@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.container_registry import (
 )
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -260,6 +261,14 @@ class SessionRepository:
         :return: List of session IDs
         """
         return await self._db_source.get_target_session_ids(session_id, recursive)
+
+    @session_repository_resilience.apply()
+    async def batch_get_owner_id_by_session(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, UserID]:
+        """Read the user id owning each session; one not found is absent."""
+        return await self._db_source.batch_get_owner_id_by_session(session_ids)
 
     @session_repository_resilience.apply()
     async def find_dependency_sessions(

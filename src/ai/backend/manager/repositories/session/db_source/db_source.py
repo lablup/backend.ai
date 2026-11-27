@@ -12,7 +12,12 @@ from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -622,6 +627,33 @@ class SessionDBSource:
                 session_ids = [session.id]
 
             return session_ids
+
+    async def batch_get_owner_id_by_session(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, UserID]:
+        """Read the user id owning each session; one not found is absent."""
+        if not session_ids:
+            return {}
+        fields = SessionSearchableFields.own
+        async with self._ops_provider.read_ops() as r:
+            sessions = (
+                await r.search_in_global(
+                    SessionSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            fields.id.filter.in_(
+                                UUIDInMatchSpec(values=list(session_ids), negated=False)
+                            )
+                        ],
+                    )
+                )
+            ).items
+        return {
+            SessionId(session.id): UserID(session.user_uuid)
+            for session in sessions
+            if session.user_uuid is not None
+        }
 
     async def find_dependency_sessions(
         self,
