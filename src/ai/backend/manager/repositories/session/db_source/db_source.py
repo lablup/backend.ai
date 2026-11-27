@@ -12,6 +12,7 @@ from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -630,7 +631,7 @@ class SessionDBSource:
     async def batch_get_owner_id_by_session(
         self,
         session_ids: Sequence[SessionId],
-    ) -> dict[SessionId, uuid.UUID]:
+    ) -> dict[SessionId, UserID]:
         """Read the user id owning each session; one not found is absent."""
         if not session_ids:
             return {}
@@ -649,7 +650,7 @@ class SessionDBSource:
                 )
             ).items
         return {
-            SessionId(session.id): session.user_uuid
+            SessionId(session.id): UserID(session.user_uuid)
             for session in sessions
             if session.user_uuid is not None
         }
