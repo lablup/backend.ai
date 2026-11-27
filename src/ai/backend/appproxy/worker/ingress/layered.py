@@ -36,13 +36,14 @@ class LayeredIngressState(IngressReader):
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
         try:
             for layer in self._layers:
-                ingress = await layer.get(frontend_key)
-                if ingress is None:
-                    continue
-                if self._in_memory is not None and layer is not self._in_memory:
-                    # Cache another layer's hit in memory so the next read stops at memory.
-                    await self._in_memory.apply([ingress])
-                return ingress
+                if self._in_memory is None or layer is self._in_memory:
+                    ingress = await layer.get(frontend_key)
+                else:
+                    ingress = await self._read_layer_into_memory(
+                        layer, self._in_memory, frontend_key
+                    )
+                if ingress is not None:
+                    return ingress
             # Requests keep reaching a key that is gone and no longer remembered; surface it.
             raise IngressNotRegisteredError(f"no layer holds frontend {frontend_key}")
         except IngressNotFoundError:
@@ -52,3 +53,21 @@ class LayeredIngressState(IngressReader):
     @override
     async def get_all(self) -> list[Ingress]:
         return await self._layers[-1].get_all()
+
+    async def _read_layer_into_memory(
+        self,
+        layer: IngressReader,
+        in_memory: InMemoryIngressState,
+        frontend_key: IngressFrontendKey,
+    ) -> Ingress | None:
+        # The in-memory layer's invalidate takes the same lock, so it cannot land between this read
+        # and the write of what it read; one that arrives meanwhile drops the written hit after it.
+        async with in_memory.key_lock(frontend_key):
+            # A read that held the lock before may have filled memory with the key already.
+            held_ingress = await in_memory.get(frontend_key)
+            if held_ingress is not None:
+                return held_ingress
+            ingress = await layer.get(frontend_key)
+            if ingress is not None:
+                await in_memory.apply([ingress])
+            return ingress

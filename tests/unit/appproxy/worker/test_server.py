@@ -14,6 +14,7 @@ from aiohttp import web
 
 from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
+    AppProxyIngressInvalidatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -23,12 +24,16 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
 )
 from ai.backend.appproxy.worker import server
+from ai.backend.appproxy.worker.config import IngressLayerType
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.validating import ValidatingIngressWriter
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.h2.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, IngressFrontendKey
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressAuthority,
+    IngressFrontendKey,
+)
 from ai.backend.common.types import AgentId
 
 _WORKER_AUTHORITY = "worker-1"
@@ -43,6 +48,12 @@ class _CircuitAccessCase:
     open_to_public: bool
     allowed_client_ips: str | None
     expected_ingress_keys: list[IngressFrontendKey]
+
+
+@dataclass(frozen=True)
+class _IngressLayersCase:
+    layers: list[IngressLayerType]
+    subscribes_to_invalidation: bool
 
 
 @dataclass(frozen=True)
@@ -272,3 +283,38 @@ async def test_server_main_opens_aiomonitor_on_localhost(monitor_start: MagicMoc
     monitor_start.assert_called_once()
     monitor: aiomonitor.Monitor = monitor_start.call_args.args[0]
     assert monitor.host == "127.0.0.1"
+
+
+class TestEventHandlerCtx:
+    @pytest.fixture
+    def root_context_reading_the_ingress_layers(self, case: _IngressLayersCase) -> MagicMock:
+        root_context = MagicMock()
+        root_context.local_config.proxy_worker.ingress.layers = case.layers
+        return root_context
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _IngressLayersCase(
+                layers=[IngressLayerType.IN_MEMORY, IngressLayerType.REDIS],
+                subscribes_to_invalidation=True,
+            ),
+            _IngressLayersCase(
+                layers=[IngressLayerType.IN_MEMORY], subscribes_to_invalidation=False
+            ),
+            _IngressLayersCase(layers=[IngressLayerType.REDIS], subscribes_to_invalidation=False),
+        ],
+        ids=lambda case: "+".join(layer.value for layer in case.layers),
+    )
+    async def test_subscribes_to_ingress_invalidation_only_with_redis_after_in_memory(
+        self, case: _IngressLayersCase, root_context_reading_the_ingress_layers: MagicMock
+    ) -> None:
+        async with server.event_handler_ctx(root_context_reading_the_ingress_layers):
+            subscribed_events = [
+                call.args[0]
+                for call in root_context_reading_the_ingress_layers.event_dispatcher.subscribe.call_args_list
+            ]
+
+        assert (
+            AppProxyIngressInvalidatedEvent in subscribed_events
+        ) == case.subscribes_to_invalidation

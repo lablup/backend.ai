@@ -7,6 +7,7 @@ import pytest
 from ai.backend.appproxy.worker.config import IngressConfig
 from ai.backend.appproxy.worker.ingress.factory import IngressState, IngressStateFactory
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
+from ai.backend.appproxy.worker.ingress.invalidating import InvalidatingIngressWriter
 from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
 from ai.backend.appproxy.worker.ingress.validating import ValidatingIngressWriter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -38,8 +39,10 @@ class TestIngressStateFactory:
         assert isinstance(in_memory, InMemoryIngressState)
         assert isinstance(redis, RedisIngressState)
         assert isinstance(state.writer, ValidatingIngressWriter)
+        assert isinstance(state.invalidating_writer, InvalidatingIngressWriter)
 
     def test_redis_only_has_no_writer(self, valkey_client: ValkeyLiveClient) -> None:
         state = _create("redis", ["redis"], valkey_client)
         assert [type(layer) for layer in state.reader.layers] == [RedisIngressState]
         assert state.writer is None
+        assert state.invalidating_writer is None

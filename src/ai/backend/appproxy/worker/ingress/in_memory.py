@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import math
 from collections.abc import Sequence
 from time import monotonic
 from typing import override
+from weakref import WeakValueDictionary
 
 from cachetools import TTLCache
 
@@ -22,6 +24,7 @@ class InMemoryIngressState(IngressReader, IngressWriter):
     _ingresses: TTLCache[IngressFrontendKey, Ingress]
     # get raises IngressNotFoundError for these keys so the layered read skips the later layers.
     _missing_keys: TTLCache[IngressFrontendKey, bool]
+    _key_locks: WeakValueDictionary[IngressFrontendKey, asyncio.Lock]
 
     def __init__(self, ttl: float | None = None, negative_ttl: float | None = None) -> None:
         self._negative_ttl = negative_ttl
@@ -33,6 +36,7 @@ class InMemoryIngressState(IngressReader, IngressWriter):
             ttl=negative_ttl if negative_ttl is not None else math.inf,
             timer=monotonic,
         )
+        self._key_locks = WeakValueDictionary()
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
@@ -68,6 +72,24 @@ class InMemoryIngressState(IngressReader, IngressWriter):
         if self._negative_ttl is None:
             return
         self._missing_keys[frontend_key] = True
+
+    async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
+        """Unlike remove, an invalidated key is read from the later layers again.
+
+        A key is dropped under its key_lock, after a read of a later layer holding the lock.
+        """
+        for frontend_key in frontend_keys:
+            async with self.key_lock(frontend_key):
+                self._ingresses.pop(frontend_key, None)
+                self._missing_keys.pop(frontend_key, None)
+
+    def key_lock(self, frontend_key: IngressFrontendKey) -> asyncio.Lock:
+        """Held by invalidate and by a read of a later layer until it stores the hit of the key."""
+        lock = self._key_locks.get(frontend_key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._key_locks[frontend_key] = lock
+        return lock
 
     @override
     async def replace_all(self, ingresses: Sequence[Ingress]) -> None:
