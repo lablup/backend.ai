@@ -38,7 +38,8 @@ async def _config(arguments: str) -> dict[str, Any]:
     result = await _SCHEMA.execute(f"{{ appConfigs {{ config{arguments} }} }}")
     assert result.errors is None
     assert result.data is not None
-    return result.data["appConfigs"][0]["config"]
+    config: dict[str, Any] = result.data["appConfigs"][0]["config"]
+    return config
 
 
 class TestConfigKeys:

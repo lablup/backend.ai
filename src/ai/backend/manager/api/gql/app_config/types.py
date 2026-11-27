@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import strawberry
 from strawberry.federation.schema_directives import Shareable
@@ -63,5 +63,5 @@ class AppConfigGQL(PydanticOutputMixin[AppConfigNode]):
     ) -> JSON:
         merged = self._original_model.config
         if keys is None:
-            return merged
-        return {key: merged[key] for key in keys if key in merged}
+            return cast(JSON, merged)
+        return cast(JSON, {key: merged[key] for key in keys if key in merged})
